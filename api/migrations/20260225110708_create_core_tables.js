@@ -1,0 +1,122 @@
+exports.up = async function (knex) {
+  await knex.raw('CREATE EXTENSION IF NOT EXISTS pgcrypto');
+
+  await knex.schema.createTable('tenants', (table) => {
+    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
+    table.string('name', 255).notNullable();
+    table.string('slug', 100).notNullable().unique();
+    table.string('api_key', 255).notNullable().unique();
+    table.string('api_key_hash', 255).notNullable();
+    table.string('primary_color', 7).defaultTo('#1B4D7A');
+    table.string('secondary_color', 7).defaultTo('#E8A832');
+    table.string('accent_color', 7).defaultTo('#FFFFFF');
+    table.string('font_family', 100).defaultTo('System');
+    table.text('logo_url');
+    table.text('icon_url');
+    table.boolean('feature_subscriptions').defaultTo(true);
+    table.boolean('feature_loyalty').defaultTo(false);
+    table.boolean('feature_referrals').defaultTo(false);
+    table.boolean('feature_water_care').defaultTo(true);
+    table.boolean('feature_service_scheduling').defaultTo(true);
+    table.boolean('feature_seasonal_timeline').defaultTo(true);
+    table.string('pos_type', 50);
+    table.string('shopify_store_url', 255);
+    table.text('shopify_storefront_token');
+    table.text('shopify_admin_token');
+    table.string('lightspeed_client_id', 255);
+    table.text('lightspeed_client_secret');
+    table.text('lightspeed_access_token');
+    table.text('lightspeed_refresh_token');
+    table.string('lightspeed_domain_prefix', 255);
+    table.string('fulfillment_mode', 20).defaultTo('self');
+    table.timestamp('last_product_sync_at');
+    table.integer('product_sync_interval_minutes').defaultTo(30);
+    table.string('status', 20).defaultTo('onboarding');
+    table.date('contract_start_date');
+    table.date('contract_end_date');
+    table.timestamp('created_at').defaultTo(knex.fn.now());
+    table.timestamp('updated_at').defaultTo(knex.fn.now());
+  });
+
+  await knex.schema.createTable('users', (table) => {
+    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
+    table.uuid('tenant_id').notNullable().references('id').inTable('tenants').onDelete('CASCADE');
+    table.string('firebase_uid', 255).notNullable();
+    table.string('email', 255).notNullable();
+    table.string('first_name', 100);
+    table.string('last_name', 100);
+    table.string('phone', 20);
+    table.string('address_line1', 255);
+    table.string('address_line2', 255);
+    table.string('city', 100);
+    table.string('state', 50);
+    table.string('zip_code', 20);
+    table.string('country', 50).defaultTo('US');
+    table.string('role', 20).defaultTo('customer');
+    table.boolean('notification_pref_maintenance').defaultTo(true);
+    table.boolean('notification_pref_orders').defaultTo(true);
+    table.boolean('notification_pref_subscriptions').defaultTo(true);
+    table.boolean('notification_pref_service').defaultTo(true);
+    table.boolean('notification_pref_promotional').defaultTo(true);
+    table.boolean('share_water_tests_with_retailer').defaultTo(false);
+    table.text('fcm_token');
+    table.timestamp('fcm_token_updated_at');
+    table.timestamp('created_at').defaultTo(knex.fn.now());
+    table.timestamp('updated_at').defaultTo(knex.fn.now());
+    table.unique(['tenant_id', 'email']);
+    table.unique(['tenant_id', 'firebase_uid']);
+  });
+  await knex.schema.raw('CREATE INDEX idx_users_tenant ON users(tenant_id)');
+  await knex.schema.raw('CREATE INDEX idx_users_firebase ON users(firebase_uid)');
+  await knex.schema.raw('CREATE INDEX idx_users_email ON users(tenant_id, email)');
+
+  await knex.schema.createTable('spa_profiles', (table) => {
+    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
+    table.uuid('user_id').notNullable().references('id').inTable('users').onDelete('CASCADE');
+    table.uuid('tenant_id').notNullable().references('id').inTable('tenants').onDelete('CASCADE');
+    table.string('brand', 100).notNullable();
+    table.string('model_line', 100).notNullable();
+    table.string('model', 100).notNullable();
+    table.integer('year').notNullable();
+    table.string('serial_number', 100);
+    table.string('nickname', 100);
+    table.string('sanitization_system', 20).notNullable();
+    table.specificType('usage_months', 'INTEGER[]').defaultTo(knex.raw("'{1,2,3,4,5,6,7,8,9,10,11,12}'"));
+    table.uuid('uhtd_spa_model_id');
+    table.date('purchase_date');
+    table.date('warranty_expiration_date');
+    table.date('last_filter_change');
+    table.timestamp('last_water_test_at');
+    table.boolean('is_primary').defaultTo(false);
+    table.timestamp('created_at').defaultTo(knex.fn.now());
+    table.timestamp('updated_at').defaultTo(knex.fn.now());
+  });
+  await knex.schema.raw('CREATE INDEX idx_spa_profiles_user ON spa_profiles(user_id)');
+  await knex.schema.raw('CREATE INDEX idx_spa_profiles_tenant ON spa_profiles(tenant_id)');
+
+  await knex.schema.createTable('admin_roles', (table) => {
+    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
+    table.uuid('tenant_id').notNullable().references('id').inTable('tenants').onDelete('CASCADE');
+    table.uuid('user_id').notNullable().references('id').inTable('users').onDelete('CASCADE');
+    table.string('role', 20).notNullable();
+    table.boolean('can_view_customers').defaultTo(false);
+    table.boolean('can_view_orders').defaultTo(false);
+    table.boolean('can_manage_products').defaultTo(false);
+    table.boolean('can_manage_content').defaultTo(false);
+    table.boolean('can_manage_service_requests').defaultTo(false);
+    table.boolean('can_send_notifications').defaultTo(false);
+    table.boolean('can_view_analytics').defaultTo(false);
+    table.boolean('can_manage_subscriptions').defaultTo(false);
+    table.boolean('can_manage_settings').defaultTo(false);
+    table.timestamp('created_at').defaultTo(knex.fn.now());
+    table.timestamp('updated_at').defaultTo(knex.fn.now());
+    table.unique(['tenant_id', 'user_id']);
+  });
+};
+
+exports.down = async function (knex) {
+  await knex.schema.dropTableIfExists('admin_roles');
+  await knex.schema.dropTableIfExists('spa_profiles');
+  await knex.schema.dropTableIfExists('users');
+  await knex.schema.dropTableIfExists('tenants');
+};
