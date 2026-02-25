@@ -1,0 +1,8 @@
+{
+  "name": "hot-tub-companion",
+  "private": true,
+  "description": "Monorepo root - dashboard deploys via vercel.json",
+  "dependencies": {
+    "next": "16.1.6"
+  }
+}
