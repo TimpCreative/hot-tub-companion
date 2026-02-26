@@ -62,18 +62,17 @@ After seeding, the console logs the Take A Break tenant `api_key`. Copy it for m
 
 ### 4. Mobile
 
-1. Edit `mobile/tenants/takeabreak/config.env`:
+1. Create `mobile/tenants/takeabreak/config.env` from the example (config.env is gitignored):
 
-   ```
-   TENANT=takeabreak
-   API_URL=https://api.hottubcompanion.com
-   TENANT_API_KEY=<api_key from seed output>
-   FIREBASE_API_KEY=...
-   FIREBASE_AUTH_DOMAIN=...
-   FIREBASE_PROJECT_ID=...
+   ```bash
+   cp mobile/tenants/takeabreak/config.env.example mobile/tenants/takeabreak/config.env
    ```
 
-2. Run:
+   Then fill in real values (API key from seed output, Firebase keys from Firebase Console).
+
+2. Create `mobile/.env` with `TENANT=takeabreak` (or set when running).
+
+3. Run:
 
 ```bash
 cd mobile

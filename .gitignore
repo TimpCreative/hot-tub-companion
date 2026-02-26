@@ -1,2 +1,6 @@
 # Debug / logs
 DebugLogger.txt
+
+# Mobile tenant config (contains API keys - use config.env.example as template)
+mobile/tenants/*/config.env
+mobile/.env
