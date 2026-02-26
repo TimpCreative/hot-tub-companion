@@ -87,7 +87,7 @@ async function proxy(
   const res = await fetch(url.toString(), {
     method,
     headers,
-    body: ['GET', 'HEAD'].includes(method) ? undefined : request.body,
+    body: ['GET', 'HEAD'].includes(method) ? undefined : await request.text(),
   });
 
   const data = await res.text();
