@@ -9,6 +9,9 @@ import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
+// Required when behind a reverse proxy (Railway, etc.) so express-rate-limit can use X-Forwarded-For
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(morgan('combined'));
 app.use(compression());

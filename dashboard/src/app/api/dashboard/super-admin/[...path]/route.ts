@@ -45,7 +45,23 @@ async function proxy(
   request: NextRequest,
   params: Promise<{ path: string[] }>,
   method: string
-) {
+): Promise<NextResponse> {
+  try {
+    return await doProxy(request, params, method);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Proxy error';
+    return NextResponse.json(
+      { success: false, error: { code: 'PROXY_ERROR', message: msg } },
+      { status: 500 }
+    );
+  }
+}
+
+async function doProxy(
+  request: NextRequest,
+  params: Promise<{ path: string[] }>,
+  method: string
+): Promise<NextResponse> {
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     return NextResponse.json(
@@ -76,6 +92,28 @@ async function proxy(
     });
 
     const data = await res.text();
+
+    // For 5xx, ensure we return JSON with a helpful message for debugging
+    if (res.status >= 500) {
+      let parsed: { error?: { message?: string } } = {};
+      try {
+        parsed = JSON.parse(data) as { error?: { message?: string } };
+      } catch {
+        parsed = { error: { message: data.slice(0, 200) || `API returned ${res.status}` } };
+      }
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'API_ERROR',
+            message: parsed.error?.message ?? `API returned ${res.status}`,
+            status: res.status,
+          },
+        },
+        { status: res.status }
+      );
+    }
+
     return new NextResponse(data, {
       status: res.status,
       headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' },

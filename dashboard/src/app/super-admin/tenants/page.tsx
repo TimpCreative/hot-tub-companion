@@ -32,9 +32,10 @@ export default function SuperAdminTenantsPage() {
         const res = await api.get('/tenants') as { data?: { tenants?: Tenant[] } };
         setTenants(res.data?.tenants || []);
       } catch (err: unknown) {
-        const e = err && typeof err === 'object' ? (err as { error?: { message?: string }; message?: string }) : {};
+        const e = err && typeof err === 'object' ? (err as { error?: { message?: string; status?: number }; message?: string }) : {};
         const msg = e.error?.message ?? e.message ?? 'Failed to load tenants';
-        setError(msg);
+        const status = e.error?.status;
+        setError(status ? `${msg} (${status})` : msg);
       } finally {
         setLoading(false);
       }
