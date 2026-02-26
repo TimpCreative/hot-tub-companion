@@ -106,20 +106,24 @@ async function doProxy(
 
     const data = await res.text();
 
-    // For 5xx, ensure we return JSON with a helpful message for debugging
-    if (res.status >= 500) {
-      let parsed: { error?: { message?: string } } = {};
+    // For 4xx/5xx, ensure we return JSON with a helpful message for debugging
+    if (res.status >= 400) {
+      let parsed: { error?: { message?: string }; message?: string } = {};
       try {
-        parsed = JSON.parse(data) as { error?: { message?: string } };
+        parsed = JSON.parse(data) as { error?: { message?: string }; message?: string };
       } catch {
-        parsed = { error: { message: data.slice(0, 200) || `API returned ${res.status}` } };
+        parsed = { error: { message: data.slice(0, 300) || `API returned ${res.status}` } };
+      }
+      let msg = parsed.error?.message ?? parsed.message ?? data.slice(0, 300) ?? `API returned ${res.status}`;
+      if (/application not found/i.test(msg) || res.status === 404) {
+        msg += '. Check NEXT_PUBLIC_API_URL in Vercel — it must point to your Railway API (e.g. https://your-app.railway.app).';
       }
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: 'API_ERROR',
-            message: parsed.error?.message ?? `API returned ${res.status}`,
+            code: res.status >= 500 ? 'API_ERROR' : 'API_ERROR',
+            message: msg,
             status: res.status,
           },
         },

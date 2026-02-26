@@ -28,7 +28,11 @@ export async function GET(request: NextRequest) {
 
   if (!res.ok) {
     const text = await res.text();
-    return NextResponse.json({ error: text || 'Failed to fetch tenant config' }, { status: res.status });
+    let errMsg = text || 'Failed to fetch tenant config';
+    if (/application not found/i.test(errMsg) || res.status === 404) {
+      errMsg += ' — Check NEXT_PUBLIC_API_URL in Vercel points to your Railway API.';
+    }
+    return NextResponse.json({ error: errMsg }, { status: res.status });
   }
 
   const data = await res.json();

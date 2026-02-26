@@ -37,6 +37,17 @@ export default function AdminLayoutClient({
     return null;
   }
 
+  if (!tenantLoading && error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="rounded-lg bg-red-50 p-6 text-red-700 max-w-md">
+          <p className="font-medium">Could not load tenant</p>
+          <p className="mt-2 text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
   const title = config?.name || (config?.slug ? config.slug.charAt(0).toUpperCase() + config.slug.slice(1) : 'Admin');
 
   return (

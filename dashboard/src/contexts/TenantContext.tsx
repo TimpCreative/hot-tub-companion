@@ -52,11 +52,15 @@ export function TenantProvider({
     }
 
     fetch(`/api/dashboard/tenant-config?slug=${encodeURIComponent(initialSlug)}`)
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to fetch tenant config');
-        return res.json();
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) {
+          const msg = json?.error ?? json?.message ?? 'Failed to fetch tenant config';
+          throw new Error(typeof msg === 'string' ? msg : 'Failed to fetch tenant config');
+        }
+        return json;
       })
-      .then((json) => setConfig(json.data))
+      .then((json) => setConfig(json.data ?? json))
       .catch((err) => setError(err.message || 'Failed to load tenant'))
       .finally(() => setLoading(false));
   }, [initialSlug]);
