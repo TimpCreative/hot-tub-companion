@@ -1,5 +1,6 @@
 import { getFirebaseAuth } from '../config/firebase';
 import { db } from '../config/database';
+import { env } from '../config/environment';
 import { ValidationError, NotFoundError } from '../utils/errors';
 
 interface RegisterBody {
@@ -67,11 +68,25 @@ export async function verifyToken(token: string, tenantId?: string) {
     .where({ firebase_uid: decoded.uid, tenant_id: tenantIdToUse })
     .first();
 
-  if (!user) {
-    throw new NotFoundError('User not found for this tenant');
+  if (user) {
+    return formatUser(user);
   }
 
-  return formatUser(user);
+  // Whitelist override: allow tenant admin emails to log in to any tenant app
+  const email = (decoded.email as string) || '';
+  if (email && env.TENANT_ADMIN_EMAILS.includes(email)) {
+    const nameParts = (decoded.name as string || '').split(' ').filter(Boolean);
+    return {
+      id: `admin_${decoded.uid}`,
+      email,
+      firstName: nameParts[0] || email.split('@')[0],
+      lastName: nameParts.slice(1).join(' ') || undefined,
+      phone: undefined,
+      role: 'admin',
+    };
+  }
+
+  throw new NotFoundError('User not found for this tenant');
 }
 
 export async function updateFcmToken(userId: string, fcmToken: string | null) {

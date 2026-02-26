@@ -38,7 +38,8 @@ cd ../dashboard && npm install
    - `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
    - `JWT_SECRET`, `ENCRYPTION_KEY`
    - `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`
-   - `SUPER_ADMIN_EMAILS` (comma-separated)
+   - `SUPER_ADMIN_EMAILS` (comma-separated – super admin dashboard)
+   - `TENANT_ADMIN_EMAILS` (comma-separated – admin whitelist for tenant apps)
    - `API_URL` (e.g. `https://api.hottubcompanion.com`)
 
 4. Link and run locally:

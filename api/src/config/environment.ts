@@ -32,4 +32,6 @@ export const env = {
   SENDGRID_FROM_NAME: process.env.SENDGRID_FROM_NAME || 'Hot Tub Companion',
   ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
   SUPER_ADMIN_EMAILS: (process.env.SUPER_ADMIN_EMAILS || '').split(',').map((e) => e.trim()).filter(Boolean),
+  /** Emails allowed to log in to any tenant app as admin (whitelist override when no users row) */
+  TENANT_ADMIN_EMAILS: (process.env.TENANT_ADMIN_EMAILS || '').split(',').map((e) => e.trim()).filter(Boolean),
 };
