@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api.hottubcompanion.com';
+function getApiBase(): string {
+  const raw = (process.env.NEXT_PUBLIC_API_URL || 'https://api.hottubcompanion.com').trim().replace(/\/+$/, '');
+  return raw.startsWith('http') ? raw : `https://${raw}`;
+}
+
+const API_BASE = getApiBase();
 
 /**
  * Proxies super-admin requests to the API from the server.
@@ -78,7 +83,15 @@ async function doProxy(
     );
   }
   const pathStr = path.join('/');
-  const url = new URL(`/api/v1/super-admin/${pathStr}${request.nextUrl.search}`, API_BASE);
+  let url: URL;
+  try {
+    url = new URL(`/api/v1/super-admin/${pathStr}${request.nextUrl.search}`, API_BASE);
+  } catch {
+    return NextResponse.json(
+      { success: false, error: { code: 'CONFIG_ERROR', message: 'Invalid API URL. Set NEXT_PUBLIC_API_URL to a valid URL (e.g. https://api.hottubcompanion.com)' } },
+      { status: 500 }
+    );
+  }
 
   const headers = new Headers();
   headers.set('Content-Type', 'application/json');

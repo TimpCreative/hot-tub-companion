@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getTenantApiKeyBySlug } from '@/lib/db';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api.hottubcompanion.com';
+function getApiBase(): string {
+  const raw = (process.env.NEXT_PUBLIC_API_URL || 'https://api.hottubcompanion.com').trim().replace(/\/+$/, '');
+  return raw.startsWith('http') ? raw : `https://${raw}`;
+}
+
+const API_BASE = getApiBase();
 
 /**
  * Proxies requests to the hot-tub-companion API with the tenant API key
@@ -61,8 +66,19 @@ async function proxy(
   }
 
   const { path } = await params;
+  if (path.some((p) => p === '..' || p === '.')) {
+    return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+  }
   const pathStr = path.join('/');
-  const url = new URL(`/api/v1/${pathStr}${request.nextUrl.search}`, API_BASE);
+  let url: URL;
+  try {
+    url = new URL(`/api/v1/${pathStr}${request.nextUrl.search}`, API_BASE);
+  } catch {
+    return NextResponse.json(
+      { error: 'Invalid API URL. Set NEXT_PUBLIC_API_URL to a valid URL (e.g. https://api.hottubcompanion.com)' },
+      { status: 500 }
+    );
+  }
 
   const headers = new Headers(request.headers);
   headers.delete('host');
