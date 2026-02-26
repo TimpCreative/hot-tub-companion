@@ -21,13 +21,18 @@ interface TenantConfig {
 interface TenantContextType {
   tenantSlug: string | null;
   config: TenantConfig | null;
-  apiKey: string | null;
   loading: boolean;
   error: string | null;
 }
 
 const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
+/**
+ * Tenant config is fetched server-side via /api/dashboard/tenant-config,
+ * which looks up the API key from the database by slug. The API key
+ * is never exposed to the client. Only tenant config.env files (mobile)
+ * contain API keys.
+ */
 export function TenantProvider({
   children,
   tenantSlug: initialSlug,
@@ -40,20 +45,13 @@ export function TenantProvider({
   const [loading, setLoading] = useState(!!initialSlug);
   const [error, setError] = useState<string | null>(null);
 
-  const apiKey =
-    typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_TENANT_API_KEY || null : null;
-
   useEffect(() => {
-    if (!initialSlug || !apiKey) {
+    if (!initialSlug) {
       setLoading(false);
       return;
     }
 
-    const baseURL =
-      (process.env.NEXT_PUBLIC_API_URL || 'https://api.hottubcompanion.com') + '/api/v1';
-    fetch(`${baseURL}/tenant/config`, {
-      headers: { 'x-tenant-key': apiKey },
-    })
+    fetch(`/api/dashboard/tenant-config?slug=${encodeURIComponent(initialSlug)}`)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch tenant config');
         return res.json();
@@ -61,14 +59,13 @@ export function TenantProvider({
       .then((json) => setConfig(json.data))
       .catch((err) => setError(err.message || 'Failed to load tenant'))
       .finally(() => setLoading(false));
-  }, [initialSlug, apiKey]);
+  }, [initialSlug]);
 
   return (
     <TenantContext.Provider
       value={{
         tenantSlug,
         config,
-        apiKey,
         loading,
         error,
       }}

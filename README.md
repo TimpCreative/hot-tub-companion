@@ -83,9 +83,11 @@ npx expo start
 
 1. Set env vars (or `.env.local`):
 
+   - `DATABASE_URL` – Same Postgres as API (Railway public URL for local dev)
    - `NEXT_PUBLIC_API_URL` – Railway API URL
    - `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, etc.
-   - `NEXT_PUBLIC_TENANT_API_KEY` – Take A Break tenant key (for retailer admin)
+
+   Tenant API keys are resolved from the database by slug (never hardcoded in dashboard).
 
 2. Local subdomain testing: use `?tenant=takeabreak` or `?tenant=admin`:
 
