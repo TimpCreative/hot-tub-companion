@@ -27,6 +27,7 @@ export default function TenantDetailPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showApiKey, setShowApiKey] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -105,8 +106,23 @@ export default function TenantDetailPage() {
           </div>
           <div className="px-6 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
             <dt className="text-sm font-medium text-gray-500">API Key</dt>
-            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono break-all">
-              {tenant.apiKey || '—'}
+            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+              {tenant.apiKey ? (
+                <div className="flex items-center gap-2">
+                  <span className="font-mono break-all">
+                    {showApiKey ? tenant.apiKey : '••••••••••••••••••••••••'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                  >
+                    {showApiKey ? 'Hide' : 'Reveal'}
+                  </button>
+                </div>
+              ) : (
+                '—'
+              )}
             </dd>
           </div>
           <div className="px-6 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
