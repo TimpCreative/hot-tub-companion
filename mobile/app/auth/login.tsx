@@ -24,9 +24,11 @@ export default function Login() {
       await login(email, password);
       router.replace('/(tabs)/home');
     } catch (err: unknown) {
-      const msg = err && typeof err === 'object' && 'error' in err
-        ? (err as { error?: { message?: string } }).error?.message ?? 'Login failed'
-        : 'Login failed';
+      let msg = 'Login failed';
+      if (err && typeof err === 'object') {
+        const e = err as { error?: { message?: string }; message?: string };
+        msg = e.error?.message ?? e.message ?? msg;
+      }
       setError(msg);
     } finally {
       setLoading(false);

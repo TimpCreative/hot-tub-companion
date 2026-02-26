@@ -34,9 +34,8 @@ export default function SuperAdminTenantsPage() {
         const res = await api.get('/super-admin/tenants') as { data?: { tenants?: Tenant[] } };
         setTenants(res.data?.tenants || []);
       } catch (err: unknown) {
-        const msg = err && typeof err === 'object' && 'message' in err
-          ? String((err as { message: unknown }).message)
-          : 'Failed to load tenants';
+        const e = err && typeof err === 'object' ? (err as { error?: { message?: string }; message?: string }) : {};
+        const msg = e.error?.message ?? e.message ?? 'Failed to load tenants';
         setError(msg);
       } finally {
         setLoading(false);
