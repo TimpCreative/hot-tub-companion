@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
-import { createApiClient } from '@/services/api';
+import { createSuperAdminApiClient } from '@/services/api';
 
 export default function NewTenantPage() {
   const { getIdToken } = useAuth();
@@ -24,8 +24,8 @@ export default function NewTenantPage() {
     setLoading(true);
     try {
       const token = await getIdToken();
-      const api = createApiClient({ getToken: async () => token });
-      const res = await api.post('/super-admin/tenants', {
+      const api = createSuperAdminApiClient(async () => token);
+      const res = await api.post('/tenants', {
         name,
         slug,
         apiKey: apiKey || undefined,
@@ -35,9 +35,8 @@ export default function NewTenantPage() {
       const tenant = res.data?.tenant;
       router.push(tenant ? `/super-admin/tenants/${tenant.id}` : '/super-admin/tenants');
     } catch (err: unknown) {
-      const msg = err && typeof err === 'object' && 'message' in err
-        ? String((err as { message: unknown }).message)
-        : 'Failed to create tenant';
+      const e = err && typeof err === 'object' ? (err as { error?: { message?: string }; message?: string }) : {};
+      const msg = e.error?.message ?? e.message ?? 'Failed to create tenant';
       setError(msg);
     } finally {
       setLoading(false);

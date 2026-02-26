@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { createApiClient } from '@/services/api';
+import { createSuperAdminApiClient } from '@/services/api';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/Button';
 
@@ -32,15 +32,14 @@ export default function TenantDetailPage() {
     async function load() {
       try {
         const token = await getIdToken();
-        const api = createApiClient({ getToken: async () => token });
-        const res = await api.get('/super-admin/tenants') as { data?: { tenants?: Tenant[] } };
+        const api = createSuperAdminApiClient(async () => token);
+        const res = await api.get('/tenants') as { data?: { tenants?: Tenant[] } };
         const found = res.data?.tenants?.find((t) => t.id === id);
         if (found) setTenant(found);
         else setError('Tenant not found');
       } catch (err: unknown) {
-        const msg = err && typeof err === 'object' && 'message' in err
-          ? String((err as { message: unknown }).message)
-          : 'Failed to load tenant';
+        const e = err && typeof err === 'object' ? (err as { error?: { message?: string }; message?: string }) : {};
+        const msg = e.error?.message ?? e.message ?? 'Failed to load tenant';
         setError(msg);
       } finally {
         setLoading(false);

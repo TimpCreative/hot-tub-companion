@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
-import { createApiClient } from '@/services/api';
+import { createSuperAdminApiClient } from '@/services/api';
 import { format } from 'date-fns';
 
 interface Tenant {
@@ -28,10 +28,8 @@ export default function SuperAdminTenantsPage() {
     async function load() {
       try {
         const token = await getIdToken();
-        const api = createApiClient({
-          getToken: async () => token,
-        });
-        const res = await api.get('/super-admin/tenants') as { data?: { tenants?: Tenant[] } };
+        const api = createSuperAdminApiClient(async () => token);
+        const res = await api.get('/tenants') as { data?: { tenants?: Tenant[] } };
         setTenants(res.data?.tenants || []);
       } catch (err: unknown) {
         const e = err && typeof err === 'object' ? (err as { error?: { message?: string }; message?: string }) : {};
