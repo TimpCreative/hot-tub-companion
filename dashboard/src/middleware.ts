@@ -12,8 +12,11 @@ export function middleware(request: NextRequest) {
 
     // Super admin: ?tenant=admin or admin.localhost
     if (tenantFromQuery === 'admin' || subdomain === 'admin') {
+      const targetPath = url.pathname.startsWith('/super-admin')
+        ? url.pathname
+        : `/super-admin${url.pathname === '/' ? '/dashboard' : url.pathname}`;
       const response = NextResponse.rewrite(
-        new URL(`/super-admin${url.pathname === '/' ? '/dashboard' : url.pathname}${url.search}`, request.url)
+        new URL(`${targetPath}${url.search}`, request.url)
       );
       response.cookies.delete('tenant_slug');
       return response;
@@ -21,8 +24,11 @@ export function middleware(request: NextRequest) {
 
     // Retailer admin: ?tenant=takeabreak or takeabreak.localhost
     if (tenant && tenant !== 'admin') {
+      const targetPath = url.pathname.startsWith('/admin')
+        ? url.pathname
+        : `/admin${url.pathname === '/' ? '/dashboard' : url.pathname}`;
       const response = NextResponse.rewrite(
-        new URL(`/admin${url.pathname === '/' ? '/dashboard' : url.pathname}${url.search}`, request.url)
+        new URL(`${targetPath}${url.search}`, request.url)
       );
       response.headers.set('x-tenant-slug', tenant);
       response.cookies.set('tenant_slug', tenant);
@@ -36,8 +42,12 @@ export function middleware(request: NextRequest) {
 
   // Super admin: admin.hottubcompanion.com
   if (subdomain === 'admin') {
+    // Avoid double-prefixing if already on /super-admin path
+    const targetPath = url.pathname.startsWith('/super-admin')
+      ? url.pathname
+      : `/super-admin${url.pathname === '/' ? '/dashboard' : url.pathname}`;
     const response = NextResponse.rewrite(
-      new URL(`/super-admin${url.pathname === '/' ? '/dashboard' : url.pathname}${url.search}`, request.url)
+      new URL(`${targetPath}${url.search}`, request.url)
     );
     response.cookies.delete('tenant_slug');
     return response;
@@ -49,8 +59,12 @@ export function middleware(request: NextRequest) {
     subdomain !== 'hottubcompanion' &&
     hostname.includes('hottubcompanion.com')
   ) {
+    // Avoid double-prefixing if already on /admin path
+    const targetPath = url.pathname.startsWith('/admin')
+      ? url.pathname
+      : `/admin${url.pathname === '/' ? '/dashboard' : url.pathname}`;
     const response = NextResponse.rewrite(
-      new URL(`/admin${url.pathname === '/' ? '/dashboard' : url.pathname}${url.search}`, request.url)
+      new URL(`${targetPath}${url.search}`, request.url)
     );
     response.headers.set('x-tenant-slug', subdomain);
     response.cookies.set('tenant_slug', subdomain);
