@@ -11,23 +11,51 @@ function parsePrivateKey(key: string | undefined): string {
 
   let parsed = key;
 
+  // Debug: log key characteristics (safe, no sensitive data)
+  console.log('Firebase key parsing debug:', {
+    originalLength: key.length,
+    startsWithQuote: key.startsWith('"') || key.startsWith("'"),
+    endsWithQuote: key.endsWith('"') || key.endsWith("'"),
+    hasDoubleEscapedNewlines: key.includes('\\\\n'),
+    hasSingleEscapedNewlines: key.includes('\\n'),
+    hasLiteralNewlines: key.includes('\n'),
+    first50Chars: key.substring(0, 50).replace(/[A-Za-z0-9+/=]/g, 'X'),
+    last30Chars: key.substring(key.length - 30).replace(/[A-Za-z0-9+/=]/g, 'X'),
+  });
+
   // Remove surrounding quotes if present
   if ((parsed.startsWith('"') && parsed.endsWith('"')) || 
       (parsed.startsWith("'") && parsed.endsWith("'"))) {
     parsed = parsed.slice(1, -1);
+    console.log('Removed surrounding quotes');
   }
 
   // Handle various newline escape formats
   // First try double-escaped (\\n -> \n -> actual newline)
-  parsed = parsed.replace(/\\\\n/g, '\n');
+  if (parsed.includes('\\\\n')) {
+    parsed = parsed.replace(/\\\\n/g, '\n');
+    console.log('Replaced double-escaped newlines');
+  }
   // Then single-escaped (\n -> actual newline)  
-  parsed = parsed.replace(/\\n/g, '\n');
+  if (parsed.includes('\\n')) {
+    parsed = parsed.replace(/\\n/g, '\n');
+    console.log('Replaced single-escaped newlines');
+  }
+
+  // Log the result (safe info only)
+  const lines = parsed.split('\n');
+  console.log('After parsing:', {
+    parsedLength: parsed.length,
+    lineCount: lines.length,
+    firstLine: lines[0]?.substring(0, 30),
+    lastLine: lines[lines.length - 1]?.substring(0, 30),
+  });
 
   // Validate key format
   if (!parsed.includes('-----BEGIN') || !parsed.includes('PRIVATE KEY-----')) {
     throw new Error(
-      'FIREBASE_PRIVATE_KEY appears malformed. It should start with "-----BEGIN PRIVATE KEY-----" ' +
-      'and end with "-----END PRIVATE KEY-----". Check Railway env var format.'
+      `FIREBASE_PRIVATE_KEY appears malformed. First line: "${lines[0]?.substring(0, 40)}...". ` +
+      'It should start with "-----BEGIN PRIVATE KEY-----". Check Railway env var format.'
     );
   }
 
@@ -75,4 +103,23 @@ export function isFirebaseInitialized(): boolean {
 
 export function getFirebaseInitError(): string | null {
   return initError?.message || null;
+}
+
+export function getFirebaseKeyDebugInfo(): Record<string, unknown> {
+  const key = process.env.FIREBASE_PRIVATE_KEY;
+  if (!key) {
+    return { error: 'FIREBASE_PRIVATE_KEY not set' };
+  }
+  
+  return {
+    length: key.length,
+    startsWithQuote: key.startsWith('"') || key.startsWith("'"),
+    endsWithQuote: key.endsWith('"') || key.endsWith("'"),
+    hasDoubleEscapedNewlines: key.includes('\\\\n'),
+    hasSingleEscapedNewlines: key.includes('\\n'),
+    hasLiteralNewlines: key.includes('\n'),
+    startsWithBegin: key.includes('-----BEGIN'),
+    endsWithEnd: key.includes('-----END'),
+    first40: key.substring(0, 40).replace(/[A-Za-z0-9+/=]/g, '*'),
+  };
 }

@@ -4,7 +4,7 @@ import { success, error } from '../utils/response';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { env } from '../config/environment';
-import { getFirebaseAuth, isFirebaseInitialized, getFirebaseInitError } from '../config/firebase';
+import { getFirebaseAuth, isFirebaseInitialized, getFirebaseInitError, getFirebaseKeyDebugInfo } from '../config/firebase';
 
 /**
  * Check if an email is allowed to sign up as a super admin
@@ -173,12 +173,14 @@ export async function getSettings(req: Request, res: Response): Promise<void> {
   const diagnostics: {
     firebaseConfigured: boolean;
     firebaseInitError: string | null;
+    firebaseKeyDebug: Record<string, unknown>;
     envVarSet: boolean;
     emailCount: number;
     lookupErrors: string[];
   } = {
     firebaseConfigured: isFirebaseInitialized(),
     firebaseInitError: getFirebaseInitError(),
+    firebaseKeyDebug: getFirebaseKeyDebugInfo(),
     envVarSet: env.SUPER_ADMIN_EMAILS.length > 0,
     emailCount: env.SUPER_ADMIN_EMAILS.length,
     lookupErrors: [],

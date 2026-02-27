@@ -17,6 +17,7 @@ interface SuperAdminUser {
 interface Diagnostics {
   firebaseConfigured: boolean;
   firebaseInitError: string | null;
+  firebaseKeyDebug?: Record<string, unknown>;
   envVarSet: boolean;
   emailCount: number;
   lookupErrors: string[];
@@ -153,11 +154,18 @@ export default function SettingsPage() {
                         ))}
                       </div>
                     )}
+                    {diagnostics.firebaseKeyDebug && (
+                      <div className="mt-2 p-2 bg-white/50 rounded text-xs font-mono">
+                        <div className="font-medium mb-1">Key Debug Info:</div>
+                        {Object.entries(diagnostics.firebaseKeyDebug).map(([k, v]) => (
+                          <div key={k}>{k}: {String(v)}</div>
+                        ))}
+                      </div>
+                    )}
                     {diagnostics.firebaseInitError && (
                       <div className="mt-3 p-2 bg-white/50 rounded text-xs">
                         <strong>How to fix:</strong> Check the <code className="bg-gray-100 px-1 rounded">FIREBASE_PRIVATE_KEY</code> environment variable in Railway. 
-                        Make sure the key starts with <code className="bg-gray-100 px-1 rounded">-----BEGIN PRIVATE KEY-----</code> and 
-                        has proper newlines (use <code className="bg-gray-100 px-1 rounded">\n</code> for line breaks).
+                        The key should NOT have surrounding quotes, and newlines should be represented as literal <code className="bg-gray-100 px-1 rounded">\n</code> characters.
                       </div>
                     )}
                   </div>
