@@ -1,0 +1,97 @@
+import { Request, Response } from 'express';
+import db from '../db';
+import { success, error } from '../utils/response';
+
+export async function getAuditLogs(req: Request, res: Response) {
+  try {
+    const {
+      tableName,
+      recordId,
+      action,
+      changedBy,
+      page = '1',
+      pageSize = '50',
+    } = req.query;
+
+    const offset = (parseInt(page as string) - 1) * parseInt(pageSize as string);
+
+    let query = db('audit_log').orderBy('created_at', 'desc');
+
+    if (tableName) query = query.where('table_name', tableName);
+    if (recordId) query = query.where('record_id', recordId);
+    if (action) query = query.where('action', action);
+    if (changedBy) query = query.where('changed_by', 'ilike', `%${changedBy}%`);
+
+    const countQuery = query.clone();
+    const [{ count }] = await countQuery.count('* as count');
+
+    const logs = await query.limit(parseInt(pageSize as string)).offset(offset);
+
+    success(
+      res,
+      logs.map((log) => ({
+        id: log.id,
+        tableName: log.table_name,
+        recordId: log.record_id,
+        action: log.action,
+        oldValues: log.old_values,
+        newValues: log.new_values,
+        changedBy: log.changed_by,
+        createdAt: log.created_at,
+      })),
+      undefined,
+      {
+        page: parseInt(page as string),
+        pageSize: parseInt(pageSize as string),
+        total: parseInt(count as string),
+        totalPages: Math.ceil(parseInt(count as string) / parseInt(pageSize as string)),
+      }
+    );
+  } catch (err) {
+    console.error('Error fetching audit logs:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to fetch audit logs', 500);
+  }
+}
+
+export async function getAuditStats(req: Request, res: Response) {
+  try {
+    const [totalCount] = await db('audit_log').count('* as count');
+    const [todayCount] = await db('audit_log')
+      .whereRaw("created_at >= NOW() - INTERVAL '24 hours'")
+      .count('* as count');
+
+    const byTable = await db('audit_log')
+      .select('table_name')
+      .count('* as count')
+      .groupBy('table_name')
+      .orderBy('count', 'desc')
+      .limit(10);
+
+    const byAction = await db('audit_log')
+      .select('action')
+      .count('* as count')
+      .groupBy('action');
+
+    const recentUsers = await db('audit_log')
+      .select('changed_by')
+      .count('* as count')
+      .whereNotNull('changed_by')
+      .groupBy('changed_by')
+      .orderBy('count', 'desc')
+      .limit(5);
+
+    success(res, {
+      total: parseInt(totalCount.count as string),
+      last24Hours: parseInt(todayCount.count as string),
+      byTable: byTable.map((r) => ({ table: r.table_name, count: parseInt(r.count as string) })),
+      byAction: byAction.map((r) => ({ action: r.action, count: parseInt(r.count as string) })),
+      topContributors: recentUsers.map((r) => ({
+        user: r.changed_by,
+        count: parseInt(r.count as string),
+      })),
+    });
+  } catch (err) {
+    console.error('Error fetching audit stats:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to fetch audit stats', 500);
+  }
+}
