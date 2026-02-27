@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -28,34 +28,46 @@ interface SystemInfo {
 }
 
 export default function SettingsPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, getIdToken } = useAuth();
   const [superAdmins, setSuperAdmins] = useState<SuperAdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [allowedEmails, setAllowedEmails] = useState<string[]>([]);
   const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchSettings() {
-      try {
-        const res = await fetch('/api/dashboard/super-admin/settings');
-        const data = await res.json();
-        if (data.success) {
-          setSuperAdmins(data.data?.users || []);
-          setAllowedEmails(data.data?.allowedEmails || []);
-          setDiagnostics(data.data?.diagnostics || null);
-        } else {
-          setFetchError(data.error?.message || 'Failed to fetch settings');
-        }
-      } catch (err: any) {
-        console.error('Error fetching settings:', err);
-        setFetchError(err.message || 'Network error');
-      } finally {
+  const fetchSettings = useCallback(async () => {
+    try {
+      const token = await getIdToken();
+      if (!token) {
+        setFetchError('Not authenticated');
         setLoading(false);
+        return;
       }
+
+      const res = await fetch('/api/dashboard/super-admin/settings', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuperAdmins(data.data?.users || []);
+        setAllowedEmails(data.data?.allowedEmails || []);
+        setDiagnostics(data.data?.diagnostics || null);
+      } else {
+        setFetchError(data.error?.message || 'Failed to fetch settings');
+      }
+    } catch (err: any) {
+      console.error('Error fetching settings:', err);
+      setFetchError(err.message || 'Network error');
+    } finally {
+      setLoading(false);
     }
+  }, [getIdToken]);
+
+  useEffect(() => {
     fetchSettings();
-  }, []);
+  }, [fetchSettings]);
 
   const systemInfo: SystemInfo = {
     environment: process.env.NODE_ENV || 'development',
