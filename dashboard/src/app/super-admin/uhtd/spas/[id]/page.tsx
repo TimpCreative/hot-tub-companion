@@ -9,17 +9,27 @@ import { Table } from '@/components/ui/Table';
 
 interface SpaModel {
   id: string;
-  modelName: string;
-  modelYear: number;
+  name: string;
+  year: number;
   brandId: string;
   brandName: string;
   modelLineId: string;
   modelLineName: string;
+  manufacturerSku: string | null;
   seatingCapacity: number | null;
   jetCount: number | null;
-  dimensions: string | null;
-  waterCapacity: string | null;
-  dryWeight: string | null;
+  waterCapacityGallons: number | null;
+  dimensionsLengthInches: number | null;
+  dimensionsWidthInches: number | null;
+  dimensionsHeightInches: number | null;
+  weightDryLbs: number | null;
+  weightFilledLbs: number | null;
+  electricalRequirement: string | null;
+  hasOzone: boolean;
+  hasUv: boolean;
+  hasSaltSystem: boolean;
+  imageUrl: string | null;
+  specSheetUrl: string | null;
   isDiscontinued: boolean;
   notes: string | null;
   dataSource: string | null;
@@ -94,6 +104,14 @@ export default function SpaDetailPage() {
     } finally {
       setDeleting(false);
     }
+  };
+
+  const formatDimensions = (spa: SpaModel): string => {
+    const { dimensionsLengthInches, dimensionsWidthInches, dimensionsHeightInches } = spa;
+    if (!dimensionsLengthInches && !dimensionsWidthInches && !dimensionsHeightInches) {
+      return '-';
+    }
+    return `${dimensionsLengthInches || '?'}" × ${dimensionsWidthInches || '?'}" × ${dimensionsHeightInches || '?'}"`;
   };
 
   const partColumns = [
@@ -172,7 +190,7 @@ export default function SpaDetailPage() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold text-gray-900">{spa.modelName}</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">{spa.name}</h1>
             <Badge variant={spa.isDiscontinued ? 'warning' : 'success'}>
               {spa.isDiscontinued ? 'Discontinued' : 'Current'}
             </Badge>
@@ -185,8 +203,11 @@ export default function SpaDetailPage() {
             <Link href={`/super-admin/uhtd/model-lines/${spa.modelLineId}`} className="hover:text-blue-600">
               {spa.modelLineName}
             </Link>
-            {' • '}{spa.modelYear}
+            {' • '}{spa.year}
           </p>
+          {spa.manufacturerSku && (
+            <p className="text-sm text-gray-400 font-mono mt-1">SKU: {spa.manufacturerSku}</p>
+          )}
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={handleDelete} loading={deleting}>
@@ -196,59 +217,125 @@ export default function SpaDetailPage() {
       </div>
 
       <div className="grid grid-cols-3 gap-6 mb-8">
-        <div className="col-span-2 bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Specifications</h3>
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
-            <div>
-              <dt className="text-sm text-gray-500">Seating Capacity</dt>
-              <dd className="text-sm font-medium text-gray-900">{spa.seatingCapacity || '-'}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Jet Count</dt>
-              <dd className="text-sm font-medium text-gray-900">{spa.jetCount || '-'}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Dimensions</dt>
-              <dd className="text-sm font-medium text-gray-900">{spa.dimensions || '-'}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Water Capacity</dt>
-              <dd className="text-sm font-medium text-gray-900">{spa.waterCapacity || '-'}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Dry Weight</dt>
-              <dd className="text-sm font-medium text-gray-900">{spa.dryWeight || '-'}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Data Source</dt>
-              <dd className="text-sm font-medium text-gray-900">{spa.dataSource || '-'}</dd>
-            </div>
-          </dl>
+        <div className="col-span-2 space-y-6">
+          {/* Specifications */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Specifications</h3>
+            <dl className="grid grid-cols-3 gap-x-6 gap-y-4">
+              <div>
+                <dt className="text-sm text-gray-500">Seating Capacity</dt>
+                <dd className="text-sm font-medium text-gray-900">{spa.seatingCapacity || '-'}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-gray-500">Jet Count</dt>
+                <dd className="text-sm font-medium text-gray-900">{spa.jetCount || '-'}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-gray-500">Water Capacity</dt>
+                <dd className="text-sm font-medium text-gray-900">
+                  {spa.waterCapacityGallons ? `${spa.waterCapacityGallons} gal` : '-'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-gray-500">Dimensions (L × W × H)</dt>
+                <dd className="text-sm font-medium text-gray-900">{formatDimensions(spa)}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-gray-500">Dry Weight</dt>
+                <dd className="text-sm font-medium text-gray-900">
+                  {spa.weightDryLbs ? `${spa.weightDryLbs} lbs` : '-'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-gray-500">Filled Weight</dt>
+                <dd className="text-sm font-medium text-gray-900">
+                  {spa.weightFilledLbs ? `${spa.weightFilledLbs} lbs` : '-'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-gray-500">Electrical</dt>
+                <dd className="text-sm font-medium text-gray-900">{spa.electricalRequirement || '-'}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-gray-500">Data Source</dt>
+                <dd className="text-sm font-medium text-gray-900">{spa.dataSource || '-'}</dd>
+              </div>
+            </dl>
+          </div>
 
+          {/* Features */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Sanitization Features</h3>
+            <div className="flex flex-wrap gap-3">
+              <Badge variant={spa.hasOzone ? 'success' : 'default'}>
+                {spa.hasOzone ? '✓' : '✗'} Ozone System
+              </Badge>
+              <Badge variant={spa.hasUv ? 'success' : 'default'}>
+                {spa.hasUv ? '✓' : '✗'} UV System
+              </Badge>
+              <Badge variant={spa.hasSaltSystem ? 'success' : 'default'}>
+                {spa.hasSaltSystem ? '✓' : '✗'} Salt System
+              </Badge>
+            </div>
+          </div>
+
+          {/* Notes */}
           {spa.notes && (
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <h4 className="text-sm font-medium text-gray-900 mb-2">Notes</h4>
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Notes</h3>
               <p className="text-sm text-gray-600 whitespace-pre-wrap">{spa.notes}</p>
             </div>
           )}
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="text-sm font-medium text-gray-500 mb-4">Details</h3>
-          <dl className="space-y-3">
-            <div>
-              <dt className="text-xs text-gray-500">ID</dt>
-              <dd className="text-sm font-mono text-gray-900 truncate">{spa.id}</dd>
+        <div className="space-y-6">
+          {/* Media */}
+          {(spa.imageUrl || spa.specSheetUrl) && (
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-sm font-medium text-gray-500 mb-4">Media</h3>
+              <div className="space-y-3">
+                {spa.imageUrl && (
+                  <a
+                    href={spa.imageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:text-blue-800 block truncate"
+                  >
+                    View Image →
+                  </a>
+                )}
+                {spa.specSheetUrl && (
+                  <a
+                    href={spa.specSheetUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:text-blue-800 block truncate"
+                  >
+                    View Spec Sheet →
+                  </a>
+                )}
+              </div>
             </div>
-            <div>
-              <dt className="text-xs text-gray-500">Created</dt>
-              <dd className="text-sm text-gray-900">{new Date(spa.createdAt).toLocaleDateString()}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-500">Last Updated</dt>
-              <dd className="text-sm text-gray-900">{new Date(spa.updatedAt).toLocaleDateString()}</dd>
-            </div>
-          </dl>
+          )}
+
+          {/* Details */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-sm font-medium text-gray-500 mb-4">Details</h3>
+            <dl className="space-y-3">
+              <div>
+                <dt className="text-xs text-gray-500">ID</dt>
+                <dd className="text-sm font-mono text-gray-900 truncate">{spa.id}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">Created</dt>
+                <dd className="text-sm text-gray-900">{new Date(spa.createdAt).toLocaleDateString()}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">Last Updated</dt>
+                <dd className="text-sm text-gray-900">{new Date(spa.updatedAt).toLocaleDateString()}</dd>
+              </div>
+            </dl>
+          </div>
         </div>
       </div>
 

@@ -117,8 +117,8 @@ export default function ImportPage() {
       description: 'Brand model lines',
     },
     spas: {
-      headers: ['brandName', 'modelLineName', 'modelName', 'modelYear', 'seatingCapacity', 'jetCount', 'dataSource'],
-      example: ['Jacuzzi', 'J-300 Collection', 'J-335', '2024', '5', '35', 'manual_entry'],
+      headers: ['brandName', 'modelLineName', 'name', 'year', 'seatingCapacity', 'jetCount', 'waterCapacityGallons', 'dimensionsLengthInches', 'dimensionsWidthInches', 'dimensionsHeightInches', 'weightDryLbs', 'dataSource'],
+      example: ['Jacuzzi', 'J-300 Collection', 'J-335', '2024', '5', '35', '350', '85', '85', '36', '725', 'manual_entry'],
       label: 'Spas',
       description: 'Spa model-years',
     },
@@ -129,7 +129,7 @@ export default function ImportPage() {
       description: 'Parts catalog',
     },
     comps: {
-      headers: ['partNumber', 'partName', 'brandName', 'modelLineName', 'modelName', 'modelYear', 'compId', 'fitNotes', 'dataSource'],
+      headers: ['partNumber', 'partName', 'brandName', 'modelLineName', 'spaName', 'spaYear', 'compId', 'fitNotes', 'dataSource'],
       example: ['PKG-12345', '', 'Jacuzzi', 'J-300', 'J-345', '2024', '', 'OEM filter', 'manual_entry'],
       label: 'Comps',
       description: 'Part-spa compatibility',
@@ -324,8 +324,8 @@ export default function ImportPage() {
                     <strong>Method 1: Individual Spas</strong><br />
                     Fill <code className="bg-yellow-100 px-1 rounded">brandName</code>,{' '}
                     <code className="bg-yellow-100 px-1 rounded">modelLineName</code>,{' '}
-                    <code className="bg-yellow-100 px-1 rounded">modelName</code>, and{' '}
-                    <code className="bg-yellow-100 px-1 rounded">modelYear</code>.
+                    <code className="bg-yellow-100 px-1 rounded">spaName</code>, and{' '}
+                    <code className="bg-yellow-100 px-1 rounded">spaYear</code>.
                     Leave <code className="bg-yellow-100 px-1 rounded">compId</code> empty.
                   </div>
                   <div>
@@ -343,6 +343,7 @@ export default function ImportPage() {
                   <li>• Rows with both compId AND spa details will be rejected</li>
                   <li>• Parts must exist in the database (by partNumber or partName)</li>
                   <li>• Spas/Comps must exist in the database</li>
+                  <li>• Use <code className="bg-red-100 px-1 rounded">spaName</code> and <code className="bg-red-100 px-1 rounded">spaYear</code> (not modelName/modelYear)</li>
                 </ul>
               </div>
             </div>

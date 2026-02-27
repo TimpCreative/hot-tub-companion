@@ -15,8 +15,8 @@ interface Brand {
 
 interface SpaModel {
   id: string;
-  modelName: string;
-  modelYear: number;
+  name: string;
+  year: number;
   brandId: string;
   brandName: string;
   modelLineId: string;
@@ -79,12 +79,12 @@ export default function SpasPage() {
 
   const columns = [
     {
-      key: 'modelName',
+      key: 'name',
       header: 'Model',
       render: (spa: any) => (
         <div>
-          <div className="font-medium text-gray-900">{spa.modelName}</div>
-          <div className="text-xs text-gray-500">{spa.modelYear}</div>
+          <div className="font-medium text-gray-900">{spa.name}</div>
+          <div className="text-xs text-gray-500">{spa.year}</div>
         </div>
       ),
     },

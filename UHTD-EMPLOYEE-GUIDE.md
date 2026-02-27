@@ -367,6 +367,27 @@ When entering possible values:
 - Quote fields containing commas
 - Boolean values: use `true` or `false`
 
+### Import Column Reference
+
+**Brands CSV:**
+- `name` (required), `logoUrl`, `websiteUrl`, `dataSource`
+
+**Model Lines CSV:**
+- `brandName` (required), `name` (required), `description`, `dataSource`
+
+**Spas CSV:**
+- `brandName` (required) - Must exist in database
+- `modelLineName` (required) - Must exist under the brand
+- `name` (required) - The spa model name (e.g., "J-335")
+- `year` (required) - The model year
+- `seatingCapacity`, `jetCount`, `waterCapacityGallons` - Numbers only
+- `dimensionsLengthInches`, `dimensionsWidthInches`, `dimensionsHeightInches` - Numbers only
+- `weightDryLbs` - Number only
+- `dataSource`
+
+**Parts CSV:**
+- `name` (required), `categoryName` (required), `partNumber`, `upc`, `manufacturer`, `isOem`, `isUniversal`, `dataSource`
+
 ### Compatibility (Comps) Import - Special Rules
 
 The Comps import links parts to spas. There are **two methods**:
@@ -379,16 +400,16 @@ PKG-12345,Filter Kit,COMP-JAC-FILT-001,Fits all J-300,catalog
 ```
 
 **Method 2: Using Individual Spa Details**
-Specify the exact brand, model line, model, and year:
+Specify the exact brand, model line, spa name, and year:
 ```csv
-partNumber,partName,brandName,modelLineName,modelName,modelYear,fitNotes,dataSource
+partNumber,partName,brandName,modelLineName,spaName,spaYear,fitNotes,dataSource
 PKG-12345,Filter Kit,Jacuzzi,J-300 Series,J-345,2024,Direct fit,catalog
 ```
 
 ### Important Compatibility Rules
 
 - **Use EITHER `compId` OR spa details (brandName, etc.) - NOT BOTH**
-- If you provide a `compId`, leave brandName/modelLineName/modelName/modelYear empty
+- If you provide a `compId`, leave brandName/modelLineName/spaName/spaYear empty
 - If you provide spa details, leave `compId` empty
 - The system will reject rows that mix both methods with a clear error message
 - All imported compatibility records start as **pending** and need to be confirmed in the Review Queue

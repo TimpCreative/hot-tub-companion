@@ -21,13 +21,21 @@ interface ModelLineImportRow {
 interface SpaModelImportRow {
   brandName: string;
   modelLineName: string;
-  modelName: string;
-  modelYear: number;
-  seatCount?: number;
+  name: string;
+  year: number;
   seatingCapacity?: number;
   jetCount?: number;
-  gallonCapacity?: number;
-  dimensions?: string;
+  waterCapacityGallons?: number;
+  dimensionsLengthInches?: number;
+  dimensionsWidthInches?: number;
+  dimensionsHeightInches?: number;
+  weightDryLbs?: number;
+  weightFilledLbs?: number;
+  electricalRequirement?: string;
+  hasOzone?: boolean;
+  hasUv?: boolean;
+  hasSaltSystem?: boolean;
+  isDiscontinued?: boolean;
   dataSource?: string;
 }
 
@@ -45,10 +53,10 @@ interface PartImportRow {
 interface CompatibilityImportRow {
   partNumber?: string;
   partName?: string;
-  brandName: string;
-  modelLineName: string;
-  modelName: string;
-  modelYear: number;
+  brandName?: string;
+  modelLineName?: string;
+  spaName?: string;
+  spaYear?: number;
   compId?: string;
   fitNotes?: string;
   dataSource?: string;
@@ -201,8 +209,8 @@ export async function importSpas(req: Request, res: Response) {
       const rowNum = i + 2;
       
       try {
-        if (!row.brandName || !row.modelLineName || !row.modelName || !row.modelYear) {
-          errors.push(`Row ${rowNum}: brandName, modelLineName, modelName, and modelYear are required`);
+        if (!row.brandName || !row.modelLineName || !row.name || !row.year) {
+          errors.push(`Row ${rowNum}: brandName, modelLineName, name, and year are required`);
           skipped++;
           continue;
         }
@@ -227,8 +235,8 @@ export async function importSpas(req: Request, res: Response) {
 
         const existing = await db('scdb_spa_models')
           .where('model_line_id', modelLine.id)
-          .where('model_name', 'ilike', row.modelName)
-          .where('model_year', row.modelYear)
+          .where('name', 'ilike', row.name)
+          .where('year', row.year)
           .first();
 
         if (existing) {
@@ -238,13 +246,23 @@ export async function importSpas(req: Request, res: Response) {
 
         const [inserted] = await db('scdb_spa_models')
           .insert({
+            brand_id: brand.id,
             model_line_id: modelLine.id,
-            model_name: row.modelName,
-            model_year: row.modelYear,
-            seating_capacity: row.seatCount || row.seatingCapacity || null,
+            name: row.name,
+            year: row.year,
+            seating_capacity: row.seatingCapacity || null,
             jet_count: row.jetCount || null,
-            water_capacity: row.gallonCapacity || null,
-            dimensions: row.dimensions || null,
+            water_capacity_gallons: row.waterCapacityGallons || null,
+            dimensions_length_inches: row.dimensionsLengthInches || null,
+            dimensions_width_inches: row.dimensionsWidthInches || null,
+            dimensions_height_inches: row.dimensionsHeightInches || null,
+            weight_dry_lbs: row.weightDryLbs || null,
+            weight_filled_lbs: row.weightFilledLbs || null,
+            electrical_requirement: row.electricalRequirement || null,
+            has_ozone: row.hasOzone ?? false,
+            has_uv: row.hasUv ?? false,
+            has_salt_system: row.hasSaltSystem ?? false,
+            is_discontinued: row.isDiscontinued ?? false,
             data_source: row.dataSource || 'csv_import',
           })
           .returning('*');
@@ -260,7 +278,7 @@ export async function importSpas(req: Request, res: Response) {
 
         created++;
       } catch (err: any) {
-        errors.push(`Row ${rowNum} "${row.modelName}": ${err.message}`);
+        errors.push(`Row ${rowNum} "${row.name}": ${err.message}`);
       }
     }
 
@@ -356,12 +374,12 @@ export async function importCompatibility(req: Request, res: Response) {
       
       try {
         // Validate: Check for conflicting methods
-        const hasSpaDetails = row.brandName || row.modelLineName || row.modelName || row.modelYear;
+        const hasSpaDetails = row.brandName || row.modelLineName || row.spaName || row.spaYear;
         const hasCompId = row.compId;
         
         if (hasCompId && hasSpaDetails) {
           errors.push(
-            `Row ${rowNum}: Cannot use both compId AND spa details (brandName/modelLineName/modelName/modelYear). ` +
+            `Row ${rowNum}: Cannot use both compId AND spa details (brandName/modelLineName/spaName/spaYear). ` +
             `Use ONE method only - either fill compId OR fill the spa details, not both.`
           );
           skipped++;
@@ -371,7 +389,7 @@ export async function importCompatibility(req: Request, res: Response) {
         if (!hasCompId && !hasSpaDetails) {
           errors.push(
             `Row ${rowNum}: Missing required data. You must provide either compId OR spa details ` +
-            `(brandName, modelLineName, modelName, modelYear).`
+            `(brandName, modelLineName, spaName, spaYear).`
           );
           skipped++;
           continue;
@@ -445,32 +463,33 @@ export async function importCompatibility(req: Request, res: Response) {
           const missingFields = [];
           if (!row.brandName) missingFields.push('brandName');
           if (!row.modelLineName) missingFields.push('modelLineName');
-          if (!row.modelName) missingFields.push('modelName');
-          if (!row.modelYear) missingFields.push('modelYear');
+          if (!row.spaName) missingFields.push('spaName');
+          if (!row.spaYear) missingFields.push('spaYear');
           
           if (missingFields.length > 0) {
             errors.push(
               `Row ${rowNum}: Missing required spa details: ${missingFields.join(', ')}. ` +
-              `All fields (brandName, modelLineName, modelName, modelYear) are required when not using compId.`
+              `All fields (brandName, modelLineName, spaName, spaYear) are required when not using compId.`
             );
             skipped++;
             continue;
           }
           
-          // Find spa by brand/model line/model name/year
+          // Find spa by brand/model line/name/year
+          // Type assertions safe here because we validated all fields exist above
           const spa = await db('scdb_spa_models as sm')
             .select('sm.id')
             .leftJoin('scdb_model_lines as ml', 'sm.model_line_id', 'ml.id')
             .leftJoin('scdb_brands as b', 'ml.brand_id', 'b.id')
-            .where('b.name', 'ilike', row.brandName)
-            .where('ml.name', 'ilike', row.modelLineName)
-            .where('sm.model_name', 'ilike', row.modelName)
-            .where('sm.model_year', row.modelYear)
+            .where('b.name', 'ilike', row.brandName as string)
+            .where('ml.name', 'ilike', row.modelLineName as string)
+            .where('sm.name', 'ilike', row.spaName as string)
+            .where('sm.year', row.spaYear as number)
             .first();
 
           if (!spa) {
             errors.push(
-              `Row: Spa "${row.brandName} ${row.modelLineName} ${row.modelName} ${row.modelYear}" not found`
+              `Row ${rowNum}: Spa "${row.brandName} ${row.modelLineName} ${row.spaName} ${row.spaYear}" not found`
             );
             skipped++;
             continue;
