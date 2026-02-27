@@ -57,7 +57,7 @@ export default function BrandsListPage() {
       key: 'name',
       header: 'Name',
       sortable: true,
-      render: (brand: Brand) => (
+      render: (brand: any) => (
         <div className="flex items-center gap-3">
           {brand.logoUrl ? (
             <img src={brand.logoUrl} alt={brand.name} className="w-8 h-8 object-contain" />
@@ -73,7 +73,7 @@ export default function BrandsListPage() {
     {
       key: 'isActive',
       header: 'Status',
-      render: (brand: Brand) => (
+      render: (brand: any) => (
         <Badge variant={brand.isActive ? 'success' : 'default'}>
           {brand.isActive ? 'Active' : 'Inactive'}
         </Badge>
@@ -82,7 +82,7 @@ export default function BrandsListPage() {
     {
       key: 'websiteUrl',
       header: 'Website',
-      render: (brand: Brand) =>
+      render: (brand: any) =>
         brand.websiteUrl ? (
           <a
             href={brand.websiteUrl}
@@ -100,7 +100,7 @@ export default function BrandsListPage() {
       key: 'actions',
       header: '',
       className: 'w-20',
-      render: (brand: Brand) => (
+      render: (brand: any) => (
         <Link
           href={`/super-admin/uhtd/brands/${brand.id}`}
           className="text-sm text-blue-600 hover:text-blue-800"

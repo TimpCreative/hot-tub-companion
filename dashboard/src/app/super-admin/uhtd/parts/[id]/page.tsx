@@ -130,7 +130,7 @@ export default function PartDetailPage() {
     {
       key: 'spa',
       header: 'Spa Model',
-      render: (compat: Compatibility) => (
+      render: (compat: any) => (
         <div>
           <div className="font-medium text-gray-900">
             {compat.spaModel?.modelName || 'Unknown'}
@@ -144,13 +144,13 @@ export default function PartDetailPage() {
     {
       key: 'status',
       header: 'Status',
-      render: (compat: Compatibility) => <StatusBadge status={compat.status} />,
+      render: (compat: any) => <StatusBadge status={compat.status} />,
     },
     {
       key: 'actions',
       header: '',
       className: 'w-32',
-      render: (compat: Compatibility) => (
+      render: (compat: any) => (
         <div className="flex gap-2">
           {compat.status === 'pending' ? (
             <button

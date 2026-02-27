@@ -55,14 +55,14 @@ export default function CompsListPage() {
     {
       key: 'id',
       header: 'Comp ID',
-      render: (comp: Comp) => (
+      render: (comp: any) => (
         <span className="font-mono text-sm text-blue-600">{comp.id}</span>
       ),
     },
     {
       key: 'name',
       header: 'Name',
-      render: (comp: Comp) => (
+      render: (comp: any) => (
         <div>
           <div className="font-medium text-gray-900">{comp.name}</div>
           {comp.description && (
@@ -75,7 +75,7 @@ export default function CompsListPage() {
       key: 'spaCount',
       header: 'Spas',
       className: 'text-center',
-      render: (comp: Comp) => (
+      render: (comp: any) => (
         <span className="text-gray-600">{comp.spaCount || 0}</span>
       ),
     },
@@ -83,14 +83,14 @@ export default function CompsListPage() {
       key: 'partCount',
       header: 'Parts (computed)',
       className: 'text-center',
-      render: (comp: Comp) => (
+      render: (comp: any) => (
         <span className="text-gray-600">{comp.partCount || 0}</span>
       ),
     },
     {
       key: 'createdAt',
       header: 'Created',
-      render: (comp: Comp) => (
+      render: (comp: any) => (
         <span className="text-gray-500 text-sm">
           {new Date(comp.createdAt).toLocaleDateString()}
         </span>
@@ -100,7 +100,7 @@ export default function CompsListPage() {
       key: 'actions',
       header: '',
       className: 'w-20',
-      render: (comp: Comp) => (
+      render: (comp: any) => (
         <Link
           href={`/super-admin/uhtd/comps/${encodeURIComponent(comp.id)}`}
           className="text-sm text-blue-600 hover:text-blue-800"

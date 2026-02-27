@@ -93,7 +93,7 @@ export default function AuditLogPage() {
     {
       key: 'createdAt',
       header: 'Time',
-      render: (log: AuditLog) => (
+      render: (log: any) => (
         <span className="text-sm text-gray-500">
           {new Date(log.createdAt).toLocaleString()}
         </span>
@@ -102,19 +102,19 @@ export default function AuditLogPage() {
     {
       key: 'action',
       header: 'Action',
-      render: (log: AuditLog) => <Badge variant={actionVariant(log.action)}>{log.action}</Badge>,
+      render: (log: any) => <Badge variant={actionVariant(log.action)}>{log.action}</Badge>,
     },
     {
       key: 'tableName',
       header: 'Table',
-      render: (log: AuditLog) => (
+      render: (log: any) => (
         <span className="font-mono text-sm text-gray-700">{log.tableName}</span>
       ),
     },
     {
       key: 'recordId',
       header: 'Record ID',
-      render: (log: AuditLog) => (
+      render: (log: any) => (
         <span className="font-mono text-xs text-gray-500 truncate max-w-32 block">
           {log.recordId}
         </span>
@@ -123,7 +123,7 @@ export default function AuditLogPage() {
     {
       key: 'changedBy',
       header: 'Changed By',
-      render: (log: AuditLog) => (
+      render: (log: any) => (
         <span className="text-sm text-gray-600">{log.changedBy || 'System'}</span>
       ),
     },
@@ -131,7 +131,7 @@ export default function AuditLogPage() {
       key: 'expand',
       header: '',
       className: 'w-20',
-      render: (log: AuditLog) => (
+      render: (log: any) => (
         <button
           onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
           className="text-sm text-blue-600 hover:text-blue-800"

@@ -87,15 +87,15 @@ export default function ModelLineDetailPage() {
     {
       key: 'name',
       header: 'Model',
-      render: (spa: SpaModel) => <span className="font-medium">{spa.name}</span>,
+      render: (spa: any) => <span className="font-medium">{spa.name}</span>,
     },
     { key: 'year', header: 'Year' },
-    { key: 'seatingCapacity', header: 'Seats', render: (spa: SpaModel) => spa.seatingCapacity || '-' },
-    { key: 'jetCount', header: 'Jets', render: (spa: SpaModel) => spa.jetCount || '-' },
+    { key: 'seatingCapacity', header: 'Seats', render: (spa: any) => spa.seatingCapacity || '-' },
+    { key: 'jetCount', header: 'Jets', render: (spa: any) => spa.jetCount || '-' },
     {
       key: 'isDiscontinued',
       header: 'Status',
-      render: (spa: SpaModel) => (
+      render: (spa: any) => (
         <Badge variant={spa.isDiscontinued ? 'warning' : 'success'}>
           {spa.isDiscontinued ? 'Discontinued' : 'Current'}
         </Badge>
@@ -105,7 +105,7 @@ export default function ModelLineDetailPage() {
       key: 'actions',
       header: '',
       className: 'w-20',
-      render: (spa: SpaModel) => (
+      render: (spa: any) => (
         <Link
           href={`/super-admin/uhtd/models/${spa.id}`}
           className="text-sm text-blue-600 hover:text-blue-800"

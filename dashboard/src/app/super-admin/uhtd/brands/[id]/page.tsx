@@ -85,12 +85,12 @@ export default function BrandDetailPage() {
     {
       key: 'name',
       header: 'Name',
-      render: (ml: ModelLine) => <span className="font-medium">{ml.name}</span>,
+      render: (ml: any) => <span className="font-medium">{ml.name}</span>,
     },
     {
       key: 'description',
       header: 'Description',
-      render: (ml: ModelLine) => (
+      render: (ml: any) => (
         <span className="text-gray-500 text-sm truncate max-w-[300px] block">
           {ml.description || '-'}
         </span>
@@ -99,7 +99,7 @@ export default function BrandDetailPage() {
     {
       key: 'isActive',
       header: 'Status',
-      render: (ml: ModelLine) => (
+      render: (ml: any) => (
         <Badge variant={ml.isActive ? 'success' : 'default'}>
           {ml.isActive ? 'Active' : 'Inactive'}
         </Badge>
@@ -109,7 +109,7 @@ export default function BrandDetailPage() {
       key: 'actions',
       header: '',
       className: 'w-20',
-      render: (ml: ModelLine) => (
+      render: (ml: any) => (
         <Link
           href={`/super-admin/uhtd/model-lines/${ml.id}`}
           className="text-sm text-blue-600 hover:text-blue-800"

@@ -92,6 +92,13 @@ export function PartForm({
     }
   };
 
+  const handleSpasSelect = (spaIds: string[]) => {
+    setSelectedSpaIds((prev) => {
+      const combined = new Set([...prev, ...spaIds]);
+      return Array.from(combined);
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await onSubmit(formData, selectedSpaIds);
@@ -246,7 +253,7 @@ export function PartForm({
         compId={quickviewCompId}
         isOpen={!!quickviewCompId}
         onClose={() => setQuickviewCompId(null)}
-        onSelectAll={handleCompSelect}
+        onSelectAll={handleSpasSelect}
       />
     </form>
   );

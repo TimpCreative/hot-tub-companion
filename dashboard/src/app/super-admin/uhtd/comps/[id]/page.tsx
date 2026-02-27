@@ -129,7 +129,7 @@ export default function CompDetailPage() {
     {
       key: 'spa',
       header: 'Spa Model',
-      render: (cs: CompSpa) => (
+      render: (cs: any) => (
         <div>
           <div className="font-medium text-gray-900">{cs.spaModel?.modelName || 'Unknown'}</div>
           <div className="text-xs text-gray-500">
@@ -142,7 +142,7 @@ export default function CompDetailPage() {
       key: 'actions',
       header: '',
       className: 'w-24',
-      render: (cs: CompSpa) => (
+      render: (cs: any) => (
         <button
           onClick={() => handleRemoveSpa(cs.spaModelId)}
           className="text-sm text-red-600 hover:text-red-800"
@@ -157,7 +157,7 @@ export default function CompDetailPage() {
     {
       key: 'part',
       header: 'Part',
-      render: (p: ComputedPart) => (
+      render: (p: any) => (
         <div>
           <div className="font-medium text-gray-900">{p.partName}</div>
           {p.partNumber && <div className="text-xs text-gray-500">{p.partNumber}</div>}
@@ -167,17 +167,17 @@ export default function CompDetailPage() {
     {
       key: 'category',
       header: 'Category',
-      render: (p: ComputedPart) => <span className="text-gray-600">{p.categoryName || '-'}</span>,
+      render: (p: any) => <span className="text-gray-600">{p.categoryName || '-'}</span>,
     },
     {
       key: 'manufacturer',
       header: 'Manufacturer',
-      render: (p: ComputedPart) => <span className="text-gray-600">{p.manufacturer || '-'}</span>,
+      render: (p: any) => <span className="text-gray-600">{p.manufacturer || '-'}</span>,
     },
     {
       key: 'coverage',
       header: 'Coverage',
-      render: (p: ComputedPart) => (
+      render: (p: any) => (
         <div className="flex items-center gap-2">
           <div className="w-24 bg-gray-200 rounded-full h-2">
             <div
@@ -194,13 +194,13 @@ export default function CompDetailPage() {
     {
       key: 'oem',
       header: '',
-      render: (p: ComputedPart) => p.isOem && <Badge variant="info" size="sm">OEM</Badge>,
+      render: (p: any) => p.isOem && <Badge variant="info" size="sm">OEM</Badge>,
     },
     {
       key: 'actions',
       header: '',
       className: 'w-20',
-      render: (p: ComputedPart) => (
+      render: (p: any) => (
         <Link
           href={`/super-admin/uhtd/parts/${p.partId}`}
           className="text-sm text-blue-600 hover:text-blue-800"

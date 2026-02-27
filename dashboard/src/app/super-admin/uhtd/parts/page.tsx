@@ -81,7 +81,7 @@ export default function PartsListPage() {
     {
       key: 'name',
       header: 'Part',
-      render: (part: Part) => (
+      render: (part: any) => (
         <div>
           <div className="font-medium text-gray-900">{part.name}</div>
           {part.partNumber && <div className="text-xs text-gray-500">{part.partNumber}</div>}
@@ -91,19 +91,19 @@ export default function PartsListPage() {
     {
       key: 'categoryDisplayName',
       header: 'Category',
-      render: (part: Part) => (
+      render: (part: any) => (
         <span className="text-gray-600">{part.categoryDisplayName || '-'}</span>
       ),
     },
     {
       key: 'manufacturer',
       header: 'Manufacturer',
-      render: (part: Part) => <span className="text-gray-600">{part.manufacturer || '-'}</span>,
+      render: (part: any) => <span className="text-gray-600">{part.manufacturer || '-'}</span>,
     },
     {
       key: 'badges',
       header: 'Type',
-      render: (part: Part) => (
+      render: (part: any) => (
         <div className="flex gap-1">
           {part.isOem && <Badge variant="info" size="sm">OEM</Badge>}
           {part.isUniversal && <Badge variant="success" size="sm">Universal</Badge>}
@@ -114,7 +114,7 @@ export default function PartsListPage() {
       key: 'actions',
       header: '',
       className: 'w-20',
-      render: (part: Part) => (
+      render: (part: any) => (
         <Link
           href={`/super-admin/uhtd/parts/${part.id}`}
           className="text-sm text-blue-600 hover:text-blue-800"

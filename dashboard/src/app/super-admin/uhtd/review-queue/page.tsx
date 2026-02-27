@@ -132,7 +132,7 @@ export default function ReviewQueuePage() {
         />
       ),
       className: 'w-10',
-      render: (item: PendingCompatibility) => (
+      render: (item: any) => (
         <input
           type="checkbox"
           checked={selectedIds.includes(item.id)}
@@ -140,7 +140,7 @@ export default function ReviewQueuePage() {
             if (e.target.checked) {
               setSelectedIds([...selectedIds, item.id]);
             } else {
-              setSelectedIds(selectedIds.filter((id) => id !== item.id));
+              setSelectedIds(selectedIds.filter((id: string) => id !== item.id));
             }
           }}
           className="rounded border-gray-300"
@@ -150,7 +150,7 @@ export default function ReviewQueuePage() {
     {
       key: 'part',
       header: 'Part',
-      render: (item: PendingCompatibility) => (
+      render: (item: any) => (
         <div>
           <Link
             href={`/super-admin/uhtd/parts/${item.partId}`}
@@ -167,7 +167,7 @@ export default function ReviewQueuePage() {
     {
       key: 'spa',
       header: 'Spa Model',
-      render: (item: PendingCompatibility) => (
+      render: (item: any) => (
         <div>
           <div className="font-medium text-gray-900">{item.spaModel.modelName}</div>
           <div className="text-xs text-gray-500">
@@ -179,14 +179,14 @@ export default function ReviewQueuePage() {
     {
       key: 'dataSource',
       header: 'Source',
-      render: (item: PendingCompatibility) => (
+      render: (item: any) => (
         <span className="text-sm text-gray-600">{item.dataSource || '-'}</span>
       ),
     },
     {
       key: 'createdAt',
       header: 'Added',
-      render: (item: PendingCompatibility) => (
+      render: (item: any) => (
         <span className="text-sm text-gray-500">
           {new Date(item.createdAt).toLocaleDateString()}
         </span>

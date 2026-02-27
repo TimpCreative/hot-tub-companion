@@ -120,14 +120,14 @@ export default function CategoriesPage() {
       key: 'sortOrder',
       header: '#',
       className: 'w-12',
-      render: (cat: Category) => (
+      render: (cat: any) => (
         <span className="text-gray-400 text-sm">{cat.sortOrder}</span>
       ),
     },
     {
       key: 'displayName',
       header: 'Category',
-      render: (cat: Category) => (
+      render: (cat: any) => (
         <div>
           <div className="font-medium text-gray-900">{cat.displayName}</div>
           <div className="text-xs text-gray-500 font-mono">{cat.name}</div>
@@ -137,7 +137,7 @@ export default function CategoriesPage() {
     {
       key: 'description',
       header: 'Description',
-      render: (cat: Category) => (
+      render: (cat: any) => (
         <span className="text-gray-500 text-sm">{cat.description || '-'}</span>
       ),
     },
@@ -145,7 +145,7 @@ export default function CategoriesPage() {
       key: 'partCount',
       header: 'Parts',
       className: 'text-center',
-      render: (cat: Category) => (
+      render: (cat: any) => (
         <span className="text-gray-600">{cat.partCount || 0}</span>
       ),
     },
@@ -153,7 +153,7 @@ export default function CategoriesPage() {
       key: 'actions',
       header: '',
       className: 'w-32',
-      render: (cat: Category) => (
+      render: (cat: any) => (
         <div className="flex gap-2">
           <button
             onClick={() => openEditModal(cat)}

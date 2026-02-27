@@ -129,7 +129,7 @@ export default function QualifiersPage() {
     {
       key: 'displayName',
       header: 'Qualifier',
-      render: (q: Qualifier) => (
+      render: (q: any) => (
         <div>
           <div className="font-medium text-gray-900">{q.displayName}</div>
           <div className="text-xs text-gray-500 font-mono">{q.name}</div>
@@ -139,7 +139,7 @@ export default function QualifiersPage() {
     {
       key: 'valueType',
       header: 'Type',
-      render: (q: Qualifier) => {
+      render: (q: any) => {
         const variant = q.valueType === 'boolean' ? 'default' : q.valueType === 'single_select' ? 'info' : 'warning';
         return <Badge variant={variant}>{q.valueType.replace('_', ' ')}</Badge>;
       },
@@ -147,7 +147,7 @@ export default function QualifiersPage() {
     {
       key: 'possibleValues',
       header: 'Possible Values',
-      render: (q: Qualifier) => (
+      render: (q: any) => (
         <span className="text-gray-600 text-sm">
           {q.valueType === 'boolean' ? 'true / false' : q.possibleValues?.join(', ') || '-'}
         </span>
@@ -156,7 +156,7 @@ export default function QualifiersPage() {
     {
       key: 'description',
       header: 'Description',
-      render: (q: Qualifier) => (
+      render: (q: any) => (
         <span className="text-gray-500 text-sm truncate max-w-xs block">
           {q.description || '-'}
         </span>
@@ -166,7 +166,7 @@ export default function QualifiersPage() {
       key: 'actions',
       header: '',
       className: 'w-32',
-      render: (q: Qualifier) => (
+      render: (q: any) => (
         <div className="flex gap-2">
           <button
             onClick={() => openEditModal(q)}
@@ -290,7 +290,7 @@ export default function QualifiersPage() {
                   onChange={(e) => setFormData({ ...formData, possibleValues: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="120V, 240V"
-                  required={formData.valueType !== 'boolean'}
+                  required
                 />
                 <p className="text-xs text-gray-500 mt-1">Comma-separated list of allowed values</p>
               </div>
