@@ -11,12 +11,14 @@ This guide walks you through entering data into the UHTD (Universal Hot Tub Data
 1. [Getting Started](#getting-started)
 2. [Understanding the Data Structure](#understanding-the-data-structure)
 3. [Adding a New Brand](#adding-a-new-brand)
-4. [Adding Model Lines and Spa Models](#adding-model-lines-and-spa-models)
-5. [Adding Parts](#adding-parts)
-6. [Using Compatibility Groups (Comps)](#using-compatibility-groups-comps)
-7. [Bulk CSV Import](#bulk-csv-import)
-8. [Review Queue](#review-queue)
-9. [Tips and Best Practices](#tips-and-best-practices)
+4. [Adding Model Lines](#adding-model-lines)
+5. [Adding Spa Models](#adding-spa-models)
+6. [Adding Parts](#adding-parts)
+7. [Using Compatibility Groups (Comps)](#using-compatibility-groups-comps)
+8. [Working with Qualifiers](#working-with-qualifiers)
+9. [Bulk CSV Import](#bulk-csv-import)
+10. [Review Queue](#review-queue)
+11. [Tips and Best Practices](#tips-and-best-practices)
 
 ---
 
@@ -24,15 +26,17 @@ This guide walks you through entering data into the UHTD (Universal Hot Tub Data
 
 ### Accessing the UHTD Dashboard
 
-1. Log in to the Super Admin dashboard at `/super-admin`
+1. Log in to the Super Admin dashboard at `https://admin.hottubcompanion.com/super-admin`
 2. Click **UHTD** in the sidebar
 3. You'll see the UHTD Overview page with stats and quick actions
 
 ### Navigation
 
 The UHTD section has these main areas:
-- **Overview** - Stats and unified search
+- **Overview** - Stats, unified search, and quick action buttons
 - **Brands** - Spa manufacturers
+- **Model Lines** - Product lines within brands
+- **Spas** - Individual spa models
 - **Parts** - Part catalog management
 - **Comps** - Compatibility groups
 - **Categories** - Part categories
@@ -40,6 +44,16 @@ The UHTD section has these main areas:
 - **Review Queue** - Pending records to approve
 - **Import** - Bulk CSV upload
 - **Audit Log** - Change history
+
+### Quick Actions
+
+The Overview page has quick action buttons for common tasks:
+- **Add Brand** - Create a new spa manufacturer
+- **Add Model Line** - Create a new product line
+- **Add Spa** - Create a new spa model
+- **Add Part** - Create a new part
+- **Create Comp** - Create a new compatibility group
+- **Import CSV** - Bulk import data
 
 ---
 
@@ -89,7 +103,7 @@ Data Source: Official website
 
 ---
 
-## Adding Model Lines and Spa Models
+## Adding Model Lines
 
 ### Understanding the Hierarchy
 
@@ -99,29 +113,53 @@ Data Source: Official website
     - **Spa Model**: J-345 (2025)
     - **Spa Model**: J-335 (2024)
 
-### Adding a Model Line
+### Steps to Add a Model Line
 
-1. Go to the **Brand detail page** (click on a brand name)
+1. Go to **UHTD → Model Lines**
 2. Click **+ Add Model Line**
-3. Fill in:
+3. Select the **Brand** from the dropdown
+   - **Don't see the brand?** Click the **+** button next to the dropdown to create a new brand without leaving the page!
+4. Fill in:
    - **Name** (required) - e.g., "J-300 Series"
    - **Description** (optional) - Brief description
    - **Data Source** - Where you got this info
-4. Click **Create Model Line**
+5. Click **Create Model Line**
 
-### Adding a Spa Model
+### Bulk Adding Model Lines
 
-1. Go to the **Model Line detail page**
-2. Click **+ Add Spa Model**
-3. Fill in the required fields:
-   - **Model Name** - e.g., "J-345"
-   - **Model Year** - e.g., "2024"
-4. Fill in optional specifications:
-   - Seat count, jet count, pump count
-   - Dimensions (length, width, height)
+You can add multiple model lines at once:
+1. Click the **Bulk Add** tab
+2. Fill in the table with multiple model lines
+3. Click **Add All** to create them in batch
+
+---
+
+## Adding Spa Models
+
+### Steps to Add a Spa Model
+
+1. Go to **UHTD → Spas**
+2. Click **+ Add Spa**
+3. Select the **Brand** from the dropdown
+   - **Don't see the brand?** Click the **+** button to create a new brand inline!
+4. Select the **Model Line** from the dropdown
+   - **Don't see the model line?** Click the **+** button to create a new model line inline!
+5. Fill in the required fields:
+   - **Model Name** (required) - e.g., "J-345"
+   - **Model Year** (required) - e.g., "2024"
+6. Fill in optional specifications:
+   - Seating capacity, jet count, pump count
+   - Dimensions (length, width, height in inches)
    - Gallon capacity, dry weight, wet weight
    - Voltage options
-5. Click **Create Spa Model**
+7. Click **Create Spa Model**
+
+### Bulk Adding Spa Models
+
+You can add multiple spa models at once:
+1. Click the **Bulk Add** tab
+2. Fill in the table with multiple spas
+3. Click **Add All** to create them in batch
 
 ### Important: Individual Year Strategy
 
@@ -138,7 +176,7 @@ Each year gets its own database entry, even if specs are identical. This allows 
 
 ## Adding Parts
 
-### The Two-Panel Part Form
+### The Three-Panel Part Form
 
 When adding a part, you'll see a three-column layout:
 
@@ -160,13 +198,25 @@ When adding a part, you'll see a three-column layout:
    - **Universal** - Check if this fits ALL spas
    - **Data Source** - Where you found this info
 4. Select Compatible Spas (unless marking as Universal):
-   - Search for spa models
-   - Click to select/deselect
-   - Use "Select All" to add multiple
+   - Search for spa models by name, brand, or model line
+   - Click to select/deselect individual spas
+   - Use "Select All" in search results to add multiple at once
 5. Use Comp Suggestions (right panel):
    - See groups that match your selections
-   - Click a Comp to add all its spas at once
+   - Click **Select All** on a Comp to add all its spas at once
+   - **Create New Comp**: If you've selected spas that should form a new group, click **Create New Comp** to save this selection as a reusable Comp!
 6. Click **Create Part**
+
+### Bulk Adding Parts
+
+You can add multiple parts at once:
+1. Click the **Bulk Add** tab
+2. Fill in the table with part data including:
+   - Part Number, Name, Category
+   - Manufacturer, UPC, Data Source
+   - OEM checkbox
+3. Click **Add All** to create them in batch
+4. Note: Bulk-added parts need spa compatibility added separately
 
 ### Part Categories
 
@@ -181,49 +231,98 @@ Common categories include:
 - Pillows
 - LED Lights
 
+### Category Sort Order
+
+When viewing or editing categories, you'll see a **Sort Order** field:
+- **0** = Highest priority (appears first in lists)
+- Higher numbers appear lower in the list
+- Use this to order categories by importance or frequency of use
+
 ---
 
 ## Using Compatibility Groups (Comps)
 
 ### What Are Comps?
 
-Comps are named groups of spas that share compatible parts. Instead of selecting 50 individual spas, you can select one Comp.
+Comps are named groups of spas that share compatible parts. Instead of selecting 50 individual spas, you can select one Comp. This dramatically speeds up data entry!
 
 ### Comp ID Format
 
+Comp IDs are human-readable identifiers:
 ```
 COMP-[BRAND]-[CATEGORY]-[NUMBER]
 Example: COMP-JAC-FILT-001
 ```
 
-- **BRAND**: 2-4 letter brand abbreviation
-- **CATEGORY**: 2-4 letter category abbreviation
-- **NUMBER**: Sequential number
+- **BRAND**: 2-4 letter brand abbreviation (JAC = Jacuzzi, HS = Hot Spring)
+- **CATEGORY**: 2-4 letter category abbreviation (FILT = Filters, PUMP = Pumps)
+- **NUMBER**: Sequential number (001, 002, etc.)
 
-### Creating a Comp
+### Creating a Comp - Method 1: From the Comps Page
 
 1. Go to **UHTD → Comps**
 2. Click **+ Create Comp**
 3. Fill in:
-   - **Brand Code** - e.g., "JAC" for Jacuzzi
-   - **Category Code** - e.g., "FILT" for filters
-4. Click **Generate** to auto-create the ID, or type your own
-5. Enter a **Name** - e.g., "Jacuzzi J-300 Series Filters"
-6. Add a **Description** explaining what's in this group
-7. Select spas using the right panel
-8. Click **Create Comp**
+   - **Comp ID** (required) - e.g., "COMP-JAC-FILT-001"
+   - **Name** (required) - e.g., "Jacuzzi J-300 Series Filters"
+   - **Description** - Explain what spas are in this group and why
+4. Select spas using the spa selection panel
+5. Click **Create Comp**
+
+### Creating a Comp - Method 2: From the Part Form (Inline)
+
+This is the fastest way to create Comps while you work:
+
+1. While adding a part, select the spas you want
+2. Look at the **Comp Suggestions** sidebar on the right
+3. If no existing Comp matches, click **Create New Comp**
+4. The modal will show how many spas you've selected
+5. Enter a Comp ID, name, and description
+6. Click **Create** - your new Comp is saved and ready to use!
 
 ### Using Comps When Adding Parts
 
 When you're on the Part form:
-1. Select a few spas manually
-2. Look at the **Comp Suggestions** panel
+1. Select a few spas manually (or search and select)
+2. Look at the **Comp Suggestions** panel on the right
 3. Matches will show with a percentage (how many of the Comp's spas you've already selected)
-4. Click **Select All** on a Comp to add all its spas
+4. Click **Select All** on a Comp to add all its spas instantly
+5. This works both ways - if you've selected some spas, relevant Comps appear; if you select a Comp, all its spas are added
 
 ### Computed Parts
 
-The Comp detail page shows **Computed Parts** - parts that are compatible with spas in that group. This is calculated dynamically, not stored.
+The Comp detail page shows **Computed Parts** - parts that are compatible with spas in that group. This is calculated dynamically based on the `part_spa_compatibility` table, not stored separately.
+
+---
+
+## Working with Qualifiers
+
+### What Are Qualifiers?
+
+Qualifiers add conditional compatibility rules. For example, a pump might fit a spa model but only if it's the 240V version. Qualifiers capture these "it depends" scenarios.
+
+### Types of Qualifiers
+
+- **Single Select** - User must pick one option (e.g., "What is your voltage?" → 120V or 240V)
+- **Multi Select** - User can select multiple options (e.g., "What features does your spa have?" → LED Lights, Ozone, Waterfall)
+
+### Creating a Qualifier
+
+1. Go to **UHTD → Qualifiers**
+2. Click **+ Add Qualifier**
+3. Fill in:
+   - **Name** (required) - e.g., "Voltage Configuration"
+   - **Description** - Help text for users
+   - **Type** - Single Select or Multi Select
+   - **Possible Values** - Enter comma-separated options (e.g., `120V, 240V`)
+4. Click **Create Qualifier**
+
+### Input Formatting
+
+When entering possible values:
+- Separate options with commas: `120V, 240V`
+- Extra spaces are automatically trimmed (so `120V,  240V` becomes `120V, 240V`)
+- Each value becomes a selectable option for the user
 
 ---
 
@@ -232,23 +331,26 @@ The Comp detail page shows **Computed Parts** - parts that are compatible with s
 ### When to Use CSV Import
 
 - Adding many brands at once
+- Adding multiple model lines or spas
 - Adding large part catalogs
 - Setting up part-spa compatibility in bulk
 
 ### Import Types
 
 1. **Brands** - Add multiple spa brands
-2. **Parts** - Add multiple parts to the catalog
-3. **Compatibility** - Link parts to spas (supports Comp IDs!)
+2. **Model Lines** - Add multiple product lines
+3. **Spas** - Add multiple spa models
+4. **Parts** - Add multiple parts to the catalog
+5. **Comps (Compatibility Groups)** - Link parts to spas using Comp IDs or individual spa details
 
 ### Steps
 
 1. Go to **UHTD → Import**
-2. Select the import type
+2. Select the import type (click one of the 5 buttons)
 3. Click **Download Template** to get a sample CSV
 4. Fill in your data following the template format
 5. Upload your CSV file
-6. Preview the data
+6. Preview the data and check for errors
 7. Click **Import**
 
 ### CSV Format Tips
@@ -258,14 +360,31 @@ The Comp detail page shows **Computed Parts** - parts that are compatible with s
 - Quote fields containing commas
 - Boolean values: use `true` or `false`
 
-### Example: Compatibility CSV with Comp ID
+### Compatibility (Comps) Import - Special Rules
 
+The Comps import links parts to spas. There are **two methods**:
+
+**Method 1: Using a Comp ID**
+If you have an existing Comp, just provide the Comp ID:
 ```csv
-partNumber,partName,brandName,modelLineName,modelName,modelYear,compId,fitNotes,dataSource
-PKG-12345,,,,,,,COMP-JAC-FILT-001,Fits all J-300 filters,manual_entry
+partNumber,partName,compId,fitNotes,dataSource
+PKG-12345,Filter Kit,COMP-JAC-FILT-001,Fits all J-300,catalog
 ```
 
-Using `compId` automatically adds the part to ALL spas in that Comp!
+**Method 2: Using Individual Spa Details**
+Specify the exact brand, model line, model, and year:
+```csv
+partNumber,partName,brandName,modelLineName,modelName,modelYear,fitNotes,dataSource
+PKG-12345,Filter Kit,Jacuzzi,J-300 Series,J-345,2024,Direct fit,catalog
+```
+
+### Important Compatibility Rules
+
+- **Use EITHER `compId` OR spa details (brandName, etc.) - NOT BOTH**
+- If you provide a `compId`, leave brandName/modelLineName/modelName/modelYear empty
+- If you provide spa details, leave `compId` empty
+- The system will reject rows that mix both methods with a clear error message
+- All imported compatibility records start as **pending** and need to be confirmed in the Review Queue
 
 ---
 
@@ -297,16 +416,25 @@ Records are created as "pending" when:
 
 ### Data Entry Tips
 
-1. **Always specify Data Source**: This helps with auditing and corrections
+1. **Always specify Data Source**: This helps with auditing and corrections later
 2. **Use Comps for efficiency**: Group similar spas once, use the group forever
-3. **Review before confirming**: Use the Review Queue regularly
-4. **Check existing data first**: Search before adding to avoid duplicates
+3. **Create Comps as you go**: Use the "Create New Comp" button in the Part form whenever you find yourself selecting the same spas repeatedly
+4. **Review before confirming**: Use the Review Queue regularly to approve pending records
+5. **Check existing data first**: Use the unified search on the Overview page to avoid duplicates
+
+### Inline Creation Workflow
+
+Take advantage of inline creation to work faster:
+- Adding a Model Line but the Brand doesn't exist? Click **+** to create the Brand without leaving the page
+- Adding a Spa but the Model Line doesn't exist? Click **+** to create the Model Line (and even the Brand!) inline
+- Adding a Part and want to save your spa selection as a Comp? Click **Create New Comp** in the sidebar
 
 ### Naming Conventions
 
 - **Brands**: Use official names ("Jacuzzi" not "jacuzzi" or "Jacuzzi®")
-- **Model Lines**: Include "Series" if that's the official name
+- **Model Lines**: Include "Series" if that's the official name (e.g., "J-300 Series")
 - **Parts**: Be descriptive ("ProClarity 6000-383A Filter" not just "Filter")
+- **Comp IDs**: Follow the format `COMP-[BRAND]-[CATEGORY]-[NUMBER]` (e.g., "COMP-JAC-FILT-001")
 
 ### OEM vs Aftermarket
 
@@ -319,28 +447,48 @@ Records are created as "pending" when:
 Only mark a part as **Universal** if it truly fits ALL spas:
 - Chemicals (chlorine, bromine, etc.)
 - Generic accessories
-- Not filters, pumps, or spa-specific components
+- NOT filters, pumps, or spa-specific components
 
 ### Handling Unknown Data
 
 If you're unsure about compatibility:
-1. Add the record as pending
-2. Add a note in the fit notes field
-3. Mark for later verification
+1. Add the record - it will start as **pending**
+2. Add a note in the fit notes field explaining the uncertainty
+3. It won't appear in the app until confirmed in the Review Queue
 
 ### Common Mistakes to Avoid
 
-1. **Don't consolidate years**: Create separate entries for each year
-2. **Don't guess part numbers**: Leave blank if unknown
-3. **Don't skip categories**: Every part needs a category
-4. **Don't forget to save**: Check for success message
+1. **Don't consolidate years**: Create separate entries for each year, even if specs are identical
+2. **Don't guess part numbers**: Leave blank if unknown - you can add them later
+3. **Don't skip categories**: Every part needs a category for proper organization
+4. **Don't forget to save**: Always check for the green success message
+5. **Don't mix Comp ID and spa details in imports**: Use one method or the other, not both
 
 ---
 
 ## Need Help?
 
-- Check the **Audit Log** to see recent changes
-- Use **unified search** on the Overview page to find anything
-- Contact your supervisor for questions about data accuracy
+### Self-Service Resources
+
+- **Audit Log** (`UHTD → Audit Log`) - See all recent changes and who made them
+- **Unified Search** (`UHTD → Overview`) - Search for anything: brands, parts, spas, or comps
+- **Review Queue** (`UHTD → Review Queue`) - See pending records that need confirmation
+
+### Reporting Issues
+
+If you encounter bugs or errors:
+1. Note the exact steps that caused the issue
+2. Take a screenshot if possible
+3. Check the browser console for error messages (F12 → Console tab)
+4. Report to your supervisor with all details
+
+### Settings
+
+Super Admin settings are available via **Settings** in the bottom-left of the dashboard sidebar. This shows:
+- Your account information
+- Other Super Admin users
+- System configuration
+
+---
 
 Remember: The UHTD powers real customer experiences. Accurate data means happy customers! 🛁
