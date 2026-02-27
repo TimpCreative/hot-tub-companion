@@ -10,6 +10,15 @@ interface SuperAdminUser {
   displayName: string | null;
   lastSignIn: string | null;
   createdAt: string | null;
+  status: 'active' | 'not_registered' | 'error';
+  error?: string;
+}
+
+interface Diagnostics {
+  firebaseConfigured: boolean;
+  envVarSet: boolean;
+  emailCount: number;
+  lookupErrors: string[];
 }
 
 interface SystemInfo {
@@ -23,6 +32,8 @@ export default function SettingsPage() {
   const [superAdmins, setSuperAdmins] = useState<SuperAdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [allowedEmails, setAllowedEmails] = useState<string[]>([]);
+  const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchSettings() {
@@ -32,9 +43,13 @@ export default function SettingsPage() {
         if (data.success) {
           setSuperAdmins(data.data?.users || []);
           setAllowedEmails(data.data?.allowedEmails || []);
+          setDiagnostics(data.data?.diagnostics || null);
+        } else {
+          setFetchError(data.error?.message || 'Failed to fetch settings');
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching settings:', err);
+        setFetchError(err.message || 'Network error');
       } finally {
         setLoading(false);
       }
@@ -98,11 +113,35 @@ export default function SettingsPage() {
               <div className="h-10 bg-gray-100 rounded"></div>
               <div className="h-10 bg-gray-100 rounded"></div>
             </div>
+          ) : fetchError ? (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="text-sm font-medium text-red-800">Error fetching settings</div>
+              <div className="text-xs text-red-600 mt-1">{fetchError}</div>
+            </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* Diagnostics (if there are issues) */}
+              {diagnostics && (diagnostics.lookupErrors.length > 0 || !diagnostics.envVarSet) && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="text-sm font-medium text-yellow-800 mb-2">Diagnostics</div>
+                  <div className="text-xs text-yellow-700 space-y-1">
+                    <div>Firebase configured: {diagnostics.firebaseConfigured ? '✓' : '✗'}</div>
+                    <div>SUPER_ADMIN_EMAILS set: {diagnostics.envVarSet ? `✓ (${diagnostics.emailCount} emails)` : '✗ Not set'}</div>
+                    {diagnostics.lookupErrors.length > 0 && (
+                      <div className="mt-2">
+                        <div className="font-medium">Lookup errors:</div>
+                        {diagnostics.lookupErrors.map((err, i) => (
+                          <div key={i} className="text-red-600">• {err}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Allowed emails from env */}
               {allowedEmails.length > 0 && (
-                <div className="mb-4">
+                <div>
                   <h4 className="text-sm font-medium text-gray-700 mb-2">Allowed Emails (from config)</h4>
                   <div className="flex flex-wrap gap-2">
                     {allowedEmails.map((email) => (
@@ -117,33 +156,50 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              {/* Registered users */}
+              {/* Users list */}
               {superAdmins.length > 0 ? (
                 <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Registered Users</h4>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Users</h4>
                   <div className="divide-y divide-gray-100">
                     {superAdmins.map((admin) => (
                       <div
                         key={admin.email}
                         className="py-3 flex items-center justify-between"
                       >
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {admin.displayName || 'No name'}
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {admin.displayName || admin.email}
+                            </div>
+                            {admin.displayName && (
+                              <div className="text-xs text-gray-500">{admin.email}</div>
+                            )}
                           </div>
-                          <div className="text-xs text-gray-500">{admin.email}</div>
                         </div>
-                        <div className="text-xs text-gray-400">
-                          {admin.lastSignIn
-                            ? `Last seen ${new Date(admin.lastSignIn).toLocaleDateString()}`
-                            : 'Never signed in'}
+                        <div className="flex items-center gap-3">
+                          {admin.status === 'active' && (
+                            <Badge variant="success" size="sm">Active</Badge>
+                          )}
+                          {admin.status === 'not_registered' && (
+                            <Badge variant="warning" size="sm">Not registered</Badge>
+                          )}
+                          {admin.status === 'error' && (
+                            <Badge variant="error" size="sm" title={admin.error}>Error</Badge>
+                          )}
+                          <div className="text-xs text-gray-400">
+                            {admin.lastSignIn
+                              ? `Last seen ${new Date(admin.lastSignIn).toLocaleDateString()}`
+                              : ''}
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
               ) : (
-                <div className="text-sm text-gray-500">No registered Super Admin users found.</div>
+                <div className="text-sm text-gray-500">
+                  No Super Admin users configured. Set the SUPER_ADMIN_EMAILS environment variable.
+                </div>
               )}
             </div>
           )}

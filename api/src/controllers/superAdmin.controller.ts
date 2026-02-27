@@ -160,7 +160,7 @@ export async function createTenant(req: Request, res: Response): Promise<void> {
 /**
  * Get settings including super admin users list
  */
-export async function getSettings(_req: Request, res: Response): Promise<void> {
+export async function getSettings(req: Request, res: Response): Promise<void> {
   try {
     const auth = getFirebaseAuth();
     const users: Array<{
@@ -168,7 +168,21 @@ export async function getSettings(_req: Request, res: Response): Promise<void> {
       displayName: string | null;
       lastSignIn: string | null;
       createdAt: string | null;
+      status: 'active' | 'not_registered' | 'error';
+      error?: string;
     }> = [];
+
+    const diagnostics: {
+      firebaseConfigured: boolean;
+      envVarSet: boolean;
+      emailCount: number;
+      lookupErrors: string[];
+    } = {
+      firebaseConfigured: !!auth,
+      envVarSet: env.SUPER_ADMIN_EMAILS.length > 0,
+      emailCount: env.SUPER_ADMIN_EMAILS.length,
+      lookupErrors: [],
+    };
 
     // Get users from Firebase for the allowed emails
     for (const email of env.SUPER_ADMIN_EMAILS) {
@@ -179,22 +193,52 @@ export async function getSettings(_req: Request, res: Response): Promise<void> {
           displayName: user.displayName || null,
           lastSignIn: user.metadata.lastSignInTime || null,
           createdAt: user.metadata.creationTime || null,
+          status: 'active',
         });
       } catch (err: any) {
-        // User doesn't exist in Firebase yet (allowed but not registered)
         if (err.code === 'auth/user-not-found') {
-          continue;
+          users.push({
+            email,
+            displayName: null,
+            lastSignIn: null,
+            createdAt: null,
+            status: 'not_registered',
+          });
+        } else {
+          const errorMsg = `${email}: ${err.code || err.message || 'Unknown error'}`;
+          diagnostics.lookupErrors.push(errorMsg);
+          console.error(`Error fetching user ${email}:`, err);
+          users.push({
+            email,
+            displayName: null,
+            lastSignIn: null,
+            createdAt: null,
+            status: 'error',
+            error: err.code || err.message,
+          });
         }
-        console.error(`Error fetching user ${email}:`, err);
       }
+    }
+
+    // Also include the currently authenticated user if not already in the list
+    const currentUserEmail = (req as any).superAdminEmail;
+    if (currentUserEmail && !users.some(u => u.email.toLowerCase() === currentUserEmail.toLowerCase())) {
+      users.unshift({
+        email: currentUserEmail,
+        displayName: null,
+        lastSignIn: new Date().toISOString(),
+        createdAt: null,
+        status: 'active',
+      });
     }
 
     success(res, {
       users,
       allowedEmails: env.SUPER_ADMIN_EMAILS,
+      diagnostics,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error getting settings:', err);
-    error(res, 'INTERNAL_ERROR', 'Failed to get settings', 500);
+    error(res, 'INTERNAL_ERROR', `Failed to get settings: ${err.message}`, 500);
   }
 }

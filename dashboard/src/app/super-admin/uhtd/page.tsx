@@ -111,6 +111,8 @@ export default function UhtdOverviewPage() {
 
   const quickActions = [
     { label: 'Add Brand', href: '/super-admin/uhtd/brands/new', color: 'blue' },
+    { label: 'Add Model Line', href: '/super-admin/uhtd/model-lines/new', color: 'cyan' },
+    { label: 'Add Spa', href: '/super-admin/uhtd/spas/new', color: 'teal' },
     { label: 'Add Part', href: '/super-admin/uhtd/parts/new', color: 'green' },
     { label: 'Create Comp', href: '/super-admin/uhtd/comps/new', color: 'purple' },
     { label: 'Import CSV', href: '/super-admin/uhtd/import', color: 'orange' },
@@ -171,25 +173,29 @@ export default function UhtdOverviewPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        {quickActions.map((action) => (
-          <Link
-            key={action.href}
-            href={action.href}
-            className={`p-4 rounded-lg border-2 border-dashed text-center transition-colors hover:bg-gray-50 ${
-              action.color === 'blue'
-                ? 'border-blue-200 text-blue-600'
-                : action.color === 'green'
-                ? 'border-green-200 text-green-600'
-                : action.color === 'purple'
-                ? 'border-purple-200 text-purple-600'
-                : 'border-orange-200 text-orange-600'
-            }`}
-          >
-            <span className="text-2xl">+</span>
-            <div className="font-medium mt-1">{action.label}</div>
-          </Link>
-        ))}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-6">
+        {quickActions.map((action) => {
+          const colorClasses: Record<string, string> = {
+            blue: 'border-blue-200 text-blue-600 hover:bg-blue-50',
+            cyan: 'border-cyan-200 text-cyan-600 hover:bg-cyan-50',
+            teal: 'border-teal-200 text-teal-600 hover:bg-teal-50',
+            green: 'border-green-200 text-green-600 hover:bg-green-50',
+            purple: 'border-purple-200 text-purple-600 hover:bg-purple-50',
+            orange: 'border-orange-200 text-orange-600 hover:bg-orange-50',
+          };
+          return (
+            <Link
+              key={action.href}
+              href={action.href}
+              className={`p-3 rounded-lg border-2 border-dashed text-center transition-colors ${
+                colorClasses[action.color] || 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <span className="text-xl">+</span>
+              <div className="font-medium text-sm mt-1">{action.label}</div>
+            </Link>
+          );
+        })}
       </div>
 
       {/* Stats Grid */}
