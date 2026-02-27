@@ -375,15 +375,21 @@ When entering possible values:
 **Model Lines CSV:**
 - `brandName` (required), `name` (required), `description`, `dataSource`
 
-**Spas CSV:**
+**Spas CSV (22 columns - matches single spa form):**
 - `brandName` (required) - Must exist in database
 - `modelLineName` (required) - Must exist under the brand
 - `name` (required) - The spa model name (e.g., "J-335")
 - `year` (required) - The model year
+- `manufacturerSku` - Manufacturer's SKU code
 - `seatingCapacity`, `jetCount`, `waterCapacityGallons` - Numbers only
-- `dimensionsLengthInches`, `dimensionsWidthInches`, `dimensionsHeightInches` - Numbers only
-- `weightDryLbs` - Number only
-- `dataSource`
+- `electricalRequirement` - e.g., "240V/50A"
+- `dimensionsLengthInches`, `dimensionsWidthInches`, `dimensionsHeightInches` - Numbers only (inches)
+- `weightDryLbs`, `weightFilledLbs` - Numbers only (lbs)
+- `hasOzone`, `hasUv`, `hasSaltSystem` - Boolean (`true`/`false`)
+- `imageUrl`, `specSheetUrl` - Full URLs
+- `notes` - Internal notes
+- `isDiscontinued` - Boolean (`true`/`false`)
+- `dataSource` - Where the data came from
 
 **Parts CSV:**
 - `name` (required), `categoryName` (required), `partNumber`, `upc`, `manufacturer`, `isOem`, `isUniversal`, `dataSource`

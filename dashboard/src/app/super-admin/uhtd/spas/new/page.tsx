@@ -180,8 +180,22 @@ function NewSpaForm() {
             modelLineId: row.modelLineId,
             name: row.name,
             year: parseInt(row.year) || new Date().getFullYear(),
+            manufacturerSku: row.manufacturerSku || null,
             seatingCapacity: row.seatingCapacity ? parseInt(row.seatingCapacity) : null,
             jetCount: row.jetCount ? parseInt(row.jetCount) : null,
+            waterCapacityGallons: row.waterCapacityGallons ? parseInt(row.waterCapacityGallons) : null,
+            dimensionsLengthInches: row.dimensionsLengthInches ? parseInt(row.dimensionsLengthInches) : null,
+            dimensionsWidthInches: row.dimensionsWidthInches ? parseInt(row.dimensionsWidthInches) : null,
+            dimensionsHeightInches: row.dimensionsHeightInches ? parseInt(row.dimensionsHeightInches) : null,
+            weightDryLbs: row.weightDryLbs ? parseInt(row.weightDryLbs) : null,
+            weightFilledLbs: row.weightFilledLbs ? parseInt(row.weightFilledLbs) : null,
+            electricalRequirement: row.electricalRequirement || null,
+            hasOzone: row.hasOzone || false,
+            hasUv: row.hasUv || false,
+            hasSaltSystem: row.hasSaltSystem || false,
+            imageUrl: row.imageUrl || null,
+            specSheetUrl: row.specSheetUrl || null,
+            notes: row.notes || null,
             isDiscontinued: row.isDiscontinued || false,
             dataSource: row.dataSource || 'Bulk import',
           }),
@@ -207,6 +221,7 @@ function NewSpaForm() {
   const years = Array.from({ length: 50 }, (_, i) => currentYear - i + 2);
 
   const bulkColumns = [
+    // Identity
     {
       key: 'modelLineId',
       header: 'Model Line',
@@ -216,21 +231,43 @@ function NewSpaForm() {
         return { value: ml.id, label: `${brand?.name || ''} - ${ml.name}` };
       }),
       required: true,
-      width: '250px',
+      width: '220px',
+      group: 'Identity',
     },
-    { key: 'name', header: 'Model Name', required: true, placeholder: 'e.g., J-335', width: '150px' },
+    { key: 'name', header: 'Name', required: true, placeholder: 'J-335', width: '120px', group: 'Identity' },
     {
       key: 'year',
       header: 'Year',
       type: 'select' as const,
       options: years.map((y) => ({ value: String(y), label: String(y) })),
       required: true,
-      width: '100px',
+      width: '90px',
+      group: 'Identity',
     },
-    { key: 'seatingCapacity', header: 'Seats', type: 'number' as const, placeholder: '5', width: '80px' },
-    { key: 'jetCount', header: 'Jets', type: 'number' as const, placeholder: '30', width: '80px' },
-    { key: 'dataSource', header: 'Data Source', placeholder: 'Source', width: '120px' },
-    { key: 'isDiscontinued', header: 'Discontinued', type: 'checkbox' as const, width: '100px' },
+    { key: 'manufacturerSku', header: 'SKU', placeholder: 'JAC-J335', width: '110px', group: 'Identity' },
+    // Specs
+    { key: 'seatingCapacity', header: 'Seats', type: 'number' as const, placeholder: '5', width: '70px', group: 'Specs' },
+    { key: 'jetCount', header: 'Jets', type: 'number' as const, placeholder: '30', width: '70px', group: 'Specs' },
+    { key: 'waterCapacityGallons', header: 'Gallons', type: 'number' as const, placeholder: '350', width: '80px', group: 'Specs' },
+    { key: 'electricalRequirement', header: 'Electrical', placeholder: '240V/50A', width: '100px', group: 'Specs' },
+    // Dimensions
+    { key: 'dimensionsLengthInches', header: 'Length"', type: 'number' as const, placeholder: '85', width: '75px', group: 'Dimensions' },
+    { key: 'dimensionsWidthInches', header: 'Width"', type: 'number' as const, placeholder: '85', width: '75px', group: 'Dimensions' },
+    { key: 'dimensionsHeightInches', header: 'Height"', type: 'number' as const, placeholder: '36', width: '75px', group: 'Dimensions' },
+    // Weight
+    { key: 'weightDryLbs', header: 'Dry lbs', type: 'number' as const, placeholder: '725', width: '80px', group: 'Weight' },
+    { key: 'weightFilledLbs', header: 'Filled lbs', type: 'number' as const, placeholder: '4200', width: '90px', group: 'Weight' },
+    // Features
+    { key: 'hasOzone', header: 'Ozone', type: 'checkbox' as const, width: '65px', group: 'Features' },
+    { key: 'hasUv', header: 'UV', type: 'checkbox' as const, width: '55px', group: 'Features' },
+    { key: 'hasSaltSystem', header: 'Salt', type: 'checkbox' as const, width: '55px', group: 'Features' },
+    // Media
+    { key: 'imageUrl', header: 'Image URL', placeholder: 'https://...', width: '150px', group: 'Media' },
+    { key: 'specSheetUrl', header: 'Spec URL', placeholder: 'https://...', width: '150px', group: 'Media' },
+    // Meta
+    { key: 'notes', header: 'Notes', placeholder: 'Internal notes', width: '150px', group: 'Meta' },
+    { key: 'isDiscontinued', header: 'Disc.', type: 'checkbox' as const, width: '60px', group: 'Meta' },
+    { key: 'dataSource', header: 'Source', placeholder: 'Website', width: '100px', group: 'Meta' },
   ];
 
   return (
@@ -602,8 +639,8 @@ function NewSpaForm() {
           </form>
         </Accordion>
 
-        <Accordion title="Bulk Add Spas" subtitle="Add multiple spa models at once using a spreadsheet-style table">
-          <BulkAddTable columns={bulkColumns} onSubmit={handleBulkAdd} />
+        <Accordion title="Bulk Add Spas" subtitle="Add multiple spa models at once - click Expand for full-screen view">
+          <BulkAddTable columns={bulkColumns} onSubmit={handleBulkAdd} title="Bulk Add Spa Models" />
         </Accordion>
       </div>
 

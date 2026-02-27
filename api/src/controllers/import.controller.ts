@@ -23,18 +23,22 @@ interface SpaModelImportRow {
   modelLineName: string;
   name: string;
   year: number;
+  manufacturerSku?: string;
   seatingCapacity?: number;
   jetCount?: number;
   waterCapacityGallons?: number;
+  electricalRequirement?: string;
   dimensionsLengthInches?: number;
   dimensionsWidthInches?: number;
   dimensionsHeightInches?: number;
   weightDryLbs?: number;
   weightFilledLbs?: number;
-  electricalRequirement?: string;
   hasOzone?: boolean;
   hasUv?: boolean;
   hasSaltSystem?: boolean;
+  imageUrl?: string;
+  specSheetUrl?: string;
+  notes?: string;
   isDiscontinued?: boolean;
   dataSource?: string;
 }
@@ -250,18 +254,22 @@ export async function importSpas(req: Request, res: Response) {
             model_line_id: modelLine.id,
             name: row.name,
             year: row.year,
+            manufacturer_sku: row.manufacturerSku || null,
             seating_capacity: row.seatingCapacity || null,
             jet_count: row.jetCount || null,
             water_capacity_gallons: row.waterCapacityGallons || null,
+            electrical_requirement: row.electricalRequirement || null,
             dimensions_length_inches: row.dimensionsLengthInches || null,
             dimensions_width_inches: row.dimensionsWidthInches || null,
             dimensions_height_inches: row.dimensionsHeightInches || null,
             weight_dry_lbs: row.weightDryLbs || null,
             weight_filled_lbs: row.weightFilledLbs || null,
-            electrical_requirement: row.electricalRequirement || null,
             has_ozone: row.hasOzone ?? false,
             has_uv: row.hasUv ?? false,
             has_salt_system: row.hasSaltSystem ?? false,
+            image_url: row.imageUrl || null,
+            spec_sheet_url: row.specSheetUrl || null,
+            notes: row.notes || null,
             is_discontinued: row.isDiscontinued ?? false,
             data_source: row.dataSource || 'csv_import',
           })

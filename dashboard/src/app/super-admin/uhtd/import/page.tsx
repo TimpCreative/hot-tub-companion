@@ -117,8 +117,8 @@ export default function ImportPage() {
       description: 'Brand model lines',
     },
     spas: {
-      headers: ['brandName', 'modelLineName', 'name', 'year', 'seatingCapacity', 'jetCount', 'waterCapacityGallons', 'dimensionsLengthInches', 'dimensionsWidthInches', 'dimensionsHeightInches', 'weightDryLbs', 'dataSource'],
-      example: ['Jacuzzi', 'J-300 Collection', 'J-335', '2024', '5', '35', '350', '85', '85', '36', '725', 'manual_entry'],
+      headers: ['brandName', 'modelLineName', 'name', 'year', 'manufacturerSku', 'seatingCapacity', 'jetCount', 'waterCapacityGallons', 'electricalRequirement', 'dimensionsLengthInches', 'dimensionsWidthInches', 'dimensionsHeightInches', 'weightDryLbs', 'weightFilledLbs', 'hasOzone', 'hasUv', 'hasSaltSystem', 'imageUrl', 'specSheetUrl', 'notes', 'isDiscontinued', 'dataSource'],
+      example: ['Jacuzzi', 'J-300 Collection', 'J-335', '2024', 'JAC-J335-24', '5', '35', '350', '240V/50A', '85', '85', '36', '725', '4200', 'true', 'false', 'false', '', '', '', 'false', 'manual_entry'],
       label: 'Spas',
       description: 'Spa model-years',
     },
