@@ -5,6 +5,70 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { env } from '../config/environment';
 import { getFirebaseAuth, isFirebaseInitialized, getFirebaseInitError, getFirebaseKeyDebugInfo } from '../config/firebase';
+import sgMail from '@sendgrid/mail';
+
+// Initialize SendGrid if API key is available
+if (env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(env.SENDGRID_API_KEY);
+}
+
+/**
+ * Helper: Check if email is in whitelist (env var OR database)
+ */
+async function isEmailWhitelisted(email: string): Promise<{ allowed: boolean; source: 'env' | 'db' | null }> {
+  const emailLower = email.toLowerCase().trim();
+  
+  // Check env var first
+  const inEnv = env.SUPER_ADMIN_EMAILS.some(
+    (allowed) => allowed.toLowerCase() === emailLower
+  );
+  if (inEnv) {
+    return { allowed: true, source: 'env' };
+  }
+  
+  // Check database whitelist
+  try {
+    const dbEntry = await db('super_admin_whitelist')
+      .whereRaw('LOWER(email) = ?', [emailLower])
+      .first();
+    if (dbEntry) {
+      return { allowed: true, source: 'db' };
+    }
+  } catch (err) {
+    // Table might not exist yet during migration
+    console.warn('Could not check super_admin_whitelist table:', err);
+  }
+  
+  return { allowed: false, source: null };
+}
+
+/**
+ * Helper: Get all whitelisted emails (env + database)
+ */
+async function getAllWhitelistedEmails(): Promise<Array<{ email: string; source: 'env' | 'db'; invitedAt?: string }>> {
+  const emails: Array<{ email: string; source: 'env' | 'db'; invitedAt?: string }> = [];
+  
+  // Add env var emails
+  for (const email of env.SUPER_ADMIN_EMAILS) {
+    emails.push({ email: email.toLowerCase(), source: 'env' });
+  }
+  
+  // Add database whitelist emails
+  try {
+    const dbEmails = await db('super_admin_whitelist').select('email', 'invited_at');
+    for (const row of dbEmails) {
+      const emailLower = row.email.toLowerCase();
+      // Don't duplicate if already in env
+      if (!emails.some(e => e.email === emailLower)) {
+        emails.push({ email: emailLower, source: 'db', invitedAt: row.invited_at });
+      }
+    }
+  } catch (err) {
+    console.warn('Could not fetch super_admin_whitelist:', err);
+  }
+  
+  return emails;
+}
 
 /**
  * Check if an email is allowed to sign up as a super admin
@@ -18,17 +82,13 @@ export async function checkEmailAllowed(req: Request, res: Response): Promise<vo
     return;
   }
 
-  const emailLower = email.toLowerCase().trim();
-  const isAllowed = env.SUPER_ADMIN_EMAILS.some(
-    (allowed) => allowed.toLowerCase() === emailLower
-  );
-
-  success(res, { allowed: isAllowed });
+  const result = await isEmailWhitelisted(email);
+  success(res, { allowed: result.allowed });
 }
 
 /**
  * Register a new super admin user
- * Only allows registration if email is in SUPER_ADMIN_EMAILS env var
+ * Only allows registration if email is in whitelist (env var or database)
  * This endpoint is public (no auth required)
  */
 export async function registerSuperAdmin(req: Request, res: Response): Promise<void> {
@@ -49,11 +109,9 @@ export async function registerSuperAdmin(req: Request, res: Response): Promise<v
   }
 
   const emailLower = email.toLowerCase().trim();
-  const isAllowed = env.SUPER_ADMIN_EMAILS.some(
-    (allowed) => allowed.toLowerCase() === emailLower
-  );
+  const whitelist = await isEmailWhitelisted(emailLower);
 
-  if (!isAllowed) {
+  if (!whitelist.allowed) {
     error(res, 'FORBIDDEN', 'This email is not authorized for super admin access. Contact your administrator.', 403);
     return;
   }
@@ -167,6 +225,8 @@ export async function getSettings(req: Request, res: Response): Promise<void> {
     lastSignIn: string | null;
     createdAt: string | null;
     status: 'active' | 'not_registered' | 'error';
+    source: 'env' | 'db';
+    invitedAt?: string;
     error?: string;
   }> = [];
 
@@ -182,9 +242,13 @@ export async function getSettings(req: Request, res: Response): Promise<void> {
     firebaseInitError: getFirebaseInitError(),
     firebaseKeyDebug: getFirebaseKeyDebugInfo(),
     envVarSet: env.SUPER_ADMIN_EMAILS.length > 0,
-    emailCount: env.SUPER_ADMIN_EMAILS.length,
+    emailCount: 0,
     lookupErrors: [],
   };
+
+  // Get all whitelisted emails (env + db)
+  const whitelistedEmails = await getAllWhitelistedEmails();
+  diagnostics.emailCount = whitelistedEmails.length;
 
   // Try to initialize Firebase and get auth
   let auth: ReturnType<typeof getFirebaseAuth> | null = null;
@@ -199,35 +263,41 @@ export async function getSettings(req: Request, res: Response): Promise<void> {
 
   // If Firebase is configured, try to look up users
   if (auth) {
-    for (const email of env.SUPER_ADMIN_EMAILS) {
+    for (const entry of whitelistedEmails) {
       try {
-        const user = await auth.getUserByEmail(email.toLowerCase());
+        const user = await auth.getUserByEmail(entry.email);
         users.push({
-          email: user.email || email,
+          email: user.email || entry.email,
           displayName: user.displayName || null,
           lastSignIn: user.metadata.lastSignInTime || null,
           createdAt: user.metadata.creationTime || null,
           status: 'active',
+          source: entry.source,
+          invitedAt: entry.invitedAt,
         });
       } catch (err: any) {
         if (err.code === 'auth/user-not-found') {
           users.push({
-            email,
+            email: entry.email,
             displayName: null,
             lastSignIn: null,
             createdAt: null,
             status: 'not_registered',
+            source: entry.source,
+            invitedAt: entry.invitedAt,
           });
         } else {
-          const errorMsg = `${email}: ${err.code || err.message || 'Unknown error'}`;
+          const errorMsg = `${entry.email}: ${err.code || err.message || 'Unknown error'}`;
           diagnostics.lookupErrors.push(errorMsg);
-          console.error(`Error fetching user ${email}:`, err);
+          console.error(`Error fetching user ${entry.email}:`, err);
           users.push({
-            email,
+            email: entry.email,
             displayName: null,
             lastSignIn: null,
             createdAt: null,
             status: 'error',
+            source: entry.source,
+            invitedAt: entry.invitedAt,
             error: err.code || err.message,
           });
         }
@@ -235,13 +305,15 @@ export async function getSettings(req: Request, res: Response): Promise<void> {
     }
   } else {
     // Firebase not initialized - show all emails as unable to verify
-    for (const email of env.SUPER_ADMIN_EMAILS) {
+    for (const entry of whitelistedEmails) {
       users.push({
-        email,
+        email: entry.email,
         displayName: null,
         lastSignIn: null,
         createdAt: null,
         status: 'error',
+        source: entry.source,
+        invitedAt: entry.invitedAt,
         error: 'Firebase not initialized',
       });
     }
@@ -256,12 +328,159 @@ export async function getSettings(req: Request, res: Response): Promise<void> {
       lastSignIn: new Date().toISOString(),
       createdAt: null,
       status: 'active',
+      source: 'env',
     });
   }
 
   success(res, {
     users,
-    allowedEmails: env.SUPER_ADMIN_EMAILS,
     diagnostics,
   });
+}
+
+/**
+ * Add an email to the super admin whitelist
+ */
+export async function addWhitelistEmail(req: Request, res: Response): Promise<void> {
+  const { email } = req.body as { email?: string };
+  const addedBy = (req as any).superAdminEmail;
+
+  if (!email) {
+    error(res, 'VALIDATION_ERROR', 'Email is required', 400);
+    return;
+  }
+
+  const emailLower = email.toLowerCase().trim();
+
+  // Check if already whitelisted
+  const existing = await isEmailWhitelisted(emailLower);
+  if (existing.allowed) {
+    error(res, 'CONFLICT', 'This email is already whitelisted', 409);
+    return;
+  }
+
+  // Add to database
+  try {
+    await db('super_admin_whitelist').insert({
+      email: emailLower,
+      added_by: addedBy,
+    });
+    success(res, { message: 'Email added to whitelist', email: emailLower });
+  } catch (err: any) {
+    console.error('Error adding email to whitelist:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to add email', 500);
+  }
+}
+
+/**
+ * Remove an email from the super admin whitelist (database only, can't remove env vars)
+ */
+export async function removeWhitelistEmail(req: Request, res: Response): Promise<void> {
+  const { email } = req.params;
+
+  if (!email) {
+    error(res, 'VALIDATION_ERROR', 'Email is required', 400);
+    return;
+  }
+
+  const emailLower = email.toLowerCase().trim();
+
+  // Check if it's from env var (can't be removed)
+  const inEnv = env.SUPER_ADMIN_EMAILS.some(
+    (allowed) => allowed.toLowerCase() === emailLower
+  );
+  if (inEnv) {
+    error(res, 'FORBIDDEN', 'Cannot remove emails from environment variable. Remove from Railway instead.', 403);
+    return;
+  }
+
+  // Remove from database
+  try {
+    const deleted = await db('super_admin_whitelist')
+      .whereRaw('LOWER(email) = ?', [emailLower])
+      .delete();
+    
+    if (deleted === 0) {
+      error(res, 'NOT_FOUND', 'Email not found in whitelist', 404);
+      return;
+    }
+    
+    success(res, { message: 'Email removed from whitelist', email: emailLower });
+  } catch (err: any) {
+    console.error('Error removing email from whitelist:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to remove email', 500);
+  }
+}
+
+/**
+ * Send an invite email to a whitelisted user
+ */
+export async function sendInviteEmail(req: Request, res: Response): Promise<void> {
+  const { email } = req.body as { email?: string };
+
+  if (!email) {
+    error(res, 'VALIDATION_ERROR', 'Email is required', 400);
+    return;
+  }
+
+  const emailLower = email.toLowerCase().trim();
+
+  // Check if email is whitelisted
+  const whitelist = await isEmailWhitelisted(emailLower);
+  if (!whitelist.allowed) {
+    error(res, 'FORBIDDEN', 'Email is not whitelisted. Add it first.', 403);
+    return;
+  }
+
+  // Check if SendGrid is configured
+  if (!env.SENDGRID_API_KEY) {
+    error(res, 'CONFIG_ERROR', 'Email sending is not configured (SENDGRID_API_KEY missing)', 500);
+    return;
+  }
+
+  const signupUrl = `${env.API_URL.replace('api.', 'admin.')}/super-admin/auth/register`;
+
+  try {
+    await sgMail.send({
+      to: emailLower,
+      from: {
+        email: env.SENDGRID_FROM_EMAIL,
+        name: env.SENDGRID_FROM_NAME,
+      },
+      subject: 'You\'re invited to Hot Tub Companion Admin',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #1B4D7A;">Welcome to Hot Tub Companion! 🛁</h2>
+          <p>You've been invited to join as a Super Admin.</p>
+          <p>Click the button below to create your account:</p>
+          <p style="margin: 30px 0;">
+            <a href="${signupUrl}" 
+               style="background-color: #1B4D7A; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Create Your Account
+            </a>
+          </p>
+          <p style="color: #666; font-size: 14px;">
+            Or copy this link: <br>
+            <a href="${signupUrl}" style="color: #1B4D7A;">${signupUrl}</a>
+          </p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          <p style="color: #999; font-size: 12px;">
+            This invitation was sent from Hot Tub Companion Admin Dashboard.
+          </p>
+        </div>
+      `,
+    });
+
+    // Update invited_at timestamp if it's a db whitelist entry
+    if (whitelist.source === 'db') {
+      await db('super_admin_whitelist')
+        .whereRaw('LOWER(email) = ?', [emailLower])
+        .update({ invited_at: db.fn.now() });
+    }
+
+    success(res, { message: 'Invite email sent', email: emailLower });
+  } catch (err: any) {
+    console.error('Error sending invite email:', err);
+    error(res, 'EMAIL_ERROR', `Failed to send email: ${err.message}`, 500);
+  }
 }

@@ -16,4 +16,9 @@ router.get('/tenants', superAdminController.listTenants);
 router.post('/tenants', superAdminController.createTenant);
 router.get('/settings', superAdminController.getSettings);
 
+// Whitelist management
+router.post('/whitelist', superAdminController.addWhitelistEmail);
+router.delete('/whitelist/:email', superAdminController.removeWhitelistEmail);
+router.post('/whitelist/invite', superAdminController.sendInviteEmail);
+
 export default router;

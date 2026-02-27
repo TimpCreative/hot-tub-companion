@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { Modal } from '@/components/ui/Modal';
 
 interface SuperAdminUser {
   email: string;
@@ -11,6 +12,8 @@ interface SuperAdminUser {
   lastSignIn: string | null;
   createdAt: string | null;
   status: 'active' | 'not_registered' | 'error';
+  source: 'env' | 'db';
+  invitedAt?: string;
   error?: string;
 }
 
@@ -33,9 +36,14 @@ export default function SettingsPage() {
   const { user, logout, getIdToken } = useAuth();
   const [superAdmins, setSuperAdmins] = useState<SuperAdminUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [allowedEmails, setAllowedEmails] = useState<string[]>([]);
   const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [usersExpanded, setUsersExpanded] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [addingEmail, setAddingEmail] = useState(false);
+  const [sendingInvite, setSendingInvite] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -54,7 +62,6 @@ export default function SettingsPage() {
       const data = await res.json();
       if (data.success) {
         setSuperAdmins(data.data?.users || []);
-        setAllowedEmails(data.data?.allowedEmails || []);
         setDiagnostics(data.data?.diagnostics || null);
       } else {
         setFetchError(data.error?.message || 'Failed to fetch settings');
@@ -71,6 +78,94 @@ export default function SettingsPage() {
     fetchSettings();
   }, [fetchSettings]);
 
+  const handleAddEmail = async () => {
+    if (!newEmail.trim()) return;
+    
+    setAddingEmail(true);
+    setActionMessage(null);
+    
+    try {
+      const token = await getIdToken();
+      const res = await fetch('/api/dashboard/super-admin/whitelist', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: newEmail.trim() }),
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setActionMessage({ type: 'success', text: `Added ${newEmail} to whitelist` });
+        setNewEmail('');
+        setShowAddModal(false);
+        fetchSettings();
+      } else {
+        setActionMessage({ type: 'error', text: data.error?.message || 'Failed to add email' });
+      }
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err.message || 'Network error' });
+    } finally {
+      setAddingEmail(false);
+    }
+  };
+
+  const handleSendInvite = async (email: string) => {
+    setSendingInvite(email);
+    setActionMessage(null);
+    
+    try {
+      const token = await getIdToken();
+      const res = await fetch('/api/dashboard/super-admin/whitelist/invite', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setActionMessage({ type: 'success', text: `Invite sent to ${email}` });
+        fetchSettings();
+      } else {
+        setActionMessage({ type: 'error', text: data.error?.message || 'Failed to send invite' });
+      }
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err.message || 'Network error' });
+    } finally {
+      setSendingInvite(null);
+    }
+  };
+
+  const handleRemoveEmail = async (email: string) => {
+    if (!confirm(`Remove ${email} from the whitelist?`)) return;
+    
+    setActionMessage(null);
+    
+    try {
+      const token = await getIdToken();
+      const res = await fetch(`/api/dashboard/super-admin/whitelist/${encodeURIComponent(email)}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setActionMessage({ type: 'success', text: `Removed ${email} from whitelist` });
+        fetchSettings();
+      } else {
+        setActionMessage({ type: 'error', text: data.error?.message || 'Failed to remove email' });
+      }
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err.message || 'Network error' });
+    }
+  };
+
   const systemInfo: SystemInfo = {
     environment: process.env.NODE_ENV || 'development',
     version: '1.0.0',
@@ -83,6 +178,13 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
         <p className="text-sm text-gray-500 mt-1">Super Admin configuration and user management</p>
       </div>
+
+      {/* Action message */}
+      {actionMessage && (
+        <div className={`mb-4 p-3 rounded-lg ${actionMessage.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+          {actionMessage.text}
+        </div>
+      )}
 
       <div className="space-y-6">
         {/* Current User */}
@@ -113,86 +215,76 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Super Admin Users */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Super Admin Users</h3>
-          <p className="text-sm text-gray-500 mb-4">
-            Users with Super Admin access to the platform. To add new users, update the{' '}
-            <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">SUPER_ADMIN_EMAILS</code>{' '}
-            environment variable in the API.
-          </p>
+        {/* Super Admin Users - Accordion */}
+        <div className="bg-white rounded-lg border border-gray-200">
+          <button
+            onClick={() => setUsersExpanded(!usersExpanded)}
+            className="w-full p-6 flex items-center justify-between text-left"
+          >
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Super Admin Users</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {superAdmins.length} user{superAdmins.length !== 1 ? 's' : ''} with access
+              </p>
+            </div>
+            <svg
+              className={`w-5 h-5 text-gray-400 transition-transform ${usersExpanded ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
           
-          {loading ? (
-            <div className="animate-pulse space-y-3">
-              <div className="h-10 bg-gray-100 rounded"></div>
-              <div className="h-10 bg-gray-100 rounded"></div>
-            </div>
-          ) : fetchError ? (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="text-sm font-medium text-red-800">Error fetching settings</div>
-              <div className="text-xs text-red-600 mt-1">{fetchError}</div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Diagnostics (if there are issues) */}
-              {diagnostics && (diagnostics.lookupErrors.length > 0 || !diagnostics.envVarSet || diagnostics.firebaseInitError) && (
-                <div className={`p-3 border rounded-lg ${diagnostics.firebaseInitError ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                  <div className={`text-sm font-medium mb-2 ${diagnostics.firebaseInitError ? 'text-red-800' : 'text-yellow-800'}`}>Diagnostics</div>
-                  <div className={`text-xs space-y-1 ${diagnostics.firebaseInitError ? 'text-red-700' : 'text-yellow-700'}`}>
-                    <div>Firebase configured: {diagnostics.firebaseConfigured ? '✓' : '✗'}</div>
-                    {diagnostics.firebaseInitError && (
-                      <div className="text-red-600 font-medium">
-                        Firebase Error: {diagnostics.firebaseInitError}
-                      </div>
-                    )}
-                    <div>SUPER_ADMIN_EMAILS set: {diagnostics.envVarSet ? `✓ (${diagnostics.emailCount} emails)` : '✗ Not set'}</div>
-                    {diagnostics.lookupErrors.length > 0 && (
-                      <div className="mt-2">
-                        <div className="font-medium">Lookup errors:</div>
-                        {diagnostics.lookupErrors.map((err, i) => (
-                          <div key={i} className="text-red-600">• {err}</div>
-                        ))}
-                      </div>
-                    )}
-                    {diagnostics.firebaseKeyDebug && (
-                      <div className="mt-2 p-2 bg-white/50 rounded text-xs font-mono">
-                        <div className="font-medium mb-1">Key Debug Info:</div>
-                        {Object.entries(diagnostics.firebaseKeyDebug).map(([k, v]) => (
-                          <div key={k}>{k}: {String(v)}</div>
-                        ))}
-                      </div>
-                    )}
-                    {diagnostics.firebaseInitError && (
-                      <div className="mt-3 p-2 bg-white/50 rounded text-xs">
-                        <strong>How to fix:</strong> Check the <code className="bg-gray-100 px-1 rounded">FIREBASE_PRIVATE_KEY</code> environment variable in Railway. 
-                        The key should NOT have surrounding quotes, and newlines should be represented as literal <code className="bg-gray-100 px-1 rounded">\n</code> characters.
-                      </div>
-                    )}
-                  </div>
+          {usersExpanded && (
+            <div className="px-6 pb-6 border-t border-gray-100">
+              {loading ? (
+                <div className="animate-pulse space-y-3 pt-4">
+                  <div className="h-10 bg-gray-100 rounded"></div>
+                  <div className="h-10 bg-gray-100 rounded"></div>
                 </div>
-              )}
-
-              {/* Allowed emails from env */}
-              {allowedEmails.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Allowed Emails (from config)</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {allowedEmails.map((email) => (
-                      <span
-                        key={email}
-                        className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-full"
-                      >
-                        {email}
-                      </span>
-                    ))}
-                  </div>
+              ) : fetchError ? (
+                <div className="p-4 mt-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="text-sm font-medium text-red-800">Error fetching settings</div>
+                  <div className="text-xs text-red-600 mt-1">{fetchError}</div>
                 </div>
-              )}
+              ) : (
+                <div className="space-y-4 pt-4">
+                  {/* Diagnostics (if there are issues) */}
+                  {diagnostics && (diagnostics.lookupErrors.length > 0 || diagnostics.firebaseInitError) && (
+                    <div className={`p-3 border rounded-lg ${diagnostics.firebaseInitError ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                      <div className={`text-sm font-medium mb-2 ${diagnostics.firebaseInitError ? 'text-red-800' : 'text-yellow-800'}`}>Diagnostics</div>
+                      <div className={`text-xs space-y-1 ${diagnostics.firebaseInitError ? 'text-red-700' : 'text-yellow-700'}`}>
+                        <div>Firebase configured: {diagnostics.firebaseConfigured ? '✓' : '✗'}</div>
+                        {diagnostics.firebaseInitError && (
+                          <div className="text-red-600 font-medium">
+                            Firebase Error: {diagnostics.firebaseInitError}
+                          </div>
+                        )}
+                        {diagnostics.lookupErrors.length > 0 && (
+                          <div className="mt-2">
+                            <div className="font-medium">Lookup errors:</div>
+                            {diagnostics.lookupErrors.map((err, i) => (
+                              <div key={i} className="text-red-600">• {err}</div>
+                            ))}
+                          </div>
+                        )}
+                        {diagnostics.firebaseKeyDebug && (
+                          <details className="mt-2">
+                            <summary className="cursor-pointer text-xs font-medium">Key Debug Info</summary>
+                            <div className="mt-1 p-2 bg-white/50 rounded text-xs font-mono">
+                              {Object.entries(diagnostics.firebaseKeyDebug).map(([k, v]) => (
+                                <div key={k}>{k}: {String(v)}</div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-              {/* Users list */}
-              {superAdmins.length > 0 ? (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Users</h4>
+                  {/* Users list */}
                   <div className="divide-y divide-gray-100">
                     {superAdmins.map((admin) => (
                       <div
@@ -201,37 +293,66 @@ export default function SettingsPage() {
                       >
                         <div className="flex items-center gap-3">
                           <div>
-                            <div className="text-sm font-medium text-gray-900">
+                            <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
                               {admin.displayName || admin.email}
+                              {admin.source === 'db' && (
+                                <span className="text-xs text-gray-400">(added via dashboard)</span>
+                              )}
                             </div>
                             {admin.displayName && (
                               <div className="text-xs text-gray-500">{admin.email}</div>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           {admin.status === 'active' && (
                             <Badge variant="success" size="sm">Active</Badge>
                           )}
                           {admin.status === 'not_registered' && (
-                            <Badge variant="warning" size="sm">Not registered</Badge>
+                            <>
+                              <Badge variant="warning" size="sm">Not registered</Badge>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleSendInvite(admin.email)}
+                                disabled={sendingInvite === admin.email}
+                              >
+                                {sendingInvite === admin.email ? 'Sending...' : 'Invite'}
+                              </Button>
+                            </>
                           )}
                           {admin.status === 'error' && (
                             <Badge variant="error" size="sm" title={admin.error}>Error</Badge>
                           )}
-                          <div className="text-xs text-gray-400">
+                          {admin.source === 'db' && (
+                            <button
+                              onClick={() => handleRemoveEmail(admin.email)}
+                              className="text-gray-400 hover:text-red-500 p-1"
+                              title="Remove from whitelist"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
+                          <div className="text-xs text-gray-400 ml-2">
                             {admin.lastSignIn
                               ? `Last seen ${new Date(admin.lastSignIn).toLocaleDateString()}`
+                              : admin.invitedAt
+                              ? `Invited ${new Date(admin.invitedAt).toLocaleDateString()}`
                               : ''}
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500">
-                  No Super Admin users configured. Set the SUPER_ADMIN_EMAILS environment variable.
+
+                  {/* Add user button */}
+                  <div className="pt-2">
+                    <Button variant="secondary" onClick={() => setShowAddModal(true)}>
+                      + Add User
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -292,6 +413,33 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Add User Modal */}
+      <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Add Super Admin User">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-500">
+            Add an email to the Super Admin whitelist. They&apos;ll be able to register at the signup page.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+            <input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="user@example.com"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setShowAddModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddEmail} disabled={addingEmail || !newEmail.trim()}>
+              {addingEmail ? 'Adding...' : 'Add User'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
