@@ -4,7 +4,7 @@ import { success, error } from '../utils/response';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { env } from '../config/environment';
-import { getFirebaseAuth } from '../config/firebase';
+import { getFirebaseAuth, isFirebaseInitialized, getFirebaseInitError } from '../config/firebase';
 
 /**
  * Check if an email is allowed to sign up as a super admin
@@ -161,30 +161,42 @@ export async function createTenant(req: Request, res: Response): Promise<void> {
  * Get settings including super admin users list
  */
 export async function getSettings(req: Request, res: Response): Promise<void> {
+  const users: Array<{
+    email: string;
+    displayName: string | null;
+    lastSignIn: string | null;
+    createdAt: string | null;
+    status: 'active' | 'not_registered' | 'error';
+    error?: string;
+  }> = [];
+
+  const diagnostics: {
+    firebaseConfigured: boolean;
+    firebaseInitError: string | null;
+    envVarSet: boolean;
+    emailCount: number;
+    lookupErrors: string[];
+  } = {
+    firebaseConfigured: isFirebaseInitialized(),
+    firebaseInitError: getFirebaseInitError(),
+    envVarSet: env.SUPER_ADMIN_EMAILS.length > 0,
+    emailCount: env.SUPER_ADMIN_EMAILS.length,
+    lookupErrors: [],
+  };
+
+  // Try to initialize Firebase and get auth
+  let auth: ReturnType<typeof getFirebaseAuth> | null = null;
   try {
-    const auth = getFirebaseAuth();
-    const users: Array<{
-      email: string;
-      displayName: string | null;
-      lastSignIn: string | null;
-      createdAt: string | null;
-      status: 'active' | 'not_registered' | 'error';
-      error?: string;
-    }> = [];
+    auth = getFirebaseAuth();
+    diagnostics.firebaseConfigured = true;
+  } catch (err: any) {
+    diagnostics.firebaseConfigured = false;
+    diagnostics.firebaseInitError = err.message;
+    console.error('Firebase initialization error:', err.message);
+  }
 
-    const diagnostics: {
-      firebaseConfigured: boolean;
-      envVarSet: boolean;
-      emailCount: number;
-      lookupErrors: string[];
-    } = {
-      firebaseConfigured: !!auth,
-      envVarSet: env.SUPER_ADMIN_EMAILS.length > 0,
-      emailCount: env.SUPER_ADMIN_EMAILS.length,
-      lookupErrors: [],
-    };
-
-    // Get users from Firebase for the allowed emails
+  // If Firebase is configured, try to look up users
+  if (auth) {
     for (const email of env.SUPER_ADMIN_EMAILS) {
       try {
         const user = await auth.getUserByEmail(email.toLowerCase());
@@ -219,26 +231,35 @@ export async function getSettings(req: Request, res: Response): Promise<void> {
         }
       }
     }
-
-    // Also include the currently authenticated user if not already in the list
-    const currentUserEmail = (req as any).superAdminEmail;
-    if (currentUserEmail && !users.some(u => u.email.toLowerCase() === currentUserEmail.toLowerCase())) {
-      users.unshift({
-        email: currentUserEmail,
+  } else {
+    // Firebase not initialized - show all emails as unable to verify
+    for (const email of env.SUPER_ADMIN_EMAILS) {
+      users.push({
+        email,
         displayName: null,
-        lastSignIn: new Date().toISOString(),
+        lastSignIn: null,
         createdAt: null,
-        status: 'active',
+        status: 'error',
+        error: 'Firebase not initialized',
       });
     }
-
-    success(res, {
-      users,
-      allowedEmails: env.SUPER_ADMIN_EMAILS,
-      diagnostics,
-    });
-  } catch (err: any) {
-    console.error('Error getting settings:', err);
-    error(res, 'INTERNAL_ERROR', `Failed to get settings: ${err.message}`, 500);
   }
+
+  // Also include the currently authenticated user if not already in the list
+  const currentUserEmail = (req as any).superAdminEmail;
+  if (currentUserEmail && !users.some(u => u.email.toLowerCase() === currentUserEmail.toLowerCase())) {
+    users.unshift({
+      email: currentUserEmail,
+      displayName: null,
+      lastSignIn: new Date().toISOString(),
+      createdAt: null,
+      status: 'active',
+    });
+  }
+
+  success(res, {
+    users,
+    allowedEmails: env.SUPER_ADMIN_EMAILS,
+    diagnostics,
+  });
 }

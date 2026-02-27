@@ -16,6 +16,7 @@ interface SuperAdminUser {
 
 interface Diagnostics {
   firebaseConfigured: boolean;
+  firebaseInitError: string | null;
   envVarSet: boolean;
   emailCount: number;
   lookupErrors: string[];
@@ -133,11 +134,16 @@ export default function SettingsPage() {
           ) : (
             <div className="space-y-4">
               {/* Diagnostics (if there are issues) */}
-              {diagnostics && (diagnostics.lookupErrors.length > 0 || !diagnostics.envVarSet) && (
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <div className="text-sm font-medium text-yellow-800 mb-2">Diagnostics</div>
-                  <div className="text-xs text-yellow-700 space-y-1">
+              {diagnostics && (diagnostics.lookupErrors.length > 0 || !diagnostics.envVarSet || diagnostics.firebaseInitError) && (
+                <div className={`p-3 border rounded-lg ${diagnostics.firebaseInitError ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                  <div className={`text-sm font-medium mb-2 ${diagnostics.firebaseInitError ? 'text-red-800' : 'text-yellow-800'}`}>Diagnostics</div>
+                  <div className={`text-xs space-y-1 ${diagnostics.firebaseInitError ? 'text-red-700' : 'text-yellow-700'}`}>
                     <div>Firebase configured: {diagnostics.firebaseConfigured ? '✓' : '✗'}</div>
+                    {diagnostics.firebaseInitError && (
+                      <div className="text-red-600 font-medium">
+                        Firebase Error: {diagnostics.firebaseInitError}
+                      </div>
+                    )}
                     <div>SUPER_ADMIN_EMAILS set: {diagnostics.envVarSet ? `✓ (${diagnostics.emailCount} emails)` : '✗ Not set'}</div>
                     {diagnostics.lookupErrors.length > 0 && (
                       <div className="mt-2">
@@ -145,6 +151,13 @@ export default function SettingsPage() {
                         {diagnostics.lookupErrors.map((err, i) => (
                           <div key={i} className="text-red-600">• {err}</div>
                         ))}
+                      </div>
+                    )}
+                    {diagnostics.firebaseInitError && (
+                      <div className="mt-3 p-2 bg-white/50 rounded text-xs">
+                        <strong>How to fix:</strong> Check the <code className="bg-gray-100 px-1 rounded">FIREBASE_PRIVATE_KEY</code> environment variable in Railway. 
+                        Make sure the key starts with <code className="bg-gray-100 px-1 rounded">-----BEGIN PRIVATE KEY-----</code> and 
+                        has proper newlines (use <code className="bg-gray-100 px-1 rounded">\n</code> for line breaks).
                       </div>
                     )}
                   </div>
