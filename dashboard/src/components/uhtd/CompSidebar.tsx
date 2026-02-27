@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Badge } from '../ui/Badge';
+import { CreateCompModal } from './CreateCompModal';
 
 interface CompMatch {
   comp: {
@@ -19,6 +20,7 @@ interface CompSidebarProps {
   categoryId?: string;
   onCompSelect: (compId: string) => void;
   onQuickview: (compId: string) => void;
+  onCompCreated?: (comp: { id: string; name: string }) => void;
 }
 
 export function CompSidebar({
@@ -26,9 +28,11 @@ export function CompSidebar({
   categoryId,
   onCompSelect,
   onQuickview,
+  onCompCreated,
 }: CompSidebarProps) {
   const [nearMatches, setNearMatches] = useState<CompMatch[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     if (selectedSpaIds.length === 0) {
@@ -137,15 +141,29 @@ export function CompSidebar({
 
       <div className="p-4 border-t border-gray-200">
         <button
-          className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          onClick={() => {
-            // This would open a "Create New Comp" modal
-            alert('Create New Comp modal would open here');
-          }}
+          className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={() => setShowCreateModal(true)}
+          disabled={selectedSpaIds.length === 0}
         >
           + Create New Comp
         </button>
+        {selectedSpaIds.length === 0 && (
+          <p className="text-xs text-gray-400 text-center mt-2">
+            Select spas first to create a Comp
+          </p>
+        )}
       </div>
+
+      <CreateCompModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        preSelectedSpaIds={selectedSpaIds}
+        categoryId={categoryId}
+        onCreated={(comp) => {
+          setShowCreateModal(false);
+          onCompCreated?.(comp);
+        }}
+      />
     </div>
   );
 }

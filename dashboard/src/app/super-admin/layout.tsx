@@ -9,13 +9,21 @@ const SUPER_ADMIN_NAV = [
   { label: 'Analytics', href: '/analytics', comingPhase: 5 },
 ];
 
+const BOTTOM_NAV = [
+  { label: 'Settings', href: '/settings' },
+];
+
 export default function SuperAdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <SuperAdminLayoutClient navItems={SUPER_ADMIN_NAV} basePath="/super-admin">
+    <SuperAdminLayoutClient 
+      navItems={SUPER_ADMIN_NAV} 
+      bottomItems={BOTTOM_NAV}
+      basePath="/super-admin"
+    >
       {children}
     </SuperAdminLayoutClient>
   );

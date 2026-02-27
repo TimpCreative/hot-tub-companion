@@ -5,29 +5,26 @@ import Link from 'next/link';
 import { Table } from '@/components/ui/Table';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { Pagination } from '@/components/ui/Pagination';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 
 interface Brand {
   id: string;
   name: string;
 }
 
-interface SpaModel {
+interface ModelLine {
   id: string;
-  modelName: string;
-  modelYear: number;
+  name: string;
   brandId: string;
   brandName: string;
-  modelLineId: string;
-  modelLineName: string;
-  seatingCapacity: number | null;
-  jetCount: number | null;
-  isDiscontinued: boolean;
+  description: string | null;
+  isActive: boolean;
+  spaCount?: number;
 }
 
-export default function SpasPage() {
-  const [spas, setSpas] = useState<SpaModel[]>([]);
+export default function ModelLinesPage() {
+  const [modelLines, setModelLines] = useState<ModelLine[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -35,7 +32,6 @@ export default function SpasPage() {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('');
-  const [selectedYear, setSelectedYear] = useState('');
 
   useEffect(() => {
     async function fetchBrands() {
@@ -51,7 +47,7 @@ export default function SpasPage() {
   }, []);
 
   useEffect(() => {
-    async function fetchSpas() {
+    async function fetchModelLines() {
       setLoading(true);
       try {
         const params = new URLSearchParams({
@@ -60,76 +56,61 @@ export default function SpasPage() {
         });
         if (search) params.append('search', search);
         if (selectedBrand) params.append('brandId', selectedBrand);
-        if (selectedYear) params.append('year', selectedYear);
 
-        const res = await fetch(`/api/dashboard/super-admin/scdb/spa-models?${params}`);
+        const res = await fetch(`/api/dashboard/super-admin/scdb/model-lines?${params}`);
         const data = await res.json();
         if (data.success) {
-          setSpas(data.data || []);
-          setTotal(data.pagination?.total || 0);
+          setModelLines(data.data || []);
+          setTotal(data.pagination?.total || data.data?.length || 0);
         }
       } catch (err) {
-        console.error('Error fetching spas:', err);
+        console.error('Error fetching model lines:', err);
       } finally {
         setLoading(false);
       }
     }
-    fetchSpas();
-  }, [page, pageSize, search, selectedBrand, selectedYear]);
+    fetchModelLines();
+  }, [page, pageSize, search, selectedBrand]);
 
   const columns = [
     {
-      key: 'modelName',
-      header: 'Model',
-      render: (spa: any) => (
+      key: 'name',
+      header: 'Model Line',
+      render: (ml: any) => (
         <div>
-          <div className="font-medium text-gray-900">{spa.modelName}</div>
-          <div className="text-xs text-gray-500">{spa.modelYear}</div>
+          <div className="font-medium text-gray-900">{ml.name}</div>
+          {ml.description && (
+            <div className="text-xs text-gray-500 truncate max-w-xs">{ml.description}</div>
+          )}
         </div>
       ),
     },
     {
       key: 'brand',
       header: 'Brand',
-      render: (spa: any) => (
+      render: (ml: any) => (
         <Link
-          href={`/super-admin/uhtd/brands/${spa.brandId}`}
+          href={`/super-admin/uhtd/brands/${ml.brandId}`}
           className="text-blue-600 hover:text-blue-800"
         >
-          {spa.brandName}
+          {ml.brandName}
         </Link>
       ),
     },
     {
-      key: 'modelLine',
-      header: 'Model Line',
-      render: (spa: any) => (
-        <Link
-          href={`/super-admin/uhtd/model-lines/${spa.modelLineId}`}
-          className="text-blue-600 hover:text-blue-800"
-        >
-          {spa.modelLineName}
-        </Link>
-      ),
-    },
-    {
-      key: 'specs',
-      header: 'Specs',
-      render: (spa: any) => (
-        <div className="text-sm text-gray-600">
-          {spa.seatingCapacity && <span>{spa.seatingCapacity} seats</span>}
-          {spa.seatingCapacity && spa.jetCount && <span className="mx-1">•</span>}
-          {spa.jetCount && <span>{spa.jetCount} jets</span>}
-          {!spa.seatingCapacity && !spa.jetCount && <span className="text-gray-400">-</span>}
-        </div>
+      key: 'spaCount',
+      header: 'Spas',
+      className: 'text-center',
+      render: (ml: any) => (
+        <span className="text-gray-600">{ml.spaCount || 0}</span>
       ),
     },
     {
       key: 'status',
       header: 'Status',
-      render: (spa: any) => (
-        <Badge variant={spa.isDiscontinued ? 'warning' : 'success'}>
-          {spa.isDiscontinued ? 'Discontinued' : 'Current'}
+      render: (ml: any) => (
+        <Badge variant={ml.isActive ? 'success' : 'default'}>
+          {ml.isActive ? 'Active' : 'Inactive'}
         </Badge>
       ),
     },
@@ -137,9 +118,9 @@ export default function SpasPage() {
       key: 'actions',
       header: '',
       className: 'w-20',
-      render: (spa: any) => (
+      render: (ml: any) => (
         <Link
-          href={`/super-admin/uhtd/spas/${spa.id}`}
+          href={`/super-admin/uhtd/model-lines/${ml.id}`}
           className="text-sm text-blue-600 hover:text-blue-800"
         >
           View
@@ -148,18 +129,15 @@ export default function SpasPage() {
     },
   ];
 
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 40 }, (_, i) => currentYear - i);
-
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Spa Models</h1>
-          <p className="text-sm text-gray-500 mt-1">Browse all spa models across all brands</p>
+          <h1 className="text-2xl font-semibold text-gray-900">Model Lines</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage model line series across all brands</p>
         </div>
-        <Link href="/super-admin/uhtd/spas/new">
-          <Button>Add Spa</Button>
+        <Link href="/super-admin/uhtd/model-lines/new">
+          <Button>Add Model Line</Button>
         </Link>
       </div>
 
@@ -169,7 +147,7 @@ export default function SpasPage() {
             <SearchInput
               value={search}
               onChange={setSearch}
-              placeholder="Search spas..."
+              placeholder="Search model lines..."
               className="w-64"
             />
             <select
@@ -187,33 +165,18 @@ export default function SpasPage() {
                 </option>
               ))}
             </select>
-            <select
-              value={selectedYear}
-              onChange={(e) => {
-                setSelectedYear(e.target.value);
-                setPage(1);
-              }}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Years</option>
-              {years.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
             <div className="ml-auto text-sm text-gray-500">
-              {total.toLocaleString()} spas total
+              {total.toLocaleString()} model lines total
             </div>
           </div>
         </div>
 
         <Table
           columns={columns}
-          data={spas}
+          data={modelLines}
           keyField="id"
           loading={loading}
-          emptyMessage="No spa models found"
+          emptyMessage="No model lines found"
         />
 
         {total > pageSize && (

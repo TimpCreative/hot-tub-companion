@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 const UHTD_NAV = [
   { label: 'Overview', href: '/super-admin/uhtd' },
   { label: 'Brands', href: '/super-admin/uhtd/brands' },
+  { label: 'Model Lines', href: '/super-admin/uhtd/model-lines' },
   { label: 'Spas', href: '/super-admin/uhtd/spas' },
   { label: 'Parts', href: '/super-admin/uhtd/parts' },
   { label: 'Comps', href: '/super-admin/uhtd/comps' },
@@ -27,9 +28,9 @@ export default function UhtdLayout({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <div className="flex gap-6">
+    <div className="flex gap-6 items-start">
       <nav className="w-48 flex-shrink-0">
-        <div className="sticky top-4 space-y-1">
+        <div className="sticky top-6 space-y-1">
           {UHTD_NAV.map((item) => (
             <Link
               key={item.href}

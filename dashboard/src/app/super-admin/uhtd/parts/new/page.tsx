@@ -116,17 +116,18 @@ export default function NewPartPage() {
   };
 
   const bulkColumns = [
-    { key: 'name', header: 'Part Name', required: true, placeholder: 'e.g., Filter Cartridge', width: '200px' },
-    { key: 'partNumber', header: 'Part #', placeholder: 'SKU/Part #', width: '120px' },
+    { key: 'name', header: 'Part Name', required: true, placeholder: 'e.g., Filter Cartridge', width: '180px' },
+    { key: 'partNumber', header: 'Part #', placeholder: 'SKU/Part #', width: '100px' },
     {
       key: 'categoryId',
       header: 'Category',
       type: 'select' as const,
       options: categories.map((c) => ({ value: c.id, label: c.displayName })),
-      width: '150px',
+      width: '140px',
     },
-    { key: 'manufacturer', header: 'Manufacturer', placeholder: 'Brand', width: '120px' },
-    { key: 'upc', header: 'UPC', placeholder: 'UPC code', width: '130px' },
+    { key: 'manufacturer', header: 'Manufacturer', placeholder: 'Brand', width: '110px' },
+    { key: 'upc', header: 'UPC', placeholder: 'UPC code', width: '120px' },
+    { key: 'dataSource', header: 'Data Source', placeholder: 'Source', width: '100px' },
     { key: 'isOem', header: 'OEM', type: 'checkbox' as const, width: '50px' },
     { key: 'isUniversal', header: 'Univ.', type: 'checkbox' as const, width: '50px' },
   ];

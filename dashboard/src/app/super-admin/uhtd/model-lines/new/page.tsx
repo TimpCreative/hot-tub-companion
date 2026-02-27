@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Accordion } from '@/components/ui/Accordion';
 import { BulkAddTable } from '@/components/ui/BulkAddTable';
+import { QuickCreateBrandModal } from '@/components/uhtd/QuickCreateBrandModal';
 
 interface Brand {
   id: string;
@@ -20,6 +21,7 @@ function NewModelLineForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [showBrandModal, setShowBrandModal] = useState(false);
 
   const [formData, setFormData] = useState({
     brandId: preselectedBrandId || '',
@@ -152,19 +154,29 @@ function NewModelLineForm() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Brand <span className="text-red-500">*</span>
               </label>
-              <select
-                value={formData.brandId}
-                onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="">Select a brand...</option>
-                {brands.map((brand) => (
-                  <option key={brand.id} value={brand.id}>
-                    {brand.name}
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={formData.brandId}
+                  onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">Select a brand...</option>
+                  {brands.map((brand) => (
+                    <option key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setShowBrandModal(true)}
+                  className="whitespace-nowrap"
+                >
+                  + New Brand
+                </Button>
+              </div>
             </div>
 
             <div>
@@ -233,6 +245,16 @@ function NewModelLineForm() {
           <BulkAddTable columns={bulkColumns} onSubmit={handleBulkAdd} />
         </Accordion>
       </div>
+
+      <QuickCreateBrandModal
+        isOpen={showBrandModal}
+        onClose={() => setShowBrandModal(false)}
+        onCreated={(brand) => {
+          setBrands((prev) => [...prev, brand]);
+          setFormData((prev) => ({ ...prev, brandId: brand.id }));
+          setShowBrandModal(false);
+        }}
+      />
     </div>
   );
 }

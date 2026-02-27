@@ -156,3 +156,45 @@ export async function createTenant(req: Request, res: Response): Promise<void> {
     },
   });
 }
+
+/**
+ * Get settings including super admin users list
+ */
+export async function getSettings(_req: Request, res: Response): Promise<void> {
+  try {
+    const auth = getFirebaseAuth();
+    const users: Array<{
+      email: string;
+      displayName: string | null;
+      lastSignIn: string | null;
+      createdAt: string | null;
+    }> = [];
+
+    // Get users from Firebase for the allowed emails
+    for (const email of env.SUPER_ADMIN_EMAILS) {
+      try {
+        const user = await auth.getUserByEmail(email.toLowerCase());
+        users.push({
+          email: user.email || email,
+          displayName: user.displayName || null,
+          lastSignIn: user.metadata.lastSignInTime || null,
+          createdAt: user.metadata.creationTime || null,
+        });
+      } catch (err: any) {
+        // User doesn't exist in Firebase yet (allowed but not registered)
+        if (err.code === 'auth/user-not-found') {
+          continue;
+        }
+        console.error(`Error fetching user ${email}:`, err);
+      }
+    }
+
+    success(res, {
+      users,
+      allowedEmails: env.SUPER_ADMIN_EMAILS,
+    });
+  } catch (err) {
+    console.error('Error getting settings:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to get settings', 500);
+  }
+}

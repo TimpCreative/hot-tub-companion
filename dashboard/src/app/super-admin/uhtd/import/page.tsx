@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 
-type ImportType = 'brands' | 'parts' | 'compatibility';
+type ImportType = 'brands' | 'model-lines' | 'spas' | 'parts' | 'comps';
 
 interface ImportResult {
   created: number;
@@ -103,18 +103,36 @@ export default function ImportPage() {
     }
   };
 
-  const templates: Record<ImportType, { headers: string[]; example: string[] }> = {
+  const templates: Record<ImportType, { headers: string[]; example: string[]; label: string; description: string }> = {
     brands: {
       headers: ['name', 'logoUrl', 'websiteUrl', 'dataSource'],
       example: ['Jacuzzi', 'https://example.com/logo.png', 'https://jacuzzi.com', 'manual_entry'],
+      label: 'Brands',
+      description: 'Spa brands',
+    },
+    'model-lines': {
+      headers: ['brandName', 'name', 'description', 'dataSource'],
+      example: ['Jacuzzi', 'J-300 Collection', 'Mid-range hot tubs', 'manual_entry'],
+      label: 'Model Lines',
+      description: 'Brand model lines',
+    },
+    spas: {
+      headers: ['brandName', 'modelLineName', 'modelName', 'modelYear', 'seatingCapacity', 'jetCount', 'dataSource'],
+      example: ['Jacuzzi', 'J-300 Collection', 'J-335', '2024', '5', '35', 'manual_entry'],
+      label: 'Spas',
+      description: 'Spa model-years',
     },
     parts: {
       headers: ['name', 'categoryName', 'partNumber', 'upc', 'manufacturer', 'isOem', 'isUniversal', 'dataSource'],
       example: ['ProClarity Filter', 'filters', 'PKG-12345', '012345678901', 'Jacuzzi', 'true', 'false', 'manual_entry'],
+      label: 'Parts',
+      description: 'Parts catalog',
     },
-    compatibility: {
+    comps: {
       headers: ['partNumber', 'partName', 'brandName', 'modelLineName', 'modelName', 'modelYear', 'compId', 'fitNotes', 'dataSource'],
       example: ['PKG-12345', '', 'Jacuzzi', 'J-300', 'J-345', '2024', '', 'OEM filter', 'manual_entry'],
+      label: 'Comps',
+      description: 'Part-spa compatibility',
     },
   };
 
@@ -141,8 +159,8 @@ export default function ImportPage() {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Import Type</h3>
-            <div className="grid grid-cols-3 gap-4">
-              {(['brands', 'parts', 'compatibility'] as ImportType[]).map((type) => (
+            <div className="grid grid-cols-5 gap-3">
+              {(['brands', 'model-lines', 'spas', 'parts', 'comps'] as ImportType[]).map((type) => (
                 <button
                   key={type}
                   onClick={() => {
@@ -151,18 +169,14 @@ export default function ImportPage() {
                     setResult(null);
                     if (fileInputRef.current) fileInputRef.current.value = '';
                   }}
-                  className={`p-4 rounded-lg border-2 text-left transition-colors ${
+                  className={`p-3 rounded-lg border-2 text-left transition-colors ${
                     importType === type
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="font-medium text-gray-900 capitalize">{type}</div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {type === 'brands' && 'Spa brands'}
-                    {type === 'parts' && 'Parts catalog'}
-                    {type === 'compatibility' && 'Part-spa links'}
-                  </div>
+                  <div className="font-medium text-gray-900 text-sm">{templates[type].label}</div>
+                  <div className="text-xs text-gray-500 mt-1">{templates[type].description}</div>
                 </button>
               ))}
             </div>
@@ -243,7 +257,7 @@ export default function ImportPage() {
               disabled={csvPreview.length === 0}
               className="w-full mt-4"
             >
-              Import {importType}
+              Import {templates[importType].label}
             </Button>
           </div>
 
@@ -289,13 +303,48 @@ export default function ImportPage() {
             </ul>
           </div>
 
-          {importType === 'compatibility' && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <h3 className="font-medium text-yellow-900 mb-2">Comp ID Shortcut</h3>
-              <p className="text-sm text-yellow-800">
-                Use the <code className="bg-yellow-100 px-1 rounded">compId</code> column to assign
-                a part to all spas in a Compatibility Group at once. Leave brandName/modelLineName/modelName/modelYear empty when using compId.
-              </p>
+          {importType === 'comps' && (
+            <div className="space-y-4">
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <h3 className="font-medium text-purple-900 mb-2">What is Compatibility Import?</h3>
+                <p className="text-sm text-purple-800 mb-2">
+                  This imports part-spa relationships from a spreadsheet. Use it when you have manufacturer data
+                  showing which parts fit which spas (e.g., &quot;Filter X fits J-300 Series 2020-2024&quot;).
+                </p>
+                <p className="text-sm text-purple-800">
+                  Each row creates a link between a part and a spa model-year. All imported records start
+                  as <Badge variant="warning" size="sm">pending</Badge> for review.
+                </p>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h3 className="font-medium text-yellow-900 mb-2">Two Import Methods</h3>
+                <div className="text-sm text-yellow-800 space-y-3">
+                  <div>
+                    <strong>Method 1: Individual Spas</strong><br />
+                    Fill <code className="bg-yellow-100 px-1 rounded">brandName</code>,{' '}
+                    <code className="bg-yellow-100 px-1 rounded">modelLineName</code>,{' '}
+                    <code className="bg-yellow-100 px-1 rounded">modelName</code>, and{' '}
+                    <code className="bg-yellow-100 px-1 rounded">modelYear</code>.
+                    Leave <code className="bg-yellow-100 px-1 rounded">compId</code> empty.
+                  </div>
+                  <div>
+                    <strong>Method 2: Using Comp Groups</strong><br />
+                    Fill <code className="bg-yellow-100 px-1 rounded">compId</code> to assign a part to ALL spas
+                    in that Compatibility Group. Leave brand/model columns empty.
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <h3 className="font-medium text-red-900 mb-2">Important Rules</h3>
+                <ul className="text-sm text-red-800 space-y-1">
+                  <li>• Each row must use ONE method only (spa details OR compId, not both)</li>
+                  <li>• Rows with both compId AND spa details will be rejected</li>
+                  <li>• Parts must exist in the database (by partNumber or partName)</li>
+                  <li>• Spas/Comps must exist in the database</li>
+                </ul>
+              </div>
             </div>
           )}
 

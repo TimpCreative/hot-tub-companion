@@ -58,6 +58,7 @@ export default function NewBrandPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: row.name,
+            logoUrl: row.logoUrl || null,
             websiteUrl: row.websiteUrl || null,
             isActive: row.isActive !== false,
             dataSource: row.dataSource || 'Bulk import',
@@ -81,9 +82,10 @@ export default function NewBrandPage() {
   };
 
   const bulkColumns = [
-    { key: 'name', header: 'Brand Name', required: true, placeholder: 'e.g., Jacuzzi', width: '200px' },
-    { key: 'websiteUrl', header: 'Website URL', placeholder: 'https://...', width: '250px' },
-    { key: 'dataSource', header: 'Data Source', placeholder: 'Source', width: '150px' },
+    { key: 'name', header: 'Brand Name', required: true, placeholder: 'e.g., Jacuzzi', width: '180px' },
+    { key: 'logoUrl', header: 'Logo URL', placeholder: 'https://...', width: '200px' },
+    { key: 'websiteUrl', header: 'Website URL', placeholder: 'https://...', width: '200px' },
+    { key: 'dataSource', header: 'Data Source', placeholder: 'Source', width: '120px' },
     { key: 'isActive', header: 'Active', type: 'checkbox' as const, width: '60px' },
   ];
 

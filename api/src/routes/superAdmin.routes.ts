@@ -14,5 +14,6 @@ router.use(superAdminAuth);
 
 router.get('/tenants', superAdminController.listTenants);
 router.post('/tenants', superAdminController.createTenant);
+router.get('/settings', superAdminController.getSettings);
 
 export default router;
