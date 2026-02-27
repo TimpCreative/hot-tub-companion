@@ -11,8 +11,9 @@ interface Qualifier {
   name: string;
   displayName: string;
   description: string | null;
-  valueType: 'boolean' | 'single_select' | 'multi_select';
-  possibleValues: string[] | null;
+  dataType: 'boolean' | 'single_select' | 'multi_select';
+  allowedValues: string[] | null;
+  appliesTo: 'spa' | 'part' | 'both';
   createdAt: string;
 }
 
@@ -22,13 +23,15 @@ export default function QualifiersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingQualifier, setEditingQualifier] = useState<Qualifier | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const [formData, setFormData] = useState({
     name: '',
     displayName: '',
     description: '',
-    valueType: 'boolean' as 'boolean' | 'single_select' | 'multi_select',
-    possibleValues: '',
+    dataType: 'boolean' as 'boolean' | 'single_select' | 'multi_select',
+    allowedValues: '',
+    appliesTo: 'both' as 'spa' | 'part' | 'both',
   });
 
   async function fetchQualifiers() {
@@ -51,24 +54,28 @@ export default function QualifiersPage() {
 
   const openCreateModal = () => {
     setEditingQualifier(null);
+    setError('');
     setFormData({
       name: '',
       displayName: '',
       description: '',
-      valueType: 'boolean',
-      possibleValues: '',
+      dataType: 'boolean',
+      allowedValues: '',
+      appliesTo: 'both',
     });
     setIsModalOpen(true);
   };
 
   const openEditModal = (qualifier: Qualifier) => {
     setEditingQualifier(qualifier);
+    setError('');
     setFormData({
       name: qualifier.name,
       displayName: qualifier.displayName,
       description: qualifier.description || '',
-      valueType: qualifier.valueType,
-      possibleValues: qualifier.possibleValues?.join(', ') || '',
+      dataType: qualifier.dataType,
+      allowedValues: qualifier.allowedValues?.join(', ') || '',
+      appliesTo: qualifier.appliesTo,
     });
     setIsModalOpen(true);
   };
@@ -76,17 +83,19 @@ export default function QualifiersPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setError('');
 
     try {
       const payload = {
         name: formData.name,
         displayName: formData.displayName,
         description: formData.description || null,
-        valueType: formData.valueType,
-        possibleValues:
-          formData.valueType !== 'boolean' && formData.possibleValues
-            ? formData.possibleValues.split(',').map((v) => v.trim())
+        dataType: formData.dataType,
+        allowedValues:
+          formData.dataType !== 'boolean' && formData.allowedValues
+            ? formData.allowedValues.split(',').map((v) => v.trim()).filter(Boolean)
             : null,
+        appliesTo: formData.appliesTo,
       };
 
       const url = editingQualifier
@@ -99,12 +108,17 @@ export default function QualifiersPage() {
         body: JSON.stringify(payload),
       });
 
-      if (res.ok) {
+      const data = await res.json();
+
+      if (res.ok && data.success) {
         setIsModalOpen(false);
         fetchQualifiers();
+      } else {
+        setError(data.error?.message || 'Failed to save qualifier');
       }
     } catch (err) {
       console.error('Error saving qualifier:', err);
+      setError('Network error - please try again');
     } finally {
       setSaving(false);
     }
@@ -137,19 +151,31 @@ export default function QualifiersPage() {
       ),
     },
     {
-      key: 'valueType',
+      key: 'dataType',
       header: 'Type',
       render: (q: any) => {
-        const variant = q.valueType === 'boolean' ? 'default' : q.valueType === 'single_select' ? 'info' : 'warning';
-        return <Badge variant={variant}>{q.valueType.replace('_', ' ')}</Badge>;
+        const variant = q.dataType === 'boolean' ? 'default' : q.dataType === 'single_select' ? 'info' : 'warning';
+        return <Badge variant={variant}>{q.dataType.replace('_', ' ')}</Badge>;
       },
     },
     {
-      key: 'possibleValues',
-      header: 'Possible Values',
+      key: 'appliesTo',
+      header: 'Applies To',
+      render: (q: any) => {
+        const colors: Record<string, 'info' | 'success' | 'warning'> = {
+          spa: 'info',
+          part: 'success',
+          both: 'warning',
+        };
+        return <Badge variant={colors[q.appliesTo] || 'default'}>{q.appliesTo}</Badge>;
+      },
+    },
+    {
+      key: 'allowedValues',
+      header: 'Allowed Values',
       render: (q: any) => (
         <span className="text-gray-600 text-sm">
-          {q.valueType === 'boolean' ? 'true / false' : q.possibleValues?.join(', ') || '-'}
+          {q.dataType === 'boolean' ? 'true / false' : q.allowedValues?.join(', ') || '-'}
         </span>
       ),
     },
@@ -213,6 +239,7 @@ export default function QualifiersPage() {
           <li>• <strong>Boolean</strong> - Simple yes/no values (e.g., "Has Ozonator")</li>
           <li>• <strong>Single Select</strong> - One value from a list (e.g., "Voltage: 120V / 240V")</li>
           <li>• <strong>Multi Select</strong> - Multiple values (e.g., "Sanitization: Chlorine, Bromine, Salt")</li>
+          <li>• <strong>Applies To</strong> - Spa (spa attribute), Part (part requirement), Both (used by both)</li>
           <li>• Use qualifiers to define conditions where parts only fit certain spa configurations</li>
         </ul>
       </div>
@@ -224,6 +251,12 @@ export default function QualifiersPage() {
       >
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Internal Name <span className="text-red-500">*</span>
@@ -266,11 +299,30 @@ export default function QualifiersPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Value Type <span className="text-red-500">*</span>
+                Applies To <span className="text-red-500">*</span>
               </label>
               <select
-                value={formData.valueType}
-                onChange={(e) => setFormData({ ...formData, valueType: e.target.value as any })}
+                value={formData.appliesTo}
+                onChange={(e) => setFormData({ ...formData, appliesTo: e.target.value as 'spa' | 'part' | 'both' })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="both">Both (Spa & Part)</option>
+                <option value="spa">Spa Only</option>
+                <option value="part">Part Only</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Spa: attribute of spas (e.g., voltage). Part: requirement of parts. Both: used by both.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Data Type <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.dataType}
+                onChange={(e) => setFormData({ ...formData, dataType: e.target.value as any })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="boolean">Boolean (Yes/No)</option>
@@ -279,20 +331,20 @@ export default function QualifiersPage() {
               </select>
             </div>
 
-            {formData.valueType !== 'boolean' && (
+            {formData.dataType !== 'boolean' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Possible Values <span className="text-red-500">*</span>
+                  Allowed Values <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  value={formData.possibleValues}
-                  onChange={(e) => setFormData({ ...formData, possibleValues: e.target.value })}
+                  value={formData.allowedValues}
+                  onChange={(e) => setFormData({ ...formData, allowedValues: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="120V, 240V"
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">Comma-separated list of allowed values</p>
+                <p className="text-xs text-gray-500 mt-1">Comma-separated list of allowed values (spaces will be trimmed)</p>
               </div>
             )}
           </div>

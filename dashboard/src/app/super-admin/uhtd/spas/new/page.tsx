@@ -36,17 +36,24 @@ function NewSpaForm() {
   const [formData, setFormData] = useState({
     brandId: '',
     modelLineId: preselectedModelLineId || '',
-    modelName: '',
-    modelYear: new Date().getFullYear(),
+    name: '',
+    year: new Date().getFullYear(),
+    manufacturerSku: '',
     seatingCapacity: '',
     jetCount: '',
-    dimensions: '',
-    waterCapacity: '',
-    weight: '',
-    msrpUsd: '',
-    description: '',
-    features: '',
+    dimensionsLengthInches: '',
+    dimensionsWidthInches: '',
+    dimensionsHeightInches: '',
+    waterCapacityGallons: '',
+    weightDryLbs: '',
+    weightFilledLbs: '',
+    electricalRequirement: '',
+    hasOzone: false,
+    hasUv: false,
+    hasSaltSystem: false,
     imageUrl: '',
+    specSheetUrl: '',
+    notes: '',
     isDiscontinued: false,
     dataSource: '',
   });
@@ -101,18 +108,26 @@ function NewSpaForm() {
 
     try {
       const payload = {
+        brandId: formData.brandId,
         modelLineId: formData.modelLineId,
-        modelName: formData.modelName,
-        modelYear: formData.modelYear,
+        name: formData.name,
+        year: formData.year,
+        manufacturerSku: formData.manufacturerSku || null,
         seatingCapacity: formData.seatingCapacity ? parseInt(formData.seatingCapacity) : null,
         jetCount: formData.jetCount ? parseInt(formData.jetCount) : null,
-        dimensions: formData.dimensions || null,
-        waterCapacity: formData.waterCapacity || null,
-        weight: formData.weight || null,
-        msrpUsd: formData.msrpUsd ? parseInt(formData.msrpUsd) : null,
-        description: formData.description || null,
-        features: formData.features ? formData.features.split(',').map((f) => f.trim()).filter(Boolean) : null,
+        dimensionsLengthInches: formData.dimensionsLengthInches ? parseInt(formData.dimensionsLengthInches) : null,
+        dimensionsWidthInches: formData.dimensionsWidthInches ? parseInt(formData.dimensionsWidthInches) : null,
+        dimensionsHeightInches: formData.dimensionsHeightInches ? parseInt(formData.dimensionsHeightInches) : null,
+        waterCapacityGallons: formData.waterCapacityGallons ? parseInt(formData.waterCapacityGallons) : null,
+        weightDryLbs: formData.weightDryLbs ? parseInt(formData.weightDryLbs) : null,
+        weightFilledLbs: formData.weightFilledLbs ? parseInt(formData.weightFilledLbs) : null,
+        electricalRequirement: formData.electricalRequirement || null,
+        hasOzone: formData.hasOzone,
+        hasUv: formData.hasUv,
+        hasSaltSystem: formData.hasSaltSystem,
         imageUrl: formData.imageUrl || null,
+        specSheetUrl: formData.specSheetUrl || null,
+        notes: formData.notes || null,
         isDiscontinued: formData.isDiscontinued,
         dataSource: formData.dataSource || null,
       };
@@ -145,7 +160,14 @@ function NewSpaForm() {
     for (const row of rows) {
       if (!row.modelLineId) {
         failed++;
-        errors.push(`${row.modelName || 'Row'}: Model Line is required`);
+        errors.push(`${row.name || 'Row'}: Model Line is required`);
+        continue;
+      }
+
+      const ml = modelLines.find((m) => m.id === row.modelLineId);
+      if (!ml) {
+        failed++;
+        errors.push(`${row.name || 'Row'}: Invalid Model Line`);
         continue;
       }
 
@@ -154,9 +176,10 @@ function NewSpaForm() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            brandId: ml.brandId,
             modelLineId: row.modelLineId,
-            modelName: row.modelName,
-            modelYear: parseInt(row.modelYear) || new Date().getFullYear(),
+            name: row.name,
+            year: parseInt(row.year) || new Date().getFullYear(),
             seatingCapacity: row.seatingCapacity ? parseInt(row.seatingCapacity) : null,
             jetCount: row.jetCount ? parseInt(row.jetCount) : null,
             isDiscontinued: row.isDiscontinued || false,
@@ -169,11 +192,11 @@ function NewSpaForm() {
           success++;
         } else {
           failed++;
-          errors.push(`${row.modelName}: ${data.error?.message || 'Failed'}`);
+          errors.push(`${row.name}: ${data.error?.message || 'Failed'}`);
         }
       } catch (err) {
         failed++;
-        errors.push(`${row.modelName}: Network error`);
+        errors.push(`${row.name}: Network error`);
       }
     }
 
@@ -195,9 +218,9 @@ function NewSpaForm() {
       required: true,
       width: '250px',
     },
-    { key: 'modelName', header: 'Model Name', required: true, placeholder: 'e.g., J-335', width: '150px' },
+    { key: 'name', header: 'Model Name', required: true, placeholder: 'e.g., J-335', width: '150px' },
     {
-      key: 'modelYear',
+      key: 'year',
       header: 'Year',
       type: 'select' as const,
       options: years.map((y) => ({ value: String(y), label: String(y) })),
@@ -221,243 +244,349 @@ function NewSpaForm() {
 
       <div className="space-y-6">
         <Accordion title="Add Single Spa" subtitle="Add one spa model with full details" defaultOpen={true}>
-          <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+          <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl">
             {error && (
               <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
                 {error}
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Brand <span className="text-red-500">*</span>
-                </label>
-                <div className="flex gap-2">
+            {/* Brand & Model Line */}
+            <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+              <h3 className="font-medium text-gray-900">Spa Identity</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Brand <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <select
+                      value={formData.brandId}
+                      onChange={(e) => {
+                        setFormData({ ...formData, brandId: e.target.value, modelLineId: '' });
+                      }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    >
+                      <option value="">Select brand...</option>
+                      {brands.map((brand) => (
+                        <option key={brand.id} value={brand.id}>
+                          {brand.name}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setShowBrandModal(true)}
+                      className="whitespace-nowrap text-sm px-2"
+                    >
+                      +
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Model Line <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <select
+                      value={formData.modelLineId}
+                      onChange={(e) => setFormData({ ...formData, modelLineId: e.target.value })}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                      disabled={!formData.brandId}
+                    >
+                      <option value="">
+                        {formData.brandId ? 'Select model line...' : 'Select a brand first'}
+                      </option>
+                      {filteredModelLines.map((ml) => (
+                        <option key={ml.id} value={ml.id}>
+                          {ml.name}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setShowModelLineModal(true)}
+                      className="whitespace-nowrap text-sm px-2"
+                      disabled={!formData.brandId}
+                    >
+                      +
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Model Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., J-335"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Model Year <span className="text-red-500">*</span>
+                  </label>
                   <select
-                    value={formData.brandId}
-                    onChange={(e) => {
-                      setFormData({ ...formData, brandId: e.target.value, modelLineId: '' });
-                    }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={formData.year}
+                    onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   >
-                    <option value="">Select brand...</option>
-                    {brands.map((brand) => (
-                      <option key={brand.id} value={brand.id}>
-                        {brand.name}
+                    {years.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
                       </option>
                     ))}
                   </select>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => setShowBrandModal(true)}
-                    className="whitespace-nowrap text-sm px-2"
-                  >
-                    +
-                  </Button>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer SKU</label>
+                  <input
+                    type="text"
+                    value={formData.manufacturerSku}
+                    onChange={(e) => setFormData({ ...formData, manufacturerSku: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., JAC-J335-2024"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Specifications */}
+            <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+              <h3 className="font-medium text-gray-900">Specifications</h3>
+              
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Seating Capacity</label>
+                  <input
+                    type="number"
+                    value={formData.seatingCapacity}
+                    onChange={(e) => setFormData({ ...formData, seatingCapacity: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="5"
+                    min="1"
+                    max="20"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Jet Count</label>
+                  <input
+                    type="number"
+                    value={formData.jetCount}
+                    onChange={(e) => setFormData({ ...formData, jetCount: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="30"
+                    min="0"
+                    max="200"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Water Capacity (gal)</label>
+                  <input
+                    type="number"
+                    value={formData.waterCapacityGallons}
+                    onChange={(e) => setFormData({ ...formData, waterCapacityGallons: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="350"
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Electrical</label>
+                  <input
+                    type="text"
+                    value={formData.electricalRequirement}
+                    onChange={(e) => setFormData({ ...formData, electricalRequirement: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="240V/50A"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Length (inches)</label>
+                  <input
+                    type="number"
+                    value={formData.dimensionsLengthInches}
+                    onChange={(e) => setFormData({ ...formData, dimensionsLengthInches: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="85"
+                    min="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Width (inches)</label>
+                  <input
+                    type="number"
+                    value={formData.dimensionsWidthInches}
+                    onChange={(e) => setFormData({ ...formData, dimensionsWidthInches: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="85"
+                    min="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Height (inches)</label>
+                  <input
+                    type="number"
+                    value={formData.dimensionsHeightInches}
+                    onChange={(e) => setFormData({ ...formData, dimensionsHeightInches: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="36"
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Dry Weight (lbs)</label>
+                  <input
+                    type="number"
+                    value={formData.weightDryLbs}
+                    onChange={(e) => setFormData({ ...formData, weightDryLbs: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="725"
+                    min="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Filled Weight (lbs)</label>
+                  <input
+                    type="number"
+                    value={formData.weightFilledLbs}
+                    onChange={(e) => setFormData({ ...formData, weightFilledLbs: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="4200"
+                    min="0"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Features */}
+            <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+              <h3 className="font-medium text-gray-900">Sanitization Features</h3>
+              <div className="flex flex-wrap gap-6">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="hasOzone"
+                    checked={formData.hasOzone}
+                    onChange={(e) => setFormData({ ...formData, hasOzone: e.target.checked })}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="hasOzone" className="text-sm text-gray-700">
+                    Has Ozone System
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="hasUv"
+                    checked={formData.hasUv}
+                    onChange={(e) => setFormData({ ...formData, hasUv: e.target.checked })}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="hasUv" className="text-sm text-gray-700">
+                    Has UV System
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="hasSaltSystem"
+                    checked={formData.hasSaltSystem}
+                    onChange={(e) => setFormData({ ...formData, hasSaltSystem: e.target.checked })}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="hasSaltSystem" className="text-sm text-gray-700">
+                    Has Salt System
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Media & Notes */}
+            <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+              <h3 className="font-medium text-gray-900">Media & Notes</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
+                  <input
+                    type="url"
+                    value={formData.imageUrl}
+                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="https://..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Spec Sheet URL</label>
+                  <input
+                    type="url"
+                    value={formData.specSheetUrl}
+                    onChange={(e) => setFormData({ ...formData, specSheetUrl: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="https://..."
+                  />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Model Line <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Internal notes about this spa model..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Data Source</label>
+                <input
+                  type="text"
+                  value={formData.dataSource}
+                  onChange={(e) => setFormData({ ...formData, dataSource: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Official website, spec sheet"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isDiscontinued"
+                  checked={formData.isDiscontinued}
+                  onChange={(e) => setFormData({ ...formData, isDiscontinued: e.target.checked })}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="isDiscontinued" className="text-sm text-gray-700">
+                  Discontinued
                 </label>
-                <div className="flex gap-2">
-                  <select
-                    value={formData.modelLineId}
-                    onChange={(e) => setFormData({ ...formData, modelLineId: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                    disabled={!formData.brandId}
-                  >
-                    <option value="">
-                      {formData.brandId ? 'Select model line...' : 'Select a brand first'}
-                    </option>
-                    {filteredModelLines.map((ml) => (
-                      <option key={ml.id} value={ml.id}>
-                        {ml.name}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => setShowModelLineModal(true)}
-                    className="whitespace-nowrap text-sm px-2"
-                    disabled={!formData.brandId}
-                  >
-                    +
-                  </Button>
-                </div>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Model Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.modelName}
-                  onChange={(e) => setFormData({ ...formData, modelName: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., J-335"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Model Year <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.modelYear}
-                  onChange={(e) => setFormData({ ...formData, modelYear: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  {years.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Seating Capacity</label>
-                <input
-                  type="number"
-                  value={formData.seatingCapacity}
-                  onChange={(e) => setFormData({ ...formData, seatingCapacity: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., 5"
-                  min="1"
-                  max="20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Jet Count</label>
-                <input
-                  type="number"
-                  value={formData.jetCount}
-                  onChange={(e) => setFormData({ ...formData, jetCount: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., 30"
-                  min="0"
-                  max="200"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Dimensions</label>
-                <input
-                  type="text"
-                  value={formData.dimensions}
-                  onChange={(e) => setFormData({ ...formData, dimensions: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder='e.g., 85" x 85" x 36"'
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Water Capacity</label>
-                <input
-                  type="text"
-                  value={formData.waterCapacity}
-                  onChange={(e) => setFormData({ ...formData, waterCapacity: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., 350 gal"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Dry Weight</label>
-                <input
-                  type="text"
-                  value={formData.weight}
-                  onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., 725 lbs"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">MSRP (USD)</label>
-              <input
-                type="number"
-                value={formData.msrpUsd}
-                onChange={(e) => setFormData({ ...formData, msrpUsd: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., 15000"
-                min="0"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Brief description of this spa model..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Features (comma-separated)</label>
-              <input
-                type="text"
-                value={formData.features}
-                onChange={(e) => setFormData({ ...formData, features: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., LED lighting, Bluetooth audio, WiFi control"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
-              <input
-                type="url"
-                value={formData.imageUrl}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="https://..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Data Source</label>
-              <input
-                type="text"
-                value={formData.dataSource}
-                onChange={(e) => setFormData({ ...formData, dataSource: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., Official website"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="isDiscontinued"
-                checked={formData.isDiscontinued}
-                onChange={(e) => setFormData({ ...formData, isDiscontinued: e.target.checked })}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <label htmlFor="isDiscontinued" className="text-sm text-gray-700">
-                Discontinued
-              </label>
             </div>
 
             <div className="flex gap-3 pt-4 border-t border-gray-200">

@@ -148,10 +148,11 @@ You can add multiple model lines at once:
    - **Model Name** (required) - e.g., "J-345"
    - **Model Year** (required) - e.g., "2024"
 6. Fill in optional specifications:
-   - Seating capacity, jet count, pump count
-   - Dimensions (length, width, height in inches)
-   - Gallon capacity, dry weight, wet weight
-   - Voltage options
+   - **Specifications**: Seating capacity, jet count, water capacity (gallons), electrical requirement
+   - **Dimensions**: Length, width, height (all in inches - enter just the number)
+   - **Weight**: Dry weight and filled weight (both in lbs - enter just the number)
+   - **Features**: Has Ozone, Has UV, Has Salt System checkboxes
+   - **Media**: Image URL, Spec Sheet URL, Notes
 7. Click **Create Spa Model**
 
 ### Bulk Adding Spa Models
@@ -303,6 +304,7 @@ Qualifiers add conditional compatibility rules. For example, a pump might fit a 
 
 ### Types of Qualifiers
 
+- **Boolean** - Simple yes/no value (e.g., "Has Ozonator?")
 - **Single Select** - User must pick one option (e.g., "What is your voltage?" → 120V or 240V)
 - **Multi Select** - User can select multiple options (e.g., "What features does your spa have?" → LED Lights, Ozone, Waterfall)
 
@@ -311,10 +313,15 @@ Qualifiers add conditional compatibility rules. For example, a pump might fit a 
 1. Go to **UHTD → Qualifiers**
 2. Click **+ Add Qualifier**
 3. Fill in:
-   - **Name** (required) - e.g., "Voltage Configuration"
+   - **Internal Name** (required) - e.g., `voltage_rating` (auto-formatted to lowercase with underscores)
+   - **Display Name** (required) - e.g., "Voltage Rating"
    - **Description** - Help text for users
-   - **Type** - Single Select or Multi Select
-   - **Possible Values** - Enter comma-separated options (e.g., `120V, 240V`)
+   - **Applies To** (required) - Choose one:
+     - **Spa Only** - This is an attribute of spas (e.g., "spa's voltage")
+     - **Part Only** - This is a requirement of parts (e.g., "part requires 240V")
+     - **Both** - Used by both spas and parts
+   - **Data Type** - Boolean (Yes/No), Single Select, or Multi Select
+   - **Allowed Values** - For Select types, enter comma-separated options (e.g., `120V, 240V`)
 4. Click **Create Qualifier**
 
 ### Input Formatting
