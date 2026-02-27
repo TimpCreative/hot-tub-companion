@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
-import db from '../db';
+import { db } from '../config/database';
 import { success, error } from '../utils/response';
 import { logAudit } from '../services/audit.service';
+import { AuditAction } from '../types/uhtd.types';
 
 export async function getPendingCompatibilities(req: Request, res: Response) {
   try {
@@ -30,7 +31,7 @@ export async function getPendingCompatibilities(req: Request, res: Response) {
 
     success(
       res,
-      rows.map((row) => ({
+      rows.map((row: Record<string, unknown>) => ({
         id: row.id,
         partId: row.part_id,
         spaModelId: row.spa_model_id,
@@ -78,14 +79,14 @@ export async function bulkConfirmCompatibilities(req: Request, res: Response) {
       .update({ status: 'confirmed', updated_at: db.fn.now() });
 
     for (const id of ids) {
-      await logAudit({
-        tableName: 'part_spa_compatibility',
-        recordId: id,
-        action: 'UPDATE',
-        oldValues: { status: 'pending' },
-        newValues: { status: 'confirmed' },
-        changedBy: userId,
-      });
+      await logAudit(
+        'part_spa_compatibility',
+        id,
+        'UPDATE' as AuditAction,
+        { status: 'pending' },
+        { status: 'confirmed' },
+        userId
+      );
     }
 
     success(res, { confirmed: updated }, `${updated} compatibilities confirmed`);
@@ -109,13 +110,14 @@ export async function bulkRejectCompatibilities(req: Request, res: Response) {
     await db('part_spa_compatibility').whereIn('id', ids).del();
 
     for (const record of existing) {
-      await logAudit({
-        tableName: 'part_spa_compatibility',
-        recordId: record.id,
-        action: 'DELETE',
-        oldValues: record,
-        changedBy: userId,
-      });
+      await logAudit(
+        'part_spa_compatibility',
+        record.id,
+        'DELETE' as AuditAction,
+        record,
+        null,
+        userId
+      );
     }
 
     success(res, { rejected: ids.length }, `${ids.length} compatibilities rejected`);
@@ -146,7 +148,7 @@ export async function getReviewStats(req: Request, res: Response) {
     success(res, {
       pending: parseInt(pendingCount.count as string),
       confirmed: parseInt(confirmedCount.count as string),
-      topPendingParts: recentPending.map((r) => ({
+      topPendingParts: recentPending.map((r: Record<string, unknown>) => ({
         partName: r.part_name,
         pendingCount: parseInt(r.pending_count as string),
       })),

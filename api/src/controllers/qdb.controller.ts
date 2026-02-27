@@ -30,14 +30,14 @@ export async function getQualifier(req: Request, res: Response) {
 export async function createQualifier(req: Request, res: Response) {
   try {
     const userId = (req as any).superAdminEmail;
-    const { name, displayName, description, valueType, possibleValues } = req.body;
+    const { name, displayName, description, dataType, allowedValues, appliesTo } = req.body;
 
-    if (!name || !displayName || !valueType) {
-      return error(res, 'VALIDATION_ERROR', 'Name, displayName, and valueType are required', 400);
+    if (!name || !displayName || !dataType || !appliesTo) {
+      return error(res, 'VALIDATION_ERROR', 'Name, displayName, dataType, and appliesTo are required', 400);
     }
 
     const qualifier = await qdbService.createQualifier(
-      { name, displayName, description, valueType, possibleValues },
+      { name, displayName, description, dataType, allowedValues, appliesTo },
       userId
     );
 
@@ -55,11 +55,11 @@ export async function updateQualifier(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const userId = (req as any).superAdminEmail;
-    const { displayName, description, valueType, possibleValues } = req.body;
+    const { displayName, description, dataType, allowedValues, appliesTo } = req.body;
 
     const qualifier = await qdbService.updateQualifier(
       id,
-      { displayName, description, valueType, possibleValues },
+      { displayName, description, dataType, allowedValues, appliesTo },
       userId
     );
 

@@ -1,11 +1,11 @@
-import db from '../db';
+import { db } from '../config/database';
 import { logAudit } from './audit.service';
 import type {
   QdbQualifier,
   QdbSpaQualifier,
   QdbPartQualifier,
-  CreateQualifierDto,
-  UpdateQualifierDto,
+  CreateQualifierInput,
+  AuditAction,
 } from '../types/uhtd.types';
 
 // Database row interfaces
@@ -14,30 +14,23 @@ interface QualifierRow {
   name: string;
   display_name: string;
   description: string | null;
-  value_type: 'boolean' | 'single_select' | 'multi_select';
-  possible_values: string | null;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
+  data_type: string;
+  allowed_values: string | null;
+  applies_to: string;
+  created_at: Date;
 }
 
 interface SpaQualifierRow {
-  id: string;
   spa_model_id: string;
   qualifier_id: string;
-  value: string;
-  created_at: string;
-  updated_at: string;
+  value: unknown;
 }
 
 interface PartQualifierRow {
-  id: string;
   part_id: string;
   qualifier_id: string;
-  value: string;
+  value: unknown;
   is_required: boolean;
-  created_at: string;
-  updated_at: string;
 }
 
 function mapQualifierFromDb(row: QualifierRow): QdbQualifier {
@@ -45,56 +38,44 @@ function mapQualifierFromDb(row: QualifierRow): QdbQualifier {
     id: row.id,
     name: row.name,
     displayName: row.display_name,
+    dataType: row.data_type as QdbQualifier['dataType'],
+    allowedValues: row.allowed_values ? JSON.parse(row.allowed_values) : null,
+    appliesTo: row.applies_to as QdbQualifier['appliesTo'],
     description: row.description,
-    valueType: row.value_type,
-    possibleValues: row.possible_values ? JSON.parse(row.possible_values) : null,
     createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    deletedAt: row.deleted_at,
   };
 }
 
 function mapSpaQualifierFromDb(row: SpaQualifierRow): QdbSpaQualifier {
   return {
-    id: row.id,
     spaModelId: row.spa_model_id,
     qualifierId: row.qualifier_id,
     value: row.value,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
   };
 }
 
 function mapPartQualifierFromDb(row: PartQualifierRow): QdbPartQualifier {
   return {
-    id: row.id,
     partId: row.part_id,
     qualifierId: row.qualifier_id,
     value: row.value,
     isRequired: row.is_required,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
   };
 }
 
 // Qualifier CRUD
 export async function getAllQualifiers(): Promise<QdbQualifier[]> {
-  const rows = await db('qdb_qualifiers')
-    .whereNull('deleted_at')
-    .orderBy('display_name');
+  const rows = await db('qdb_qualifiers').orderBy('display_name');
   return rows.map(mapQualifierFromDb);
 }
 
 export async function getQualifierById(id: string): Promise<QdbQualifier | null> {
-  const row = await db('qdb_qualifiers')
-    .where({ id })
-    .whereNull('deleted_at')
-    .first();
+  const row = await db('qdb_qualifiers').where({ id }).first();
   return row ? mapQualifierFromDb(row) : null;
 }
 
 export async function createQualifier(
-  data: CreateQualifierDto,
+  data: CreateQualifierInput,
   userId?: string
 ): Promise<QdbQualifier> {
   const [row] = await db('qdb_qualifiers')
@@ -102,51 +83,54 @@ export async function createQualifier(
       name: data.name,
       display_name: data.displayName,
       description: data.description,
-      value_type: data.valueType,
-      possible_values: data.possibleValues ? JSON.stringify(data.possibleValues) : null,
+      data_type: data.dataType,
+      allowed_values: data.allowedValues ? JSON.stringify(data.allowedValues) : null,
+      applies_to: data.appliesTo,
     })
     .returning('*');
 
-  await logAudit({
-    tableName: 'qdb_qualifiers',
-    recordId: row.id,
-    action: 'INSERT',
-    newValues: row,
-    changedBy: userId,
-  });
+  await logAudit(
+    'qdb_qualifiers',
+    row.id,
+    'INSERT' as AuditAction,
+    null,
+    row,
+    userId
+  );
 
   return mapQualifierFromDb(row);
 }
 
 export async function updateQualifier(
   id: string,
-  data: UpdateQualifierDto,
+  data: Partial<CreateQualifierInput>,
   userId?: string
 ): Promise<QdbQualifier | null> {
   const existing = await db('qdb_qualifiers').where({ id }).first();
   if (!existing) return null;
 
-  const updateData: Record<string, unknown> = { updated_at: db.fn.now() };
+  const updateData: Record<string, unknown> = {};
   if (data.displayName !== undefined) updateData.display_name = data.displayName;
   if (data.description !== undefined) updateData.description = data.description;
-  if (data.valueType !== undefined) updateData.value_type = data.valueType;
-  if (data.possibleValues !== undefined) {
-    updateData.possible_values = data.possibleValues ? JSON.stringify(data.possibleValues) : null;
+  if (data.dataType !== undefined) updateData.data_type = data.dataType;
+  if (data.allowedValues !== undefined) {
+    updateData.allowed_values = data.allowedValues ? JSON.stringify(data.allowedValues) : null;
   }
+  if (data.appliesTo !== undefined) updateData.applies_to = data.appliesTo;
 
   const [row] = await db('qdb_qualifiers')
     .where({ id })
     .update(updateData)
     .returning('*');
 
-  await logAudit({
-    tableName: 'qdb_qualifiers',
-    recordId: id,
-    action: 'UPDATE',
-    oldValues: existing,
-    newValues: row,
-    changedBy: userId,
-  });
+  await logAudit(
+    'qdb_qualifiers',
+    id,
+    'UPDATE' as AuditAction,
+    existing,
+    row,
+    userId
+  );
 
   return mapQualifierFromDb(row);
 }
@@ -155,19 +139,16 @@ export async function deleteQualifier(id: string, userId?: string): Promise<bool
   const existing = await db('qdb_qualifiers').where({ id }).first();
   if (!existing) return false;
 
-  const [row] = await db('qdb_qualifiers')
-    .where({ id })
-    .update({ deleted_at: db.fn.now(), updated_at: db.fn.now() })
-    .returning('*');
+  await db('qdb_qualifiers').where({ id }).del();
 
-  await logAudit({
-    tableName: 'qdb_qualifiers',
-    recordId: id,
-    action: 'DELETE',
-    oldValues: existing,
-    newValues: row,
-    changedBy: userId,
-  });
+  await logAudit(
+    'qdb_qualifiers',
+    id,
+    'DELETE' as AuditAction,
+    existing,
+    null,
+    userId
+  );
 
   return true;
 }
@@ -181,7 +162,7 @@ export async function getSpaQualifiers(spaModelId: string): Promise<QdbSpaQualif
 export async function setSpaQualifier(
   spaModelId: string,
   qualifierId: string,
-  value: string,
+  value: unknown,
   userId?: string
 ): Promise<QdbSpaQualifier> {
   const existing = await db('qdb_spa_qualifiers')
@@ -190,18 +171,18 @@ export async function setSpaQualifier(
 
   if (existing) {
     const [row] = await db('qdb_spa_qualifiers')
-      .where({ id: existing.id })
-      .update({ value, updated_at: db.fn.now() })
+      .where({ spa_model_id: spaModelId, qualifier_id: qualifierId })
+      .update({ value })
       .returning('*');
 
-    await logAudit({
-      tableName: 'qdb_spa_qualifiers',
-      recordId: row.id,
-      action: 'UPDATE',
-      oldValues: existing,
-      newValues: row,
-      changedBy: userId,
-    });
+    await logAudit(
+      'qdb_spa_qualifiers',
+      `${spaModelId}:${qualifierId}`,
+      'UPDATE' as AuditAction,
+      existing,
+      row,
+      userId
+    );
 
     return mapSpaQualifierFromDb(row);
   } else {
@@ -209,13 +190,14 @@ export async function setSpaQualifier(
       .insert({ spa_model_id: spaModelId, qualifier_id: qualifierId, value })
       .returning('*');
 
-    await logAudit({
-      tableName: 'qdb_spa_qualifiers',
-      recordId: row.id,
-      action: 'INSERT',
-      newValues: row,
-      changedBy: userId,
-    });
+    await logAudit(
+      'qdb_spa_qualifiers',
+      `${spaModelId}:${qualifierId}`,
+      'INSERT' as AuditAction,
+      null,
+      row,
+      userId
+    );
 
     return mapSpaQualifierFromDb(row);
   }
@@ -232,15 +214,18 @@ export async function removeSpaQualifier(
 
   if (!existing) return false;
 
-  await db('qdb_spa_qualifiers').where({ id: existing.id }).del();
+  await db('qdb_spa_qualifiers')
+    .where({ spa_model_id: spaModelId, qualifier_id: qualifierId })
+    .del();
 
-  await logAudit({
-    tableName: 'qdb_spa_qualifiers',
-    recordId: existing.id,
-    action: 'DELETE',
-    oldValues: existing,
-    changedBy: userId,
-  });
+  await logAudit(
+    'qdb_spa_qualifiers',
+    `${spaModelId}:${qualifierId}`,
+    'DELETE' as AuditAction,
+    existing,
+    null,
+    userId
+  );
 
   return true;
 }
@@ -254,7 +239,7 @@ export async function getPartQualifiers(partId: string): Promise<QdbPartQualifie
 export async function setPartQualifier(
   partId: string,
   qualifierId: string,
-  value: string,
+  value: unknown,
   isRequired: boolean,
   userId?: string
 ): Promise<QdbPartQualifier> {
@@ -264,18 +249,18 @@ export async function setPartQualifier(
 
   if (existing) {
     const [row] = await db('qdb_part_qualifiers')
-      .where({ id: existing.id })
-      .update({ value, is_required: isRequired, updated_at: db.fn.now() })
+      .where({ part_id: partId, qualifier_id: qualifierId })
+      .update({ value, is_required: isRequired })
       .returning('*');
 
-    await logAudit({
-      tableName: 'qdb_part_qualifiers',
-      recordId: row.id,
-      action: 'UPDATE',
-      oldValues: existing,
-      newValues: row,
-      changedBy: userId,
-    });
+    await logAudit(
+      'qdb_part_qualifiers',
+      `${partId}:${qualifierId}`,
+      'UPDATE' as AuditAction,
+      existing,
+      row,
+      userId
+    );
 
     return mapPartQualifierFromDb(row);
   } else {
@@ -283,13 +268,14 @@ export async function setPartQualifier(
       .insert({ part_id: partId, qualifier_id: qualifierId, value, is_required: isRequired })
       .returning('*');
 
-    await logAudit({
-      tableName: 'qdb_part_qualifiers',
-      recordId: row.id,
-      action: 'INSERT',
-      newValues: row,
-      changedBy: userId,
-    });
+    await logAudit(
+      'qdb_part_qualifiers',
+      `${partId}:${qualifierId}`,
+      'INSERT' as AuditAction,
+      null,
+      row,
+      userId
+    );
 
     return mapPartQualifierFromDb(row);
   }
@@ -306,15 +292,18 @@ export async function removePartQualifier(
 
   if (!existing) return false;
 
-  await db('qdb_part_qualifiers').where({ id: existing.id }).del();
+  await db('qdb_part_qualifiers')
+    .where({ part_id: partId, qualifier_id: qualifierId })
+    .del();
 
-  await logAudit({
-    tableName: 'qdb_part_qualifiers',
-    recordId: existing.id,
-    action: 'DELETE',
-    oldValues: existing,
-    changedBy: userId,
-  });
+  await logAudit(
+    'qdb_part_qualifiers',
+    `${partId}:${qualifierId}`,
+    'DELETE' as AuditAction,
+    existing,
+    null,
+    userId
+  );
 
   return true;
 }
@@ -328,9 +317,9 @@ export async function findPartsMatchingSpaQualifiers(spaModelId: string): Promis
   const partIds = await db('qdb_part_qualifiers')
     .select('part_id')
     .where('is_required', true)
-    .whereIn('qualifier_id', spaQualifiers.map((q) => q.qualifierId))
-    .whereIn('value', spaQualifiers.map((q) => q.value))
+    .whereIn('qualifier_id', spaQualifiers.map((q: QdbSpaQualifier) => q.qualifierId))
+    .whereIn('value', spaQualifiers.map((q: QdbSpaQualifier) => q.value as string))
     .groupBy('part_id');
 
-  return partIds.map((row) => row.part_id);
+  return partIds.map((row: { part_id: string }) => row.part_id);
 }

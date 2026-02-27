@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import db from '../db';
+import { db } from '../config/database';
 import { success, error } from '../utils/response';
 
 export async function getUhtdStats(req: Request, res: Response) {
@@ -41,8 +41,8 @@ export async function getUhtdStats(req: Request, res: Response) {
         confirmed: parseInt(confirmedCount.count as string),
       },
       recent: {
-        brands: recentBrands.map((b) => ({ id: b.id, name: b.name, createdAt: b.created_at })),
-        parts: recentParts.map((p) => ({ id: p.id, name: p.name, createdAt: p.created_at })),
+        brands: recentBrands.map((b: Record<string, unknown>) => ({ id: b.id, name: b.name, createdAt: b.created_at })),
+        parts: recentParts.map((p: Record<string, unknown>) => ({ id: p.id, name: p.name, createdAt: p.created_at })),
       },
     });
   } catch (err) {
@@ -68,7 +68,7 @@ export async function searchUhtd(req: Request, res: Response) {
 
     const parts = await db('pcdb_parts')
       .whereNull('deleted_at')
-      .where((qb) => {
+      .where((qb: any) => {
         qb.where('name', 'ilike', searchTerm).orWhere('part_number', 'ilike', searchTerm);
       })
       .limit(5)
@@ -79,32 +79,32 @@ export async function searchUhtd(req: Request, res: Response) {
       .leftJoin('scdb_model_lines as ml', 'sm.model_line_id', 'ml.id')
       .leftJoin('scdb_brands as b', 'ml.brand_id', 'b.id')
       .whereNull('sm.deleted_at')
-      .where((qb) => {
+      .where((qb: any) => {
         qb.where('sm.model_name', 'ilike', searchTerm).orWhere('b.name', 'ilike', searchTerm);
       })
       .limit(5);
 
     const comps = await db('compatibility_groups')
-      .where((qb) => {
+      .where((qb: any) => {
         qb.where('id', 'ilike', searchTerm).orWhere('name', 'ilike', searchTerm);
       })
       .limit(5)
       .select('id', 'name');
 
     success(res, {
-      brands: brands.map((b) => ({ id: b.id, name: b.name, type: 'brand' })),
-      parts: parts.map((p) => ({
+      brands: brands.map((b: Record<string, unknown>) => ({ id: b.id, name: b.name, type: 'brand' })),
+      parts: parts.map((p: Record<string, unknown>) => ({
         id: p.id,
         name: p.name,
         partNumber: p.part_number,
         type: 'part',
       })),
-      spas: spas.map((s) => ({
+      spas: spas.map((s: Record<string, unknown>) => ({
         id: s.id,
         name: `${s.brand_name} ${s.model_name} ${s.model_year}`,
         type: 'spa',
       })),
-      comps: comps.map((c) => ({ id: c.id, name: c.name, type: 'comp' })),
+      comps: comps.map((c: Record<string, unknown>) => ({ id: c.id, name: c.name, type: 'comp' })),
     });
   } catch (err) {
     console.error('Error searching UHTD:', err);

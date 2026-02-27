@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
-import db from '../db';
+import { db } from '../config/database';
 import { success, error } from '../utils/response';
 import { logAudit } from '../services/audit.service';
+import { AuditAction } from '../types/uhtd.types';
 
 interface BrandImportRow {
   name: string;
@@ -87,13 +88,14 @@ export async function importBrands(req: Request, res: Response) {
           })
           .returning('*');
 
-        await logAudit({
-          tableName: 'scdb_brands',
-          recordId: inserted.id,
-          action: 'INSERT',
-          newValues: inserted,
-          changedBy: userId,
-        });
+        await logAudit(
+          'scdb_brands',
+          inserted.id,
+          'INSERT' as AuditAction,
+          null,
+          inserted,
+          userId
+        );
 
         created++;
       } catch (err: any) {
@@ -152,13 +154,14 @@ export async function importParts(req: Request, res: Response) {
           })
           .returning('*');
 
-        await logAudit({
-          tableName: 'pcdb_parts',
-          recordId: inserted.id,
-          action: 'INSERT',
-          newValues: inserted,
-          changedBy: userId,
-        });
+        await logAudit(
+          'pcdb_parts',
+          inserted.id,
+          'INSERT' as AuditAction,
+          null,
+          inserted,
+          userId
+        );
 
         created++;
       } catch (err: any) {
@@ -226,13 +229,14 @@ export async function importCompatibility(req: Request, res: Response) {
               })
               .returning('*');
 
-            await logAudit({
-              tableName: 'part_spa_compatibility',
-              recordId: inserted.id,
-              action: 'INSERT',
-              newValues: inserted,
-              changedBy: userId,
-            });
+            await logAudit(
+              'part_spa_compatibility',
+              inserted.id,
+              'INSERT' as AuditAction,
+              null,
+              inserted,
+              userId
+            );
 
             created++;
           }
@@ -275,13 +279,14 @@ export async function importCompatibility(req: Request, res: Response) {
             })
             .returning('*');
 
-          await logAudit({
-            tableName: 'part_spa_compatibility',
-            recordId: inserted.id,
-            action: 'INSERT',
-            newValues: inserted,
-            changedBy: userId,
-          });
+          await logAudit(
+            'part_spa_compatibility',
+            inserted.id,
+            'INSERT' as AuditAction,
+            null,
+            inserted,
+            userId
+          );
 
           created++;
         }

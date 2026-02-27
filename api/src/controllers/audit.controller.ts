@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import db from '../db';
+import { db } from '../config/database';
 import { success, error } from '../utils/response';
 
 export async function getAuditLogs(req: Request, res: Response) {
@@ -29,7 +29,7 @@ export async function getAuditLogs(req: Request, res: Response) {
 
     success(
       res,
-      logs.map((log) => ({
+      logs.map((log: Record<string, unknown>) => ({
         id: log.id,
         tableName: log.table_name,
         recordId: log.record_id,
@@ -83,9 +83,9 @@ export async function getAuditStats(req: Request, res: Response) {
     success(res, {
       total: parseInt(totalCount.count as string),
       last24Hours: parseInt(todayCount.count as string),
-      byTable: byTable.map((r) => ({ table: r.table_name, count: parseInt(r.count as string) })),
-      byAction: byAction.map((r) => ({ action: r.action, count: parseInt(r.count as string) })),
-      topContributors: recentUsers.map((r) => ({
+      byTable: byTable.map((r: Record<string, unknown>) => ({ table: r.table_name, count: parseInt(r.count as string) })),
+      byAction: byAction.map((r: Record<string, unknown>) => ({ action: r.action, count: parseInt(r.count as string) })),
+      topContributors: recentUsers.map((r: Record<string, unknown>) => ({
         user: r.changed_by,
         count: parseInt(r.count as string),
       })),
