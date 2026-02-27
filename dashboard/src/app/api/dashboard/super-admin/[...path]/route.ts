@@ -62,27 +62,35 @@ async function proxy(
   }
 }
 
+const PUBLIC_PATHS = [
+  'auth/check-email',
+  'auth/register',
+];
+
 async function doProxy(
   request: NextRequest,
   params: Promise<{ path: string[] }>,
   method: string
 ): Promise<NextResponse> {
+  const { path } = await params;
+  const pathStr = path.join('/');
+  
+  const isPublicPath = PUBLIC_PATHS.some((p) => pathStr === p || pathStr.startsWith(p + '/'));
+  
   const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
+  if (!isPublicPath && !authHeader?.startsWith('Bearer ')) {
     return NextResponse.json(
       { success: false, error: { code: 'UNAUTHORIZED', message: 'Missing or invalid Authorization header' } },
       { status: 401 }
     );
   }
-
-  const { path } = await params;
   if (path.some((p) => p === '..' || p === '.')) {
     return NextResponse.json(
       { success: false, error: { code: 'BAD_REQUEST', message: 'Invalid path' } },
       { status: 400 }
     );
   }
-  const pathStr = path.join('/');
+  
   let url: URL;
   try {
     url = new URL(`/api/v1/super-admin/${pathStr}${request.nextUrl.search}`, API_BASE);
@@ -95,7 +103,9 @@ async function doProxy(
 
   const headers = new Headers();
   headers.set('Content-Type', 'application/json');
-  headers.set('Authorization', authHeader);
+  if (authHeader) {
+    headers.set('Authorization', authHeader);
+  }
 
   try {
     const res = await fetch(url.toString(), {
