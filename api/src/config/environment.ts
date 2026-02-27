@@ -34,4 +34,5 @@ export const env = {
   SUPER_ADMIN_EMAILS: (process.env.SUPER_ADMIN_EMAILS || '').split(',').map((e) => e.trim()).filter(Boolean),
   /** Emails allowed to log in to any tenant app as admin (whitelist override when no users row) */
   TENANT_ADMIN_EMAILS: (process.env.TENANT_ADMIN_EMAILS || '').split(',').map((e) => e.trim()).filter(Boolean),
+  FIREBASE_STORAGE_BUCKET: process.env.FIREBASE_STORAGE_BUCKET,
 };

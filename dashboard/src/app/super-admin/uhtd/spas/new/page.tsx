@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Accordion } from '@/components/ui/Accordion';
 import { BulkAddTable } from '@/components/ui/BulkAddTable';
+import { MediaInput } from '@/components/ui/MediaInput';
+import { DataSourceInput } from '@/components/ui/DataSourceInput';
 import { QuickCreateBrandModal } from '@/components/uhtd/QuickCreateBrandModal';
 import { QuickCreateModelLineModal } from '@/components/uhtd/QuickCreateModelLineModal';
 
@@ -568,26 +570,22 @@ function NewSpaForm() {
               <h3 className="font-medium text-gray-900">Media & Notes</h3>
               
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
-                  <input
-                    type="url"
-                    value={formData.imageUrl}
-                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="https://..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Spec Sheet URL</label>
-                  <input
-                    type="url"
-                    value={formData.specSheetUrl}
-                    onChange={(e) => setFormData({ ...formData, specSheetUrl: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="https://..."
-                  />
-                </div>
+                <MediaInput
+                  label="Product Image"
+                  value={formData.imageUrl}
+                  onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+                  accept="image/*"
+                  entityType="spa"
+                  fieldName="image"
+                />
+                <MediaInput
+                  label="Spec Sheet"
+                  value={formData.specSheetUrl}
+                  onChange={(url) => setFormData({ ...formData, specSheetUrl: url })}
+                  accept="application/pdf"
+                  entityType="spa"
+                  fieldName="specSheet"
+                />
               </div>
 
               <div>
@@ -601,16 +599,10 @@ function NewSpaForm() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Data Source</label>
-                <input
-                  type="text"
-                  value={formData.dataSource}
-                  onChange={(e) => setFormData({ ...formData, dataSource: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., Official website, spec sheet"
-                />
-              </div>
+              <DataSourceInput
+                value={formData.dataSource}
+                onChange={(value) => setFormData({ ...formData, dataSource: value })}
+              />
 
               <div className="flex items-center gap-2">
                 <input

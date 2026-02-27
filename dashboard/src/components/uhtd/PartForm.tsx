@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/Button';
+import { MediaInput } from '../ui/MediaInput';
+import { DataSourceInput } from '../ui/DataSourceInput';
 import { SpaSelector } from './SpaSelector';
 import { CompSidebar } from './CompSidebar';
 import { CompQuickview } from './CompQuickview';
@@ -197,16 +199,20 @@ export function PartForm({
               </label>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Data Source</label>
-              <input
-                type="text"
-                value={formData.dataSource}
-                onChange={(e) => setFormData({ ...formData, dataSource: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Where did this info come from?"
-              />
-            </div>
+            <MediaInput
+              label="Product Image"
+              value={formData.imageUrl}
+              onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+              accept="image/*"
+              entityType="part"
+              fieldName="image"
+            />
+
+            <DataSourceInput
+              value={formData.dataSource}
+              onChange={(value) => setFormData({ ...formData, dataSource: value })}
+              placeholder="Where did this info come from?"
+            />
           </div>
 
           <Button type="submit" loading={loading} className="w-full">

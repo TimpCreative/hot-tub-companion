@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Accordion } from '@/components/ui/Accordion';
 import { BulkAddTable } from '@/components/ui/BulkAddTable';
+import { MediaInput } from '@/components/ui/MediaInput';
+import { DataSourceInput } from '@/components/ui/DataSourceInput';
 
 interface ModelLine {
   id: string;
@@ -324,16 +326,32 @@ export default function NewSpaModelPage() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Data Source</label>
-            <input
-              type="text"
-              value={formData.dataSource}
-              onChange={(e) => setFormData({ ...formData, dataSource: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., 2024 spec sheet"
-            />
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Media</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <MediaInput
+                label="Product Image"
+                value={formData.imageUrl}
+                onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+                accept="image/*"
+                entityType="spa"
+                fieldName="image"
+              />
+              <MediaInput
+                label="Spec Sheet"
+                value={formData.specSheetUrl}
+                onChange={(url) => setFormData({ ...formData, specSheetUrl: url })}
+                accept="application/pdf"
+                entityType="spa"
+                fieldName="specSheet"
+              />
+            </div>
           </div>
+
+          <DataSourceInput
+            value={formData.dataSource}
+            onChange={(value) => setFormData({ ...formData, dataSource: value })}
+          />
 
             <div className="flex gap-3 pt-4 border-t border-gray-200">
               <Button type="submit" loading={loading}>

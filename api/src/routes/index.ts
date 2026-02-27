@@ -10,6 +10,7 @@ import qdbRoutes from './qdb.routes';
 import auditRoutes from './audit.routes';
 import importRoutes from './import.routes';
 import statsRoutes from './stats.routes';
+import mediaRoutes from './media.routes';
 import { superAdminAuth } from '../middleware/superAdminAuth';
 
 const router = Router();
@@ -33,5 +34,6 @@ router.use('/api/v1/super-admin/qdb', superAdminAuth, qdbRoutes);
 router.use('/api/v1/super-admin/audit', superAdminAuth, auditRoutes);
 router.use('/api/v1/super-admin/import', superAdminAuth, importRoutes);
 router.use('/api/v1/super-admin/stats', superAdminAuth, statsRoutes);
+router.use('/api/v1/super-admin/media', superAdminAuth, mediaRoutes);
 
 export default router;

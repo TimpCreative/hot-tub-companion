@@ -97,6 +97,19 @@ export function getFirebaseAuth(): admin.auth.Auth {
   return admin.auth();
 }
 
+export function getFirebaseStorage(): admin.storage.Storage {
+  initFirebase();
+  return admin.storage();
+}
+
+export function getStorageBucket(): ReturnType<admin.storage.Storage['bucket']> {
+  const bucketName = env.FIREBASE_STORAGE_BUCKET;
+  if (!bucketName) {
+    throw new Error('FIREBASE_STORAGE_BUCKET environment variable is not set');
+  }
+  return getFirebaseStorage().bucket(bucketName);
+}
+
 export function isFirebaseInitialized(): boolean {
   return initialized;
 }
