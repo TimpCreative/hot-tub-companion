@@ -1,21 +1,42 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PartForm } from '@/components/uhtd/PartForm';
+import { Accordion } from '@/components/ui/Accordion';
+import { BulkAddTable } from '@/components/ui/BulkAddTable';
+
+interface Category {
+  id: string;
+  name: string;
+  displayName: string;
+}
 
 export default function NewPartPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        const res = await fetch('/api/dashboard/super-admin/pcdb/categories');
+        const data = await res.json();
+        if (data.success) setCategories(data.data || []);
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+      }
+    }
+    fetchCategories();
+  }, []);
 
   const handleSubmit = async (formData: any, spaIds: string[]) => {
     setLoading(true);
     setError('');
 
     try {
-      // Create the part
       const partRes = await fetch('/api/dashboard/super-admin/pcdb/parts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -30,7 +51,6 @@ export default function NewPartPage() {
 
       const partId = partData.data.id;
 
-      // Create compatibility records if spas were selected
       if (spaIds.length > 0 && !formData.isUniversal) {
         await fetch('/api/dashboard/super-admin/comps/compatibility/bulk', {
           method: 'POST',
@@ -51,6 +71,66 @@ export default function NewPartPage() {
     }
   };
 
+  const handleBulkAdd = async (rows: Record<string, any>[]) => {
+    let success = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const row of rows) {
+      if (!row.name) {
+        failed++;
+        errors.push(`Row: Name is required`);
+        continue;
+      }
+
+      try {
+        const res = await fetch('/api/dashboard/super-admin/pcdb/parts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: row.name,
+            partNumber: row.partNumber || null,
+            categoryId: row.categoryId || null,
+            manufacturer: row.manufacturer || null,
+            upc: row.upc || null,
+            isOem: row.isOem === true,
+            isUniversal: row.isUniversal === true,
+            dataSource: row.dataSource || 'Bulk import',
+          }),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          success++;
+        } else {
+          failed++;
+          errors.push(`${row.name}: ${data.error?.message || 'Failed'}`);
+        }
+      } catch (err) {
+        failed++;
+        errors.push(`${row.name}: Network error`);
+      }
+    }
+
+    return { success, failed, errors };
+  };
+
+  const bulkColumns = [
+    { key: 'name', header: 'Part Name', required: true, placeholder: 'e.g., Filter Cartridge', width: '200px' },
+    { key: 'partNumber', header: 'Part #', placeholder: 'SKU/Part #', width: '120px' },
+    {
+      key: 'categoryId',
+      header: 'Category',
+      type: 'select' as const,
+      options: categories.map((c) => ({ value: c.id, label: c.displayName })),
+      width: '150px',
+    },
+    { key: 'manufacturer', header: 'Manufacturer', placeholder: 'Brand', width: '120px' },
+    { key: 'upc', header: 'UPC', placeholder: 'UPC code', width: '130px' },
+    { key: 'isOem', header: 'OEM', type: 'checkbox' as const, width: '50px' },
+    { key: 'isUniversal', header: 'Univ.', type: 'checkbox' as const, width: '50px' },
+  ];
+
   return (
     <div>
       <div className="mb-6">
@@ -59,7 +139,7 @@ export default function NewPartPage() {
         </Link>
         <h1 className="text-2xl font-semibold text-gray-900 mt-2">Add New Part</h1>
         <p className="text-sm text-gray-500">
-          Fill in part details and select compatible spas using the two-panel form
+          Add parts individually with full details, or bulk add basic parts
         </p>
       </div>
 
@@ -69,7 +149,18 @@ export default function NewPartPage() {
         </div>
       )}
 
-      <PartForm onSubmit={handleSubmit} submitLabel="Create Part" loading={loading} />
+      <div className="space-y-6">
+        <Accordion title="Add Single Part with Compatibility" subtitle="Full two-panel form with spa compatibility selection" defaultOpen={true}>
+          <PartForm onSubmit={handleSubmit} submitLabel="Create Part" loading={loading} />
+        </Accordion>
+
+        <Accordion title="Bulk Add Parts" subtitle="Add multiple parts quickly - spa compatibility can be added later">
+          <p className="text-sm text-gray-600 mb-4">
+            Note: Bulk-added parts won&apos;t have spa compatibility set. Edit each part after creation to add compatible spas.
+          </p>
+          <BulkAddTable columns={bulkColumns} onSubmit={handleBulkAdd} />
+        </Accordion>
+      </div>
     </div>
   );
 }

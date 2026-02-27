@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
+import { Accordion } from '@/components/ui/Accordion';
+import { BulkAddTable } from '@/components/ui/BulkAddTable';
 
 interface ModelLine {
   id: string;
@@ -106,6 +108,71 @@ export default function NewSpaModelPage() {
     }
   };
 
+  const handleBulkAdd = async (rows: Record<string, any>[]) => {
+    let success = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const row of rows) {
+      if (!row.name || !row.year) {
+        failed++;
+        errors.push(`${row.name || 'Row'}: Name and Year are required`);
+        continue;
+      }
+
+      try {
+        const res = await fetch('/api/dashboard/super-admin/scdb/spa-models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            modelLineId,
+            brandId: modelLine?.brandId,
+            name: row.name,
+            year: Number(row.year),
+            seatingCapacity: row.seatingCapacity ? Number(row.seatingCapacity) : undefined,
+            jetCount: row.jetCount ? Number(row.jetCount) : undefined,
+            electricalRequirement: row.electrical || undefined,
+            isDiscontinued: row.isDiscontinued === true,
+            dataSource: row.dataSource || 'Bulk import',
+          }),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          success++;
+        } else {
+          failed++;
+          errors.push(`${row.name} (${row.year}): ${data.error?.message || 'Failed'}`);
+        }
+      } catch (err) {
+        failed++;
+        errors.push(`${row.name}: Network error`);
+      }
+    }
+
+    return { success, failed, errors };
+  };
+
+  const bulkColumns = [
+    { key: 'name', header: 'Model Name', required: true, placeholder: 'e.g., J-335', width: '150px' },
+    { key: 'year', header: 'Year', type: 'number' as const, required: true, placeholder: String(currentYear), width: '80px' },
+    { key: 'seatingCapacity', header: 'Seats', type: 'number' as const, placeholder: '#', width: '70px' },
+    { key: 'jetCount', header: 'Jets', type: 'number' as const, placeholder: '#', width: '70px' },
+    {
+      key: 'electrical',
+      header: 'Electrical',
+      type: 'select' as const,
+      options: [
+        { value: '120V', label: '120V' },
+        { value: '240V', label: '240V' },
+        { value: '120V/240V', label: '120V/240V' },
+      ],
+      width: '100px',
+    },
+    { key: 'isDiscontinued', header: 'Disc.', type: 'checkbox' as const, width: '50px' },
+    { key: 'dataSource', header: 'Source', placeholder: 'Source', width: '100px' },
+  ];
+
   if (fetching) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -129,8 +196,9 @@ export default function NewSpaModelPage() {
         </p>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 max-w-3xl">
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+      <div className="space-y-6">
+        <Accordion title="Add Single Spa Model" subtitle="Add one spa model with full specifications" defaultOpen={true}>
+          <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl">
           {error && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {error}
@@ -267,17 +335,25 @@ export default function NewSpaModelPage() {
             />
           </div>
 
-          <div className="flex gap-3 pt-4 border-t border-gray-200">
-            <Button type="submit" loading={loading}>
-              Create Spa Model
-            </Button>
-            <Link href={`/super-admin/uhtd/model-lines/${modelLineId}`}>
-              <Button type="button" variant="secondary">
-                Cancel
+            <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <Button type="submit" loading={loading}>
+                Create Spa Model
               </Button>
-            </Link>
-          </div>
-        </form>
+              <Link href={`/super-admin/uhtd/model-lines/${modelLineId}`}>
+                <Button type="button" variant="secondary">
+                  Cancel
+                </Button>
+              </Link>
+            </div>
+          </form>
+        </Accordion>
+
+        <Accordion title="Bulk Add Spa Models" subtitle="Add multiple spa models at once - great for adding multiple years of the same model">
+          <p className="text-sm text-gray-600 mb-4">
+            Tip: To quickly add a model across multiple years, add rows with the same name but different years.
+          </p>
+          <BulkAddTable columns={bulkColumns} onSubmit={handleBulkAdd} />
+        </Accordion>
       </div>
     </div>
   );

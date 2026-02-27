@@ -83,6 +83,14 @@ function LoginForm() {
           <Button type="submit" loading={loading} className="w-full">
             Sign In
           </Button>
+          {isAdmin && (
+            <p className="text-center text-sm text-gray-600">
+              Need an account?{' '}
+              <a href="/auth/signup?admin=1" className="text-blue-600 hover:text-blue-800">
+                Create one
+              </a>
+            </p>
+          )}
         </form>
       </div>
     </div>

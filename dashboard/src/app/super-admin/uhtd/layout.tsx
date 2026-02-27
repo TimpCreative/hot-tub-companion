@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 const UHTD_NAV = [
   { label: 'Overview', href: '/super-admin/uhtd' },
   { label: 'Brands', href: '/super-admin/uhtd/brands' },
+  { label: 'Spas', href: '/super-admin/uhtd/spas' },
   { label: 'Parts', href: '/super-admin/uhtd/parts' },
   { label: 'Comps', href: '/super-admin/uhtd/comps' },
   { label: 'Categories', href: '/super-admin/uhtd/categories' },
