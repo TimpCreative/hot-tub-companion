@@ -458,3 +458,95 @@ export async function getPublicSpaModels(req: Request, res: Response) {
     return error(res, 'INTERNAL_ERROR', 'Failed to get spa models', 500);
   }
 }
+
+// =============================================================================
+// Electrical Configs
+// =============================================================================
+
+export async function getElectricalConfigs(req: Request, res: Response) {
+  try {
+    const { spaModelId } = req.params;
+    const configs = await scdbService.getElectricalConfigsForSpa(spaModelId);
+    return success(res, configs);
+  } catch (err) {
+    console.error('Error getting electrical configs:', err);
+    return error(res, 'INTERNAL_ERROR', 'Failed to get electrical configs', 500);
+  }
+}
+
+export async function createElectricalConfig(req: Request, res: Response) {
+  try {
+    const { spaModelId } = req.params;
+    const { voltage, voltageUnit, frequencyHz, amperage, sortOrder } = req.body;
+
+    if (!voltage || !amperage) {
+      return error(res, 'VALIDATION_ERROR', 'voltage and amperage are required', 400);
+    }
+
+    const config = await scdbService.createElectricalConfig(spaModelId, {
+      voltage,
+      voltageUnit,
+      frequencyHz,
+      amperage,
+      sortOrder,
+    });
+    res.status(201);
+    return success(res, config, 'Electrical config created');
+  } catch (err) {
+    console.error('Error creating electrical config:', err);
+    return error(res, 'INTERNAL_ERROR', 'Failed to create electrical config', 500);
+  }
+}
+
+export async function updateElectricalConfig(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { voltage, voltageUnit, frequencyHz, amperage, sortOrder } = req.body;
+
+    const config = await scdbService.updateElectricalConfig(id, {
+      voltage,
+      voltageUnit,
+      frequencyHz,
+      amperage,
+      sortOrder,
+    });
+    if (!config) {
+      return error(res, 'NOT_FOUND', 'Electrical config not found', 404);
+    }
+    return success(res, config);
+  } catch (err) {
+    console.error('Error updating electrical config:', err);
+    return error(res, 'INTERNAL_ERROR', 'Failed to update electrical config', 500);
+  }
+}
+
+export async function deleteElectricalConfig(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const deleted = await scdbService.deleteElectricalConfig(id);
+    if (!deleted) {
+      return error(res, 'NOT_FOUND', 'Electrical config not found', 404);
+    }
+    return success(res, null, 'Electrical config deleted');
+  } catch (err) {
+    console.error('Error deleting electrical config:', err);
+    return error(res, 'INTERNAL_ERROR', 'Failed to delete electrical config', 500);
+  }
+}
+
+export async function replaceElectricalConfigs(req: Request, res: Response) {
+  try {
+    const { spaModelId } = req.params;
+    const { configs } = req.body;
+
+    if (!Array.isArray(configs)) {
+      return error(res, 'VALIDATION_ERROR', 'configs must be an array', 400);
+    }
+
+    const result = await scdbService.replaceElectricalConfigs(spaModelId, configs);
+    return success(res, result, 'Electrical configs updated');
+  } catch (err) {
+    console.error('Error replacing electrical configs:', err);
+    return error(res, 'INTERNAL_ERROR', 'Failed to replace electrical configs', 500);
+  }
+}

@@ -13,12 +13,25 @@ import { success, error } from '../utils/response';
 
 export async function listCategories(req: Request, res: Response) {
   try {
-    const { includeDeleted } = req.query;
-    const categories = await pcdbService.listCategories(includeDeleted === 'true');
+    const { includeDeleted, tree } = req.query;
+    const categories = tree === 'true'
+      ? await pcdbService.listCategoriesTree(includeDeleted === 'true')
+      : await pcdbService.listCategories(includeDeleted === 'true');
     return success(res, categories);
   } catch (err) {
     console.error('Error listing categories:', err);
     return error(res, 'INTERNAL_ERROR', 'Failed to list categories', 500);
+  }
+}
+
+export async function getCategoryAncestors(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const ancestors = await pcdbService.getCategoryAncestors(id);
+    return success(res, ancestors);
+  } catch (err) {
+    console.error('Error getting category ancestors:', err);
+    return error(res, 'INTERNAL_ERROR', 'Failed to get category ancestors', 500);
   }
 }
 
@@ -38,7 +51,7 @@ export async function getCategory(req: Request, res: Response) {
 
 export async function createCategory(req: Request, res: Response) {
   try {
-    const { name, displayName, description, iconName, sortOrder } = req.body;
+    const { name, displayName, description, iconName, sortOrder, parentId } = req.body;
     if (!name || !displayName) {
       return error(res, 'VALIDATION_ERROR', 'name and displayName are required', 400);
     }
@@ -50,7 +63,7 @@ export async function createCategory(req: Request, res: Response) {
 
     const userId = (req as any).superAdminEmail;
     const category = await pcdbService.createCategory(
-      { name, displayName, description, iconName, sortOrder },
+      { name, displayName, description, iconName, sortOrder, parentId },
       userId
     );
     res.status(201);
@@ -244,6 +257,7 @@ export async function createPart(req: Request, res: Response) {
     const {
       categoryId,
       partNumber,
+      manufacturerSku,
       upc,
       ean,
       skuAliases,
@@ -270,6 +284,7 @@ export async function createPart(req: Request, res: Response) {
       {
         categoryId,
         partNumber,
+        manufacturerSku,
         upc,
         ean,
         skuAliases,

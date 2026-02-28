@@ -17,14 +17,18 @@ interface Category {
 interface PartFormData {
   categoryId: string;
   partNumber: string;
+  manufacturerSku: string;
   upc: string;
   ean: string;
   name: string;
   manufacturer: string;
   isOem: boolean;
   isUniversal: boolean;
+  isDiscontinued: boolean;
   displayImportance: number;
   imageUrl: string;
+  specSheetUrl: string;
+  skuAliases: string;
   notes: string;
   dataSource: string;
 }
@@ -51,14 +55,18 @@ export function PartForm({
   const [formData, setFormData] = useState<PartFormData>({
     categoryId: initialData?.categoryId || '',
     partNumber: initialData?.partNumber || '',
+    manufacturerSku: initialData?.manufacturerSku || '',
     upc: initialData?.upc || '',
     ean: initialData?.ean || '',
     name: initialData?.name || '',
     manufacturer: initialData?.manufacturer || '',
     isOem: initialData?.isOem ?? false,
     isUniversal: initialData?.isUniversal ?? false,
+    isDiscontinued: initialData?.isDiscontinued ?? false,
     displayImportance: initialData?.displayImportance ?? 2,
     imageUrl: initialData?.imageUrl || '',
+    specSheetUrl: initialData?.specSheetUrl || '',
+    skuAliases: initialData?.skuAliases || '',
     notes: initialData?.notes || '',
     dataSource: initialData?.dataSource || '',
   });
@@ -158,11 +166,32 @@ export function PartForm({
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer SKU</label>
+                <input
+                  type="text"
+                  value={formData.manufacturerSku}
+                  onChange={(e) => setFormData({ ...formData, manufacturerSku: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">UPC</label>
                 <input
                   type="text"
                   value={formData.upc}
                   onChange={(e) => setFormData({ ...formData, upc: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">EAN</label>
+                <input
+                  type="text"
+                  value={formData.ean}
+                  onChange={(e) => setFormData({ ...formData, ean: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -176,6 +205,18 @@ export function PartForm({
                 onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">SKU Aliases</label>
+              <input
+                type="text"
+                value={formData.skuAliases}
+                onChange={(e) => setFormData({ ...formData, skuAliases: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Comma-separated aliases"
+              />
+              <p className="text-xs text-gray-500 mt-1">Alternative SKUs or part numbers (comma-separated)</p>
             </div>
 
             <div className="flex flex-wrap gap-4">
@@ -197,16 +238,46 @@ export function PartForm({
                 />
                 <span className="text-sm text-gray-700">Universal (fits all)</span>
               </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.isDiscontinued}
+                  onChange={(e) => setFormData({ ...formData, isDiscontinued: e.target.checked })}
+                  className="rounded border-gray-300 text-blue-600"
+                />
+                <span className="text-sm text-gray-700">Discontinued</span>
+              </label>
             </div>
 
-            <MediaInput
-              label="Product Image"
-              value={formData.imageUrl}
-              onChange={(url) => setFormData({ ...formData, imageUrl: url })}
-              accept="image/*"
-              entityType="part"
-              fieldName="image"
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <MediaInput
+                label="Product Image"
+                value={formData.imageUrl}
+                onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+                accept="image/*"
+                entityType="part"
+                fieldName="image"
+              />
+              <MediaInput
+                label="Spec Sheet"
+                value={formData.specSheetUrl}
+                onChange={(url) => setFormData({ ...formData, specSheetUrl: url })}
+                accept="application/pdf"
+                entityType="part"
+                fieldName="specSheet"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Internal notes about this part..."
+              />
+            </div>
 
             <DataSourceInput
               value={formData.dataSource}

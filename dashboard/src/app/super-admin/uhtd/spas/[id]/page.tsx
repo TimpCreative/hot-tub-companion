@@ -28,6 +28,7 @@ interface SpaModel {
   hasOzone: boolean;
   hasUv: boolean;
   hasSaltSystem: boolean;
+  hasJacuzziTrue: boolean;
   imageUrl: string | null;
   specSheetUrl: string | null;
   isDiscontinued: boolean;
@@ -48,6 +49,14 @@ interface CompatiblePart {
   quantityRequired: number | null;
 }
 
+interface ElectricalConfig {
+  id: string;
+  voltage: number;
+  voltageUnit: string;
+  frequencyHz: number | null;
+  amperage: string;
+}
+
 export default function SpaDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -55,6 +64,7 @@ export default function SpaDetailPage() {
 
   const [spa, setSpa] = useState<SpaModel | null>(null);
   const [parts, setParts] = useState<CompatiblePart[]>([]);
+  const [electricalConfigs, setElectricalConfigs] = useState<ElectricalConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
@@ -62,16 +72,19 @@ export default function SpaDetailPage() {
     async function fetchData() {
       setLoading(true);
       try {
-        const [spaRes, partsRes] = await Promise.all([
+        const [spaRes, partsRes, electricalRes] = await Promise.all([
           fetch(`/api/dashboard/super-admin/scdb/spa-models/${spaId}`),
           fetch(`/api/dashboard/super-admin/comps/spa/${spaId}/parts`),
+          fetch(`/api/dashboard/super-admin/scdb/spa-models/${spaId}/electrical`),
         ]);
 
         const spaData = await spaRes.json();
         const partsData = await partsRes.json();
+        const electricalData = await electricalRes.json();
 
         if (spaData.success) setSpa(spaData.data);
         if (partsData.success) setParts(partsData.data || []);
+        if (electricalData.success) setElectricalConfigs(electricalData.data || []);
       } catch (err) {
         console.error('Error fetching spa data:', err);
       } finally {
@@ -206,7 +219,7 @@ export default function SpaDetailPage() {
             {' • '}{spa.year}
           </p>
           {spa.manufacturerSku && (
-            <p className="text-sm text-gray-400 font-mono mt-1">SKU: {spa.manufacturerSku}</p>
+            <p className="text-sm text-gray-400 font-mono mt-1">Mfr #: {spa.manufacturerSku}</p>
           )}
         </div>
         <div className="flex gap-2">
@@ -252,9 +265,25 @@ export default function SpaDetailPage() {
                   {spa.weightFilledLbs ? `${spa.weightFilledLbs} lbs` : '-'}
                 </dd>
               </div>
-              <div>
-                <dt className="text-sm text-gray-500">Electrical</dt>
-                <dd className="text-sm font-medium text-gray-900">{spa.electricalRequirement || '-'}</dd>
+              <div className="col-span-3">
+                <dt className="text-sm text-gray-500 mb-2">Electrical Configurations</dt>
+                <dd className="text-sm font-medium text-gray-900">
+                  {electricalConfigs.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {electricalConfigs.map((config) => (
+                        <span key={config.id} className="inline-flex items-center px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 text-sm">
+                          {config.voltage} {config.voltageUnit}
+                          {config.frequencyHz && ` ${config.frequencyHz}Hz`}
+                          {config.amperage && ` @ ${config.amperage}`}
+                        </span>
+                      ))}
+                    </div>
+                  ) : spa.electricalRequirement ? (
+                    spa.electricalRequirement
+                  ) : (
+                    '-'
+                  )}
+                </dd>
               </div>
               <div>
                 <dt className="text-sm text-gray-500">Data Source</dt>
@@ -275,6 +304,9 @@ export default function SpaDetailPage() {
               </Badge>
               <Badge variant={spa.hasSaltSystem ? 'success' : 'default'}>
                 {spa.hasSaltSystem ? '✓' : '✗'} Salt System
+              </Badge>
+              <Badge variant={spa.hasJacuzziTrue ? 'success' : 'default'}>
+                {spa.hasJacuzziTrue ? '✓' : '✗'} Jacuzzi True
               </Badge>
             </div>
           </div>

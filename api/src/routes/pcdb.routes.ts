@@ -11,6 +11,7 @@ const router = Router();
 // Categories
 router.get('/categories', pcdbController.listCategories);
 router.get('/categories/:id', pcdbController.getCategory);
+router.get('/categories/:id/ancestors', pcdbController.getCategoryAncestors);
 router.post('/categories', pcdbController.createCategory);
 router.put('/categories/:id', pcdbController.updateCategory);
 router.delete('/categories/:id', pcdbController.deleteCategory);

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Table } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 
@@ -11,12 +10,110 @@ interface Category {
   displayName: string;
   description: string | null;
   parentId: string | null;
+  fullPath: string | null;
+  depth: number;
   sortOrder: number;
   partCount?: number;
+  children?: Category[];
+}
+
+function CategoryRow({
+  category,
+  allCategories,
+  onEdit,
+  onDelete,
+  onAddChild,
+  depth = 0,
+}: {
+  category: Category;
+  allCategories: Category[];
+  onEdit: (cat: Category) => void;
+  onDelete: (id: string) => void;
+  onAddChild: (parentId: string) => void;
+  depth?: number;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const hasChildren = category.children && category.children.length > 0;
+
+  return (
+    <>
+      <tr className="hover:bg-gray-50">
+        <td className="px-4 py-3" style={{ paddingLeft: `${depth * 24 + 16}px` }}>
+          <div className="flex items-center gap-2">
+            {hasChildren ? (
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600"
+              >
+                <svg
+                  className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            ) : (
+              <span className="w-5" />
+            )}
+            <div>
+              <div className="font-medium text-gray-900">{category.displayName}</div>
+              <div className="text-xs text-gray-500 font-mono">{category.name}</div>
+            </div>
+          </div>
+        </td>
+        <td className="px-4 py-3">
+          <span className="text-gray-500 text-sm">{category.description || '-'}</span>
+        </td>
+        <td className="px-4 py-3 text-center">
+          <span className="text-gray-600">{category.partCount || 0}</span>
+        </td>
+        <td className="px-4 py-3 text-center">
+          <span className="text-gray-400 text-sm">{category.depth}</span>
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => onAddChild(category.id)}
+              className="text-sm text-green-600 hover:text-green-800"
+              title="Add subcategory"
+            >
+              + Sub
+            </button>
+            <button
+              onClick={() => onEdit(category)}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => onDelete(category.id)}
+              className="text-sm text-red-600 hover:text-red-800"
+            >
+              Delete
+            </button>
+          </div>
+        </td>
+      </tr>
+      {expanded && hasChildren && category.children!.map((child) => (
+        <CategoryRow
+          key={child.id}
+          category={child}
+          allCategories={allCategories}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onAddChild={onAddChild}
+          depth={depth + 1}
+        />
+      ))}
+    </>
+  );
 }
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [flatCategories, setFlatCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -27,14 +124,22 @@ export default function CategoriesPage() {
     displayName: '',
     description: '',
     sortOrder: 0,
+    parentId: '' as string | null,
   });
 
   async function fetchCategories() {
     try {
-      const res = await fetch('/api/dashboard/super-admin/pcdb/categories');
-      const data = await res.json();
-      if (data.success) {
-        setCategories(data.data || []);
+      const [treeRes, flatRes] = await Promise.all([
+        fetch('/api/dashboard/super-admin/pcdb/categories?tree=true'),
+        fetch('/api/dashboard/super-admin/pcdb/categories'),
+      ]);
+      const treeData = await treeRes.json();
+      const flatData = await flatRes.json();
+      if (treeData.success) {
+        setCategories(treeData.data || []);
+      }
+      if (flatData.success) {
+        setFlatCategories(flatData.data || []);
       }
     } catch (err) {
       console.error('Error fetching categories:', err);
@@ -47,13 +152,14 @@ export default function CategoriesPage() {
     fetchCategories();
   }, []);
 
-  const openCreateModal = () => {
+  const openCreateModal = (parentId?: string) => {
     setEditingCategory(null);
     setFormData({
       name: '',
       displayName: '',
       description: '',
-      sortOrder: categories.length,
+      sortOrder: flatCategories.length,
+      parentId: parentId || null,
     });
     setIsModalOpen(true);
   };
@@ -65,6 +171,7 @@ export default function CategoriesPage() {
       displayName: category.displayName,
       description: category.description || '',
       sortOrder: category.sortOrder,
+      parentId: category.parentId,
     });
     setIsModalOpen(true);
   };
@@ -86,6 +193,7 @@ export default function CategoriesPage() {
           displayName: formData.displayName,
           description: formData.description || null,
           sortOrder: formData.sortOrder,
+          parentId: formData.parentId || null,
         }),
       });
 
@@ -101,7 +209,7 @@ export default function CategoriesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this category?')) return;
+    if (!confirm('Are you sure you want to delete this category? Subcategories will be orphaned.')) return;
 
     try {
       const res = await fetch(`/api/dashboard/super-admin/pcdb/categories/${id}`, {
@@ -115,81 +223,52 @@ export default function CategoriesPage() {
     }
   };
 
-  const columns = [
-    {
-      key: 'sortOrder',
-      header: '#',
-      className: 'w-12',
-      render: (cat: any) => (
-        <span className="text-gray-400 text-sm">{cat.sortOrder}</span>
-      ),
-    },
-    {
-      key: 'displayName',
-      header: 'Category',
-      render: (cat: any) => (
-        <div>
-          <div className="font-medium text-gray-900">{cat.displayName}</div>
-          <div className="text-xs text-gray-500 font-mono">{cat.name}</div>
-        </div>
-      ),
-    },
-    {
-      key: 'description',
-      header: 'Description',
-      render: (cat: any) => (
-        <span className="text-gray-500 text-sm">{cat.description || '-'}</span>
-      ),
-    },
-    {
-      key: 'partCount',
-      header: 'Parts',
-      className: 'text-center',
-      render: (cat: any) => (
-        <span className="text-gray-600">{cat.partCount || 0}</span>
-      ),
-    },
-    {
-      key: 'actions',
-      header: '',
-      className: 'w-32',
-      render: (cat: any) => (
-        <div className="flex gap-2">
-          <button
-            onClick={() => openEditModal(cat)}
-            className="text-sm text-blue-600 hover:text-blue-800"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => handleDelete(cat.id)}
-            className="text-sm text-red-600 hover:text-red-800"
-          >
-            Delete
-          </button>
-        </div>
-      ),
-    },
-  ];
+  const getParentOptions = (excludeId?: string) => {
+    return flatCategories.filter((c) => c.id !== excludeId);
+  };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Categories</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage part categories</p>
+          <p className="text-sm text-gray-500 mt-1">Manage part categories with nested hierarchy</p>
         </div>
-        <Button onClick={openCreateModal}>+ Add Category</Button>
+        <Button onClick={() => openCreateModal()}>+ Add Category</Button>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200">
-        <Table
-          columns={columns}
-          data={categories}
-          keyField="id"
-          loading={loading}
-          emptyMessage="No categories found. Add your first category to organize parts."
-        />
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        {loading ? (
+          <div className="p-8 text-center text-gray-500">Loading...</div>
+        ) : categories.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">
+            No categories found. Add your first category to organize parts.
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Category</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Description</th>
+                <th className="text-center px-4 py-3 text-sm font-medium text-gray-700">Parts</th>
+                <th className="text-center px-4 py-3 text-sm font-medium text-gray-700">Depth</th>
+                <th className="text-right px-4 py-3 text-sm font-medium text-gray-700">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {categories.map((category) => (
+                <CategoryRow
+                  key={category.id}
+                  category={category}
+                  allCategories={flatCategories}
+                  onEdit={openEditModal}
+                  onDelete={handleDelete}
+                  onAddChild={openCreateModal}
+                />
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <Modal
@@ -199,6 +278,24 @@ export default function CategoriesPage() {
       >
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Parent Category
+              </label>
+              <select
+                value={formData.parentId || ''}
+                onChange={(e) => setFormData({ ...formData, parentId: e.target.value || null })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">None (Root Category)</option>
+                {getParentOptions(editingCategory?.id).map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {'—'.repeat(cat.depth)} {cat.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Internal Name <span className="text-red-500">*</span>

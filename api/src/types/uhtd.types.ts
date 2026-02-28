@@ -85,6 +85,7 @@ export interface ScdbSpaModel {
   hasOzone: boolean;
   hasUv: boolean;
   hasSaltSystem: boolean;
+  hasJacuzziTrue: boolean;
   // Media
   imageUrl: string | null;
   specSheetUrl: string | null;
@@ -118,6 +119,7 @@ export interface CreateSpaModelInput {
   hasOzone?: boolean;
   hasUv?: boolean;
   hasSaltSystem?: boolean;
+  hasJacuzziTrue?: boolean;
   imageUrl?: string;
   specSheetUrl?: string;
   isDiscontinued?: boolean;
@@ -126,6 +128,36 @@ export interface CreateSpaModelInput {
 }
 
 export interface UpdateSpaModelInput extends Partial<CreateSpaModelInput> {}
+
+export interface SpaElectricalConfig {
+  id: string;
+  spaModelId: string;
+  voltage: number;
+  voltageUnit: string;
+  frequencyHz: number | null;
+  amperage: string;
+  sortOrder: number;
+  createdAt: Date;
+}
+
+export interface CreateElectricalConfigInput {
+  voltage: number;
+  voltageUnit?: string;
+  frequencyHz?: number;
+  amperage: string;
+  sortOrder?: number;
+}
+
+export interface DbSpaElectricalConfig {
+  id: string;
+  spa_model_id: string;
+  voltage: number;
+  voltage_unit: string;
+  frequency_hz: number | null;
+  amperage: string;
+  sort_order: number;
+  created_at: Date;
+}
 
 // =============================================================================
 // PCdb Types (Parts Catalog Database)
@@ -138,8 +170,12 @@ export interface PcdbCategory {
   description: string | null;
   iconName: string | null;
   sortOrder: number;
+  parentId: string | null;
+  fullPath: string | null;
+  depth: number;
   deletedAt: Date | null;
   createdAt: Date;
+  children?: PcdbCategory[];
 }
 
 export interface CreateCategoryInput {
@@ -148,6 +184,7 @@ export interface CreateCategoryInput {
   description?: string;
   iconName?: string;
   sortOrder?: number;
+  parentId?: string;
 }
 
 export interface UpdateCategoryInput {
@@ -177,6 +214,7 @@ export interface PcdbPart {
   categoryId: string;
   // Identification
   partNumber: string | null;
+  manufacturerSku: string | null;
   upc: string | null;
   ean: string | null;
   skuAliases: string[] | null;
@@ -209,6 +247,7 @@ export interface PcdbPart {
 export interface CreatePartInput {
   categoryId: string;
   partNumber?: string;
+  manufacturerSku?: string;
   upc?: string;
   ean?: string;
   skuAliases?: string[];
@@ -557,6 +596,7 @@ export interface DbScdbSpaModel {
   has_ozone: boolean;
   has_uv: boolean;
   has_salt_system: boolean;
+  has_jacuzzi_true: boolean;
   image_url: string | null;
   spec_sheet_url: string | null;
   is_discontinued: boolean;
@@ -571,6 +611,7 @@ export interface DbPcdbPart {
   id: string;
   category_id: string;
   part_number: string | null;
+  manufacturer_sku: string | null;
   upc: string | null;
   ean: string | null;
   sku_aliases: string[] | null;

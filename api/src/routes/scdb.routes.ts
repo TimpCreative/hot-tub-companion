@@ -47,3 +47,10 @@ adminRoutes.get('/spa-models/:id', scdbController.getSpaModel);
 adminRoutes.post('/spa-models', scdbController.createSpaModel);
 adminRoutes.put('/spa-models/:id', scdbController.updateSpaModel);
 adminRoutes.delete('/spa-models/:id', scdbController.deleteSpaModel);
+
+// Electrical Configs
+adminRoutes.get('/spa-models/:spaModelId/electrical', scdbController.getElectricalConfigs);
+adminRoutes.post('/spa-models/:spaModelId/electrical', scdbController.createElectricalConfig);
+adminRoutes.put('/spa-models/:spaModelId/electrical', scdbController.replaceElectricalConfigs);
+adminRoutes.put('/electrical-configs/:id', scdbController.updateElectricalConfig);
+adminRoutes.delete('/electrical-configs/:id', scdbController.deleteElectricalConfig);

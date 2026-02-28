@@ -10,6 +10,7 @@ import { MediaInput } from '@/components/ui/MediaInput';
 import { DataSourceInput } from '@/components/ui/DataSourceInput';
 import { QuickCreateBrandModal } from '@/components/uhtd/QuickCreateBrandModal';
 import { QuickCreateModelLineModal } from '@/components/uhtd/QuickCreateModelLineModal';
+import { ElectricalConfigInput, ElectricalConfig } from '@/components/uhtd/ElectricalConfigInput';
 
 interface Brand {
   id: string;
@@ -34,6 +35,7 @@ function NewSpaForm() {
   const [filteredModelLines, setFilteredModelLines] = useState<ModelLine[]>([]);
   const [showBrandModal, setShowBrandModal] = useState(false);
   const [showModelLineModal, setShowModelLineModal] = useState(false);
+  const [electricalConfigs, setElectricalConfigs] = useState<ElectricalConfig[]>([]);
 
   const [formData, setFormData] = useState({
     brandId: '',
@@ -53,6 +55,7 @@ function NewSpaForm() {
     hasOzone: false,
     hasUv: false,
     hasSaltSystem: false,
+    hasJacuzziTrue: false,
     imageUrl: '',
     specSheetUrl: '',
     notes: '',
@@ -127,6 +130,7 @@ function NewSpaForm() {
         hasOzone: formData.hasOzone,
         hasUv: formData.hasUv,
         hasSaltSystem: formData.hasSaltSystem,
+        hasJacuzziTrue: formData.hasJacuzziTrue,
         imageUrl: formData.imageUrl || null,
         specSheetUrl: formData.specSheetUrl || null,
         notes: formData.notes || null,
@@ -146,7 +150,29 @@ function NewSpaForm() {
         throw new Error(data.error?.message || 'Failed to create spa model');
       }
 
-      router.push(`/super-admin/uhtd/spas/${data.data.id}`);
+      const spaId = data.data.id;
+
+      // Save electrical configs if any
+      if (electricalConfigs.length > 0) {
+        const validConfigs = electricalConfigs.filter(c => c.voltage && c.amperage);
+        if (validConfigs.length > 0) {
+          await fetch(`/api/dashboard/super-admin/scdb/spa-models/${spaId}/electrical`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              configs: validConfigs.map((c, i) => ({
+                voltage: c.voltage,
+                voltageUnit: c.voltageUnit,
+                frequencyHz: c.frequencyHz || null,
+                amperage: c.amperage,
+                sortOrder: i,
+              })),
+            }),
+          });
+        }
+      }
+
+      router.push(`/super-admin/uhtd/spas/${spaId}`);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -195,6 +221,7 @@ function NewSpaForm() {
             hasOzone: row.hasOzone || false,
             hasUv: row.hasUv || false,
             hasSaltSystem: row.hasSaltSystem || false,
+            hasJacuzziTrue: row.hasJacuzziTrue || false,
             imageUrl: row.imageUrl || null,
             specSheetUrl: row.specSheetUrl || null,
             notes: row.notes || null,
@@ -246,7 +273,7 @@ function NewSpaForm() {
       width: '90px',
       group: 'Identity',
     },
-    { key: 'manufacturerSku', header: 'SKU', placeholder: 'JAC-J335', width: '110px', group: 'Identity' },
+    { key: 'manufacturerSku', header: 'Mfr #', placeholder: 'JAC-J335', width: '110px', group: 'Identity' },
     // Specs
     { key: 'seatingCapacity', header: 'Seats', type: 'number' as const, placeholder: '5', width: '70px', group: 'Specs' },
     { key: 'jetCount', header: 'Jets', type: 'number' as const, placeholder: '30', width: '70px', group: 'Specs' },
@@ -263,6 +290,7 @@ function NewSpaForm() {
     { key: 'hasOzone', header: 'Ozone', type: 'checkbox' as const, width: '65px', group: 'Features' },
     { key: 'hasUv', header: 'UV', type: 'checkbox' as const, width: '55px', group: 'Features' },
     { key: 'hasSaltSystem', header: 'Salt', type: 'checkbox' as const, width: '55px', group: 'Features' },
+    { key: 'hasJacuzziTrue', header: 'JacTrue', type: 'checkbox' as const, width: '70px', group: 'Features' },
     // Media
     { key: 'imageUrl', header: 'Image URL', placeholder: 'https://...', width: '150px', group: 'Media' },
     { key: 'specSheetUrl', header: 'Spec URL', placeholder: 'https://...', width: '150px', group: 'Media' },
@@ -393,7 +421,7 @@ function NewSpaForm() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer SKU</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer #</label>
                   <input
                     type="text"
                     value={formData.manufacturerSku}
@@ -447,18 +475,12 @@ function NewSpaForm() {
                     min="0"
                   />
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Electrical</label>
-                  <input
-                    type="text"
-                    value={formData.electricalRequirement}
-                    onChange={(e) => setFormData({ ...formData, electricalRequirement: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="240V/50A"
-                  />
-                </div>
               </div>
+              
+              <ElectricalConfigInput
+                configs={electricalConfigs}
+                onChange={setElectricalConfigs}
+              />
 
               <div className="grid grid-cols-3 gap-4">
                 <div>
@@ -560,6 +582,18 @@ function NewSpaForm() {
                   />
                   <label htmlFor="hasSaltSystem" className="text-sm text-gray-700">
                     Has Salt System
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="hasJacuzziTrue"
+                    checked={formData.hasJacuzziTrue}
+                    onChange={(e) => setFormData({ ...formData, hasJacuzziTrue: e.target.checked })}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="hasJacuzziTrue" className="text-sm text-gray-700">
+                    Has Jacuzzi True
                   </label>
                 </div>
               </div>

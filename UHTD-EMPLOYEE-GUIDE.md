@@ -380,7 +380,7 @@ When entering possible values:
 - `modelLineName` (required) - Must exist under the brand
 - `name` (required) - The spa model name (e.g., "J-335")
 - `year` (required) - The model year
-- `manufacturerSku` - Manufacturer's SKU code
+- `manufacturerSku` - Manufacturer's part/model number
 - `seatingCapacity`, `jetCount`, `waterCapacityGallons` - Numbers only
 - `electricalRequirement` - e.g., "240V/50A"
 - `dimensionsLengthInches`, `dimensionsWidthInches`, `dimensionsHeightInches` - Numbers only (inches)

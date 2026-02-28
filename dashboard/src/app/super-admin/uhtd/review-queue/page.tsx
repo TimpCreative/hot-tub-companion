@@ -32,7 +32,35 @@ interface ReviewStats {
   topPendingParts: { partName: string; pendingCount: number }[];
 }
 
+type TabType = 'brands' | 'model-lines' | 'spas' | 'parts' | 'compatibility';
+
+const TABS: { key: TabType; label: string }[] = [
+  { key: 'brands', label: 'Brands' },
+  { key: 'model-lines', label: 'Model Lines' },
+  { key: 'spas', label: 'Spas' },
+  { key: 'parts', label: 'Parts' },
+  { key: 'compatibility', label: 'Compatibility' },
+];
+
+function PlaceholderTab({ entityType }: { entityType: string }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+      <div className="text-gray-400 mb-4">
+        <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+      </div>
+      <h3 className="text-lg font-medium text-gray-900 mb-2">No Pending {entityType}</h3>
+      <p className="text-sm text-gray-500 max-w-md mx-auto">
+        Imported {entityType.toLowerCase()} that need review will appear here.
+        Use the Import page to bulk import data.
+      </p>
+    </div>
+  );
+}
+
 export default function ReviewQueuePage() {
+  const [activeTab, setActiveTab] = useState<TabType>('compatibility');
   const [items, setItems] = useState<PendingCompatibility[]>([]);
   const [stats, setStats] = useState<ReviewStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,6 +71,11 @@ export default function ReviewQueuePage() {
   const [processing, setProcessing] = useState(false);
 
   async function fetchData() {
+    if (activeTab !== 'compatibility') {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -72,7 +105,12 @@ export default function ReviewQueuePage() {
 
   useEffect(() => {
     fetchData();
-  }, [page, pageSize]);
+  }, [page, pageSize, activeTab]);
+
+  useEffect(() => {
+    setSelectedIds([]);
+    setPage(1);
+  }, [activeTab]);
 
   const handleSelectAll = () => {
     if (selectedIds.length === items.length) {
@@ -200,91 +238,116 @@ export default function ReviewQueuePage() {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Review Queue</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Confirm or reject pending part-spa compatibility records
+            Review and confirm imported data before it goes live
           </p>
         </div>
       </div>
 
-      {stats && (
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="text-2xl font-bold text-yellow-700">{stats.pending}</div>
-            <div className="text-sm text-yellow-600">Pending Review</div>
-          </div>
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="text-2xl font-bold text-green-700">{stats.confirmed}</div>
-            <div className="text-sm text-green-600">Confirmed</div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="text-sm font-medium text-gray-700 mb-2">Top Pending Parts</div>
-            {stats.topPendingParts.length > 0 ? (
-              <ul className="text-xs text-gray-600 space-y-1">
-                {stats.topPendingParts.slice(0, 3).map((p, i) => (
-                  <li key={i}>
-                    {p.partName}: <span className="font-medium">{p.pendingCount}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-xs text-gray-400">No pending items</p>
+      {/* Tabs */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="-mb-px flex gap-4">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.key
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {activeTab === 'compatibility' ? (
+        <>
+          {stats && (
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="text-2xl font-bold text-yellow-700">{stats.pending}</div>
+                <div className="text-sm text-yellow-600">Pending Review</div>
+              </div>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="text-2xl font-bold text-green-700">{stats.confirmed}</div>
+                <div className="text-sm text-green-600">Confirmed</div>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="text-sm font-medium text-gray-700 mb-2">Top Pending Parts</div>
+                {stats.topPendingParts.length > 0 ? (
+                  <ul className="text-xs text-gray-600 space-y-1">
+                    {stats.topPendingParts.slice(0, 3).map((p, i) => (
+                      <li key={i}>
+                        {p.partName}: <span className="font-medium">{p.pendingCount}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-gray-400">No pending items</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-lg border border-gray-200">
+            {selectedIds.length > 0 && (
+              <div className="p-4 border-b border-gray-200 bg-blue-50 flex items-center justify-between">
+                <span className="text-sm text-blue-700">
+                  {selectedIds.length} item{selectedIds.length !== 1 ? 's' : ''} selected
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleRejectSelected}
+                    loading={processing}
+                  >
+                    Reject
+                  </Button>
+                  <Button size="sm" onClick={handleConfirmSelected} loading={processing}>
+                    Confirm
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <Table
+              columns={columns}
+              data={items}
+              keyField="id"
+              loading={loading}
+              emptyMessage="No pending items to review. All compatibility records have been confirmed."
+            />
+
+            {total > 0 && (
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={total}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setPage(1);
+                }}
+              />
             )}
           </div>
-        </div>
-      )}
 
-      <div className="bg-white rounded-lg border border-gray-200">
-        {selectedIds.length > 0 && (
-          <div className="p-4 border-b border-gray-200 bg-blue-50 flex items-center justify-between">
-            <span className="text-sm text-blue-700">
-              {selectedIds.length} item{selectedIds.length !== 1 ? 's' : ''} selected
-            </span>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={handleRejectSelected}
-                loading={processing}
-              >
-                Reject
-              </Button>
-              <Button size="sm" onClick={handleConfirmSelected} loading={processing}>
-                Confirm
-              </Button>
-            </div>
+          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="font-medium text-blue-900 mb-2">Review Workflow</h3>
+            <ul className="text-sm text-blue-800 space-y-1">
+              <li>• <strong>Pending</strong> items are created during bulk imports or manual entry</li>
+              <li>• <strong>Confirm</strong> to verify that a part truly fits the spa model</li>
+              <li>• <strong>Reject</strong> to remove incorrect compatibility records</li>
+              <li>• Confirmed records appear in the mobile app for customers</li>
+            </ul>
           </div>
-        )}
-
-        <Table
-          columns={columns}
-          data={items}
-          keyField="id"
-          loading={loading}
-          emptyMessage="No pending items to review. All compatibility records have been confirmed."
-        />
-
-        {total > 0 && (
-          <Pagination
-            page={page}
-            pageSize={pageSize}
-            total={total}
-            onPageChange={setPage}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setPage(1);
-            }}
-          />
-        )}
-      </div>
-
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-medium text-blue-900 mb-2">Review Workflow</h3>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li>• <strong>Pending</strong> items are created during bulk imports or manual entry</li>
-          <li>• <strong>Confirm</strong> to verify that a part truly fits the spa model</li>
-          <li>• <strong>Reject</strong> to remove incorrect compatibility records</li>
-          <li>• Confirmed records appear in the mobile app for customers</li>
-        </ul>
-      </div>
+        </>
+      ) : (
+        <PlaceholderTab entityType={TABS.find(t => t.key === activeTab)?.label || ''} />
+      )}
     </div>
   );
 }

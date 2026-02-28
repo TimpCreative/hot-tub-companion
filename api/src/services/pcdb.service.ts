@@ -30,6 +30,9 @@ function mapCategoryFromDb(row: any): PcdbCategory {
     description: row.description,
     iconName: row.icon_name,
     sortOrder: row.sort_order,
+    parentId: row.parent_id,
+    fullPath: row.full_path,
+    depth: row.depth ?? 0,
     deletedAt: row.deleted_at,
     createdAt: row.created_at,
   };
@@ -54,6 +57,7 @@ function mapPartFromDb(row: DbPcdbPart & {
     id: row.id,
     categoryId: row.category_id,
     partNumber: row.part_number,
+    manufacturerSku: row.manufacturer_sku,
     upc: row.upc,
     ean: row.ean,
     skuAliases: row.sku_aliases,
@@ -106,6 +110,17 @@ export async function getCategoryByName(name: string): Promise<PcdbCategory | nu
 }
 
 export async function createCategory(input: CreateCategoryInput, userId?: string): Promise<PcdbCategory> {
+  let fullPath = `/${input.name}`;
+  let depth = 0;
+
+  if (input.parentId) {
+    const parent = await getCategoryById(input.parentId);
+    if (parent) {
+      fullPath = `${parent.fullPath || '/' + parent.name}/${input.name}`;
+      depth = (parent.depth ?? 0) + 1;
+    }
+  }
+
   const [row] = await db('pcdb_categories')
     .insert({
       name: input.name,
@@ -113,6 +128,9 @@ export async function createCategory(input: CreateCategoryInput, userId?: string
       description: input.description,
       icon_name: input.iconName,
       sort_order: input.sortOrder ?? 0,
+      parent_id: input.parentId || null,
+      full_path: fullPath,
+      depth,
     })
     .returning('*');
 
@@ -134,6 +152,7 @@ export async function updateCategory(
   if (input.description !== undefined) updateData.description = input.description;
   if (input.iconName !== undefined) updateData.icon_name = input.iconName;
   if (input.sortOrder !== undefined) updateData.sort_order = input.sortOrder;
+  if ((input as any).parentId !== undefined) updateData.parent_id = (input as any).parentId;
 
   const [row] = await db('pcdb_categories').where({ id }).update(updateData).returning('*');
 
@@ -148,6 +167,51 @@ export async function deleteCategory(id: string, userId?: string): Promise<boole
   await db('pcdb_categories').where({ id }).update({ deleted_at: db.fn.now() });
   await logAudit('pcdb_categories', id, 'DELETE', oldRow, null, userId);
   return true;
+}
+
+export async function listCategoriesTree(includeDeleted = false): Promise<PcdbCategory[]> {
+  let query = db('pcdb_categories').select('*');
+  if (!includeDeleted) {
+    query = query.whereNull('deleted_at');
+  }
+  const rows = await query.orderBy('depth').orderBy('sort_order');
+  const allCategories = rows.map(mapCategoryFromDb);
+  
+  const categoryMap = new Map<string, PcdbCategory>();
+  const rootCategories: PcdbCategory[] = [];
+  
+  for (const cat of allCategories) {
+    cat.children = [];
+    categoryMap.set(cat.id, cat);
+  }
+  
+  for (const cat of allCategories) {
+    if (cat.parentId && categoryMap.has(cat.parentId)) {
+      const parent = categoryMap.get(cat.parentId)!;
+      parent.children!.push(cat);
+    } else {
+      rootCategories.push(cat);
+    }
+  }
+  
+  return rootCategories;
+}
+
+export async function getCategoryAncestors(id: string): Promise<PcdbCategory[]> {
+  const ancestors: PcdbCategory[] = [];
+  let current = await getCategoryById(id);
+  
+  while (current && current.parentId) {
+    const parent = await getCategoryById(current.parentId);
+    if (parent) {
+      ancestors.unshift(parent);
+      current = parent;
+    } else {
+      break;
+    }
+  }
+  
+  return ancestors;
 }
 
 // =============================================================================
@@ -344,6 +408,7 @@ export async function createPart(input: CreatePartInput, userId?: string): Promi
     .insert({
       category_id: input.categoryId,
       part_number: input.partNumber,
+      manufacturer_sku: input.manufacturerSku,
       upc: input.upc,
       ean: input.ean,
       sku_aliases: input.skuAliases,
@@ -379,6 +444,7 @@ export async function updatePart(
   const fieldMappings: Record<string, string> = {
     categoryId: 'category_id',
     partNumber: 'part_number',
+    manufacturerSku: 'manufacturer_sku',
     upc: 'upc',
     ean: 'ean',
     skuAliases: 'sku_aliases',
