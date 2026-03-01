@@ -375,7 +375,7 @@ When entering possible values:
 **Model Lines CSV:**
 - `brandName` (required), `name` (required), `description`, `dataSource`
 
-**Spas CSV (22 columns - matches single spa form):**
+**Spas CSV (23 columns - matches single spa form):**
 - `brandName` (required) - Must exist in database
 - `modelLineName` (required) - Must exist under the brand
 - `name` (required) - The spa model name (e.g., "J-335")
@@ -385,14 +385,96 @@ When entering possible values:
 - `electricalRequirement` - e.g., "240V/50A"
 - `dimensionsLengthInches`, `dimensionsWidthInches`, `dimensionsHeightInches` - Numbers only (inches)
 - `weightDryLbs`, `weightFilledLbs` - Numbers only (lbs)
-- `hasOzone`, `hasUv`, `hasSaltSystem` - Boolean (`true`/`false`)
+- `hasOzone`, `hasUv`, `hasSaltSystem`, `hasJacuzziTrue` - Boolean (`true`/`false`)
 - `imageUrl`, `specSheetUrl` - Full URLs
 - `notes` - Internal notes
 - `isDiscontinued` - Boolean (`true`/`false`)
 - `dataSource` - Where the data came from
 
-**Parts CSV:**
-- `name` (required), `categoryName` (required), `partNumber`, `upc`, `manufacturer`, `isOem`, `isUniversal`, `dataSource`
+**Parts CSV (20 columns with smart compatibility):**
+
+Required columns:
+- `name` - Descriptive part name
+- `categoryName` - Must match an existing category name
+
+Identification columns:
+- `partNumber` - Manufacturer's part number
+- `manufacturerSku` - Manufacturer's SKU
+- `upc` - Universal Product Code
+- `ean` - European Article Number
+- `skuAliases` - Comma-separated alternative SKUs
+
+Details:
+- `manufacturer` - Who makes this part
+- `isOem` - Boolean: `true` if OEM part
+- `isUniversal` - Boolean: `true` if fits all spas
+- `isDiscontinued` - Boolean: `true` if no longer available
+- `displayImportance` - Number (1-5, lower = more important)
+- `imageUrl`, `specSheetUrl` - Full URLs
+- `notes`, `dataSource` - Text fields
+
+Smart Compatibility Columns (see below for details):
+- `compatibleBrands` - Brand names (comma-separated)
+- `compatibleModelLines` - Model line names (comma-separated)
+- `compatibleSpas` - Spa model names (comma-separated)
+- `compatibleYears` - Years: `2024`, `2020-2024`, or `2020, 2022, 2024`
+
+### Parts Import - Smart Compatibility
+
+The Parts import supports assigning part-spa compatibility during import using four separate columns that work as **cascading filters**:
+
+| Column | Contains | Example |
+|--------|----------|---------|
+| `compatibleBrands` | Brand names | `Jacuzzi, Hot Spring` |
+| `compatibleModelLines` | Model line names | `J-300, Limelight` |
+| `compatibleSpas` | Spa model names | `J-335, J-345` |
+| `compatibleYears` | Year or range | `2020-2024` or `2020, 2022, 2024` |
+
+**How filters work together:**
+- Brands narrow which model lines are considered
+- Model lines narrow which spas are considered
+- Spa names further narrow the selection
+- Years filter the final result
+
+**Examples:**
+
+1. **All spas from a brand:**
+   - `compatibleBrands`: `Jacuzzi`
+   - Result: Part is compatible with ALL Jacuzzi spas (all years)
+
+2. **All spas in a model line for certain years:**
+   - `compatibleBrands`: `Jacuzzi`
+   - `compatibleModelLines`: `J-300`
+   - `compatibleYears`: `2020-2024`
+   - Result: All J-300 spas from 2020-2024
+
+3. **Specific spas:**
+   - `compatibleBrands`: `Jacuzzi`
+   - `compatibleModelLines`: `J-300`
+   - `compatibleSpas`: `J-335, J-345`
+   - `compatibleYears`: `2020-2022`
+   - Result: Only J-335 and J-345 from 2020-2022
+
+### Continuation Rows
+
+For parts with complex compatibility spanning different brands or year ranges, use **continuation rows**. A continuation row has empty part info (name, categoryName) but has compatibility columns filled - it adds more compatibility to the previous part.
+
+| name | partNumber | categoryName | compatibleBrands | compatibleModelLines | compatibleSpas | compatibleYears |
+|------|------------|--------------|------------------|---------------------|----------------|-----------------|
+| Filter XL | FLT-001 | filters | Jacuzzi | J-300 | J-335 | 2020-2022 |
+| | | | | J-300 | J-345 | 2021-2024 |
+| | | | Hot Spring | Highlife | Envoy | 2019-2023 |
+
+- **Row 1**: Creates the "Filter XL" part and adds J-335 compatibility for 2020-2022
+- **Row 2**: Adds J-345 compatibility for 2021-2024 to the same part
+- **Row 3**: Adds Hot Spring Envoy compatibility for 2019-2023 to the same part
+
+### Duplicate Part Handling
+
+If you import a part with a `partNumber` that already exists in the database, the system will:
+1. Find the existing part (won't create a duplicate)
+2. Add any new compatibility from the row to the existing part
+3. Report it as "existing found" in the results
 
 ### Compatibility (Comps) Import - Special Rules
 

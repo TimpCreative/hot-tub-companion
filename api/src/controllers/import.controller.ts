@@ -36,6 +36,7 @@ interface SpaModelImportRow {
   hasOzone?: boolean;
   hasUv?: boolean;
   hasSaltSystem?: boolean;
+  hasJacuzziTrue?: boolean;
   imageUrl?: string;
   specSheetUrl?: string;
   notes?: string;
@@ -44,14 +45,59 @@ interface SpaModelImportRow {
 }
 
 interface PartImportRow {
-  name: string;
-  categoryName: string;
+  name?: string;
+  categoryName?: string;
   partNumber?: string;
+  manufacturerSku?: string;
   upc?: string;
+  ean?: string;
+  skuAliases?: string;
   manufacturer?: string;
   isOem?: boolean;
   isUniversal?: boolean;
+  isDiscontinued?: boolean;
+  displayImportance?: number;
+  imageUrl?: string;
+  specSheetUrl?: string;
+  notes?: string;
   dataSource?: string;
+  // Smart compatibility columns (separate, simpler format)
+  compatibleBrands?: string;
+  compatibleModelLines?: string;
+  compatibleSpas?: string;
+  compatibleYears?: string;
+}
+
+/**
+ * Parse year range string into array of individual years
+ * Supports: "2024", "2020-2024", "2020, 2022, 2024", "2020-2022, 2024"
+ */
+function parseYearRange(yearStr: string): number[] {
+  if (!yearStr || !yearStr.trim()) return [];
+  
+  const years: number[] = [];
+  const parts = yearStr.split(',').map(s => s.trim()).filter(Boolean);
+  
+  for (const part of parts) {
+    if (part.includes('-')) {
+      const [startStr, endStr] = part.split('-').map(s => s.trim());
+      const start = parseInt(startStr, 10);
+      const end = parseInt(endStr, 10);
+      
+      if (!isNaN(start) && !isNaN(end) && start <= end) {
+        for (let y = start; y <= end; y++) {
+          if (!years.includes(y)) years.push(y);
+        }
+      }
+    } else {
+      const year = parseInt(part, 10);
+      if (!isNaN(year) && !years.includes(year)) {
+        years.push(year);
+      }
+    }
+  }
+  
+  return years.sort((a, b) => a - b);
 }
 
 interface CompatibilityImportRow {
@@ -267,6 +313,7 @@ export async function importSpas(req: Request, res: Response) {
             has_ozone: row.hasOzone ?? false,
             has_uv: row.hasUv ?? false,
             has_salt_system: row.hasSaltSystem ?? false,
+            has_jacuzzi_true: row.hasJacuzziTrue ?? false,
             image_url: row.imageUrl || null,
             spec_sheet_url: row.specSheetUrl || null,
             notes: row.notes || null,
@@ -308,55 +355,224 @@ export async function importParts(req: Request, res: Response) {
 
     let created = 0;
     let skipped = 0;
+    let updated = 0;
+    let compatibilityCreated = 0;
     const errors: string[] = [];
 
-    for (const row of rows) {
+    // Track current part for continuation rows
+    let currentPart: { id: string; name: string; isUniversal: boolean } | null = null;
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 2;
+      
       try {
-        if (!row.name || !row.categoryName) {
+        // Check if this is a part row or continuation row
+        const hasPartInfo = row.name && row.categoryName;
+        const hasCompatibility = row.compatibleBrands || row.compatibleModelLines || row.compatibleSpas || row.compatibleYears;
+        
+        // If no part info and no compatibility, skip
+        if (!hasPartInfo && !hasCompatibility) {
           skipped++;
           continue;
         }
 
-        const category = await db('pcdb_categories')
-          .where('name', 'ilike', row.categoryName)
-          .orWhere('display_name', 'ilike', row.categoryName)
-          .first();
+        // If this is a continuation row (no part info, but has compatibility)
+        if (!hasPartInfo && hasCompatibility) {
+          if (!currentPart) {
+            errors.push(`Row ${rowNum}: Compatibility data found but no part context. Add part info (name, categoryName) first.`);
+            skipped++;
+            continue;
+          }
+          // Use the current part for compatibility
+        } else if (hasPartInfo) {
+          // This is a new part row - create or find the part
+          const category = await db('pcdb_categories')
+            .where('name', 'ilike', row.categoryName!)
+            .orWhere('display_name', 'ilike', row.categoryName!)
+            .first();
 
-        if (!category) {
-          errors.push(`Row "${row.name}": Category "${row.categoryName}" not found`);
-          skipped++;
+          if (!category) {
+            errors.push(`Row ${rowNum} "${row.name}": Category "${row.categoryName}" not found`);
+            skipped++;
+            continue;
+          }
+
+          // Check for existing part by partNumber (for duplicate handling)
+          let existingPart = null;
+          if (row.partNumber) {
+            existingPart = await db('pcdb_parts')
+              .where('part_number', row.partNumber)
+              .whereNull('deleted_at')
+              .first();
+          }
+
+          if (existingPart) {
+            // Part already exists - use it for compatibility, don't create new
+            currentPart = {
+              id: existingPart.id,
+              name: existingPart.name,
+              isUniversal: existingPart.is_universal,
+            };
+            updated++;
+          } else {
+            // Create new part
+            let skuAliasesArray: string[] | null = null;
+            if (row.skuAliases) {
+              skuAliasesArray = row.skuAliases.split(',').map(s => s.trim()).filter(Boolean);
+            }
+
+            const [inserted] = await db('pcdb_parts')
+              .insert({
+                category_id: category.id,
+                name: row.name,
+                part_number: row.partNumber || null,
+                manufacturer_sku: row.manufacturerSku || null,
+                upc: row.upc || null,
+                ean: row.ean || null,
+                sku_aliases: skuAliasesArray,
+                manufacturer: row.manufacturer || null,
+                is_oem: row.isOem ?? false,
+                is_universal: row.isUniversal ?? false,
+                is_discontinued: row.isDiscontinued ?? false,
+                display_importance: row.displayImportance ?? 2,
+                image_url: row.imageUrl || null,
+                spec_sheet_url: row.specSheetUrl || null,
+                notes: row.notes || null,
+                data_source: row.dataSource || 'csv_import',
+              })
+              .returning('*');
+
+            await logAudit(
+              'pcdb_parts',
+              inserted.id,
+              'INSERT' as AuditAction,
+              null,
+              inserted,
+              userId
+            );
+
+            currentPart = {
+              id: inserted.id,
+              name: inserted.name,
+              isUniversal: inserted.is_universal,
+            };
+            created++;
+          }
+        }
+
+        // Now handle compatibility (for both new parts and continuation rows)
+        if (!currentPart) {
           continue;
         }
 
-        const [inserted] = await db('pcdb_parts')
-          .insert({
-            category_id: category.id,
-            name: row.name,
-            part_number: row.partNumber,
-            upc: row.upc,
-            manufacturer: row.manufacturer,
-            is_oem: row.isOem ?? false,
-            is_universal: row.isUniversal ?? false,
-            data_source: row.dataSource || 'csv_import',
-          })
-          .returning('*');
+        // Skip compatibility if part is universal
+        if (currentPart.isUniversal) {
+          continue;
+        }
 
-        await logAudit(
-          'pcdb_parts',
-          inserted.id,
-          'INSERT' as AuditAction,
-          null,
-          inserted,
-          userId
-        );
+        // Skip if no compatibility columns filled
+        if (!hasCompatibility) {
+          continue;
+        }
 
-        created++;
+        // Parse years from compatibleYears column
+        const years = parseYearRange(row.compatibleYears || '');
+
+        // Build spa query with cascading filters
+        const spaIds: string[] = [];
+
+        // Parse filter values
+        const brandNames = row.compatibleBrands 
+          ? row.compatibleBrands.split(',').map(s => s.trim()).filter(Boolean) 
+          : [];
+        const modelLineNames = row.compatibleModelLines 
+          ? row.compatibleModelLines.split(',').map(s => s.trim()).filter(Boolean) 
+          : [];
+        const spaNames = row.compatibleSpas 
+          ? row.compatibleSpas.split(',').map(s => s.trim()).filter(Boolean) 
+          : [];
+
+        // Build query with cascading filters
+        let query = db('scdb_spa_models as sm')
+          .select('sm.id')
+          .leftJoin('scdb_model_lines as ml', 'sm.model_line_id', 'ml.id')
+          .leftJoin('scdb_brands as b', 'sm.brand_id', 'b.id')
+          .whereNull('sm.deleted_at');
+
+        // Filter by brands if specified (case-insensitive)
+        if (brandNames.length > 0) {
+          const lowerBrands = brandNames.map(n => n.toLowerCase());
+          query = query.whereRaw(
+            `LOWER(b.name) IN (${lowerBrands.map(() => '?').join(',')})`,
+            lowerBrands
+          );
+        }
+
+        // Filter by model lines if specified (case-insensitive)
+        if (modelLineNames.length > 0) {
+          const lowerModelLines = modelLineNames.map(n => n.toLowerCase());
+          query = query.whereRaw(
+            `LOWER(ml.name) IN (${lowerModelLines.map(() => '?').join(',')})`,
+            lowerModelLines
+          );
+        }
+
+        // Filter by spa names if specified (case-insensitive)
+        if (spaNames.length > 0) {
+          const lowerSpaNames = spaNames.map(n => n.toLowerCase());
+          query = query.whereRaw(
+            `LOWER(sm.name) IN (${lowerSpaNames.map(() => '?').join(',')})`,
+            lowerSpaNames
+          );
+        }
+
+        // Filter by years if specified
+        if (years.length > 0) {
+          query = query.whereIn('sm.year', years);
+        }
+
+        // Only proceed if at least one filter is specified
+        if (brandNames.length === 0 && modelLineNames.length === 0 && spaNames.length === 0 && years.length === 0) {
+          continue;
+        }
+
+        const matchingSpas = await query;
+
+        for (const spa of matchingSpas) {
+          if (!spaIds.includes(spa.id)) {
+            spaIds.push(spa.id);
+          }
+        }
+
+        // Create compatibility records
+        for (const spaId of spaIds) {
+          const existing = await db('part_spa_compatibility')
+            .where({ part_id: currentPart.id, spa_model_id: spaId })
+            .first();
+
+          if (!existing) {
+            await db('part_spa_compatibility')
+              .insert({
+                part_id: currentPart.id,
+                spa_model_id: spaId,
+                status: 'pending',
+                source: 'bulk_import',
+                data_source: row.dataSource || 'csv_import',
+              });
+            compatibilityCreated++;
+          }
+        }
       } catch (err: any) {
-        errors.push(`Row "${row.name}": ${err.message}`);
+        errors.push(`Row ${rowNum} "${row.name || '(continuation)'}": ${err.message}`);
       }
     }
 
-    success(res, { created, skipped, errors }, `Imported ${created} parts`);
+    success(
+      res, 
+      { created, updated, skipped, compatibilityCreated, errors }, 
+      `Imported ${created} parts (${updated} existing updated) with ${compatibilityCreated} compatibility records`
+    );
   } catch (err) {
     console.error('Error importing parts:', err);
     error(res, 'INTERNAL_ERROR', 'Failed to import parts', 500);

@@ -8,7 +8,9 @@ type ImportType = 'brands' | 'model-lines' | 'spas' | 'parts' | 'comps';
 
 interface ImportResult {
   created: number;
+  updated?: number;
   skipped: number;
+  compatibilityCreated?: number;
   errors: string[];
 }
 
@@ -117,16 +119,26 @@ export default function ImportPage() {
       description: 'Brand model lines',
     },
     spas: {
-      headers: ['brandName', 'modelLineName', 'name', 'year', 'manufacturerSku', 'seatingCapacity', 'jetCount', 'waterCapacityGallons', 'electricalRequirement', 'dimensionsLengthInches', 'dimensionsWidthInches', 'dimensionsHeightInches', 'weightDryLbs', 'weightFilledLbs', 'hasOzone', 'hasUv', 'hasSaltSystem', 'imageUrl', 'specSheetUrl', 'notes', 'isDiscontinued', 'dataSource'],
-      example: ['Jacuzzi', 'J-300 Collection', 'J-335', '2024', 'JAC-J335-24', '5', '35', '350', '240V/50A', '85', '85', '36', '725', '4200', 'true', 'false', 'false', '', '', '', 'false', 'manual_entry'],
+      headers: ['brandName', 'modelLineName', 'name', 'year', 'manufacturerSku', 'seatingCapacity', 'jetCount', 'waterCapacityGallons', 'electricalRequirement', 'dimensionsLengthInches', 'dimensionsWidthInches', 'dimensionsHeightInches', 'weightDryLbs', 'weightFilledLbs', 'hasOzone', 'hasUv', 'hasSaltSystem', 'hasJacuzziTrue', 'imageUrl', 'specSheetUrl', 'notes', 'isDiscontinued', 'dataSource'],
+      example: ['Jacuzzi', 'J-300 Collection', 'J-335', '2024', 'JAC-J335-24', '5', '35', '350', '240V/50A', '85', '85', '36', '725', '4200', 'true', 'false', 'false', 'false', '', '', '', 'false', 'manual_entry'],
       label: 'Spas',
       description: 'Spa model-years',
     },
     parts: {
-      headers: ['name', 'categoryName', 'partNumber', 'upc', 'manufacturer', 'isOem', 'isUniversal', 'dataSource'],
-      example: ['ProClarity Filter', 'filters', 'PKG-12345', '012345678901', 'Jacuzzi', 'true', 'false', 'manual_entry'],
+      headers: [
+        'name', 'categoryName', 'partNumber', 'manufacturerSku', 'upc', 'ean', 'skuAliases',
+        'manufacturer', 'isOem', 'isUniversal', 'isDiscontinued', 'displayImportance',
+        'imageUrl', 'specSheetUrl', 'notes', 'dataSource',
+        'compatibleBrands', 'compatibleModelLines', 'compatibleSpas', 'compatibleYears'
+      ],
+      example: [
+        'ProClarity Filter', 'filters', 'PKG-12345', 'JAC-FILTER-001', '012345678901', '', 'PKG12345,FILTER-001',
+        'Jacuzzi', 'true', 'false', 'false', '2',
+        '', '', '', 'manual_entry',
+        'Jacuzzi', 'J-300', 'J-335', '2020-2024'
+      ],
       label: 'Parts',
-      description: 'Parts catalog',
+      description: 'Parts catalog with compatibility',
     },
     comps: {
       headers: ['partNumber', 'partName', 'brandName', 'modelLineName', 'spaName', 'spaYear', 'compId', 'fitNotes', 'dataSource'],
@@ -268,7 +280,7 @@ export default function ImportPage() {
               }`}
             >
               <h4 className="font-medium text-gray-900 mb-2">Import Results</h4>
-              <div className="flex gap-4 mb-3">
+              <div className="flex flex-wrap gap-4 mb-3">
                 <div>
                   <span className="text-2xl font-bold text-green-600">{result.created}</span>
                   <span className="text-sm text-gray-500 ml-1">created</span>
@@ -277,6 +289,18 @@ export default function ImportPage() {
                   <span className="text-2xl font-bold text-gray-400">{result.skipped}</span>
                   <span className="text-sm text-gray-500 ml-1">skipped</span>
                 </div>
+                {result.updated !== undefined && result.updated > 0 && (
+                  <div>
+                    <span className="text-2xl font-bold text-yellow-600">{result.updated}</span>
+                    <span className="text-sm text-gray-500 ml-1">existing found</span>
+                  </div>
+                )}
+                {result.compatibilityCreated !== undefined && result.compatibilityCreated > 0 && (
+                  <div>
+                    <span className="text-2xl font-bold text-blue-600">{result.compatibilityCreated}</span>
+                    <span className="text-sm text-gray-500 ml-1">compatibility records</span>
+                  </div>
+                )}
               </div>
               {result.errors.length > 0 && (
                 <div>
@@ -302,6 +326,107 @@ export default function ImportPage() {
               <li>• Compatibility imports create "pending" records</li>
             </ul>
           </div>
+
+          {importType === 'parts' && (
+            <div className="space-y-4">
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <h3 className="font-medium text-purple-900 mb-2">Smart Compatibility Columns</h3>
+                <p className="text-sm text-purple-800 mb-2">
+                  Assign compatibility using four separate columns that work as filters:
+                </p>
+                <div className="text-sm text-purple-800 space-y-1">
+                  <div><strong>compatibleBrands</strong> - Brand names (comma-separated)</div>
+                  <div><strong>compatibleModelLines</strong> - Model line names only</div>
+                  <div><strong>compatibleSpas</strong> - Spa model names only</div>
+                  <div><strong>compatibleYears</strong> - Years or year ranges</div>
+                </div>
+                <p className="text-xs text-purple-700 mt-2">
+                  Columns narrow progressively: brands → model lines → spas → years
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-medium text-blue-900 mb-2">Column Formats</h3>
+                <div className="text-sm text-blue-800 space-y-3">
+                  <div>
+                    <strong>compatibleBrands</strong><br />
+                    <code className="bg-blue-100 px-1 rounded">Jacuzzi, Hot Spring</code>
+                  </div>
+                  <div>
+                    <strong>compatibleModelLines</strong><br />
+                    <code className="bg-blue-100 px-1 rounded">J-300, Limelight</code>
+                  </div>
+                  <div>
+                    <strong>compatibleSpas</strong><br />
+                    <code className="bg-blue-100 px-1 rounded">J-335, J-345</code>
+                  </div>
+                  <div>
+                    <strong>compatibleYears</strong><br />
+                    <code className="bg-blue-100 px-1 rounded">2020-2024</code> or <code className="bg-blue-100 px-1 rounded">2020, 2022, 2024</code>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h3 className="font-medium text-yellow-900 mb-2">Example Scenarios</h3>
+                <ul className="text-sm text-yellow-800 space-y-2">
+                  <li>
+                    <strong>All brand spas:</strong> <code className="bg-yellow-100 px-1 rounded">compatibleBrands=Jacuzzi</code>
+                  </li>
+                  <li>
+                    <strong>Model line + years:</strong> <code className="bg-yellow-100 px-1 rounded">compatibleBrands=Jacuzzi</code>, <code className="bg-yellow-100 px-1 rounded">compatibleModelLines=J-300</code>, <code className="bg-yellow-100 px-1 rounded">compatibleYears=2020-2024</code>
+                  </li>
+                  <li>
+                    <strong>Specific spas:</strong> <code className="bg-yellow-100 px-1 rounded">compatibleBrands=Jacuzzi</code>, <code className="bg-yellow-100 px-1 rounded">compatibleModelLines=J-300</code>, <code className="bg-yellow-100 px-1 rounded">compatibleSpas=J-335</code>, <code className="bg-yellow-100 px-1 rounded">compatibleYears=2020-2022</code>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h3 className="font-medium text-green-900 mb-2">Continuation Rows</h3>
+                <p className="text-sm text-green-800 mb-2">
+                  For complex compatibility, use continuation rows. Rows without part info (name, categoryName) add more compatibility to the previous part:
+                </p>
+                <div className="text-xs font-mono text-green-700 bg-green-100 p-2 rounded overflow-x-auto">
+                  <div>name,partNumber,categoryName,compatibleBrands,compatibleModelLines,compatibleSpas,compatibleYears</div>
+                  <div>Filter XL,FLT-001,filters,Jacuzzi,J-300,J-335,2020-2022</div>
+                  <div>,,,,J-300,J-345,2021-2024</div>
+                  <div>,,,Hot Spring,Highlife,Envoy,2019-2023</div>
+                </div>
+                <p className="text-xs text-green-700 mt-2">Row 1 creates the part. Rows 2-3 add more compatibility.</p>
+              </div>
+
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h3 className="font-medium text-gray-900 mb-2">All Parts Columns (20)</h3>
+                <div className="text-xs font-mono text-gray-600 grid grid-cols-2 gap-1">
+                  <div>• name <span className="text-red-500">*</span></div>
+                  <div>• categoryName <span className="text-red-500">*</span></div>
+                  <div>• partNumber</div>
+                  <div>• manufacturerSku</div>
+                  <div>• upc</div>
+                  <div>• ean</div>
+                  <div>• skuAliases</div>
+                  <div>• manufacturer</div>
+                  <div>• isOem</div>
+                  <div>• isUniversal</div>
+                  <div>• isDiscontinued</div>
+                  <div>• displayImportance</div>
+                  <div>• imageUrl</div>
+                  <div>• specSheetUrl</div>
+                  <div>• notes</div>
+                  <div>• dataSource</div>
+                  <div className="col-span-2 mt-2 border-t pt-2">
+                    <strong>Compatibility (optional):</strong>
+                  </div>
+                  <div>• compatibleBrands</div>
+                  <div>• compatibleModelLines</div>
+                  <div>• compatibleSpas</div>
+                  <div>• compatibleYears</div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2"><span className="text-red-500">*</span> = required (except for continuation rows)</p>
+              </div>
+            </div>
+          )}
 
           {importType === 'comps' && (
             <div className="space-y-4">
