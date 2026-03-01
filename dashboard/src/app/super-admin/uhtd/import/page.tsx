@@ -132,10 +132,10 @@ export default function ImportPage() {
         'compatibleBrands', 'compatibleModelLines', 'compatibleSpas', 'compatibleYears'
       ],
       example: [
-        'ProClarity Filter', 'filters', 'PKG-12345', 'JAC-FILTER-001', '012345678901', '', 'PKG12345,FILTER-001',
+        'ProClarity Filter', 'filters', 'PKG-12345', 'JAC-FILTER-001', '012345678901', '', 'PKG12345, FILTER-001',
         'Jacuzzi', 'true', 'false', 'false', '2',
         '', '', '', 'manual_entry',
-        'Jacuzzi', 'J-300', 'J-335', '2020-2024'
+        'Jacuzzi, Hot Spring', 'J-300, Limelight', 'J-335, J-345', '2020-2024'
       ],
       label: 'Parts',
       description: 'Parts catalog with compatibility',
@@ -148,9 +148,18 @@ export default function ImportPage() {
     },
   };
 
+  const escapeCsvValue = (value: string): string => {
+    if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+      return `"${value.replace(/"/g, '""')}"`;
+    }
+    return value;
+  };
+
   const downloadTemplate = () => {
     const template = templates[importType];
-    const csv = [template.headers.join(','), template.example.join(',')].join('\n');
+    const headerRow = template.headers.join(',');
+    const exampleRow = template.example.map(escapeCsvValue).join(',');
+    const csv = [headerRow, exampleRow].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
