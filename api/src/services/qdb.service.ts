@@ -34,12 +34,18 @@ interface PartQualifierRow {
 }
 
 function mapQualifierFromDb(row: QualifierRow): QdbQualifier {
+  // pg returns jsonb as parsed JS; only parse if it came through as string
+  const allowedValues = row.allowed_values == null
+    ? null
+    : typeof row.allowed_values === 'string'
+      ? JSON.parse(row.allowed_values)
+      : row.allowed_values;
   return {
     id: row.id,
     name: row.name,
     displayName: row.display_name,
     dataType: row.data_type as QdbQualifier['dataType'],
-    allowedValues: row.allowed_values ? JSON.parse(row.allowed_values) : null,
+    allowedValues,
     appliesTo: row.applies_to as QdbQualifier['appliesTo'],
     description: row.description,
     createdAt: row.created_at,

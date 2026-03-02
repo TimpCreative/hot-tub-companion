@@ -7,9 +7,15 @@ export async function listQualifiers(req: Request, res: Response) {
   try {
     const qualifiers = await qdbService.getAllQualifiers();
     success(res, qualifiers);
-  } catch (err) {
+  } catch (err: any) {
+    if (err.code === '42703') {
+      return error(res, 'INTERNAL_ERROR', 'Database schema may be outdated – ensure all migrations have run', 500);
+    }
     console.error('Error listing qualifiers:', err);
-    error(res, 'INTERNAL_ERROR', 'Failed to list qualifiers', 500);
+    const msg = process.env.NODE_ENV === 'development' && err?.message
+      ? `Failed to list qualifiers: ${err.message}`
+      : 'Failed to list qualifiers';
+    return error(res, 'INTERNAL_ERROR', msg, 500);
   }
 }
 

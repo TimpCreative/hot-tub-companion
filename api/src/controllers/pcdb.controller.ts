@@ -305,9 +305,21 @@ export async function createPart(req: Request, res: Response) {
     );
     res.status(201);
     return success(res, part, 'Part created');
-  } catch (err) {
+  } catch (err: any) {
+    if (err.code === '23503') {
+      return error(res, 'VALIDATION_ERROR', 'Invalid category or interchange group – verify they exist', 400);
+    }
+    if (err.code === '42703') {
+      return error(res, 'INTERNAL_ERROR', 'Database schema may be outdated – ensure all migrations have run (manufacturer_sku)', 500);
+    }
+    if (err.code === '22P02') {
+      return error(res, 'VALIDATION_ERROR', 'Invalid UUID format for category or interchange group', 400);
+    }
     console.error('Error creating part:', err);
-    return error(res, 'INTERNAL_ERROR', 'Failed to create part', 500);
+    const msg = process.env.NODE_ENV === 'development' && err?.message
+      ? `Failed to create part: ${err.message}`
+      : 'Failed to create part';
+    return error(res, 'INTERNAL_ERROR', msg, 500);
   }
 }
 
