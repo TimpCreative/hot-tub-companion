@@ -330,8 +330,20 @@ export async function createSpaModel(req: Request, res: Response) {
     if (err.code === '23505') {
       return error(res, 'CONFLICT', 'Spa model with this name and year already exists for this model line', 409);
     }
+    if (err.code === '23503') {
+      return error(res, 'VALIDATION_ERROR', 'Invalid brand or model line – verify the brand and model line exist', 400);
+    }
+    if (err.code === '42703') {
+      return error(res, 'INTERNAL_ERROR', 'Database schema may be outdated – ensure all migrations have run (has_jacuzzi_true)', 500);
+    }
+    if (err.code === '22P02') {
+      return error(res, 'VALIDATION_ERROR', 'Invalid UUID format for brand or model line', 400);
+    }
     console.error('Error creating spa model:', err);
-    return error(res, 'INTERNAL_ERROR', 'Failed to create spa model', 500);
+    const msg = process.env.NODE_ENV === 'development' && err?.message
+      ? `Failed to create spa model: ${err.message}`
+      : 'Failed to create spa model';
+    return error(res, 'INTERNAL_ERROR', msg, 500);
   }
 }
 
