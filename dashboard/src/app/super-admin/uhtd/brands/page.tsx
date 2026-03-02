@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { Badge } from '@/components/ui/Badge';
 import { Pagination } from '@/components/ui/Pagination';
+import { MergeModal } from '@/components/uhtd/MergeModal';
 
 interface Brand {
   id: string;
@@ -26,6 +27,8 @@ export default function BrandsListPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [total, setTotal] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showMergeModal, setShowMergeModal] = useState(false);
 
   useEffect(() => {
     async function fetchBrands() {
@@ -52,7 +55,50 @@ export default function BrandsListPage() {
     fetchBrands();
   }, [page, pageSize, search]);
 
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === brands.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(brands.map(b => b.id));
+    }
+  };
+
+  const handleMergeComplete = () => {
+    setSelectedIds([]);
+    setPage(1);
+  };
+
   const columns = [
+    {
+      key: 'select',
+      header: (
+        <input
+          type="checkbox"
+          checked={brands.length > 0 && selectedIds.length === brands.length}
+          onChange={toggleSelectAll}
+          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      ),
+      className: 'w-10',
+      render: (brand: any) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.includes(brand.id)}
+          onChange={(e) => {
+            e.stopPropagation();
+            toggleSelection(brand.id);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      ),
+    },
     {
       key: 'name',
       header: 'Name',
@@ -133,6 +179,22 @@ export default function BrandsListPage() {
           />
         </div>
 
+        {selectedIds.length >= 2 && (
+          <div className="p-4 border-b border-gray-200 bg-blue-50 flex items-center justify-between">
+            <span className="text-sm text-blue-700">
+              {selectedIds.length} brand{selectedIds.length !== 1 ? 's' : ''} selected
+            </span>
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setSelectedIds([])}>
+                Clear Selection
+              </Button>
+              <Button size="sm" onClick={() => setShowMergeModal(true)}>
+                Merge Selected
+              </Button>
+            </div>
+          </div>
+        )}
+
         <Table
           columns={columns}
           data={brands}
@@ -155,6 +217,14 @@ export default function BrandsListPage() {
           />
         )}
       </div>
+
+      <MergeModal
+        isOpen={showMergeModal}
+        onClose={() => setShowMergeModal(false)}
+        entityType="brand"
+        selectedItems={brands.filter(b => selectedIds.includes(b.id)).map(b => ({ id: b.id, name: b.name }))}
+        onMergeComplete={handleMergeComplete}
+      />
     </div>
   );
 }

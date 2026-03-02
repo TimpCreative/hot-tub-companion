@@ -9,6 +9,7 @@ import compRoutes from './comp.routes';
 import qdbRoutes from './qdb.routes';
 import auditRoutes from './audit.routes';
 import importRoutes from './import.routes';
+import mergeRoutes from './merge.routes';
 import statsRoutes from './stats.routes';
 import mediaRoutes from './media.routes';
 import { superAdminAuth } from '../middleware/superAdminAuth';
@@ -33,6 +34,7 @@ router.use('/api/v1/super-admin/comps', superAdminAuth, compRoutes);
 router.use('/api/v1/super-admin/qdb', superAdminAuth, qdbRoutes);
 router.use('/api/v1/super-admin/audit', superAdminAuth, auditRoutes);
 router.use('/api/v1/super-admin/import', superAdminAuth, importRoutes);
+router.use('/api/v1/super-admin/merge', superAdminAuth, mergeRoutes);
 router.use('/api/v1/super-admin/stats', superAdminAuth, statsRoutes);
 router.use('/api/v1/super-admin/media', superAdminAuth, mediaRoutes);
 

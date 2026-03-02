@@ -17,8 +17,9 @@ This guide walks you through entering data into the UHTD (Universal Hot Tub Data
 7. [Using Compatibility Groups (Comps)](#using-compatibility-groups-comps)
 8. [Working with Qualifiers](#working-with-qualifiers)
 9. [Bulk CSV Import](#bulk-csv-import)
-10. [Review Queue](#review-queue)
-11. [Tips and Best Practices](#tips-and-best-practices)
+10. [Merging Duplicate Entries](#merging-duplicate-entries)
+11. [Review Queue](#review-queue)
+12. [Tips and Best Practices](#tips-and-best-practices)
 
 ---
 
@@ -501,6 +502,101 @@ PKG-12345,Filter Kit,Jacuzzi,J-300 Series,J-345,2024,Direct fit,catalog
 - If you provide spa details, leave `compId` empty
 - The system will reject rows that mix both methods with a clear error message
 - All imported compatibility records start as **pending** and need to be confirmed in the Review Queue
+
+### Auto-Create Missing Entities During Import
+
+When importing Model Lines, Spas, or Parts, you can enable the **Auto-create missing brands/model lines** option. This is helpful when you have data that references entities that don't exist yet.
+
+**How to Enable:**
+1. On the Import page, select your import type (Model Lines, Spas, or Parts)
+2. Check the **Auto-create missing brands/model lines** checkbox before uploading
+3. Upload and import your CSV as normal
+
+**What Gets Auto-Created:**
+
+| Import Type | Auto-Creates |
+|-------------|--------------|
+| Model Lines | Brands |
+| Spas | Brands and Model Lines |
+| Parts | Categories, Brands, Model Lines, and Spas |
+
+**Important Notes:**
+- Auto-created entities have minimal data (just the name)
+- They're tagged with `data_source: auto_created_during_import`
+- You should review and enhance auto-created records after import
+- The import results will show how many entities were auto-created
+
+**Example Use Case:**
+You have a list of spas from a new brand. Instead of:
+1. Creating the brand
+2. Creating all model lines
+3. Importing the spas
+
+You can simply check the auto-create box and import all spas at once. The brand and model lines will be created automatically.
+
+---
+
+## Merging Duplicate Entries
+
+Sometimes duplicate entries are created - perhaps due to typos, different naming conventions, or multiple people entering data. The merge tool lets you combine duplicates into a single record while preserving all relationships.
+
+### When to Merge
+
+- **Same brand, different spelling**: "HotSpring" and "Hot Spring" should be one brand
+- **Duplicate model lines**: "J-300" and "J-300 Series" might be the same
+- **Duplicate spas**: Sometimes the same spa gets entered twice
+
+### How to Merge Brands
+
+1. Go to **UHTD → Brands**
+2. Use the checkboxes in the first column to select 2 or more brands
+3. An action bar will appear: "{n} brands selected"
+4. Click **Merge Selected**
+5. In the modal:
+   - Choose which brand to **keep** (the target)
+   - Review what will happen:
+     - All model lines will move to the target brand
+     - All spa models will move to the target brand
+     - Visibility settings will be consolidated
+   - Other brands will be soft-deleted
+6. Click **Merge** to confirm
+
+### How to Merge Model Lines
+
+1. Go to **UHTD → Model Lines**
+2. Select 2 or more model lines using checkboxes
+3. Click **Merge Selected**
+4. Choose which model line to keep
+5. All spa models will move to the target model line
+6. Click **Merge** to confirm
+
+### How to Merge Spas
+
+1. Go to **UHTD → Spas**
+2. Select 2 or more spas using checkboxes
+3. Click **Merge Selected**
+4. Choose which spa to keep
+5. Review affected records:
+   - Part compatibility records
+   - Comp assignments
+   - Qualifiers
+   - Electrical configs
+   - User spa profiles
+6. Click **Merge** to confirm
+
+### Merge Safety
+
+- **Preview before merge**: The modal shows exactly what will be affected
+- **Non-destructive**: Source entities are soft-deleted, not permanently removed
+- **Audit logged**: All merges are recorded in the Audit Log
+- **No data loss**: All relationships are moved to the target entity
+
+### Best Practices
+
+1. **Review first**: Before merging, look at both entries to decide which one has better data
+2. **Choose the best target**: Pick the entry with the most complete/accurate information
+3. **Small batches**: When merging many items, do it in small batches to review each
+4. **Check after merge**: Verify the target entry looks correct after merging
 
 ---
 

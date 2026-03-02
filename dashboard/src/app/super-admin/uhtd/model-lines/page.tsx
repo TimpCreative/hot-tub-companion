@@ -7,6 +7,7 @@ import { SearchInput } from '@/components/ui/SearchInput';
 import { Pagination } from '@/components/ui/Pagination';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { MergeModal } from '@/components/uhtd/MergeModal';
 
 interface Brand {
   id: string;
@@ -32,6 +33,8 @@ export default function ModelLinesPage() {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showMergeModal, setShowMergeModal] = useState(false);
 
   useEffect(() => {
     async function fetchBrands() {
@@ -72,7 +75,50 @@ export default function ModelLinesPage() {
     fetchModelLines();
   }, [page, pageSize, search, selectedBrand]);
 
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === modelLines.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(modelLines.map(ml => ml.id));
+    }
+  };
+
+  const handleMergeComplete = () => {
+    setSelectedIds([]);
+    setPage(1);
+  };
+
   const columns = [
+    {
+      key: 'select',
+      header: (
+        <input
+          type="checkbox"
+          checked={modelLines.length > 0 && selectedIds.length === modelLines.length}
+          onChange={toggleSelectAll}
+          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      ),
+      className: 'w-10',
+      render: (ml: any) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.includes(ml.id)}
+          onChange={(e) => {
+            e.stopPropagation();
+            toggleSelection(ml.id);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      ),
+    },
     {
       key: 'name',
       header: 'Model Line',
@@ -171,6 +217,22 @@ export default function ModelLinesPage() {
           </div>
         </div>
 
+        {selectedIds.length >= 2 && (
+          <div className="p-4 border-b border-gray-200 bg-blue-50 flex items-center justify-between">
+            <span className="text-sm text-blue-700">
+              {selectedIds.length} model line{selectedIds.length !== 1 ? 's' : ''} selected
+            </span>
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setSelectedIds([])}>
+                Clear Selection
+              </Button>
+              <Button size="sm" onClick={() => setShowMergeModal(true)}>
+                Merge Selected
+              </Button>
+            </div>
+          </div>
+        )}
+
         <Table
           columns={columns}
           data={modelLines}
@@ -190,6 +252,14 @@ export default function ModelLinesPage() {
           </div>
         )}
       </div>
+
+      <MergeModal
+        isOpen={showMergeModal}
+        onClose={() => setShowMergeModal(false)}
+        entityType="model-line"
+        selectedItems={modelLines.filter(ml => selectedIds.includes(ml.id)).map(ml => ({ id: ml.id, name: `${ml.name} (${ml.brandName})` }))}
+        onMergeComplete={handleMergeComplete}
+      />
     </div>
   );
 }

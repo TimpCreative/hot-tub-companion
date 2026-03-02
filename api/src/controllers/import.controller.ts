@@ -171,7 +171,7 @@ export async function importBrands(req: Request, res: Response) {
 
 export async function importModelLines(req: Request, res: Response) {
   try {
-    const { rows } = req.body as { rows: ModelLineImportRow[] };
+    const { rows, autoCreate } = req.body as { rows: ModelLineImportRow[]; autoCreate?: boolean };
     const userId = (req as any).superAdminEmail;
 
     if (!rows || !Array.isArray(rows)) {
@@ -180,6 +180,7 @@ export async function importModelLines(req: Request, res: Response) {
 
     let created = 0;
     let skipped = 0;
+    let brandsAutoCreated = 0;
     const errors: string[] = [];
 
     for (let i = 0; i < rows.length; i++) {
@@ -193,11 +194,33 @@ export async function importModelLines(req: Request, res: Response) {
           continue;
         }
 
-        const brand = await db('scdb_brands').where('name', 'ilike', row.brandName).first();
+        let brand = await db('scdb_brands').where('name', 'ilike', row.brandName).first();
         if (!brand) {
-          errors.push(`Row ${rowNum}: Brand "${row.brandName}" not found. Add the brand first.`);
-          skipped++;
-          continue;
+          if (autoCreate) {
+            // Auto-create the brand
+            const [newBrand] = await db('scdb_brands')
+              .insert({
+                name: row.brandName,
+                data_source: 'auto_created_during_import',
+              })
+              .returning('*');
+            
+            await logAudit(
+              'scdb_brands',
+              newBrand.id,
+              'INSERT' as AuditAction,
+              null,
+              newBrand,
+              userId
+            );
+            
+            brand = newBrand;
+            brandsAutoCreated++;
+          } else {
+            errors.push(`Row ${rowNum}: Brand "${row.brandName}" not found. Add the brand first or enable auto-create.`);
+            skipped++;
+            continue;
+          }
         }
 
         const existing = await db('scdb_model_lines')
@@ -234,7 +257,7 @@ export async function importModelLines(req: Request, res: Response) {
       }
     }
 
-    success(res, { created, skipped, errors }, `Imported ${created} model lines`);
+    success(res, { created, skipped, brandsAutoCreated, errors }, `Imported ${created} model lines${brandsAutoCreated > 0 ? ` (auto-created ${brandsAutoCreated} brands)` : ''}`);
   } catch (err) {
     console.error('Error importing model lines:', err);
     error(res, 'INTERNAL_ERROR', 'Failed to import model lines', 500);
@@ -243,7 +266,7 @@ export async function importModelLines(req: Request, res: Response) {
 
 export async function importSpas(req: Request, res: Response) {
   try {
-    const { rows } = req.body as { rows: SpaModelImportRow[] };
+    const { rows, autoCreate } = req.body as { rows: SpaModelImportRow[]; autoCreate?: boolean };
     const userId = (req as any).superAdminEmail;
 
     if (!rows || !Array.isArray(rows)) {
@@ -252,6 +275,8 @@ export async function importSpas(req: Request, res: Response) {
 
     let created = 0;
     let skipped = 0;
+    let brandsAutoCreated = 0;
+    let modelLinesAutoCreated = 0;
     const errors: string[] = [];
 
     for (let i = 0; i < rows.length; i++) {
@@ -265,22 +290,67 @@ export async function importSpas(req: Request, res: Response) {
           continue;
         }
 
-        const brand = await db('scdb_brands').where('name', 'ilike', row.brandName).first();
+        let brand = await db('scdb_brands').where('name', 'ilike', row.brandName).first();
         if (!brand) {
-          errors.push(`Row ${rowNum}: Brand "${row.brandName}" not found. Add the brand first.`);
-          skipped++;
-          continue;
+          if (autoCreate) {
+            // Auto-create the brand
+            const [newBrand] = await db('scdb_brands')
+              .insert({
+                name: row.brandName,
+                data_source: 'auto_created_during_import',
+              })
+              .returning('*');
+            
+            await logAudit(
+              'scdb_brands',
+              newBrand.id,
+              'INSERT' as AuditAction,
+              null,
+              newBrand,
+              userId
+            );
+            
+            brand = newBrand;
+            brandsAutoCreated++;
+          } else {
+            errors.push(`Row ${rowNum}: Brand "${row.brandName}" not found. Add the brand first or enable auto-create.`);
+            skipped++;
+            continue;
+          }
         }
 
-        const modelLine = await db('scdb_model_lines')
+        let modelLine = await db('scdb_model_lines')
           .where('brand_id', brand.id)
           .where('name', 'ilike', row.modelLineName)
           .first();
 
         if (!modelLine) {
-          errors.push(`Row ${rowNum}: Model Line "${row.modelLineName}" not found under brand "${row.brandName}". Add the model line first.`);
-          skipped++;
-          continue;
+          if (autoCreate) {
+            // Auto-create the model line
+            const [newModelLine] = await db('scdb_model_lines')
+              .insert({
+                brand_id: brand.id,
+                name: row.modelLineName,
+                data_source: 'auto_created_during_import',
+              })
+              .returning('*');
+            
+            await logAudit(
+              'scdb_model_lines',
+              newModelLine.id,
+              'INSERT' as AuditAction,
+              null,
+              newModelLine,
+              userId
+            );
+            
+            modelLine = newModelLine;
+            modelLinesAutoCreated++;
+          } else {
+            errors.push(`Row ${rowNum}: Model Line "${row.modelLineName}" not found under brand "${row.brandName}". Add the model line first or enable auto-create.`);
+            skipped++;
+            continue;
+          }
         }
 
         const existing = await db('scdb_spa_models')
@@ -337,7 +407,15 @@ export async function importSpas(req: Request, res: Response) {
       }
     }
 
-    success(res, { created, skipped, errors }, `Imported ${created} spa models`);
+    const autoCreatedMsg = [];
+    if (brandsAutoCreated > 0) autoCreatedMsg.push(`${brandsAutoCreated} brands`);
+    if (modelLinesAutoCreated > 0) autoCreatedMsg.push(`${modelLinesAutoCreated} model lines`);
+    
+    success(
+      res, 
+      { created, skipped, brandsAutoCreated, modelLinesAutoCreated, errors }, 
+      `Imported ${created} spa models${autoCreatedMsg.length > 0 ? ` (auto-created ${autoCreatedMsg.join(', ')})` : ''}`
+    );
   } catch (err) {
     console.error('Error importing spas:', err);
     error(res, 'INTERNAL_ERROR', 'Failed to import spas', 500);
@@ -346,7 +424,7 @@ export async function importSpas(req: Request, res: Response) {
 
 export async function importParts(req: Request, res: Response) {
   try {
-    const { rows } = req.body as { rows: PartImportRow[] };
+    const { rows, autoCreate } = req.body as { rows: PartImportRow[]; autoCreate?: boolean };
     const userId = (req as any).superAdminEmail;
 
     if (!rows || !Array.isArray(rows)) {
@@ -357,10 +435,105 @@ export async function importParts(req: Request, res: Response) {
     let skipped = 0;
     let updated = 0;
     let compatibilityCreated = 0;
+    let categoriesAutoCreated = 0;
+    let brandsAutoCreated = 0;
+    let modelLinesAutoCreated = 0;
+    let spasAutoCreated = 0;
     const errors: string[] = [];
 
     // Track current part for continuation rows
     let currentPart: { id: string; name: string; isUniversal: boolean } | null = null;
+
+    // Helper to slugify category name for internal name
+    function slugifyCategory(name: string): string {
+      return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    }
+
+    // Helper to get or create category
+    async function getOrCreateCategory(categoryName: string): Promise<any> {
+      let category = await db('pcdb_categories')
+        .where('name', 'ilike', categoryName)
+        .orWhere('display_name', 'ilike', categoryName)
+        .first();
+      
+      if (!category && autoCreate) {
+        const slugName = slugifyCategory(categoryName);
+        const [newCategory] = await db('pcdb_categories')
+          .insert({
+            name: slugName,
+            display_name: categoryName,
+            sort_order: 99,
+          })
+          .returning('*');
+        await logAudit('pcdb_categories', newCategory.id, 'INSERT' as AuditAction, null, newCategory, userId);
+        category = newCategory;
+        categoriesAutoCreated++;
+      }
+      return category;
+    }
+
+    // Helper to get or create brand
+    async function getOrCreateBrand(brandName: string): Promise<any> {
+      let brand = await db('scdb_brands').where('name', 'ilike', brandName).first();
+      if (!brand && autoCreate) {
+        const [newBrand] = await db('scdb_brands')
+          .insert({
+            name: brandName,
+            data_source: 'auto_created_during_import',
+          })
+          .returning('*');
+        await logAudit('scdb_brands', newBrand.id, 'INSERT' as AuditAction, null, newBrand, userId);
+        brand = newBrand;
+        brandsAutoCreated++;
+      }
+      return brand;
+    }
+
+    // Helper to get or create model line
+    async function getOrCreateModelLine(brandId: string, brandName: string, modelLineName: string): Promise<any> {
+      let modelLine = await db('scdb_model_lines')
+        .where('brand_id', brandId)
+        .where('name', 'ilike', modelLineName)
+        .first();
+      if (!modelLine && autoCreate) {
+        const [newModelLine] = await db('scdb_model_lines')
+          .insert({
+            brand_id: brandId,
+            name: modelLineName,
+            data_source: 'auto_created_during_import',
+          })
+          .returning('*');
+        await logAudit('scdb_model_lines', newModelLine.id, 'INSERT' as AuditAction, null, newModelLine, userId);
+        modelLine = newModelLine;
+        modelLinesAutoCreated++;
+      }
+      return modelLine;
+    }
+
+    // Helper to get or create spa
+    async function getOrCreateSpa(brandId: string, modelLineId: string, spaName: string, year: number): Promise<any> {
+      let spa = await db('scdb_spa_models')
+        .where('model_line_id', modelLineId)
+        .where('name', 'ilike', spaName)
+        .where('year', year)
+        .whereNull('deleted_at')
+        .first();
+      if (!spa && autoCreate) {
+        const [newSpa] = await db('scdb_spa_models')
+          .insert({
+            brand_id: brandId,
+            model_line_id: modelLineId,
+            name: spaName,
+            year: year,
+            data_source: 'auto_created_during_import',
+          })
+          .returning('*');
+        await logAudit('scdb_spa_models', newSpa.id, 'INSERT' as AuditAction, null, newSpa, userId);
+        spa = newSpa;
+        spasAutoCreated++;
+      }
+      return spa;
+    }
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -387,13 +560,10 @@ export async function importParts(req: Request, res: Response) {
           // Use the current part for compatibility
         } else if (hasPartInfo) {
           // This is a new part row - create or find the part
-          const category = await db('pcdb_categories')
-            .where('name', 'ilike', row.categoryName!)
-            .orWhere('display_name', 'ilike', row.categoryName!)
-            .first();
+          const category = await getOrCreateCategory(row.categoryName!);
 
           if (!category) {
-            errors.push(`Row ${rowNum} "${row.name}": Category "${row.categoryName}" not found`);
+            errors.push(`Row ${rowNum} "${row.name}": Category "${row.categoryName}" not found. Enable auto-create to create it automatically.`);
             skipped++;
             continue;
           }
@@ -493,55 +663,78 @@ export async function importParts(req: Request, res: Response) {
           ? row.compatibleSpas.split(',').map(s => s.trim()).filter(Boolean) 
           : [];
 
-        // Build query with cascading filters
-        let query = db('scdb_spa_models as sm')
-          .select('sm.id')
-          .leftJoin('scdb_model_lines as ml', 'sm.model_line_id', 'ml.id')
-          .leftJoin('scdb_brands as b', 'sm.brand_id', 'b.id')
-          .whereNull('sm.deleted_at');
-
-        // Filter by brands if specified (case-insensitive)
-        if (brandNames.length > 0) {
-          const lowerBrands = brandNames.map(n => n.toLowerCase());
-          query = query.whereRaw(
-            `LOWER(b.name) IN (${lowerBrands.map(() => '?').join(',')})`,
-            lowerBrands
-          );
-        }
-
-        // Filter by model lines if specified (case-insensitive)
-        if (modelLineNames.length > 0) {
-          const lowerModelLines = modelLineNames.map(n => n.toLowerCase());
-          query = query.whereRaw(
-            `LOWER(ml.name) IN (${lowerModelLines.map(() => '?').join(',')})`,
-            lowerModelLines
-          );
-        }
-
-        // Filter by spa names if specified (case-insensitive)
-        if (spaNames.length > 0) {
-          const lowerSpaNames = spaNames.map(n => n.toLowerCase());
-          query = query.whereRaw(
-            `LOWER(sm.name) IN (${lowerSpaNames.map(() => '?').join(',')})`,
-            lowerSpaNames
-          );
-        }
-
-        // Filter by years if specified
-        if (years.length > 0) {
-          query = query.whereIn('sm.year', years);
-        }
-
         // Only proceed if at least one filter is specified
         if (brandNames.length === 0 && modelLineNames.length === 0 && spaNames.length === 0 && years.length === 0) {
           continue;
         }
 
-        const matchingSpas = await query;
+        // If autoCreate is enabled and we have specific spa details, create missing entities
+        if (autoCreate && spaNames.length > 0 && modelLineNames.length > 0 && brandNames.length > 0 && years.length > 0) {
+          // Create brands/model lines/spas if they don't exist
+          for (const brandName of brandNames) {
+            const brand = await getOrCreateBrand(brandName);
+            if (!brand) continue;
 
-        for (const spa of matchingSpas) {
-          if (!spaIds.includes(spa.id)) {
-            spaIds.push(spa.id);
+            for (const modelLineName of modelLineNames) {
+              const modelLine = await getOrCreateModelLine(brand.id, brandName, modelLineName);
+              if (!modelLine) continue;
+
+              for (const spaName of spaNames) {
+                for (const year of years) {
+                  const spa = await getOrCreateSpa(brand.id, modelLine.id, spaName, year);
+                  if (spa && !spaIds.includes(spa.id)) {
+                    spaIds.push(spa.id);
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          // Standard query-based matching
+          let query = db('scdb_spa_models as sm')
+            .select('sm.id')
+            .leftJoin('scdb_model_lines as ml', 'sm.model_line_id', 'ml.id')
+            .leftJoin('scdb_brands as b', 'sm.brand_id', 'b.id')
+            .whereNull('sm.deleted_at');
+
+          // Filter by brands if specified (case-insensitive)
+          if (brandNames.length > 0) {
+            const lowerBrands = brandNames.map(n => n.toLowerCase());
+            query = query.whereRaw(
+              `LOWER(b.name) IN (${lowerBrands.map(() => '?').join(',')})`,
+              lowerBrands
+            );
+          }
+
+          // Filter by model lines if specified (case-insensitive)
+          if (modelLineNames.length > 0) {
+            const lowerModelLines = modelLineNames.map(n => n.toLowerCase());
+            query = query.whereRaw(
+              `LOWER(ml.name) IN (${lowerModelLines.map(() => '?').join(',')})`,
+              lowerModelLines
+            );
+          }
+
+          // Filter by spa names if specified (case-insensitive)
+          if (spaNames.length > 0) {
+            const lowerSpaNames = spaNames.map(n => n.toLowerCase());
+            query = query.whereRaw(
+              `LOWER(sm.name) IN (${lowerSpaNames.map(() => '?').join(',')})`,
+              lowerSpaNames
+            );
+          }
+
+          // Filter by years if specified
+          if (years.length > 0) {
+            query = query.whereIn('sm.year', years);
+          }
+
+          const matchingSpas = await query;
+
+          for (const spa of matchingSpas) {
+            if (!spaIds.includes(spa.id)) {
+              spaIds.push(spa.id);
+            }
           }
         }
 
@@ -568,10 +761,16 @@ export async function importParts(req: Request, res: Response) {
       }
     }
 
+    const autoCreatedMsg = [];
+    if (categoriesAutoCreated > 0) autoCreatedMsg.push(`${categoriesAutoCreated} categories`);
+    if (brandsAutoCreated > 0) autoCreatedMsg.push(`${brandsAutoCreated} brands`);
+    if (modelLinesAutoCreated > 0) autoCreatedMsg.push(`${modelLinesAutoCreated} model lines`);
+    if (spasAutoCreated > 0) autoCreatedMsg.push(`${spasAutoCreated} spas`);
+
     success(
       res, 
-      { created, updated, skipped, compatibilityCreated, errors }, 
-      `Imported ${created} parts (${updated} existing updated) with ${compatibilityCreated} compatibility records`
+      { created, updated, skipped, compatibilityCreated, categoriesAutoCreated, brandsAutoCreated, modelLinesAutoCreated, spasAutoCreated, errors }, 
+      `Imported ${created} parts (${updated} existing updated) with ${compatibilityCreated} compatibility records${autoCreatedMsg.length > 0 ? ` (auto-created ${autoCreatedMsg.join(', ')})` : ''}`
     );
   } catch (err) {
     console.error('Error importing parts:', err);

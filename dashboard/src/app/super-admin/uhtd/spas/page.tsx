@@ -7,6 +7,7 @@ import { SearchInput } from '@/components/ui/SearchInput';
 import { Pagination } from '@/components/ui/Pagination';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { MergeModal } from '@/components/uhtd/MergeModal';
 
 interface Brand {
   id: string;
@@ -36,6 +37,8 @@ export default function SpasPage() {
   const [search, setSearch] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showMergeModal, setShowMergeModal] = useState(false);
 
   useEffect(() => {
     async function fetchBrands() {
@@ -77,7 +80,50 @@ export default function SpasPage() {
     fetchSpas();
   }, [page, pageSize, search, selectedBrand, selectedYear]);
 
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === spas.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(spas.map(s => s.id));
+    }
+  };
+
+  const handleMergeComplete = () => {
+    setSelectedIds([]);
+    setPage(1);
+  };
+
   const columns = [
+    {
+      key: 'select',
+      header: (
+        <input
+          type="checkbox"
+          checked={spas.length > 0 && selectedIds.length === spas.length}
+          onChange={toggleSelectAll}
+          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      ),
+      className: 'w-10',
+      render: (spa: any) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.includes(spa.id)}
+          onChange={(e) => {
+            e.stopPropagation();
+            toggleSelection(spa.id);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      ),
+    },
     {
       key: 'name',
       header: 'Model',
@@ -208,6 +254,22 @@ export default function SpasPage() {
           </div>
         </div>
 
+        {selectedIds.length >= 2 && (
+          <div className="p-4 border-b border-gray-200 bg-blue-50 flex items-center justify-between">
+            <span className="text-sm text-blue-700">
+              {selectedIds.length} spa{selectedIds.length !== 1 ? 's' : ''} selected
+            </span>
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setSelectedIds([])}>
+                Clear Selection
+              </Button>
+              <Button size="sm" onClick={() => setShowMergeModal(true)}>
+                Merge Selected
+              </Button>
+            </div>
+          </div>
+        )}
+
         <Table
           columns={columns}
           data={spas}
@@ -227,6 +289,14 @@ export default function SpasPage() {
           </div>
         )}
       </div>
+
+      <MergeModal
+        isOpen={showMergeModal}
+        onClose={() => setShowMergeModal(false)}
+        entityType="spa"
+        selectedItems={spas.filter(s => selectedIds.includes(s.id)).map(s => ({ id: s.id, name: `${s.brandName} ${s.modelLineName} ${s.name} (${s.year})` }))}
+        onMergeComplete={handleMergeComplete}
+      />
     </div>
   );
 }

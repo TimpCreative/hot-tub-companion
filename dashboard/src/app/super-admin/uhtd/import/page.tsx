@@ -11,6 +11,10 @@ interface ImportResult {
   updated?: number;
   skipped: number;
   compatibilityCreated?: number;
+  categoriesAutoCreated?: number;
+  brandsAutoCreated?: number;
+  modelLinesAutoCreated?: number;
+  spasAutoCreated?: number;
   errors: string[];
 }
 
@@ -19,6 +23,7 @@ export default function ImportPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [csvPreview, setCsvPreview] = useState<string[][]>([]);
+  const [autoCreate, setAutoCreate] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const parseCSV = (text: string): string[][] => {
@@ -89,7 +94,7 @@ export default function ImportPage() {
       const res = await fetch(`/api/dashboard/super-admin/import/${importType}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows }),
+        body: JSON.stringify({ rows, autoCreate }),
       });
 
       const data = await res.json();
@@ -272,6 +277,29 @@ export default function ImportPage() {
               </div>
             )}
 
+            {['model-lines', 'spas', 'parts'].includes(importType) && (
+              <label className="flex items-center gap-2 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoCreate}
+                  onChange={(e) => setAutoCreate(e.target.checked)}
+                  className="w-4 h-4 text-amber-600 rounded border-gray-300 focus:ring-amber-500"
+                />
+                <div>
+                  <span className="text-sm font-medium text-amber-900">
+                    Auto-create missing entities
+                  </span>
+                  <p className="text-xs text-amber-700">
+                    {importType === 'parts' 
+                      ? 'Create categories, brands, model lines, and spas if they don\'t exist'
+                      : importType === 'spas'
+                      ? 'Create brands and model lines if they don\'t exist'
+                      : 'Create brands if they don\'t exist'}
+                  </p>
+                </div>
+              </label>
+            )}
+
             <Button
               onClick={handleImport}
               loading={loading}
@@ -311,6 +339,28 @@ export default function ImportPage() {
                   </div>
                 )}
               </div>
+              {((result.categoriesAutoCreated && result.categoriesAutoCreated > 0) ||
+                (result.brandsAutoCreated && result.brandsAutoCreated > 0) || 
+                (result.modelLinesAutoCreated && result.modelLinesAutoCreated > 0) || 
+                (result.spasAutoCreated && result.spasAutoCreated > 0)) && (
+                <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded">
+                  <h5 className="text-sm font-medium text-amber-800 mb-1">Auto-created:</h5>
+                  <div className="flex flex-wrap gap-4 text-sm text-amber-700">
+                    {result.categoriesAutoCreated && result.categoriesAutoCreated > 0 && (
+                      <span>{result.categoriesAutoCreated} categor{result.categoriesAutoCreated !== 1 ? 'ies' : 'y'}</span>
+                    )}
+                    {result.brandsAutoCreated && result.brandsAutoCreated > 0 && (
+                      <span>{result.brandsAutoCreated} brand{result.brandsAutoCreated !== 1 ? 's' : ''}</span>
+                    )}
+                    {result.modelLinesAutoCreated && result.modelLinesAutoCreated > 0 && (
+                      <span>{result.modelLinesAutoCreated} model line{result.modelLinesAutoCreated !== 1 ? 's' : ''}</span>
+                    )}
+                    {result.spasAutoCreated && result.spasAutoCreated > 0 && (
+                      <span>{result.spasAutoCreated} spa{result.spasAutoCreated !== 1 ? 's' : ''}</span>
+                    )}
+                  </div>
+                </div>
+              )}
               {result.errors.length > 0 && (
                 <div>
                   <h5 className="text-sm font-medium text-red-700 mb-1">Errors:</h5>
