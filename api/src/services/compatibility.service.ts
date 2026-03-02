@@ -284,9 +284,11 @@ export async function getPendingCompatibilities(
     .leftJoin('scdb_brands', 'scdb_spa_models.brand_id', 'scdb_brands.id')
     .where('part_spa_compatibility.status', 'pending');
 
-  const countQuery = query.clone();
-  const [{ count }] = await countQuery.count('* as count');
-  const total = parseInt(count as string, 10);
+  const countResult = await db('part_spa_compatibility')
+    .where('status', 'pending')
+    .count('* as count')
+    .first();
+  const total = parseInt((countResult?.count as string) ?? '0', 10);
 
   query = query.orderBy('part_spa_compatibility.added_at', 'desc');
 
@@ -322,12 +324,11 @@ export async function listComps(
     query = query.whereNull('compatibility_groups.deleted_at');
   }
 
-  const countQuery = db('compatibility_groups');
-  if (!includeDeleted) {
-    countQuery.whereNull('deleted_at');
-  }
-  const [{ count }] = await countQuery.count('* as count');
-  const total = parseInt(count as string, 10);
+  const countQuery = includeDeleted
+    ? db('compatibility_groups')
+    : db('compatibility_groups').whereNull('deleted_at');
+  const countResult = await countQuery.count('* as count').first();
+  const total = parseInt((countResult?.count as string) ?? '0', 10);
 
   const sortBy = pagination?.sortBy || 'compatibility_groups.id';
   const sortOrder = pagination?.sortOrder || 'asc';

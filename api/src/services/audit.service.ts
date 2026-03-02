@@ -41,38 +41,24 @@ export async function getAuditLogs(
   } = {},
   pagination?: PaginationParams
 ): Promise<{ logs: AuditLogEntry[]; total: number }> {
-  let query = db('audit_log').select('*');
+  const baseQuery = () => {
+    let q = db('audit_log');
+    if (filters.tableName) q = q.where('table_name', filters.tableName);
+    if (filters.recordId) q = q.where('record_id', filters.recordId);
+    if (filters.action) q = q.where('action', filters.action);
+    if (filters.changedBy) q = q.where('changed_by', filters.changedBy);
+    if (filters.startDate) q = q.where('changed_at', '>=', filters.startDate);
+    if (filters.endDate) q = q.where('changed_at', '<=', filters.endDate);
+    return q;
+  };
+  const countResult = await baseQuery().count('* as count').first();
+  const total = parseInt((countResult?.count as string) ?? '0', 10);
 
-  if (filters.tableName) {
-    query = query.where('table_name', filters.tableName);
-  }
-  if (filters.recordId) {
-    query = query.where('record_id', filters.recordId);
-  }
-  if (filters.action) {
-    query = query.where('action', filters.action);
-  }
-  if (filters.changedBy) {
-    query = query.where('changed_by', filters.changedBy);
-  }
-  if (filters.startDate) {
-    query = query.where('changed_at', '>=', filters.startDate);
-  }
-  if (filters.endDate) {
-    query = query.where('changed_at', '<=', filters.endDate);
-  }
-
-  // Get total count
-  const countQuery = query.clone();
-  const [{ count }] = await countQuery.count('* as count');
-  const total = parseInt(count as string, 10);
-
-  // Apply sorting
+  let query = baseQuery().select('*');
   const sortBy = pagination?.sortBy || 'changed_at';
   const sortOrder = pagination?.sortOrder || 'desc';
   query = query.orderBy(sortBy, sortOrder);
 
-  // Apply pagination
   if (pagination?.page && pagination?.pageSize) {
     const offset = (pagination.page - 1) * pagination.pageSize;
     query = query.offset(offset).limit(pagination.pageSize);

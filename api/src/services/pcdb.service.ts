@@ -313,56 +313,44 @@ export async function listParts(
   } = {},
   pagination?: PaginationParams
 ): Promise<{ parts: PcdbPart[]; total: number }> {
-  let query = db('pcdb_parts')
-    .select(
-      'pcdb_parts.*',
-      'pcdb_categories.name as category_name',
-      'pcdb_categories.display_name as category_display_name',
-      'pcdb_interchange_groups.name as interchange_group_name'
-    )
-    .leftJoin('pcdb_categories', 'pcdb_parts.category_id', 'pcdb_categories.id')
-    .leftJoin('pcdb_interchange_groups', 'pcdb_parts.interchange_group_id', 'pcdb_interchange_groups.id');
+  const baseQuery = () => {
+    let q = db('pcdb_parts')
+      .leftJoin('pcdb_categories', 'pcdb_parts.category_id', 'pcdb_categories.id')
+      .leftJoin('pcdb_interchange_groups', 'pcdb_parts.interchange_group_id', 'pcdb_interchange_groups.id');
+    if (filters.categoryId) q = q.where('pcdb_parts.category_id', filters.categoryId);
+    if (filters.manufacturer) q = q.whereRaw('LOWER(pcdb_parts.manufacturer) = LOWER(?)', [filters.manufacturer]);
+    if (filters.isOem !== undefined) q = q.where('pcdb_parts.is_oem', filters.isOem);
+    if (filters.isUniversal !== undefined) q = q.where('pcdb_parts.is_universal', filters.isUniversal);
+    if (filters.search) {
+      q = q.where(function () {
+        this.whereRaw('pcdb_parts.name ILIKE ?', [`%${filters.search}%`])
+          .orWhereRaw('pcdb_parts.part_number ILIKE ?', [`%${filters.search}%`])
+          .orWhereRaw('pcdb_parts.manufacturer ILIKE ?', [`%${filters.search}%`]);
+      });
+    }
+    if (!filters.includeDeleted) q = q.whereNull('pcdb_parts.deleted_at');
+    return q;
+  };
 
-  if (filters.categoryId) {
-    query = query.where('pcdb_parts.category_id', filters.categoryId);
-  }
-  if (filters.manufacturer) {
-    query = query.whereRaw('LOWER(pcdb_parts.manufacturer) = LOWER(?)', [filters.manufacturer]);
-  }
-  if (filters.isOem !== undefined) {
-    query = query.where('pcdb_parts.is_oem', filters.isOem);
-  }
-  if (filters.isUniversal !== undefined) {
-    query = query.where('pcdb_parts.is_universal', filters.isUniversal);
-  }
-  if (filters.search) {
-    query = query.where(function () {
-      this.whereRaw('pcdb_parts.name ILIKE ?', [`%${filters.search}%`])
-        .orWhereRaw('pcdb_parts.part_number ILIKE ?', [`%${filters.search}%`])
-        .orWhereRaw('pcdb_parts.manufacturer ILIKE ?', [`%${filters.search}%`]);
-    });
-  }
-  if (!filters.includeDeleted) {
-    query = query.whereNull('pcdb_parts.deleted_at');
-  }
+  const countResult = await baseQuery().count('pcdb_parts.id as count').first();
+  const total = parseInt((countResult?.count as string) ?? '0', 10);
 
-  // Get total count
-  const countQuery = query.clone();
-  const [{ count }] = await countQuery.count('* as count');
-  const total = parseInt(count as string, 10);
-
-  // Apply sorting
+  let dataQuery = baseQuery().select(
+    'pcdb_parts.*',
+    'pcdb_categories.name as category_name',
+    'pcdb_categories.display_name as category_display_name',
+    'pcdb_interchange_groups.name as interchange_group_name'
+  );
   const sortBy = pagination?.sortBy || 'pcdb_parts.name';
   const sortOrder = pagination?.sortOrder || 'asc';
-  query = query.orderBy('pcdb_parts.display_importance').orderBy(sortBy, sortOrder);
+  dataQuery = dataQuery.orderBy('pcdb_parts.display_importance').orderBy(sortBy, sortOrder);
 
-  // Apply pagination
   if (pagination?.page && pagination?.pageSize) {
     const offset = (pagination.page - 1) * pagination.pageSize;
-    query = query.offset(offset).limit(pagination.pageSize);
+    dataQuery = dataQuery.offset(offset).limit(pagination.pageSize);
   }
 
-  const rows = await query;
+  const rows = await dataQuery;
   return {
     parts: rows.map(mapPartFromDb),
     total,

@@ -101,29 +101,28 @@ export async function listBrands(
   includeDeleted = false,
   pagination?: PaginationParams
 ): Promise<{ brands: ScdbBrand[]; total: number }> {
-  let query = db('scdb_brands').select('*');
+  const baseQuery = () => {
+    let q = db('scdb_brands');
+    if (!includeDeleted) q = q.whereNull('deleted_at');
+    return q;
+  };
 
-  if (!includeDeleted) {
-    query = query.whereNull('deleted_at');
-  }
+  // Get total count (separate query to avoid select * + count SQL error)
+  const countResult = await baseQuery().count('* as count').first();
+  const total = parseInt((countResult?.count as string) ?? '0', 10);
 
-  // Get total count
-  const countQuery = query.clone();
-  const [{ count }] = await countQuery.count('* as count');
-  const total = parseInt(count as string, 10);
-
-  // Apply sorting
+  // Build data query
+  let dataQuery = baseQuery().select('*');
   const sortBy = pagination?.sortBy || 'name';
   const sortOrder = pagination?.sortOrder || 'asc';
-  query = query.orderBy(sortBy, sortOrder);
+  dataQuery = dataQuery.orderBy(sortBy, sortOrder);
 
-  // Apply pagination
   if (pagination?.page && pagination?.pageSize) {
     const offset = (pagination.page - 1) * pagination.pageSize;
-    query = query.offset(offset).limit(pagination.pageSize);
+    dataQuery = dataQuery.offset(offset).limit(pagination.pageSize);
   }
 
-  const rows = await query;
+  const rows = await dataQuery;
   return {
     brands: rows.map(mapBrandFromDb),
     total,
@@ -284,38 +283,31 @@ export async function listSpaModels(
   } = {},
   pagination?: PaginationParams
 ): Promise<{ spaModels: ScdbSpaModel[]; total: number }> {
-  let query = db('scdb_spa_models')
-    .select(
-      'scdb_spa_models.*',
-      'scdb_brands.name as brand_name',
-      'scdb_model_lines.name as model_line_name'
-    )
-    .leftJoin('scdb_brands', 'scdb_spa_models.brand_id', 'scdb_brands.id')
-    .leftJoin('scdb_model_lines', 'scdb_spa_models.model_line_id', 'scdb_model_lines.id');
+  const baseQuery = () => {
+    let q = db('scdb_spa_models')
+      .leftJoin('scdb_brands', 'scdb_spa_models.brand_id', 'scdb_brands.id')
+      .leftJoin('scdb_model_lines', 'scdb_spa_models.model_line_id', 'scdb_model_lines.id');
+    if (filters.brandId) q = q.where('scdb_spa_models.brand_id', filters.brandId);
+    if (filters.modelLineId) q = q.where('scdb_spa_models.model_line_id', filters.modelLineId);
+    if (filters.year) q = q.where('scdb_spa_models.year', filters.year);
+    if (filters.search) {
+      q = q.where(function () {
+        this.whereRaw('scdb_spa_models.name ILIKE ?', [`%${filters.search}%`])
+          .orWhereRaw('scdb_brands.name ILIKE ?', [`%${filters.search}%`]);
+      });
+    }
+    if (!filters.includeDeleted) q = q.whereNull('scdb_spa_models.deleted_at');
+    return q;
+  };
 
-  if (filters.brandId) {
-    query = query.where('scdb_spa_models.brand_id', filters.brandId);
-  }
-  if (filters.modelLineId) {
-    query = query.where('scdb_spa_models.model_line_id', filters.modelLineId);
-  }
-  if (filters.year) {
-    query = query.where('scdb_spa_models.year', filters.year);
-  }
-  if (filters.search) {
-    query = query.where(function () {
-      this.whereRaw('scdb_spa_models.name ILIKE ?', [`%${filters.search}%`])
-        .orWhereRaw('scdb_brands.name ILIKE ?', [`%${filters.search}%`]);
-    });
-  }
-  if (!filters.includeDeleted) {
-    query = query.whereNull('scdb_spa_models.deleted_at');
-  }
+  const countResult = await baseQuery().count('scdb_spa_models.id as count').first();
+  const total = parseInt((countResult?.count as string) ?? '0', 10);
 
-  // Get total count
-  const countQuery = query.clone();
-  const [{ count }] = await countQuery.count('* as count');
-  const total = parseInt(count as string, 10);
+  let query = baseQuery().select(
+    'scdb_spa_models.*',
+    'scdb_brands.name as brand_name',
+    'scdb_model_lines.name as model_line_name'
+  );
 
   // Apply sorting
   const sortBy = pagination?.sortBy || 'scdb_brands.name';

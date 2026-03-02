@@ -15,17 +15,22 @@ export async function getAuditLogs(req: Request, res: Response) {
 
     const offset = (parseInt(page as string) - 1) * parseInt(pageSize as string);
 
-    let query = db('audit_log').orderBy('created_at', 'desc');
+    const baseQuery = () => {
+      let q = db('audit_log');
+      if (tableName) q = q.where('table_name', tableName);
+      if (recordId) q = q.where('record_id', recordId);
+      if (action) q = q.where('action', action);
+      if (changedBy) q = q.where('changed_by', 'ilike', `%${changedBy}%`);
+      return q;
+    };
 
-    if (tableName) query = query.where('table_name', tableName);
-    if (recordId) query = query.where('record_id', recordId);
-    if (action) query = query.where('action', action);
-    if (changedBy) query = query.where('changed_by', 'ilike', `%${changedBy}%`);
+    const countResult = await baseQuery().count('* as count').first();
+    const totalCount = parseInt((countResult?.count as string) ?? '0', 10);
 
-    const countQuery = query.clone();
-    const [{ count }] = await countQuery.count('* as count');
-
-    const logs = await query.limit(parseInt(pageSize as string)).offset(offset);
+    const logs = await baseQuery()
+      .orderBy('created_at', 'desc')
+      .limit(parseInt(pageSize as string))
+      .offset(offset);
 
     success(
       res,
@@ -43,8 +48,8 @@ export async function getAuditLogs(req: Request, res: Response) {
       {
         page: parseInt(page as string),
         pageSize: parseInt(pageSize as string),
-        total: parseInt(count as string),
-        totalPages: Math.ceil(parseInt(count as string) / parseInt(pageSize as string)),
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / parseInt(pageSize as string)),
       }
     );
   } catch (err) {

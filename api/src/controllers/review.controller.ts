@@ -9,7 +9,13 @@ export async function getPendingCompatibilities(req: Request, res: Response) {
     const { page = '1', pageSize = '50' } = req.query;
     const offset = (parseInt(page as string) - 1) * parseInt(pageSize as string);
 
-    const query = db('part_spa_compatibility as psc')
+    const countResult = await db('part_spa_compatibility')
+      .where('status', 'pending')
+      .count('* as count')
+      .first();
+    const totalCount = parseInt((countResult?.count as string) ?? '0', 10);
+
+    const rows = await db('part_spa_compatibility as psc')
       .select(
         'psc.*',
         'p.name as part_name',
@@ -24,10 +30,9 @@ export async function getPendingCompatibilities(req: Request, res: Response) {
       .leftJoin('scdb_model_lines as ml', 'sm.model_line_id', 'ml.id')
       .leftJoin('scdb_brands as b', 'ml.brand_id', 'b.id')
       .where('psc.status', 'pending')
-      .orderBy('psc.created_at', 'desc');
-
-    const [{ count }] = await query.clone().count('* as count');
-    const rows = await query.limit(parseInt(pageSize as string)).offset(offset);
+      .orderBy('psc.created_at', 'desc')
+      .limit(parseInt(pageSize as string))
+      .offset(offset);
 
     success(
       res,
@@ -54,8 +59,8 @@ export async function getPendingCompatibilities(req: Request, res: Response) {
       {
         page: parseInt(page as string),
         pageSize: parseInt(pageSize as string),
-        total: parseInt(count as string),
-        totalPages: Math.ceil(parseInt(count as string) / parseInt(pageSize as string)),
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / parseInt(pageSize as string)),
       }
     );
   } catch (err) {
