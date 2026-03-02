@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { useRouter } from 'next/navigation';
 import { Table } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
@@ -27,6 +28,7 @@ interface Category {
 
 export default function PartsListPage() {
   const router = useRouter();
+  const fetchWithAuth = useSuperAdminFetch();
   const [parts, setParts] = useState<Part[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +41,7 @@ export default function PartsListPage() {
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const res = await fetch('/api/dashboard/super-admin/pcdb/categories');
+        const res = await fetchWithAuth('/api/dashboard/super-admin/pcdb/categories');
         const data = await res.json();
         if (data.success) {
           setCategories(data.data || []);
@@ -49,7 +51,7 @@ export default function PartsListPage() {
       }
     }
     fetchCategories();
-  }, []);
+  }, [fetchWithAuth]);
 
   useEffect(() => {
     async function fetchParts() {
@@ -62,7 +64,7 @@ export default function PartsListPage() {
         if (search) params.append('search', search);
         if (selectedCategory) params.append('categoryId', selectedCategory);
 
-        const res = await fetch(`/api/dashboard/super-admin/pcdb/parts?${params}`);
+        const res = await fetchWithAuth(`/api/dashboard/super-admin/pcdb/parts?${params}`);
         const data = await res.json();
         if (data.success) {
           setParts(data.data || []);
@@ -75,7 +77,7 @@ export default function PartsListPage() {
       }
     }
     fetchParts();
-  }, [page, pageSize, search, selectedCategory]);
+  }, [page, pageSize, search, selectedCategory, fetchWithAuth]);
 
   const columns = [
     {

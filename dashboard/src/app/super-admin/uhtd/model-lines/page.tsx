@@ -7,6 +7,7 @@ import { SearchInput } from '@/components/ui/SearchInput';
 import { Pagination } from '@/components/ui/Pagination';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { MergeModal } from '@/components/uhtd/MergeModal';
 
 interface Brand {
@@ -25,6 +26,7 @@ interface ModelLine {
 }
 
 export default function ModelLinesPage() {
+  const fetchWithAuth = useSuperAdminFetch();
   const [modelLines, setModelLines] = useState<ModelLine[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +41,7 @@ export default function ModelLinesPage() {
   useEffect(() => {
     async function fetchBrands() {
       try {
-        const res = await fetch('/api/dashboard/super-admin/scdb/brands');
+        const res = await fetchWithAuth('/api/dashboard/super-admin/scdb/brands');
         const data = await res.json();
         if (data.success) setBrands(data.data || []);
       } catch (err) {
@@ -47,7 +49,7 @@ export default function ModelLinesPage() {
       }
     }
     fetchBrands();
-  }, []);
+  }, [fetchWithAuth]);
 
   useEffect(() => {
     async function fetchModelLines() {
@@ -60,7 +62,7 @@ export default function ModelLinesPage() {
         if (search) params.append('search', search);
         if (selectedBrand) params.append('brandId', selectedBrand);
 
-        const res = await fetch(`/api/dashboard/super-admin/scdb/model-lines?${params}`);
+        const res = await fetchWithAuth(`/api/dashboard/super-admin/scdb/model-lines?${params}`);
         const data = await res.json();
         if (data.success) {
           setModelLines(data.data || []);
@@ -73,7 +75,7 @@ export default function ModelLinesPage() {
       }
     }
     fetchModelLines();
-  }, [page, pageSize, search, selectedBrand]);
+  }, [page, pageSize, search, selectedBrand, fetchWithAuth]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => 

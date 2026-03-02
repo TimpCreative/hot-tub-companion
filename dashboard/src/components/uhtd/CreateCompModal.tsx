@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 
@@ -19,6 +20,7 @@ export function CreateCompModal({
   preSelectedSpaIds = [],
   categoryId,
 }: CreateCompModalProps) {
+  const fetchWithAuth = useSuperAdminFetch();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -42,7 +44,7 @@ export function CreateCompModal({
     setError('');
 
     try {
-      const res = await fetch('/api/dashboard/super-admin/comps', {
+      const res = await fetchWithAuth('/api/dashboard/super-admin/comps', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

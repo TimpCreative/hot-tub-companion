@@ -7,6 +7,7 @@ import { SearchInput } from '@/components/ui/SearchInput';
 import { Pagination } from '@/components/ui/Pagination';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { MergeModal } from '@/components/uhtd/MergeModal';
 
 interface Brand {
@@ -28,6 +29,7 @@ interface SpaModel {
 }
 
 export default function SpasPage() {
+  const fetchWithAuth = useSuperAdminFetch();
   const [spas, setSpas] = useState<SpaModel[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +45,7 @@ export default function SpasPage() {
   useEffect(() => {
     async function fetchBrands() {
       try {
-        const res = await fetch('/api/dashboard/super-admin/scdb/brands');
+        const res = await fetchWithAuth('/api/dashboard/super-admin/scdb/brands');
         const data = await res.json();
         if (data.success) setBrands(data.data || []);
       } catch (err) {
@@ -51,7 +53,7 @@ export default function SpasPage() {
       }
     }
     fetchBrands();
-  }, []);
+  }, [fetchWithAuth]);
 
   useEffect(() => {
     async function fetchSpas() {
@@ -65,7 +67,7 @@ export default function SpasPage() {
         if (selectedBrand) params.append('brandId', selectedBrand);
         if (selectedYear) params.append('year', selectedYear);
 
-        const res = await fetch(`/api/dashboard/super-admin/scdb/spa-models?${params}`);
+        const res = await fetchWithAuth(`/api/dashboard/super-admin/scdb/spa-models?${params}`);
         const data = await res.json();
         if (data.success) {
           setSpas(data.data || []);
@@ -78,7 +80,7 @@ export default function SpasPage() {
       }
     }
     fetchSpas();
-  }, [page, pageSize, search, selectedBrand, selectedYear]);
+  }, [page, pageSize, search, selectedBrand, selectedYear, fetchWithAuth]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => 

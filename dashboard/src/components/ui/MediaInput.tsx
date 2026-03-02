@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback } from 'react';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 
 interface MediaInputProps {
   label?: string;
@@ -25,6 +26,7 @@ export function MediaInput({
   placeholder = 'https://...',
   required = false,
 }: MediaInputProps) {
+  const fetchWithAuth = useSuperAdminFetch();
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export function MediaInput({
         if (entityId) formData.append('entityId', entityId);
         if (fieldName) formData.append('fieldName', fieldName);
 
-        const response = await fetch('/api/dashboard/super-admin/media/upload', {
+        const response = await fetchWithAuth('/api/dashboard/super-admin/media/upload', {
           method: 'POST',
           body: formData,
         });
@@ -63,7 +65,7 @@ export function MediaInput({
         setUploading(false);
       }
     },
-    [entityType, entityId, fieldName, onChange]
+    [entityType, entityId, fieldName, onChange, fetchWithAuth]
   );
 
   const handleDrop = useCallback(

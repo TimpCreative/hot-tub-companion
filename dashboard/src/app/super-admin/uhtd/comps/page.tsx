@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Table } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { SearchInput } from '@/components/ui/SearchInput';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Pagination } from '@/components/ui/Pagination';
 
 interface Comp {
@@ -19,6 +20,7 @@ interface Comp {
 
 export default function CompsListPage() {
   const router = useRouter();
+  const fetchWithAuth = useSuperAdminFetch();
   const [comps, setComps] = useState<Comp[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -36,7 +38,7 @@ export default function CompsListPage() {
         });
         if (search) params.append('search', search);
 
-        const res = await fetch(`/api/dashboard/super-admin/comps?${params}`);
+        const res = await fetchWithAuth(`/api/dashboard/super-admin/comps?${params}`);
         const data = await res.json();
         if (data.success) {
           setComps(data.data || []);
@@ -49,7 +51,7 @@ export default function CompsListPage() {
       }
     }
     fetchComps();
-  }, [page, pageSize, search]);
+  }, [page, pageSize, search, fetchWithAuth]);
 
   const columns = [
     {

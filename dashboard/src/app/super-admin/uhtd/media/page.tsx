@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Button } from '@/components/ui/Button';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { Pagination } from '@/components/ui/Pagination';
@@ -64,6 +65,7 @@ function getFileIcon(mimeType: string): string {
 }
 
 export default function MediaLibraryPage() {
+  const fetchWithAuth = useSuperAdminFetch();
   const [files, setFiles] = useState<MediaFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -90,7 +92,7 @@ export default function MediaLibraryPage() {
       if (entityType) params.set('entityType', entityType);
       if (mimeType) params.set('mimeType', mimeType);
 
-      const response = await fetch(`/api/dashboard/super-admin/media?${params}`);
+      const response = await fetchWithAuth(`/api/dashboard/super-admin/media?${params}`);
       const data = await response.json();
 
       if (data.success) {
@@ -103,7 +105,7 @@ export default function MediaLibraryPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, entityType, mimeType]);
+  }, [page, search, entityType, mimeType, fetchWithAuth]);
 
   useEffect(() => {
     fetchFiles();
@@ -114,7 +116,7 @@ export default function MediaLibraryPage() {
 
     setDeleting(true);
     try {
-      const response = await fetch(`/api/dashboard/super-admin/media/${deleteConfirm.id}`, {
+      const response = await fetchWithAuth(`/api/dashboard/super-admin/media/${deleteConfirm.id}`, {
         method: 'DELETE',
       });
 

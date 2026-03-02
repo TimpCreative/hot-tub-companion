@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Button } from '@/components/ui/Button';
 import { Accordion } from '@/components/ui/Accordion';
 import { BulkAddTable } from '@/components/ui/BulkAddTable';
@@ -16,6 +17,7 @@ interface Brand {
 function NewModelLineForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const fetchWithAuth = useSuperAdminFetch();
   const preselectedBrandId = searchParams.get('brandId');
 
   const [loading, setLoading] = useState(false);
@@ -34,17 +36,15 @@ function NewModelLineForm() {
   useEffect(() => {
     async function fetchBrands() {
       try {
-        const res = await fetch('/api/dashboard/super-admin/scdb/brands');
+        const res = await fetchWithAuth('/api/dashboard/super-admin/scdb/brands');
         const data = await res.json();
-        if (data.success) {
-          setBrands(data.data || []);
-        }
+        if (data.success && Array.isArray(data.data)) setBrands(data.data);
       } catch (err) {
         console.error('Error fetching brands:', err);
       }
     }
     fetchBrands();
-  }, []);
+  }, [fetchWithAuth]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +52,7 @@ function NewModelLineForm() {
     setError('');
 
     try {
-      const res = await fetch('/api/dashboard/super-admin/scdb/model-lines', {
+      const res = await fetchWithAuth('/api/dashboard/super-admin/scdb/model-lines', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -85,7 +85,7 @@ function NewModelLineForm() {
       }
 
       try {
-        const res = await fetch('/api/dashboard/super-admin/scdb/model-lines', {
+        const res = await fetchWithAuth('/api/dashboard/super-admin/scdb/model-lines', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import Link from 'next/link';
 import { PartForm } from '@/components/uhtd/PartForm';
 
@@ -29,6 +30,7 @@ interface Compatibility {
 export default function EditPartPage() {
   const params = useParams();
   const router = useRouter();
+  const fetchWithAuth = useSuperAdminFetch();
   const partId = params.id as string;
 
   const [part, setPart] = useState<Part | null>(null);
@@ -41,8 +43,8 @@ export default function EditPartPage() {
     async function fetchData() {
       try {
         const [partRes, compatRes] = await Promise.all([
-          fetch(`/api/dashboard/super-admin/pcdb/parts/${partId}`),
-          fetch(`/api/dashboard/super-admin/comps/compatibility?partId=${partId}`),
+          fetchWithAuth(`/api/dashboard/super-admin/pcdb/parts/${partId}`),
+          fetchWithAuth(`/api/dashboard/super-admin/comps/compatibility?partId=${partId}`),
         ]);
 
         const partData = await partRes.json();
@@ -60,7 +62,7 @@ export default function EditPartPage() {
       }
     }
     fetchData();
-  }, [partId]);
+  }, [partId, fetchWithAuth]);
 
   const handleSubmit = async (formData: any, spaIds: string[]) => {
     setSaving(true);
@@ -68,7 +70,7 @@ export default function EditPartPage() {
 
     try {
       // Update the part
-      const partRes = await fetch(`/api/dashboard/super-admin/pcdb/parts/${partId}`, {
+      const partRes = await fetchWithAuth(`/api/dashboard/super-admin/pcdb/parts/${partId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -86,7 +88,7 @@ export default function EditPartPage() {
 
         // Add new compatibilities
         if (toAdd.length > 0) {
-          await fetch('/api/dashboard/super-admin/comps/compatibility/bulk', {
+          await fetchWithAuth('/api/dashboard/super-admin/comps/compatibility/bulk', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -99,7 +101,7 @@ export default function EditPartPage() {
 
         // Remove old compatibilities
         for (const spaModelId of toRemove) {
-          await fetch(`/api/dashboard/super-admin/comps/compatibility`, {
+          await fetchWithAuth(`/api/dashboard/super-admin/comps/compatibility`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ partId, spaModelId }),

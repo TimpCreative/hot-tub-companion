@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 
@@ -112,6 +113,7 @@ function CategoryRow({
 }
 
 export default function CategoriesPage() {
+  const fetchWithAuth = useSuperAdminFetch();
   const [categories, setCategories] = useState<Category[]>([]);
   const [flatCategories, setFlatCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,8 +132,8 @@ export default function CategoriesPage() {
   async function fetchCategories() {
     try {
       const [treeRes, flatRes] = await Promise.all([
-        fetch('/api/dashboard/super-admin/pcdb/categories?tree=true'),
-        fetch('/api/dashboard/super-admin/pcdb/categories'),
+        fetchWithAuth('/api/dashboard/super-admin/pcdb/categories?tree=true'),
+        fetchWithAuth('/api/dashboard/super-admin/pcdb/categories'),
       ]);
       const treeData = await treeRes.json();
       const flatData = await flatRes.json();
@@ -150,7 +152,7 @@ export default function CategoriesPage() {
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [fetchWithAuth]);
 
   const openCreateModal = (parentId?: string) => {
     setEditingCategory(null);
@@ -185,7 +187,7 @@ export default function CategoriesPage() {
         ? `/api/dashboard/super-admin/pcdb/categories/${editingCategory.id}`
         : '/api/dashboard/super-admin/pcdb/categories';
 
-      const res = await fetch(url, {
+      const res = await fetchWithAuth(url, {
         method: editingCategory ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -212,7 +214,7 @@ export default function CategoriesPage() {
     if (!confirm('Are you sure you want to delete this category? Subcategories will be orphaned.')) return;
 
     try {
-      const res = await fetch(`/api/dashboard/super-admin/pcdb/categories/${id}`, {
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/pcdb/categories/${id}`, {
         method: 'DELETE',
       });
       if (res.ok) {

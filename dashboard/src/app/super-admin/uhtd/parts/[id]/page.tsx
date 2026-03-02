@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Button } from '@/components/ui/Button';
 import { Badge, StatusBadge } from '@/components/ui/Badge';
 import { Table } from '@/components/ui/Table';
@@ -41,6 +42,7 @@ interface Compatibility {
 export default function PartDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const fetchWithAuth = useSuperAdminFetch();
   const partId = params.id as string;
 
   const [part, setPart] = useState<Part | null>(null);
@@ -52,8 +54,8 @@ export default function PartDetailPage() {
     async function fetchData() {
       try {
         const [partRes, compatRes] = await Promise.all([
-          fetch(`/api/dashboard/super-admin/pcdb/parts/${partId}`),
-          fetch(`/api/dashboard/super-admin/comps/compatibility?partId=${partId}`),
+          fetchWithAuth(`/api/dashboard/super-admin/pcdb/parts/${partId}`),
+          fetchWithAuth(`/api/dashboard/super-admin/comps/compatibility?partId=${partId}`),
         ]);
 
         const partData = await partRes.json();
@@ -68,7 +70,7 @@ export default function PartDetailPage() {
       }
     }
     fetchData();
-  }, [partId]);
+  }, [partId, fetchWithAuth]);
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this part? This action cannot be undone.')) {
@@ -77,7 +79,7 @@ export default function PartDetailPage() {
 
     setDeleting(true);
     try {
-      const res = await fetch(`/api/dashboard/super-admin/pcdb/parts/${partId}`, {
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/pcdb/parts/${partId}`, {
         method: 'DELETE',
       });
 
@@ -93,7 +95,7 @@ export default function PartDetailPage() {
 
   const handleStatusUpdate = async (compatId: string, newStatus: 'pending' | 'confirmed') => {
     try {
-      await fetch(`/api/dashboard/super-admin/comps/compatibility/${compatId}/status`, {
+      await fetchWithAuth(`/api/dashboard/super-admin/comps/compatibility/${compatId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),

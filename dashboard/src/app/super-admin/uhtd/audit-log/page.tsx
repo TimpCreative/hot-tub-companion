@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Table } from '@/components/ui/Table';
 import { Badge } from '@/components/ui/Badge';
 import { Pagination } from '@/components/ui/Pagination';
@@ -25,6 +26,7 @@ interface AuditStats {
 }
 
 export default function AuditLogPage() {
+  const fetchWithAuth = useSuperAdminFetch();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [stats, setStats] = useState<AuditStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,7 +42,7 @@ export default function AuditLogPage() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const res = await fetch('/api/dashboard/super-admin/audit/stats');
+        const res = await fetchWithAuth('/api/dashboard/super-admin/audit/stats');
         const data = await res.json();
         if (data.success) setStats(data.data);
       } catch (err) {
@@ -48,7 +50,7 @@ export default function AuditLogPage() {
       }
     }
     fetchStats();
-  }, []);
+  }, [fetchWithAuth]);
 
   useEffect(() => {
     async function fetchLogs() {
@@ -61,7 +63,7 @@ export default function AuditLogPage() {
         if (filters.tableName) params.append('tableName', filters.tableName);
         if (filters.action) params.append('action', filters.action);
 
-        const res = await fetch(`/api/dashboard/super-admin/audit/logs?${params}`);
+        const res = await fetchWithAuth(`/api/dashboard/super-admin/audit/logs?${params}`);
         const data = await res.json();
         if (data.success) {
           setLogs(data.data || []);
@@ -74,7 +76,7 @@ export default function AuditLogPage() {
       }
     }
     fetchLogs();
-  }, [page, pageSize, filters]);
+  }, [page, pageSize, filters, fetchWithAuth]);
 
   const actionVariant = (action: string) => {
     switch (action) {

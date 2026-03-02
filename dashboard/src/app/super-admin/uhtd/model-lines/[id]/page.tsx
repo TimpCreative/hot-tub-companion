@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Table } from '@/components/ui/Table';
@@ -30,6 +31,7 @@ interface SpaModel {
 export default function ModelLineDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const fetchWithAuth = useSuperAdminFetch();
   const [modelLine, setModelLine] = useState<ModelLine | null>(null);
   const [spaModels, setSpaModels] = useState<SpaModel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,8 +42,8 @@ export default function ModelLineDetailPage() {
       setLoading(true);
       try {
         const [modelLineRes, spasRes] = await Promise.all([
-          fetch(`/api/dashboard/super-admin/scdb/model-lines/${params.id}`),
-          fetch(`/api/dashboard/super-admin/scdb/spa-models?modelLineId=${params.id}`),
+          fetchWithAuth(`/api/dashboard/super-admin/scdb/model-lines/${params.id}`),
+          fetchWithAuth(`/api/dashboard/super-admin/scdb/spa-models?modelLineId=${params.id}`),
         ]);
 
         const modelLineData = await modelLineRes.json();
@@ -60,7 +62,7 @@ export default function ModelLineDetailPage() {
       }
     }
     fetchData();
-  }, [params.id]);
+  }, [params.id, fetchWithAuth]);
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this model line? This will also delete all spa models under it.')) {
@@ -69,7 +71,7 @@ export default function ModelLineDetailPage() {
 
     setDeleting(true);
     try {
-      const res = await fetch(`/api/dashboard/super-admin/scdb/model-lines/${params.id}`, {
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/scdb/model-lines/${params.id}`, {
         method: 'DELETE',
       });
 

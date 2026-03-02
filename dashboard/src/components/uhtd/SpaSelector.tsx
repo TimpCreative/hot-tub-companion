@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { SearchInput } from '../ui/SearchInput';
 
 interface SpaModel {
@@ -19,6 +20,7 @@ interface SpaSelectorProps {
 }
 
 export function SpaSelector({ selectedIds, onChange, brandId, modelLineId }: SpaSelectorProps) {
+  const fetchWithAuth = useSuperAdminFetch();
   const [spas, setSpas] = useState<SpaModel[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -32,7 +34,7 @@ export function SpaSelector({ selectedIds, onChange, brandId, modelLineId }: Spa
       if (modelLineId) params.append('modelLineId', modelLineId);
       if (search) params.append('search', search);
 
-      const res = await fetch(`/api/dashboard/super-admin/scdb/spa-models?${params}`);
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/scdb/spa-models?${params}`);
       const data = await res.json();
       if (data.success) {
         setSpas(data.data || []);
@@ -42,7 +44,7 @@ export function SpaSelector({ selectedIds, onChange, brandId, modelLineId }: Spa
     } finally {
       setLoading(false);
     }
-  }, [brandId, modelLineId, search]);
+  }, [brandId, modelLineId, search, fetchWithAuth]);
 
   useEffect(() => {
     fetchSpas();

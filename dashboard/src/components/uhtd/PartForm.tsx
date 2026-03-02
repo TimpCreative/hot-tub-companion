@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Button } from '../ui/Button';
 import { MediaInput } from '../ui/MediaInput';
 import { DataSourceInput } from '../ui/DataSourceInput';
@@ -48,6 +49,7 @@ export function PartForm({
   submitLabel = 'Save Part',
   loading = false,
 }: PartFormProps) {
+  const fetchWithAuth = useSuperAdminFetch();
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedSpaIds, setSelectedSpaIds] = useState<string[]>(initialSpaIds);
   const [quickviewCompId, setQuickviewCompId] = useState<string | null>(null);
@@ -74,7 +76,7 @@ export function PartForm({
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const res = await fetch('/api/dashboard/super-admin/pcdb/categories');
+        const res = await fetchWithAuth('/api/dashboard/super-admin/pcdb/categories');
         const data = await res.json();
         if (data.success) {
           setCategories(data.data || []);
@@ -84,11 +86,11 @@ export function PartForm({
       }
     }
     fetchCategories();
-  }, []);
+  }, [fetchWithAuth]);
 
   const handleCompSelect = async (compId: string) => {
     try {
-      const res = await fetch(`/api/dashboard/super-admin/comps/${compId}/spas`);
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/comps/${compId}/spas`);
       const data = await res.json();
       if (data.success && data.data) {
         const compSpaIds = data.data.map((s: { spaModelId: string }) => s.spaModelId);

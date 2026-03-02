@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 
 interface DataSourceMatch {
   value: string;
@@ -23,6 +24,7 @@ export function DataSourceInput({
   placeholder = 'e.g., Official website, spec sheet',
   required = false,
 }: DataSourceInputProps) {
+  const fetchWithAuth = useSuperAdminFetch();
   const [suggestions, setSuggestions] = useState<DataSourceMatch[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,7 +37,7 @@ export function DataSourceInput({
     setLoading(true);
     try {
       const params = search ? `?search=${encodeURIComponent(search)}` : '';
-      const response = await fetch(`/api/dashboard/super-admin/media/data-sources${params}`);
+      const response = await fetchWithAuth(`/api/dashboard/super-admin/media/data-sources${params}`);
       const data = await response.json();
 
       if (data.success) {

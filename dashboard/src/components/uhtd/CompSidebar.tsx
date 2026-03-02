@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Badge } from '../ui/Badge';
 import { CreateCompModal } from './CreateCompModal';
 
@@ -30,6 +31,7 @@ export function CompSidebar({
   onQuickview,
   onCompCreated,
 }: CompSidebarProps) {
+  const fetchWithAuth = useSuperAdminFetch();
   const [nearMatches, setNearMatches] = useState<CompMatch[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -43,7 +45,7 @@ export function CompSidebar({
     const fetchNearMatches = async () => {
       setLoading(true);
       try {
-        const res = await fetch('/api/dashboard/super-admin/comps/near-matches', {
+        const res = await fetchWithAuth('/api/dashboard/super-admin/comps/near-matches', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -64,7 +66,7 @@ export function CompSidebar({
     };
 
     fetchNearMatches();
-  }, [selectedSpaIds, categoryId]);
+  }, [selectedSpaIds, categoryId, fetchWithAuth]);
 
   const getMatchLabel = (percentage: number) => {
     if (percentage >= 1) return 'Exact match';

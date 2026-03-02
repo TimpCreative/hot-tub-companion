@@ -8,6 +8,7 @@ import { Accordion } from '@/components/ui/Accordion';
 import { BulkAddTable } from '@/components/ui/BulkAddTable';
 import { MediaInput } from '@/components/ui/MediaInput';
 import { DataSourceInput } from '@/components/ui/DataSourceInput';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { QuickCreateBrandModal } from '@/components/uhtd/QuickCreateBrandModal';
 import { QuickCreateModelLineModal } from '@/components/uhtd/QuickCreateModelLineModal';
 import { ElectricalConfigInput, ElectricalConfig } from '@/components/uhtd/ElectricalConfigInput';
@@ -26,6 +27,7 @@ interface ModelLine {
 function NewSpaForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const fetchWithAuth = useSuperAdminFetch();
   const preselectedModelLineId = searchParams.get('modelLineId');
 
   const [loading, setLoading] = useState(false);
@@ -64,30 +66,21 @@ function NewSpaForm() {
   });
 
   useEffect(() => {
-    async function fetchBrands() {
+    async function load() {
       try {
-        const res = await fetch('/api/dashboard/super-admin/scdb/brands');
-        const data = await res.json();
-        if (data.success) setBrands(data.data || []);
+        const [brandsRes, modelLinesRes] = await Promise.all([
+          fetchWithAuth('/api/dashboard/super-admin/scdb/brands'),
+          fetchWithAuth('/api/dashboard/super-admin/scdb/model-lines'),
+        ]);
+        const [brandsData, mlData] = await Promise.all([brandsRes.json(), modelLinesRes.json()]);
+        if (brandsData.success) setBrands(brandsData.data || []);
+        if (mlData.success) setModelLines(mlData.data || []);
       } catch (err) {
-        console.error('Error fetching brands:', err);
+        console.error('Error fetching brands/model lines:', err);
       }
     }
-    fetchBrands();
-  }, []);
-
-  useEffect(() => {
-    async function fetchModelLines() {
-      try {
-        const res = await fetch('/api/dashboard/super-admin/scdb/model-lines');
-        const data = await res.json();
-        if (data.success) setModelLines(data.data || []);
-      } catch (err) {
-        console.error('Error fetching model lines:', err);
-      }
-    }
-    fetchModelLines();
-  }, []);
+    load();
+  }, [fetchWithAuth]);
 
   useEffect(() => {
     if (formData.brandId) {
@@ -157,7 +150,7 @@ function NewSpaForm() {
       let createdSpas: { id: string }[] = [];
 
       if (formData.selectedYears.length === 1) {
-        const res = await fetch('/api/dashboard/super-admin/scdb/spa-models', {
+        const res = await fetchWithAuth('/api/dashboard/super-admin/scdb/spa-models', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...basePayload, year: formData.selectedYears[0] }),
@@ -168,14 +161,14 @@ function NewSpaForm() {
         createdSpas = [{ id: data.data.id }];
 
         if (electricalPayload) {
-          await fetch(`/api/dashboard/super-admin/scdb/spa-models/${data.data.id}/electrical`, {
+          await fetchWithAuth(`/api/dashboard/super-admin/scdb/spa-models/${data.data.id}/electrical`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(electricalPayload),
           });
         }
       } else {
-        const res = await fetch('/api/dashboard/super-admin/scdb/spa-models/bulk', {
+        const res = await fetchWithAuth('/api/dashboard/super-admin/scdb/spa-models/bulk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...basePayload, years: formData.selectedYears }),
@@ -187,7 +180,7 @@ function NewSpaForm() {
 
         if (electricalPayload && createdSpas.length > 0) {
           for (const spa of createdSpas) {
-            await fetch(`/api/dashboard/super-admin/scdb/spa-models/${spa.id}/electrical`, {
+            await fetchWithAuth(`/api/dashboard/super-admin/scdb/spa-models/${spa.id}/electrical`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(electricalPayload),
@@ -228,7 +221,7 @@ function NewSpaForm() {
       }
 
       try {
-        const res = await fetch('/api/dashboard/super-admin/scdb/spa-models', {
+        const res = await fetchWithAuth('/api/dashboard/super-admin/scdb/spa-models', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 
@@ -11,6 +12,7 @@ interface QuickCreateBrandModalProps {
 }
 
 export function QuickCreateBrandModal({ isOpen, onClose, onCreated }: QuickCreateBrandModalProps) {
+  const fetchWithAuth = useSuperAdminFetch();
   const [name, setName] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,7 +24,7 @@ export function QuickCreateBrandModal({ isOpen, onClose, onCreated }: QuickCreat
     setError('');
 
     try {
-      const res = await fetch('/api/dashboard/super-admin/scdb/brands', {
+      const res = await fetchWithAuth('/api/dashboard/super-admin/scdb/brands', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

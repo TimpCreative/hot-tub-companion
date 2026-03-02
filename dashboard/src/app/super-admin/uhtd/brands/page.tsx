@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Table } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { SearchInput } from '@/components/ui/SearchInput';
@@ -22,7 +22,7 @@ interface Brand {
 
 export default function BrandsListPage() {
   const router = useRouter();
-  const { user, getIdToken } = useAuth();
+  const fetchWithAuth = useSuperAdminFetch();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -33,25 +33,15 @@ export default function BrandsListPage() {
   const [showMergeModal, setShowMergeModal] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
     async function fetchBrands() {
       setLoading(true);
       try {
-        const token = await getIdToken();
-        if (!token) {
-          setLoading(false);
-          return;
-        }
         const params = new URLSearchParams({
           page: String(page),
           pageSize: String(pageSize),
         });
         if (search) params.append('search', search);
-
-        const res = await fetch(`/api/dashboard/super-admin/scdb/brands?${params}`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-          cache: 'no-store',
-        });
+        const res = await fetchWithAuth(`/api/dashboard/super-admin/scdb/brands?${params}`);
         const data = await res.json();
         if (data.success) {
           setBrands(Array.isArray(data.data) ? data.data : []);
@@ -64,7 +54,7 @@ export default function BrandsListPage() {
       }
     }
     fetchBrands();
-  }, [user, page, pageSize, search, getIdToken]);
+  }, [page, pageSize, search, fetchWithAuth]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { useRouter } from 'next/navigation';
 import { SearchInput } from '@/components/ui/SearchInput';
 
@@ -35,6 +36,7 @@ interface SearchResult {
 
 export default function UhtdOverviewPage() {
   const router = useRouter();
+  const fetchWithAuth = useSuperAdminFetch();
   const [stats, setStats] = useState<UhtdStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -44,7 +46,7 @@ export default function UhtdOverviewPage() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const res = await fetch('/api/dashboard/super-admin/stats/uhtd');
+        const res = await fetchWithAuth('/api/dashboard/super-admin/stats/uhtd');
         const data = await res.json();
         if (data.success) {
           setStats(data.data);
@@ -56,7 +58,7 @@ export default function UhtdOverviewPage() {
       }
     }
     fetchStats();
-  }, []);
+  }, [fetchWithAuth]);
 
   const handleSearch = useCallback(async (term: string) => {
     if (term.length < 2) {
@@ -66,7 +68,7 @@ export default function UhtdOverviewPage() {
 
     setSearching(true);
     try {
-      const res = await fetch(`/api/dashboard/super-admin/stats/search?q=${encodeURIComponent(term)}`);
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/stats/search?q=${encodeURIComponent(term)}`);
       const data = await res.json();
       if (data.success) {
         setSearchResults([
@@ -81,7 +83,7 @@ export default function UhtdOverviewPage() {
     } finally {
       setSearching(false);
     }
-  }, []);
+  }, [fetchWithAuth]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Table } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
@@ -18,6 +19,7 @@ interface Qualifier {
 }
 
 export default function QualifiersPage() {
+  const fetchWithAuth = useSuperAdminFetch();
   const [qualifiers, setQualifiers] = useState<Qualifier[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -36,7 +38,7 @@ export default function QualifiersPage() {
 
   async function fetchQualifiers() {
     try {
-      const res = await fetch('/api/dashboard/super-admin/qdb/qualifiers');
+      const res = await fetchWithAuth('/api/dashboard/super-admin/qdb/qualifiers');
       const data = await res.json();
       if (data.success) {
         setQualifiers(data.data || []);
@@ -50,7 +52,7 @@ export default function QualifiersPage() {
 
   useEffect(() => {
     fetchQualifiers();
-  }, []);
+  }, [fetchWithAuth]);
 
   const openCreateModal = () => {
     setEditingQualifier(null);
@@ -102,7 +104,7 @@ export default function QualifiersPage() {
         ? `/api/dashboard/super-admin/qdb/qualifiers/${editingQualifier.id}`
         : '/api/dashboard/super-admin/qdb/qualifiers';
 
-      const res = await fetch(url, {
+      const res = await fetchWithAuth(url, {
         method: editingQualifier ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -128,7 +130,7 @@ export default function QualifiersPage() {
     if (!confirm('Are you sure you want to delete this qualifier?')) return;
 
     try {
-      const res = await fetch(`/api/dashboard/super-admin/qdb/qualifiers/${id}`, {
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/qdb/qualifiers/${id}`, {
         method: 'DELETE',
       });
       if (res.ok) {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import Link from 'next/link';
 import { PartForm } from '@/components/uhtd/PartForm';
 import { Accordion } from '@/components/ui/Accordion';
@@ -15,6 +16,7 @@ interface Category {
 
 export default function NewPartPage() {
   const router = useRouter();
+  const fetchWithAuth = useSuperAdminFetch();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
@@ -22,7 +24,7 @@ export default function NewPartPage() {
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const res = await fetch('/api/dashboard/super-admin/pcdb/categories');
+        const res = await fetchWithAuth('/api/dashboard/super-admin/pcdb/categories');
         const data = await res.json();
         if (data.success) setCategories(data.data || []);
       } catch (err) {
@@ -30,14 +32,14 @@ export default function NewPartPage() {
       }
     }
     fetchCategories();
-  }, []);
+  }, [fetchWithAuth]);
 
   const handleSubmit = async (formData: any, spaIds: string[]) => {
     setLoading(true);
     setError('');
 
     try {
-      const partRes = await fetch('/api/dashboard/super-admin/pcdb/parts', {
+      const partRes = await fetchWithAuth('/api/dashboard/super-admin/pcdb/parts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -52,7 +54,7 @@ export default function NewPartPage() {
       const partId = partData.data.id;
 
       if (spaIds.length > 0 && !formData.isUniversal) {
-        await fetch('/api/dashboard/super-admin/comps/compatibility/bulk', {
+        await fetchWithAuth('/api/dashboard/super-admin/comps/compatibility/bulk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -84,7 +86,7 @@ export default function NewPartPage() {
       }
 
       try {
-        const res = await fetch('/api/dashboard/super-admin/pcdb/parts', {
+        const res = await fetchWithAuth('/api/dashboard/super-admin/pcdb/parts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

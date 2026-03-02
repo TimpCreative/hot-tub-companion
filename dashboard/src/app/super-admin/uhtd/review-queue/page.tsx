@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Button } from '@/components/ui/Button';
 import { Table } from '@/components/ui/Table';
 import { Pagination } from '@/components/ui/Pagination';
@@ -60,6 +61,7 @@ function PlaceholderTab({ entityType }: { entityType: string }) {
 }
 
 export default function ReviewQueuePage() {
+  const fetchWithAuth = useSuperAdminFetch();
   const [activeTab, setActiveTab] = useState<TabType>('compatibility');
   const [items, setItems] = useState<PendingCompatibility[]>([]);
   const [stats, setStats] = useState<ReviewStats | null>(null);
@@ -84,8 +86,8 @@ export default function ReviewQueuePage() {
       });
 
       const [itemsRes, statsRes] = await Promise.all([
-        fetch(`/api/dashboard/super-admin/audit/review/pending?${params}`),
-        fetch('/api/dashboard/super-admin/audit/review/stats'),
+        fetchWithAuth(`/api/dashboard/super-admin/audit/review/pending?${params}`),
+        fetchWithAuth('/api/dashboard/super-admin/audit/review/stats'),
       ]);
 
       const itemsData = await itemsRes.json();
@@ -105,7 +107,7 @@ export default function ReviewQueuePage() {
 
   useEffect(() => {
     fetchData();
-  }, [page, pageSize, activeTab]);
+  }, [page, pageSize, activeTab, fetchWithAuth]);
 
   useEffect(() => {
     setSelectedIds([]);
@@ -124,7 +126,7 @@ export default function ReviewQueuePage() {
     if (selectedIds.length === 0) return;
     setProcessing(true);
     try {
-      await fetch('/api/dashboard/super-admin/audit/review/confirm', {
+      await fetchWithAuth('/api/dashboard/super-admin/audit/review/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: selectedIds }),
@@ -144,7 +146,7 @@ export default function ReviewQueuePage() {
 
     setProcessing(true);
     try {
-      await fetch('/api/dashboard/super-admin/audit/review/reject', {
+      await fetchWithAuth('/api/dashboard/super-admin/audit/review/reject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: selectedIds }),

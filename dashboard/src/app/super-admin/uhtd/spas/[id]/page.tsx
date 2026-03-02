@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Table } from '@/components/ui/Table';
@@ -60,6 +61,7 @@ interface ElectricalConfig {
 export default function SpaDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const fetchWithAuth = useSuperAdminFetch();
   const spaId = params.id as string;
 
   const [spa, setSpa] = useState<SpaModel | null>(null);
@@ -73,9 +75,9 @@ export default function SpaDetailPage() {
       setLoading(true);
       try {
         const [spaRes, partsRes, electricalRes] = await Promise.all([
-          fetch(`/api/dashboard/super-admin/scdb/spa-models/${spaId}`),
-          fetch(`/api/dashboard/super-admin/comps/spa/${spaId}/parts`),
-          fetch(`/api/dashboard/super-admin/scdb/spa-models/${spaId}/electrical`),
+          fetchWithAuth(`/api/dashboard/super-admin/scdb/spa-models/${spaId}`),
+          fetchWithAuth(`/api/dashboard/super-admin/comps/spa/${spaId}/parts`),
+          fetchWithAuth(`/api/dashboard/super-admin/scdb/spa-models/${spaId}/electrical`),
         ]);
 
         const spaData = await spaRes.json();
@@ -93,7 +95,7 @@ export default function SpaDetailPage() {
     }
 
     if (spaId) fetchData();
-  }, [spaId]);
+  }, [spaId, fetchWithAuth]);
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this spa model? This cannot be undone.')) {
@@ -102,7 +104,7 @@ export default function SpaDetailPage() {
 
     setDeleting(true);
     try {
-      const res = await fetch(`/api/dashboard/super-admin/scdb/spa-models/${spaId}`, {
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/scdb/spa-models/${spaId}`, {
         method: 'DELETE',
       });
       const data = await res.json();

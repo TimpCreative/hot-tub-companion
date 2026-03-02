@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Modal } from '../ui/Modal';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -21,6 +22,7 @@ interface CompQuickviewProps {
 }
 
 export function CompQuickview({ compId, isOpen, onClose, onSelectAll }: CompQuickviewProps) {
+  const fetchWithAuth = useSuperAdminFetch();
   const [comp, setComp] = useState<{
     id: string;
     name: string | null;
@@ -38,8 +40,8 @@ export function CompQuickview({ compId, isOpen, onClose, onSelectAll }: CompQuic
       setLoading(true);
       try {
         const [compRes, spasRes] = await Promise.all([
-          fetch(`/api/dashboard/super-admin/comps/${compId}`),
-          fetch(`/api/dashboard/super-admin/comps/${compId}/spas`),
+          fetchWithAuth(`/api/dashboard/super-admin/comps/${compId}`),
+          fetchWithAuth(`/api/dashboard/super-admin/comps/${compId}/spas`),
         ]);
 
         const compData = await compRes.json();
@@ -59,7 +61,7 @@ export function CompQuickview({ compId, isOpen, onClose, onSelectAll }: CompQuic
     };
 
     fetchCompDetails();
-  }, [compId, isOpen]);
+  }, [compId, isOpen, fetchWithAuth]);
 
   const handleSelectAll = () => {
     if (onSelectAll && spas.length > 0) {

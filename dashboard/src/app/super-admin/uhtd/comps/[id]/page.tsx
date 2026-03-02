@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Button } from '@/components/ui/Button';
 import { Table } from '@/components/ui/Table';
 import { Badge, StatusBadge } from '@/components/ui/Badge';
@@ -40,6 +41,7 @@ interface ComputedPart {
 export default function CompDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const fetchWithAuth = useSuperAdminFetch();
   const compId = decodeURIComponent(params.id as string);
 
   const [comp, setComp] = useState<Comp | null>(null);
@@ -53,9 +55,9 @@ export default function CompDetailPage() {
     async function fetchData() {
       try {
         const [compRes, spasRes, partsRes] = await Promise.all([
-          fetch(`/api/dashboard/super-admin/comps/${encodeURIComponent(compId)}`),
-          fetch(`/api/dashboard/super-admin/comps/${encodeURIComponent(compId)}/spas`),
-          fetch(`/api/dashboard/super-admin/comps/${encodeURIComponent(compId)}/parts`),
+          fetchWithAuth(`/api/dashboard/super-admin/comps/${encodeURIComponent(compId)}`),
+          fetchWithAuth(`/api/dashboard/super-admin/comps/${encodeURIComponent(compId)}/spas`),
+          fetchWithAuth(`/api/dashboard/super-admin/comps/${encodeURIComponent(compId)}/parts`),
         ]);
 
         const compData = await compRes.json();
@@ -72,7 +74,7 @@ export default function CompDetailPage() {
       }
     }
     fetchData();
-  }, [compId]);
+  }, [compId, fetchWithAuth]);
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this compatibility group? This will NOT delete the associated parts or spas.')) {
@@ -81,7 +83,7 @@ export default function CompDetailPage() {
 
     setDeleting(true);
     try {
-      const res = await fetch(`/api/dashboard/super-admin/comps/${encodeURIComponent(compId)}`, {
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/comps/${encodeURIComponent(compId)}`, {
         method: 'DELETE',
       });
 
@@ -97,7 +99,7 @@ export default function CompDetailPage() {
 
   const handleRemoveSpa = async (spaModelId: string) => {
     try {
-      await fetch(`/api/dashboard/super-admin/comps/${encodeURIComponent(compId)}/spas/${spaModelId}`, {
+      await fetchWithAuth(`/api/dashboard/super-admin/comps/${encodeURIComponent(compId)}/spas/${spaModelId}`, {
         method: 'DELETE',
       });
       setSpas((prev) => prev.filter((s) => s.spaModelId !== spaModelId));

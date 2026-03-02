@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { QuickCreateBrandModal } from './QuickCreateBrandModal';
@@ -23,6 +24,7 @@ export function QuickCreateModelLineModal({
   onCreated,
   preSelectedBrandId,
 }: QuickCreateModelLineModalProps) {
+  const fetchWithAuth = useSuperAdminFetch();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [brandId, setBrandId] = useState(preSelectedBrandId || '');
   const [name, setName] = useState('');
@@ -34,7 +36,7 @@ export function QuickCreateModelLineModal({
   useEffect(() => {
     async function fetchBrands() {
       try {
-        const res = await fetch('/api/dashboard/super-admin/scdb/brands');
+        const res = await fetchWithAuth('/api/dashboard/super-admin/scdb/brands');
         const data = await res.json();
         if (data.success) setBrands(data.data || []);
       } catch (err) {
@@ -44,7 +46,7 @@ export function QuickCreateModelLineModal({
     if (isOpen) {
       fetchBrands();
     }
-  }, [isOpen]);
+  }, [isOpen, fetchWithAuth]);
 
   useEffect(() => {
     if (preSelectedBrandId) {
@@ -58,7 +60,7 @@ export function QuickCreateModelLineModal({
     setError('');
 
     try {
-      const res = await fetch('/api/dashboard/super-admin/scdb/model-lines', {
+      const res = await fetchWithAuth('/api/dashboard/super-admin/scdb/model-lines', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

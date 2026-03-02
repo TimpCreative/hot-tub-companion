@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 
@@ -17,6 +18,7 @@ interface Brand {
 export default function EditBrandPage() {
   const params = useParams();
   const router = useRouter();
+  const fetchWithAuth = useSuperAdminFetch();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -32,7 +34,7 @@ export default function EditBrandPage() {
   useEffect(() => {
     async function fetchBrand() {
       try {
-        const res = await fetch(`/api/dashboard/super-admin/scdb/brands/${params.id}`);
+        const res = await fetchWithAuth(`/api/dashboard/super-admin/scdb/brands/${params.id}`);
         const data = await res.json();
 
         if (data.success && data.data) {
@@ -52,7 +54,7 @@ export default function EditBrandPage() {
       }
     }
     fetchBrand();
-  }, [params.id]);
+  }, [params.id, fetchWithAuth]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +62,7 @@ export default function EditBrandPage() {
     setError('');
 
     try {
-      const res = await fetch(`/api/dashboard/super-admin/scdb/brands/${params.id}`, {
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/scdb/brands/${params.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

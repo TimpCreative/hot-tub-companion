@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { SpaSelector } from '@/components/uhtd/SpaSelector';
 
 interface Category {
@@ -14,6 +15,7 @@ interface Category {
 
 export default function NewCompPage() {
   const router = useRouter();
+  const fetchWithAuth = useSuperAdminFetch();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [generatedId, setGeneratedId] = useState('');
@@ -31,7 +33,7 @@ export default function NewCompPage() {
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const res = await fetch('/api/dashboard/super-admin/pcdb/categories');
+        const res = await fetchWithAuth('/api/dashboard/super-admin/pcdb/categories');
         const data = await res.json();
         if (data.success) setCategories(data.data || []);
       } catch (err) {
@@ -39,7 +41,7 @@ export default function NewCompPage() {
       }
     }
     fetchCategories();
-  }, []);
+  }, [fetchWithAuth]);
 
   const generateCompId = async () => {
     if (!formData.brandCode || !formData.categoryCode) {
@@ -48,7 +50,7 @@ export default function NewCompPage() {
     }
 
     try {
-      const res = await fetch(
+      const res = await fetchWithAuth(
         `/api/dashboard/super-admin/comps/generate-id?brandCode=${formData.brandCode}&categoryCode=${formData.categoryCode}`
       );
       const data = await res.json();
@@ -75,7 +77,7 @@ export default function NewCompPage() {
 
     try {
       // Create the comp
-      const compRes = await fetch('/api/dashboard/super-admin/comps', {
+      const compRes = await fetchWithAuth('/api/dashboard/super-admin/comps', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -92,7 +94,7 @@ export default function NewCompPage() {
 
       // Add spas to the comp if selected
       if (selectedSpaIds.length > 0) {
-        await fetch(`/api/dashboard/super-admin/comps/${encodeURIComponent(formData.id)}/spas`, {
+        await fetchWithAuth(`/api/dashboard/super-admin/comps/${encodeURIComponent(formData.id)}/spas`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ spaModelIds: selectedSpaIds }),

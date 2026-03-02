@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 
@@ -43,6 +44,7 @@ const affectedLabels: Record<string, string> = {
 };
 
 export function MergeModal({ isOpen, onClose, entityType, selectedItems, onMergeComplete }: MergeModalProps) {
+  const fetchWithAuth = useSuperAdminFetch();
   const [targetId, setTargetId] = useState<string>('');
   const [preview, setPreview] = useState<MergePreview | null>(null);
   const [loading, setLoading] = useState(false);
@@ -72,7 +74,7 @@ export function MergeModal({ isOpen, onClose, entityType, selectedItems, onMerge
     const sourceIds = selectedItems.filter(item => item.id !== targetId).map(item => item.id);
 
     try {
-      const res = await fetch(`/api/dashboard/super-admin/merge/${entityType}s/preview`, {
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/merge/${entityType}s/preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetId, sourceIds }),
@@ -98,7 +100,7 @@ export function MergeModal({ isOpen, onClose, entityType, selectedItems, onMerge
     const sourceIds = selectedItems.filter(item => item.id !== targetId).map(item => item.id);
 
     try {
-      const res = await fetch(`/api/dashboard/super-admin/merge/${entityType}s`, {
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/merge/${entityType}s`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetId, sourceIds }),

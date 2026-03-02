@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 
@@ -19,6 +20,7 @@ interface ImportResult {
 }
 
 export default function ImportPage() {
+  const fetchWithAuth = useSuperAdminFetch();
   const [importType, setImportType] = useState<ImportType>('brands');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -91,7 +93,7 @@ export default function ImportPage() {
       const parsed = parseCSV(text);
       const rows = csvToRows(parsed);
 
-      const res = await fetch(`/api/dashboard/super-admin/import/${importType}`, {
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/import/${importType}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows, autoCreate }),
