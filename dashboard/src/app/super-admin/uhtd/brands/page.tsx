@@ -22,7 +22,7 @@ interface Brand {
 
 export default function BrandsListPage() {
   const router = useRouter();
-  const { getIdToken } = useAuth();
+  const { user, getIdToken } = useAuth();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -33,11 +33,15 @@ export default function BrandsListPage() {
   const [showMergeModal, setShowMergeModal] = useState(false);
 
   useEffect(() => {
+    if (!user) return;
     async function fetchBrands() {
       setLoading(true);
       try {
         const token = await getIdToken();
-        if (!token) return;
+        if (!token) {
+          setLoading(false);
+          return;
+        }
         const params = new URLSearchParams({
           page: String(page),
           pageSize: String(pageSize),
@@ -46,11 +50,12 @@ export default function BrandsListPage() {
 
         const res = await fetch(`/api/dashboard/super-admin/scdb/brands?${params}`, {
           headers: { 'Authorization': `Bearer ${token}` },
+          cache: 'no-store',
         });
         const data = await res.json();
         if (data.success) {
-          setBrands(data.data || []);
-          setTotal(data.pagination?.total || 0);
+          setBrands(Array.isArray(data.data) ? data.data : []);
+          setTotal(data.pagination?.total ?? 0);
         }
       } catch (err) {
         console.error('Error fetching brands:', err);
@@ -59,7 +64,7 @@ export default function BrandsListPage() {
       }
     }
     fetchBrands();
-  }, [page, pageSize, search, getIdToken]);
+  }, [user, page, pageSize, search, getIdToken]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => 
