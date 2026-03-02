@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Accordion } from '@/components/ui/Accordion';
 import { BulkAddTable } from '@/components/ui/BulkAddTable';
 
 export default function NewBrandPage() {
   const router = useRouter();
+  const { getIdToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -26,9 +28,14 @@ export default function NewBrandPage() {
     setError('');
 
     try {
+      const token = await getIdToken();
+      if (!token) throw new Error('Not authenticated');
       const res = await fetch('/api/dashboard/super-admin/scdb/brands', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify(formData),
       });
 
@@ -47,6 +54,8 @@ export default function NewBrandPage() {
   };
 
   const handleBulkAdd = async (rows: Record<string, any>[]) => {
+    const token = await getIdToken();
+    if (!token) return { success: 0, failed: rows.length, errors: ['Not authenticated'] };
     let success = 0;
     let failed = 0;
     const errors: string[] = [];
@@ -55,7 +64,10 @@ export default function NewBrandPage() {
       try {
         const res = await fetch('/api/dashboard/super-admin/scdb/brands', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
           body: JSON.stringify({
             name: row.name,
             logoUrl: row.logoUrl || null,
