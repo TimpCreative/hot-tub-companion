@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import { Table } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { SearchInput } from '@/components/ui/SearchInput';
@@ -21,6 +22,7 @@ interface Brand {
 
 export default function BrandsListPage() {
   const router = useRouter();
+  const { getIdToken } = useAuth();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -34,13 +36,17 @@ export default function BrandsListPage() {
     async function fetchBrands() {
       setLoading(true);
       try {
+        const token = await getIdToken();
+        if (!token) return;
         const params = new URLSearchParams({
           page: String(page),
           pageSize: String(pageSize),
         });
         if (search) params.append('search', search);
 
-        const res = await fetch(`/api/dashboard/super-admin/scdb/brands?${params}`);
+        const res = await fetch(`/api/dashboard/super-admin/scdb/brands?${params}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
         const data = await res.json();
         if (data.success) {
           setBrands(data.data || []);
@@ -53,7 +59,7 @@ export default function BrandsListPage() {
       }
     }
     fetchBrands();
-  }, [page, pageSize, search]);
+  }, [page, pageSize, search, getIdToken]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => 

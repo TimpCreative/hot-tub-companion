@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Table } from '@/components/ui/Table';
@@ -28,6 +29,7 @@ interface ModelLine {
 export default function BrandDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { getIdToken } = useAuth();
   const [brand, setBrand] = useState<Brand | null>(null);
   const [modelLines, setModelLines] = useState<ModelLine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,9 +39,12 @@ export default function BrandDetailPage() {
     async function fetchData() {
       setLoading(true);
       try {
+        const token = await getIdToken();
+        if (!token) return;
+        const headers = { 'Authorization': `Bearer ${token}` };
         const [brandRes, modelLinesRes] = await Promise.all([
-          fetch(`/api/dashboard/super-admin/scdb/brands/${params.id}`),
-          fetch(`/api/dashboard/super-admin/scdb/model-lines?brandId=${params.id}`),
+          fetch(`/api/dashboard/super-admin/scdb/brands/${params.id}`, { headers }),
+          fetch(`/api/dashboard/super-admin/scdb/model-lines?brandId=${params.id}`, { headers }),
         ]);
 
         const brandData = await brandRes.json();
@@ -58,7 +63,7 @@ export default function BrandDetailPage() {
       }
     }
     fetchData();
-  }, [params.id]);
+  }, [params.id, getIdToken]);
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this brand? This will also delete all model lines and spa models under it.')) {
@@ -67,8 +72,11 @@ export default function BrandDetailPage() {
 
     setDeleting(true);
     try {
+      const token = await getIdToken();
+      if (!token) return;
       const res = await fetch(`/api/dashboard/super-admin/scdb/brands/${params.id}`, {
         method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
       });
 
       if (res.ok) {
