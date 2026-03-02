@@ -43,6 +43,7 @@ adminRoutes.get('/model-lines/:modelLineId/names/:modelName/years', scdbControll
 // Spa Models
 adminRoutes.get('/spa-models', scdbController.listSpaModels);
 adminRoutes.get('/spa-models/search', scdbController.searchSpaModels);
+adminRoutes.post('/spa-models/bulk', scdbController.createSpaModelsBulk);
 adminRoutes.get('/spa-models/:id', scdbController.getSpaModel);
 adminRoutes.post('/spa-models', scdbController.createSpaModel);
 adminRoutes.put('/spa-models/:id', scdbController.updateSpaModel);

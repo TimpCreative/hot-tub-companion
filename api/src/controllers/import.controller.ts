@@ -69,34 +69,41 @@ interface PartImportRow {
 }
 
 /**
- * Parse year range string into array of individual years
- * Supports: "2024", "2020-2024", "2020, 2022, 2024", "2020-2022, 2024"
+ * Parse year range string into array of individual years.
+ * Supports flexible formats:
+ * - "2024" (single year)
+ * - "2020-2024", "2020 - 2024" (range, spaces optional)
+ * - "2020, 2022, 2024" (comma-separated)
+ * - "2002-2007, 2009, 2011- 2015" (mix of ranges and singles, spaces flexible)
  */
 function parseYearRange(yearStr: string): number[] {
   if (!yearStr || !yearStr.trim()) return [];
-  
+
   const years: number[] = [];
-  const parts = yearStr.split(',').map(s => s.trim()).filter(Boolean);
-  
+  const parts = yearStr.split(',').map((s) => s.trim()).filter(Boolean);
+
   for (const part of parts) {
-    if (part.includes('-')) {
-      const [startStr, endStr] = part.split('-').map(s => s.trim());
+    const trimmed = part.trim();
+    const hyphenIdx = trimmed.indexOf('-');
+    if (hyphenIdx >= 0) {
+      const startStr = trimmed.slice(0, hyphenIdx).trim();
+      const endStr = trimmed.slice(hyphenIdx + 1).trim();
       const start = parseInt(startStr, 10);
       const end = parseInt(endStr, 10);
-      
+
       if (!isNaN(start) && !isNaN(end) && start <= end) {
         for (let y = start; y <= end; y++) {
           if (!years.includes(y)) years.push(y);
         }
       }
     } else {
-      const year = parseInt(part, 10);
+      const year = parseInt(trimmed, 10);
       if (!isNaN(year) && !years.includes(year)) {
         years.push(year);
       }
     }
   }
-  
+
   return years.sort((a, b) => a - b);
 }
 

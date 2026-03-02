@@ -415,6 +415,30 @@ export async function createSpaModel(
   return (await getSpaModelById(row.id))!;
 }
 
+export async function createSpaModelsForYears(
+  baseInput: Omit<CreateSpaModelInput, 'year'>,
+  years: number[],
+  userId?: string
+): Promise<{ created: ScdbSpaModel[]; skipped: { year: number; reason: string }[] }> {
+  const created: ScdbSpaModel[] = [];
+  const skipped: { year: number; reason: string }[] = [];
+
+  for (const year of years) {
+    try {
+      const spaModel = await createSpaModel({ ...baseInput, year }, userId);
+      created.push(spaModel);
+    } catch (err: any) {
+      if (err.code === '23505') {
+        skipped.push({ year, reason: 'Already exists' });
+      } else {
+        skipped.push({ year, reason: err.message || 'Unknown error' });
+      }
+    }
+  }
+
+  return { created, skipped };
+}
+
 export async function updateSpaModel(
   id: string,
   input: UpdateSpaModelInput,

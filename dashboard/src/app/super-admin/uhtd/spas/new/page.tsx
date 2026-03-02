@@ -41,7 +41,7 @@ function NewSpaForm() {
     brandId: '',
     modelLineId: preselectedModelLineId || '',
     name: '',
-    year: new Date().getFullYear(),
+    selectedYears: [] as number[],
     manufacturerSku: '',
     seatingCapacity: '',
     jetCount: '',
@@ -108,15 +108,20 @@ function NewSpaForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (formData.selectedYears.length === 0) {
+      setError('Please select at least one year');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      const payload = {
+      const basePayload = {
         brandId: formData.brandId,
         modelLineId: formData.modelLineId,
         name: formData.name,
-        year: formData.year,
         manufacturerSku: formData.manufacturerSku || null,
         seatingCapacity: formData.seatingCapacity ? parseInt(formData.seatingCapacity) : null,
         jetCount: formData.jetCount ? parseInt(formData.jetCount) : null,
@@ -138,43 +143,66 @@ function NewSpaForm() {
         dataSource: formData.dataSource || null,
       };
 
-      const res = await fetch('/api/dashboard/super-admin/scdb/spa-models', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const validConfigs = electricalConfigs.filter(c => c.voltage && c.amperage);
+      const electricalPayload = validConfigs.length > 0 ? {
+        configs: validConfigs.map((c, i) => ({
+          voltage: c.voltage,
+          voltageUnit: c.voltageUnit,
+          frequencyHz: c.frequencyHz || null,
+          amperage: c.amperage,
+          sortOrder: i,
+        })),
+      } : null;
 
-      const data = await res.json();
+      let createdSpas: { id: string }[] = [];
 
-      if (!res.ok) {
-        throw new Error(data.error?.message || 'Failed to create spa model');
-      }
+      if (formData.selectedYears.length === 1) {
+        const res = await fetch('/api/dashboard/super-admin/scdb/spa-models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...basePayload, year: formData.selectedYears[0] }),
+        });
 
-      const spaId = data.data.id;
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || 'Failed to create spa model');
+        createdSpas = [{ id: data.data.id }];
 
-      // Save electrical configs if any
-      if (electricalConfigs.length > 0) {
-        const validConfigs = electricalConfigs.filter(c => c.voltage && c.amperage);
-        if (validConfigs.length > 0) {
-          await fetch(`/api/dashboard/super-admin/scdb/spa-models/${spaId}/electrical`, {
+        if (electricalPayload) {
+          await fetch(`/api/dashboard/super-admin/scdb/spa-models/${data.data.id}/electrical`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              configs: validConfigs.map((c, i) => ({
-                voltage: c.voltage,
-                voltageUnit: c.voltageUnit,
-                frequencyHz: c.frequencyHz || null,
-                amperage: c.amperage,
-                sortOrder: i,
-              })),
-            }),
+            body: JSON.stringify(electricalPayload),
           });
+        }
+      } else {
+        const res = await fetch('/api/dashboard/super-admin/scdb/spa-models/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...basePayload, years: formData.selectedYears }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || 'Failed to create spa models');
+        createdSpas = data.data?.created || [];
+
+        if (electricalPayload && createdSpas.length > 0) {
+          for (const spa of createdSpas) {
+            await fetch(`/api/dashboard/super-admin/scdb/spa-models/${spa.id}/electrical`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(electricalPayload),
+            });
+          }
         }
       }
 
-      router.push(`/super-admin/uhtd/spas/${spaId}`);
-    } catch (err: any) {
-      setError(err.message);
+      if (createdSpas.length > 0) {
+        router.push(`/super-admin/uhtd/spas/${createdSpas[0].id}`);
+      } else {
+        setError('No spas were created (all years may already exist)');
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create spa(s)');
     } finally {
       setLoading(false);
     }
@@ -248,6 +276,25 @@ function NewSpaForm() {
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 50 }, (_, i) => currentYear - i + 2);
+
+  const toggleYear = (year: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      selectedYears: prev.selectedYears.includes(year)
+        ? prev.selectedYears.filter((y) => y !== year)
+        : [...prev.selectedYears, year].sort((a, b) => a - b),
+    }));
+  };
+
+  const selectYearRange = (start: number, end: number) => {
+    const range = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+    setFormData((prev) => ({
+      ...prev,
+      selectedYears: [...new Set([...prev.selectedYears, ...range])].sort((a, b) => a - b),
+    }));
+  };
+
+  const clearYears = () => setFormData((prev) => ({ ...prev, selectedYears: [] }));
 
   const bulkColumns = [
     // Identity
@@ -387,7 +434,7 @@ function NewSpaForm() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Model Name <span className="text-red-500">*</span>
@@ -403,24 +450,6 @@ function NewSpaForm() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Model Year <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formData.year}
-                    onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    {years.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer #</label>
                   <input
                     type="text"
@@ -431,6 +460,64 @@ function NewSpaForm() {
                   />
                 </div>
               </div>
+
+              <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Model Year(s) <span className="text-red-500">*</span> — select all years this model applies to
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => selectYearRange(currentYear - 24, currentYear)}
+                    >
+                      {currentYear - 24}–{currentYear}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => selectYearRange(currentYear - 14, currentYear)}
+                    >
+                      Last 15 years
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => selectYearRange(currentYear - 9, currentYear)}
+                    >
+                      Last 10 years
+                    </Button>
+                    <Button type="button" size="sm" variant="secondary" onClick={clearYears}>
+                      Clear
+                    </Button>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-white">
+                    <div className="grid grid-cols-5 sm:grid-cols-8 gap-2">
+                      {years.map((year) => (
+                        <label
+                          key={year}
+                          className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 rounded px-2 py-1"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={formData.selectedYears.includes(year)}
+                            onChange={() => toggleYear(year)}
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm">{year}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {formData.selectedYears.length > 0 && (
+                    <p className="mt-1.5 text-xs text-gray-500">
+                      {formData.selectedYears.length} year{formData.selectedYears.length !== 1 ? 's' : ''} selected
+                    </p>
+                  )}
+                </div>
             </div>
 
             {/* Specifications */}

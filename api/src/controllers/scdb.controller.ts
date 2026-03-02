@@ -335,6 +335,82 @@ export async function createSpaModel(req: Request, res: Response) {
   }
 }
 
+export async function createSpaModelsBulk(req: Request, res: Response) {
+  try {
+    const {
+      modelLineId,
+      brandId,
+      name,
+      years,
+      manufacturerSku,
+      waterCapacityGallons,
+      jetCount,
+      seatingCapacity,
+      dimensionsLengthInches,
+      dimensionsWidthInches,
+      dimensionsHeightInches,
+      weightDryLbs,
+      weightFilledLbs,
+      electricalRequirement,
+      hasOzone,
+      hasUv,
+      hasSaltSystem,
+      hasJacuzziTrue,
+      imageUrl,
+      specSheetUrl,
+      isDiscontinued,
+      notes,
+      dataSource,
+    } = req.body;
+
+    if (!modelLineId || !brandId || !name || !years || !Array.isArray(years) || years.length === 0) {
+      return error(res, 'VALIDATION_ERROR', 'modelLineId, brandId, name, and years (non-empty array) are required', 400);
+    }
+
+    const userId = (req as any).superAdminEmail;
+    const validYears = [...new Set(years.map((y: unknown) => parseInt(String(y), 10)).filter((y: number) => !isNaN(y)))].sort((a, b) => a - b);
+
+    if (validYears.length === 0) {
+      return error(res, 'VALIDATION_ERROR', 'At least one valid year is required', 400);
+    }
+
+    const results = await scdbService.createSpaModelsForYears(
+      {
+        modelLineId,
+        brandId,
+        name,
+        manufacturerSku,
+        waterCapacityGallons,
+        jetCount,
+        seatingCapacity,
+        dimensionsLengthInches,
+        dimensionsWidthInches,
+        dimensionsHeightInches,
+        weightDryLbs,
+        weightFilledLbs,
+        electricalRequirement,
+        hasOzone,
+        hasUv,
+        hasSaltSystem,
+        hasJacuzziTrue,
+        imageUrl,
+        specSheetUrl,
+        isDiscontinued,
+        notes,
+        dataSource,
+      },
+      validYears,
+      userId
+    );
+
+    res.status(201);
+    return success(res, results, `Created ${results.created.length} spa model(s)`);
+  } catch (err: any) {
+    console.error('Error creating spa models bulk:', err);
+    return error(res, 'INTERNAL_ERROR', 'Failed to create spa models', 500);
+  }
+}
+
 export async function updateSpaModel(req: Request, res: Response) {
   try {
     const { id } = req.params;

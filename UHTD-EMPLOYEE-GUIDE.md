@@ -147,7 +147,7 @@ You can add multiple model lines at once:
    - **Don't see the model line?** Click the **+** button to create a new model line inline!
 5. Fill in the required fields:
    - **Model Name** (required) - e.g., "J-345"
-   - **Model Year** (required) - e.g., "2024"
+   - **Model Year(s)** (required) - Check the years this model applies to (e.g., 2005-2025). Use quick-select buttons for ranges, or check individual years. One spa record is created per selected year.
 6. Fill in optional specifications:
    - **Specifications**: Seating capacity, jet count, water capacity (gallons), electrical requirement
    - **Dimensions**: Length, width, height (all in inches - enter just the number)
@@ -418,7 +418,20 @@ Smart Compatibility Columns (see below for details):
 - `compatibleBrands` - Brand names (comma-separated)
 - `compatibleModelLines` - Model line names (comma-separated)
 - `compatibleSpas` - Spa model names (comma-separated)
-- `compatibleYears` - Years: `2024`, `2020-2024`, or `2020, 2022, 2024`
+- `compatibleYears` - Flexible format (see below)
+
+### compatibleYears Format (Parts Import)
+
+The `compatibleYears` column accepts flexible formats with optional spaces:
+
+| Format | Example |
+|--------|---------|
+| Single year | `2024` |
+| Range | `2020-2024` or `2020 - 2024` |
+| Comma-separated | `2020, 2022, 2024` |
+| Mix | `2002-2007, 2009, 2011- 2015` |
+
+Spaces around hyphens and commas are trimmed. Ranges expand into individual years (e.g., `2002-2005` → 2002, 2003, 2004, 2005).
 
 ### Parts Import - Smart Compatibility
 
@@ -429,7 +442,7 @@ The Parts import supports assigning part-spa compatibility during import using f
 | `compatibleBrands` | Brand names | `Jacuzzi, Hot Spring` |
 | `compatibleModelLines` | Model line names | `J-300, Limelight` |
 | `compatibleSpas` | Spa model names | `J-335, J-345` |
-| `compatibleYears` | Year or range | `2020-2024` or `2020, 2022, 2024` |
+| `compatibleYears` | Year or range | `2020-2024`, `2020, 2022, 2024`, or `2002 - 2015` |
 
 **How filters work together:**
 - Brands narrow which model lines are considered
