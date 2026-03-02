@@ -275,14 +275,19 @@ export async function createPart(req: Request, res: Response) {
       dataSource,
     } = req.body;
 
-    if (!categoryId || !name) {
+    const categoryIdVal = typeof categoryId === 'string' ? categoryId.trim() : categoryId;
+    const interchangeGroupIdVal = interchangeGroupId && String(interchangeGroupId).trim()
+      ? interchangeGroupId
+      : undefined;
+
+    if (!categoryIdVal || !name) {
       return error(res, 'VALIDATION_ERROR', 'categoryId and name are required', 400);
     }
 
     const userId = (req as any).superAdminEmail;
     const part = await pcdbService.createPart(
       {
-        categoryId,
+        categoryId: categoryIdVal,
         partNumber,
         manufacturerSku,
         upc,
@@ -290,7 +295,7 @@ export async function createPart(req: Request, res: Response) {
         skuAliases,
         name,
         manufacturer,
-        interchangeGroupId,
+        interchangeGroupId: interchangeGroupIdVal,
         isOem,
         isUniversal,
         isDiscontinued,

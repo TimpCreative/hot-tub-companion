@@ -392,6 +392,9 @@ export async function getPartByPartNumber(partNumber: string): Promise<PcdbPart 
 }
 
 export async function createPart(input: CreatePartInput, userId?: string): Promise<PcdbPart> {
+  const interchangeGroupId = input.interchangeGroupId && String(input.interchangeGroupId).trim()
+    ? input.interchangeGroupId
+    : null;
   const [row] = await db('pcdb_parts')
     .insert({
       category_id: input.categoryId,
@@ -402,7 +405,7 @@ export async function createPart(input: CreatePartInput, userId?: string): Promi
       sku_aliases: input.skuAliases,
       name: input.name,
       manufacturer: input.manufacturer,
-      interchange_group_id: input.interchangeGroupId,
+      interchange_group_id: interchangeGroupId,
       is_oem: input.isOem ?? false,
       is_universal: input.isUniversal ?? false,
       is_discontinued: input.isDiscontinued ?? false,
@@ -455,6 +458,8 @@ export async function updatePart(
     if (value !== undefined) {
       if (camelKey === 'dimensionsJson' && value) {
         updateData[snakeKey] = JSON.stringify(value);
+      } else if (camelKey === 'interchangeGroupId') {
+        updateData[snakeKey] = value && String(value).trim() ? value : null;
       } else {
         updateData[snakeKey] = value;
       }
