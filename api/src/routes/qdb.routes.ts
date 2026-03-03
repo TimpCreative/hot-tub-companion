@@ -3,6 +3,17 @@ import * as qdbController from '../controllers/qdb.controller';
 
 const router = Router();
 
+// Sections
+router.get('/sections', qdbController.listSections);
+router.post('/sections', qdbController.createSection);
+router.put('/sections/:id', qdbController.updateSection);
+router.delete('/sections/:id', qdbController.deleteSection);
+
+// Brand Qualifiers
+router.get('/qualifiers/for-brand/:brandId', qdbController.getQualifiersForBrand);
+router.get('/brand-qualifiers/:brandId', qdbController.getBrandQualifiers);
+router.put('/brand-qualifiers/:brandId', qdbController.setBrandQualifiers);
+
 // Qualifier CRUD
 router.get('/qualifiers', qdbController.listQualifiers);
 router.get('/qualifiers/:id', qdbController.getQualifier);

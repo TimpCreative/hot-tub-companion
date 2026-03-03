@@ -18,9 +18,6 @@ import {
   DbScdbModelLine,
   DbScdbSpaModel,
   PaginationParams,
-  SpaElectricalConfig,
-  CreateElectricalConfigInput,
-  DbSpaElectricalConfig,
 } from '../types/uhtd.types';
 import { logAudit } from './audit.service';
 
@@ -75,11 +72,6 @@ function mapSpaModelFromDb(
     dimensionsHeightInches: row.dimensions_height_inches,
     weightDryLbs: row.weight_dry_lbs,
     weightFilledLbs: row.weight_filled_lbs,
-    electricalRequirement: row.electrical_requirement,
-    hasOzone: row.has_ozone,
-    hasUv: row.has_uv,
-    hasSaltSystem: row.has_salt_system,
-    hasJacuzziTrue: row.has_jacuzzi_true,
     imageUrl: row.image_url,
     specSheetUrl: row.spec_sheet_url,
     isDiscontinued: row.is_discontinued,
@@ -389,11 +381,6 @@ export async function createSpaModel(
       dimensions_height_inches: input.dimensionsHeightInches,
       weight_dry_lbs: input.weightDryLbs,
       weight_filled_lbs: input.weightFilledLbs,
-      electrical_requirement: input.electricalRequirement,
-      has_ozone: input.hasOzone ?? false,
-      has_uv: input.hasUv ?? false,
-      has_salt_system: input.hasSaltSystem ?? false,
-      has_jacuzzi_true: input.hasJacuzziTrue ?? false,
       image_url: input.imageUrl,
       spec_sheet_url: input.specSheetUrl,
       is_discontinued: input.isDiscontinued ?? false,
@@ -456,11 +443,6 @@ export async function updateSpaModel(
     dimensionsHeightInches: 'dimensions_height_inches',
     weightDryLbs: 'weight_dry_lbs',
     weightFilledLbs: 'weight_filled_lbs',
-    electricalRequirement: 'electrical_requirement',
-    hasOzone: 'has_ozone',
-    hasUv: 'has_uv',
-    hasSaltSystem: 'has_salt_system',
-    hasJacuzziTrue: 'has_jacuzzi_true',
     imageUrl: 'image_url',
     specSheetUrl: 'spec_sheet_url',
     isDiscontinued: 'is_discontinued',
@@ -552,91 +534,3 @@ export async function getActiveBrands(tenantId?: string): Promise<ScdbBrand[]> {
   return rows.map(mapBrandFromDb);
 }
 
-// =============================================================================
-// Spa Electrical Configs
-// =============================================================================
-
-function mapElectricalConfigFromDb(row: DbSpaElectricalConfig): SpaElectricalConfig {
-  return {
-    id: row.id,
-    spaModelId: row.spa_model_id,
-    voltage: row.voltage,
-    voltageUnit: row.voltage_unit,
-    frequencyHz: row.frequency_hz,
-    amperage: row.amperage,
-    sortOrder: row.sort_order,
-    createdAt: row.created_at,
-  };
-}
-
-export async function getElectricalConfigsForSpa(spaModelId: string): Promise<SpaElectricalConfig[]> {
-  const rows = await db('scdb_spa_electrical_configs')
-    .where({ spa_model_id: spaModelId })
-    .orderBy('sort_order');
-  return rows.map(mapElectricalConfigFromDb);
-}
-
-export async function createElectricalConfig(
-  spaModelId: string,
-  input: CreateElectricalConfigInput
-): Promise<SpaElectricalConfig> {
-  const [row] = await db('scdb_spa_electrical_configs')
-    .insert({
-      spa_model_id: spaModelId,
-      voltage: input.voltage,
-      voltage_unit: input.voltageUnit || 'VAC',
-      frequency_hz: input.frequencyHz,
-      amperage: input.amperage,
-      sort_order: input.sortOrder ?? 0,
-    })
-    .returning('*');
-  return mapElectricalConfigFromDb(row);
-}
-
-export async function updateElectricalConfig(
-  id: string,
-  input: Partial<CreateElectricalConfigInput>
-): Promise<SpaElectricalConfig | null> {
-  const updateData: Record<string, unknown> = {};
-  if (input.voltage !== undefined) updateData.voltage = input.voltage;
-  if (input.voltageUnit !== undefined) updateData.voltage_unit = input.voltageUnit;
-  if (input.frequencyHz !== undefined) updateData.frequency_hz = input.frequencyHz;
-  if (input.amperage !== undefined) updateData.amperage = input.amperage;
-  if (input.sortOrder !== undefined) updateData.sort_order = input.sortOrder;
-
-  if (Object.keys(updateData).length === 0) return null;
-
-  const [row] = await db('scdb_spa_electrical_configs')
-    .where({ id })
-    .update(updateData)
-    .returning('*');
-  return row ? mapElectricalConfigFromDb(row) : null;
-}
-
-export async function deleteElectricalConfig(id: string): Promise<boolean> {
-  const deleted = await db('scdb_spa_electrical_configs').where({ id }).delete();
-  return deleted > 0;
-}
-
-export async function replaceElectricalConfigs(
-  spaModelId: string,
-  configs: CreateElectricalConfigInput[]
-): Promise<SpaElectricalConfig[]> {
-  await db('scdb_spa_electrical_configs').where({ spa_model_id: spaModelId }).delete();
-  
-  if (configs.length === 0) return [];
-  
-  const rows = await db('scdb_spa_electrical_configs')
-    .insert(
-      configs.map((config, index) => ({
-        spa_model_id: spaModelId,
-        voltage: config.voltage,
-        voltage_unit: config.voltageUnit || 'VAC',
-        frequency_hz: config.frequencyHz,
-        amperage: config.amperage,
-        sort_order: config.sortOrder ?? index,
-      }))
-    )
-    .returning('*');
-  return rows.map(mapElectricalConfigFromDb);
-}

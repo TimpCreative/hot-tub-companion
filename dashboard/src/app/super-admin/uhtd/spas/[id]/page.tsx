@@ -25,11 +25,6 @@ interface SpaModel {
   dimensionsHeightInches: number | null;
   weightDryLbs: number | null;
   weightFilledLbs: number | null;
-  electricalRequirement: string | null;
-  hasOzone: boolean;
-  hasUv: boolean;
-  hasSaltSystem: boolean;
-  hasJacuzziTrue: boolean;
   imageUrl: string | null;
   specSheetUrl: string | null;
   isDiscontinued: boolean;
@@ -37,6 +32,13 @@ interface SpaModel {
   dataSource: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface SpaQualifier {
+  qualifierId: string;
+  qualifierName?: string;
+  qualifierDisplayName?: string;
+  value: unknown;
 }
 
 interface CompatiblePart {
@@ -50,14 +52,6 @@ interface CompatiblePart {
   quantityRequired: number | null;
 }
 
-interface ElectricalConfig {
-  id: string;
-  voltage: number;
-  voltageUnit: string;
-  frequencyHz: number | null;
-  amperage: string;
-}
-
 export default function SpaDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -66,7 +60,7 @@ export default function SpaDetailPage() {
 
   const [spa, setSpa] = useState<SpaModel | null>(null);
   const [parts, setParts] = useState<CompatiblePart[]>([]);
-  const [electricalConfigs, setElectricalConfigs] = useState<ElectricalConfig[]>([]);
+  const [spaQualifiers, setSpaQualifiers] = useState<SpaQualifier[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
@@ -74,19 +68,19 @@ export default function SpaDetailPage() {
     async function fetchData() {
       setLoading(true);
       try {
-        const [spaRes, partsRes, electricalRes] = await Promise.all([
+        const [spaRes, partsRes, qualifiersRes] = await Promise.all([
           fetchWithAuth(`/api/dashboard/super-admin/scdb/spa-models/${spaId}`),
           fetchWithAuth(`/api/dashboard/super-admin/comps/spa/${spaId}/parts`),
-          fetchWithAuth(`/api/dashboard/super-admin/scdb/spa-models/${spaId}/electrical`),
+          fetchWithAuth(`/api/dashboard/super-admin/qdb/spa-qualifiers/${spaId}`),
         ]);
 
         const spaData = await spaRes.json();
         const partsData = await partsRes.json();
-        const electricalData = await electricalRes.json();
+        const qualifiersData = await qualifiersRes.json();
 
         if (spaData.success) setSpa(spaData.data);
         if (partsData.success) setParts(partsData.data || []);
-        if (electricalData.success) setElectricalConfigs(electricalData.data || []);
+        if (qualifiersData.success) setSpaQualifiers(qualifiersData.data || []);
       } catch (err) {
         console.error('Error fetching spa data:', err);
       } finally {
@@ -267,26 +261,6 @@ export default function SpaDetailPage() {
                   {spa.weightFilledLbs ? `${spa.weightFilledLbs} lbs` : '-'}
                 </dd>
               </div>
-              <div className="col-span-3">
-                <dt className="text-sm text-gray-500 mb-2">Electrical Configurations</dt>
-                <dd className="text-sm font-medium text-gray-900">
-                  {electricalConfigs.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {electricalConfigs.map((config) => (
-                        <span key={config.id} className="inline-flex items-center px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 text-sm">
-                          {config.voltage} {config.voltageUnit}
-                          {config.frequencyHz && ` ${config.frequencyHz}Hz`}
-                          {config.amperage && ` @ ${config.amperage}`}
-                        </span>
-                      ))}
-                    </div>
-                  ) : spa.electricalRequirement ? (
-                    spa.electricalRequirement
-                  ) : (
-                    '-'
-                  )}
-                </dd>
-              </div>
               <div>
                 <dt className="text-sm text-gray-500">Data Source</dt>
                 <dd className="text-sm font-medium text-gray-900">{spa.dataSource || '-'}</dd>
@@ -294,24 +268,44 @@ export default function SpaDetailPage() {
             </dl>
           </div>
 
-          {/* Features */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Sanitization Features</h3>
-            <div className="flex flex-wrap gap-3">
-              <Badge variant={spa.hasOzone ? 'success' : 'default'}>
-                {spa.hasOzone ? '✓' : '✗'} Ozone System
-              </Badge>
-              <Badge variant={spa.hasUv ? 'success' : 'default'}>
-                {spa.hasUv ? '✓' : '✗'} UV System
-              </Badge>
-              <Badge variant={spa.hasSaltSystem ? 'success' : 'default'}>
-                {spa.hasSaltSystem ? '✓' : '✗'} Salt System
-              </Badge>
-              <Badge variant={spa.hasJacuzziTrue ? 'success' : 'default'}>
-                {spa.hasJacuzziTrue ? '✓' : '✗'} Jacuzzi True
-              </Badge>
+          {/* Qualifiers */}
+          {spaQualifiers.length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Specifications & Options</h3>
+              <dl className="space-y-3">
+                {spaQualifiers.map((sq) => (
+                  <div key={sq.qualifierId}>
+                    <dt className="text-sm text-gray-500">{sq.qualifierDisplayName || sq.qualifierName || sq.qualifierId}</dt>
+                    <dd className="text-sm font-medium text-gray-900 mt-0.5">
+                      {Array.isArray(sq.value) ? (
+                        sq.value.every((v: unknown) => typeof v === 'object' && v !== null && 'voltage' in v) ? (
+                          <div className="flex flex-wrap gap-2">
+                            {(sq.value as { voltage: number; voltageUnit?: string; frequencyHz?: number; amperage: string }[]).map((c, i) => (
+                              <span key={i} className="inline-flex items-center px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 text-sm">
+                                {c.voltage} {c.voltageUnit || 'VAC'}
+                                {c.frequencyHz && ` ${c.frequencyHz}Hz`}
+                                {c.amperage && ` @ ${c.amperage}`}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {(sq.value as string[]).map((v, i) => (
+                              <Badge key={i} variant="info">{v}</Badge>
+                            ))}
+                          </div>
+                        )
+                      ) : typeof sq.value === 'boolean' ? (
+                        sq.value ? 'Yes' : 'No'
+                      ) : (
+                        String(sq.value)
+                      )}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             </div>
-          </div>
+          )}
 
           {/* Notes */}
           {spa.notes && (

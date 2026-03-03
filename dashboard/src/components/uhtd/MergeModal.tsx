@@ -39,7 +39,6 @@ const affectedLabels: Record<string, string> = {
   partCompatibility: 'Part Compatibility Records',
   compSpas: 'Comp Assignments',
   qualifiers: 'Qualifiers',
-  electricalConfigs: 'Electrical Configs',
   spaProfiles: 'User Spa Profiles',
 };
 

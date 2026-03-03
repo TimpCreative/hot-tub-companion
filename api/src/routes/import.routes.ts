@@ -3,6 +3,7 @@ import * as importController from '../controllers/import.controller';
 
 const router = Router();
 
+router.get('/templates/:type', importController.getImportTemplate);
 router.post('/brands', importController.importBrands);
 router.post('/model-lines', importController.importModelLines);
 router.post('/spas', importController.importSpas);

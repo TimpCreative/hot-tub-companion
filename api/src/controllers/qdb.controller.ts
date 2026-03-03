@@ -2,6 +2,105 @@ import { Request, Response } from 'express';
 import * as qdbService from '../services/qdb.service';
 import { success, error } from '../utils/response';
 
+// Sections CRUD
+export async function listSections(req: Request, res: Response) {
+  try {
+    const sections = await qdbService.listSections();
+    success(res, sections);
+  } catch (err: any) {
+    if (err.code === '42P01') {
+      return error(res, 'INTERNAL_ERROR', 'Database schema may be outdated - ensure all migrations have run', 500);
+    }
+    console.error('Error listing sections:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to list sections', 500);
+  }
+}
+
+export async function createSection(req: Request, res: Response) {
+  try {
+    const userId = (req as any).superAdminEmail;
+    const { name, sortOrder } = req.body;
+    if (!name) {
+      return error(res, 'VALIDATION_ERROR', 'Name is required', 400);
+    }
+    const section = await qdbService.createSection({ name, sortOrder }, userId);
+    res.status(201);
+    success(res, section, 'Section created');
+  } catch (err) {
+    console.error('Error creating section:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to create section', 500);
+  }
+}
+
+export async function updateSection(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).superAdminEmail;
+    const { name, sortOrder } = req.body;
+    const section = await qdbService.updateSection(id, { name, sortOrder }, userId);
+    if (!section) return error(res, 'NOT_FOUND', 'Section not found', 404);
+    success(res, section);
+  } catch (err) {
+    console.error('Error updating section:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to update section', 500);
+  }
+}
+
+export async function deleteSection(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).superAdminEmail;
+    const deleted = await qdbService.deleteSection(id, userId);
+    if (!deleted) return error(res, 'NOT_FOUND', 'Section not found', 404);
+    success(res, null, 'Section deleted');
+  } catch (err) {
+    console.error('Error deleting section:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to delete section', 500);
+  }
+}
+
+// Brand Qualifiers
+export async function getBrandQualifiers(req: Request, res: Response) {
+  try {
+    const { brandId } = req.params;
+    const qualifierIds = await qdbService.getBrandQualifiers(brandId);
+    success(res, qualifierIds);
+  } catch (err) {
+    console.error('Error getting brand qualifiers:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to get brand qualifiers', 500);
+  }
+}
+
+export async function setBrandQualifiers(req: Request, res: Response) {
+  try {
+    const { brandId } = req.params;
+    const { qualifierIds } = req.body;
+    const userId = (req as any).superAdminEmail;
+    if (!Array.isArray(qualifierIds)) {
+      return error(res, 'VALIDATION_ERROR', 'qualifierIds must be an array', 400);
+    }
+    await qdbService.setBrandQualifiers(brandId, qualifierIds, userId);
+    success(res, qualifierIds, 'Brand qualifiers updated');
+  } catch (err) {
+    console.error('Error setting brand qualifiers:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to set brand qualifiers', 500);
+  }
+}
+
+export async function getQualifiersForBrand(req: Request, res: Response) {
+  try {
+    const { brandId } = req.params;
+    const result = await qdbService.getQualifiersForBrand(brandId);
+    success(res, result);
+  } catch (err: any) {
+    if (err.code === '42P01') {
+      return error(res, 'INTERNAL_ERROR', 'Database schema may be outdated - ensure all migrations have run', 500);
+    }
+    console.error('Error getting qualifiers for brand:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to get qualifiers for brand', 500);
+  }
+}
+
 // Qualifier CRUD
 export async function listQualifiers(req: Request, res: Response) {
   try {
@@ -36,14 +135,14 @@ export async function getQualifier(req: Request, res: Response) {
 export async function createQualifier(req: Request, res: Response) {
   try {
     const userId = (req as any).superAdminEmail;
-    const { name, displayName, description, dataType, allowedValues, appliesTo } = req.body;
+    const { name, displayName, description, dataType, allowedValues, appliesTo, sectionId, isUniversal, isRequired } = req.body;
 
     if (!name || !displayName || !dataType || !appliesTo) {
       return error(res, 'VALIDATION_ERROR', 'Name, displayName, dataType, and appliesTo are required', 400);
     }
 
     const qualifier = await qdbService.createQualifier(
-      { name, displayName, description, dataType, allowedValues, appliesTo },
+      { name, displayName, description, dataType, allowedValues, appliesTo, sectionId, isUniversal, isRequired },
       userId
     );
 
@@ -61,11 +160,11 @@ export async function updateQualifier(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const userId = (req as any).superAdminEmail;
-    const { displayName, description, dataType, allowedValues, appliesTo } = req.body;
+    const { displayName, description, dataType, allowedValues, appliesTo, sectionId, isUniversal, isRequired } = req.body;
 
     const qualifier = await qdbService.updateQualifier(
       id,
-      { displayName, description, dataType, allowedValues, appliesTo },
+      { displayName, description, dataType, allowedValues, appliesTo, sectionId, isUniversal, isRequired },
       userId
     );
 

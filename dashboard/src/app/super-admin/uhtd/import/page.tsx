@@ -1,11 +1,16 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 
 type ImportType = 'brands' | 'model-lines' | 'spas' | 'parts' | 'comps';
+
+interface TemplateResponse {
+  headers: string[];
+  example: string[];
+}
 
 interface ImportResult {
   created: number;
@@ -26,7 +31,20 @@ export default function ImportPage() {
   const [result, setResult] = useState<ImportResult | null>(null);
   const [csvPreview, setCsvPreview] = useState<string[][]>([]);
   const [autoCreate, setAutoCreate] = useState(false);
+  const [spaTemplate, setSpaTemplate] = useState<TemplateResponse | null>(null);
+  const [partsTemplate, setPartsTemplate] = useState<TemplateResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetchWithAuth('/api/dashboard/super-admin/import/templates/spas')
+      .then((res) => res.json())
+      .then((data) => data.success && data.data && setSpaTemplate(data.data))
+      .catch(() => {});
+    fetchWithAuth('/api/dashboard/super-admin/import/templates/parts')
+      .then((res) => res.json())
+      .then((data) => data.success && data.data && setPartsTemplate(data.data))
+      .catch(() => {});
+  }, [fetchWithAuth]);
 
   const parseCSV = (text: string): string[][] => {
     const lines = text.split('\n').filter((line) => line.trim());
@@ -112,7 +130,7 @@ export default function ImportPage() {
     }
   };
 
-  const templates: Record<ImportType, { headers: string[]; example: string[]; label: string; description: string }> = {
+  const staticTemplates: Record<ImportType, { headers: string[]; example: string[]; label: string; description: string }> = {
     brands: {
       headers: ['name', 'logoUrl', 'websiteUrl', 'dataSource'],
       example: ['Jacuzzi', 'https://example.com/logo.png', 'https://jacuzzi.com', 'manual_entry'],
@@ -125,20 +143,26 @@ export default function ImportPage() {
       label: 'Model Lines',
       description: 'Brand model lines',
     },
+    comps: {
+      headers: ['partNumber', 'partName', 'brandName', 'modelLineName', 'spaName', 'spaYear', 'compId', 'fitNotes', 'dataSource'],
+      example: ['PKG-12345', '', 'Jacuzzi', 'J-300', 'J-345', '2024', '', 'OEM filter', 'manual_entry'],
+      label: 'Comps',
+      description: 'Part-spa compatibility',
+    },
     spas: {
-      headers: ['brandName', 'modelLineName', 'name', 'year', 'manufacturerSku', 'seatingCapacity', 'jetCount', 'waterCapacityGallons', 'electricalRequirement', 'dimensionsLengthInches', 'dimensionsWidthInches', 'dimensionsHeightInches', 'weightDryLbs', 'weightFilledLbs', 'hasOzone', 'hasUv', 'hasSaltSystem', 'hasJacuzziTrue', 'imageUrl', 'specSheetUrl', 'notes', 'isDiscontinued', 'dataSource'],
-      example: ['Jacuzzi', 'J-300 Collection', 'J-335', '2024', 'JAC-J335-24', '5', '35', '350', '240V/50A', '85', '85', '36', '725', '4200', 'true', 'false', 'false', 'false', '', '', '', 'false', 'manual_entry'],
+      headers: spaTemplate?.headers ?? ['brandName', 'modelLineName', 'name', 'year', 'manufacturerSku', 'seatingCapacity', 'jetCount', 'waterCapacityGallons', 'dimensionsLengthInches', 'dimensionsWidthInches', 'dimensionsHeightInches', 'weightDryLbs', 'weightFilledLbs', 'imageUrl', 'specSheetUrl', 'notes', 'isDiscontinued', 'dataSource'],
+      example: spaTemplate?.example ?? ['Jacuzzi', 'J-300 Collection', 'J-335', '2024', 'JAC-J335-24', '5', '35', '350', '85', '85', '36', '725', '4200', '', '', '', 'false', 'manual_entry'],
       label: 'Spas',
       description: 'Spa model-years',
     },
     parts: {
-      headers: [
+      headers: partsTemplate?.headers ?? [
         'name', 'categoryName', 'partNumber', 'manufacturerSku', 'upc', 'ean', 'skuAliases',
         'manufacturer', 'isOem', 'isUniversal', 'isDiscontinued', 'displayImportance',
         'imageUrl', 'specSheetUrl', 'notes', 'dataSource',
         'compatibleBrands', 'compatibleModelLines', 'compatibleSpas', 'compatibleYears'
       ],
-      example: [
+      example: partsTemplate?.example ?? [
         'ProClarity Filter', 'filters', 'PKG-12345', 'JAC-FILTER-001', '012345678901', '', 'PKG12345, FILTER-001',
         'Jacuzzi', 'true', 'false', 'false', '2',
         '', '', '', 'manual_entry',
@@ -147,13 +171,9 @@ export default function ImportPage() {
       label: 'Parts',
       description: 'Parts catalog with compatibility',
     },
-    comps: {
-      headers: ['partNumber', 'partName', 'brandName', 'modelLineName', 'spaName', 'spaYear', 'compId', 'fitNotes', 'dataSource'],
-      example: ['PKG-12345', '', 'Jacuzzi', 'J-300', 'J-345', '2024', '', 'OEM filter', 'manual_entry'],
-      label: 'Comps',
-      description: 'Part-spa compatibility',
-    },
   };
+
+  const templates = staticTemplates;
 
   const escapeCsvValue = (value: string): string => {
     if (value.includes(',') || value.includes('"') || value.includes('\n')) {

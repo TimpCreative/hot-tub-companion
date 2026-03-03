@@ -9,6 +9,7 @@ import { BulkAddTable } from '@/components/ui/BulkAddTable';
 import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { MediaInput } from '@/components/ui/MediaInput';
 import { DataSourceInput } from '@/components/ui/DataSourceInput';
+import { SpaQualifiersInput } from '@/components/uhtd/SpaQualifiersInput';
 
 interface ModelLine {
   id: string;
@@ -30,6 +31,7 @@ export default function NewSpaModelPage() {
 
   const currentYear = new Date().getFullYear();
 
+  const [qualifierValues, setQualifierValues] = useState<Record<string, unknown>>({});
   const [formData, setFormData] = useState({
     modelLineId,
     brandId: '',
@@ -44,10 +46,6 @@ export default function NewSpaModelPage() {
     dimensionsHeightInches: '',
     weightDryLbs: '',
     weightFilledLbs: '',
-    electricalRequirement: '',
-    hasOzone: false,
-    hasUv: false,
-    hasSaltSystem: false,
     imageUrl: '',
     specSheetUrl: '',
     isDiscontinued: false,
@@ -89,6 +87,7 @@ export default function NewSpaModelPage() {
       dimensionsHeightInches: formData.dimensionsHeightInches ? Number(formData.dimensionsHeightInches) : undefined,
       weightDryLbs: formData.weightDryLbs ? Number(formData.weightDryLbs) : undefined,
       weightFilledLbs: formData.weightFilledLbs ? Number(formData.weightFilledLbs) : undefined,
+      qualifierValues: Object.keys(qualifierValues).length > 0 ? qualifierValues : undefined,
     };
 
     try {
@@ -135,7 +134,6 @@ export default function NewSpaModelPage() {
             year: Number(row.year),
             seatingCapacity: row.seatingCapacity ? Number(row.seatingCapacity) : undefined,
             jetCount: row.jetCount ? Number(row.jetCount) : undefined,
-            electricalRequirement: row.electrical || undefined,
             isDiscontinued: row.isDiscontinued === true,
             dataSource: row.dataSource || 'Bulk import',
           }),
@@ -162,17 +160,6 @@ export default function NewSpaModelPage() {
     { key: 'year', header: 'Year', type: 'number' as const, required: true, placeholder: String(currentYear), width: '80px' },
     { key: 'seatingCapacity', header: 'Seats', type: 'number' as const, placeholder: '#', width: '70px' },
     { key: 'jetCount', header: 'Jets', type: 'number' as const, placeholder: '#', width: '70px' },
-    {
-      key: 'electrical',
-      header: 'Electrical',
-      type: 'select' as const,
-      options: [
-        { value: '120V', label: '120V' },
-        { value: '240V', label: '240V' },
-        { value: '120V/240V', label: '120V/240V' },
-      ],
-      width: '100px',
-    },
     { key: 'isDiscontinued', header: 'Disc.', type: 'checkbox' as const, width: '50px' },
     { key: 'dataSource', header: 'Source', placeholder: 'Source', width: '100px' },
   ];
@@ -270,62 +257,30 @@ export default function NewSpaModelPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Electrical</label>
-                <select
-                  value={formData.electricalRequirement}
-                  onChange={(e) => setFormData({ ...formData, electricalRequirement: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select...</option>
-                  <option value="120V">120V</option>
-                  <option value="240V">240V</option>
-                  <option value="120V/240V">120V/240V</option>
-                </select>
-              </div>
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Features</h3>
-            <div className="flex gap-6">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.hasOzone}
-                  onChange={(e) => setFormData({ ...formData, hasOzone: e.target.checked })}
-                  className="rounded border-gray-300 text-blue-600"
-                />
-                <span className="text-sm text-gray-700">Has Ozone</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.hasUv}
-                  onChange={(e) => setFormData({ ...formData, hasUv: e.target.checked })}
-                  className="rounded border-gray-300 text-blue-600"
-                />
-                <span className="text-sm text-gray-700">Has UV</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.hasSaltSystem}
-                  onChange={(e) => setFormData({ ...formData, hasSaltSystem: e.target.checked })}
-                  className="rounded border-gray-300 text-blue-600"
-                />
-                <span className="text-sm text-gray-700">Has Salt System</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.isDiscontinued}
-                  onChange={(e) => setFormData({ ...formData, isDiscontinued: e.target.checked })}
-                  className="rounded border-gray-300 text-blue-600"
-                />
-                <span className="text-sm text-gray-700">Discontinued</span>
-              </label>
+          {formData.brandId && (
+            <div className="border-t border-gray-200 pt-6">
+              <SpaQualifiersInput
+                brandId={formData.brandId}
+                value={qualifierValues}
+                onChange={setQualifierValues}
+                fetchWithAuth={fetchWithAuth}
+              />
             </div>
+          )}
+
+          <div className="border-t border-gray-200 pt-6">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={formData.isDiscontinued}
+                onChange={(e) => setFormData({ ...formData, isDiscontinued: e.target.checked })}
+                className="rounded border-gray-300 text-blue-600"
+              />
+              <span className="text-sm text-gray-700">Discontinued</span>
+            </label>
           </div>
 
           <div className="border-t border-gray-200 pt-6">

@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { db } from '../config/database';
 import { success, error } from '../utils/response';
 import { logAudit } from '../services/audit.service';
+import * as scdbService from '../services/scdb.service';
+import * as qdbService from '../services/qdb.service';
 import { AuditAction } from '../types/uhtd.types';
 
 interface BrandImportRow {
@@ -27,21 +29,17 @@ interface SpaModelImportRow {
   seatingCapacity?: number;
   jetCount?: number;
   waterCapacityGallons?: number;
-  electricalRequirement?: string;
   dimensionsLengthInches?: number;
   dimensionsWidthInches?: number;
   dimensionsHeightInches?: number;
   weightDryLbs?: number;
   weightFilledLbs?: number;
-  hasOzone?: boolean;
-  hasUv?: boolean;
-  hasSaltSystem?: boolean;
-  hasJacuzziTrue?: boolean;
   imageUrl?: string;
   specSheetUrl?: string;
   notes?: string;
   isDiscontinued?: boolean;
   dataSource?: string;
+  [qualifierKey: string]: unknown; // qualifier_<name> columns
 }
 
 interface PartImportRow {
@@ -107,6 +105,74 @@ function parseYearRange(yearStr: string): number[] {
   return years.sort((a, b) => a - b);
 }
 
+/**
+ * Parse electrical config string into structured fields for electrical_configs qualifier.
+ * Supports formats: "240V/50A", "240V/60Hz/50A", "120V 15A", "230V 32A"
+ * Returns null if unparseable.
+ */
+function parseElectricalConfig(
+  str: string
+): { voltage: number; voltageUnit: string; frequencyHz: number | null; amperage: string } | null {
+  if (!str || typeof str !== 'string') return null;
+  const s = str.trim();
+  if (!s) return null;
+
+  const voltageMatch = s.match(/(\d+)\s*V(?:AC|DC)?/i);
+  const amperageMatch = s.match(/(\d+)\s*A(?:mp)?s?/i);
+  const freqMatch = s.match(/(\d+)\s*Hz/i);
+
+  if (!voltageMatch || !amperageMatch) return null;
+  const voltage = parseInt(voltageMatch[1], 10);
+  const amperage = `${amperageMatch[1]}A`;
+  const frequencyHz = freqMatch ? parseInt(freqMatch[1], 10) : null;
+
+  return { voltage, voltageUnit: 'VAC', frequencyHz, amperage };
+}
+
+/**
+ * Parse qualifier values from import row. Extracts qualifier_<name> columns and maps
+ * to qualifier IDs. Handles electrical_configs (pipe-separated "240V/50A|120V/15A"),
+ * sanitization_systems (pipe-separated "ozone|uv|salt"), and enum/boolean values.
+ */
+function parseQualifierValuesFromRow(
+  row: Record<string, unknown>,
+  qualifierNameToId: Map<string, string>
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(row)) {
+    if (!key.startsWith('qualifier_') || val === undefined || val === null || val === '') continue;
+    const qualifierName = key.slice('qualifier_'.length);
+    const qualifierId = qualifierNameToId.get(qualifierName);
+    if (!qualifierId) continue;
+
+    const strVal = typeof val === 'string' ? val.trim() : String(val);
+    if (!strVal) continue;
+
+    if (qualifierName === 'electrical_configs') {
+      const configs: { voltage: number; voltageUnit: string; frequencyHz: number | null; amperage: string }[] = [];
+      const parts = strVal.split(/[|,;]/).map((s) => s.trim()).filter(Boolean);
+      for (const part of parts) {
+        const parsed = parseElectricalConfig(part);
+        if (parsed) configs.push(parsed);
+      }
+      if (configs.length > 0) result[qualifierId] = configs;
+    } else if (qualifierName === 'sanitization_systems') {
+      const systems = strVal.split(/[|,;]/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+      if (systems.length > 0) result[qualifierId] = systems;
+    } else if (qualifierName === 'voltage_requirement') {
+      result[qualifierId] = strVal;
+    } else {
+      try {
+        const parsed = JSON.parse(strVal);
+        result[qualifierId] = parsed;
+      } catch {
+        result[qualifierId] = strVal;
+      }
+    }
+  }
+  return result;
+}
+
 interface CompatibilityImportRow {
   partNumber?: string;
   partName?: string;
@@ -117,6 +183,88 @@ interface CompatibilityImportRow {
   compId?: string;
   fitNotes?: string;
   dataSource?: string;
+}
+
+const SPA_BASE_HEADERS = [
+  'brandName', 'modelLineName', 'name', 'year', 'manufacturerSku',
+  'seatingCapacity', 'jetCount', 'waterCapacityGallons',
+  'dimensionsLengthInches', 'dimensionsWidthInches', 'dimensionsHeightInches',
+  'weightDryLbs', 'weightFilledLbs', 'imageUrl', 'specSheetUrl',
+  'notes', 'isDiscontinued', 'dataSource',
+];
+
+const SPA_BASE_EXAMPLE = [
+  'Example Brand', 'Premium Line', 'Model X', '2024', 'SKU-123',
+  '6', '40', '350',
+  '84', '84', '36',
+  '500', '3500', 'https://...', 'https://...',
+  'Notes', 'false', 'csv_import',
+];
+
+const PART_BASE_HEADERS = [
+  'name', 'categoryName', 'partNumber', 'manufacturerSku', 'upc', 'ean',
+  'skuAliases', 'manufacturer', 'isOem', 'isUniversal', 'isDiscontinued',
+  'displayImportance', 'imageUrl', 'specSheetUrl', 'notes', 'dataSource',
+  'compatibleBrands', 'compatibleModelLines', 'compatibleSpas', 'compatibleYears',
+];
+
+const PART_BASE_EXAMPLE = [
+  'Filter Cartridge', 'Filters', 'ABC-123', 'MFG-456', '', '',
+  '', 'Example Mfg', 'false', 'false', 'false',
+  '50', 'https://...', '', 'Notes', 'csv_import',
+  '', '', '', '',
+];
+
+export async function getImportTemplate(req: Request, res: Response) {
+  try {
+    const { type } = req.params;
+    if (type !== 'spas' && type !== 'parts') {
+      return error(res, 'VALIDATION_ERROR', 'type must be "spas" or "parts"', 400);
+    }
+
+    const qualifiers = await qdbService.getAllQualifiers();
+    const qualifierHeaders: string[] = [];
+    const qualifierExamples: string[] = [];
+
+    if (type === 'spas') {
+      const spaQualifiers = qualifiers.filter((q) => q.appliesTo === 'spa' || q.appliesTo === 'both');
+      for (const q of spaQualifiers) {
+        qualifierHeaders.push(`qualifier_${q.name}`);
+        if (q.name === 'electrical_configs') {
+          qualifierExamples.push('240V/50A|120V/15A');
+        } else if (q.name === 'sanitization_systems') {
+          qualifierExamples.push('ozone|uv|salt');
+        } else if (q.name === 'voltage_requirement') {
+          qualifierExamples.push('240V');
+        } else if (q.dataType === 'array') {
+          qualifierExamples.push('val1|val2');
+        } else if (q.dataType === 'boolean') {
+          qualifierExamples.push('true');
+        } else {
+          qualifierExamples.push('value');
+        }
+      }
+      return success(res, {
+        headers: [...SPA_BASE_HEADERS, ...qualifierHeaders],
+        example: [...SPA_BASE_EXAMPLE, ...qualifierExamples],
+      });
+    }
+
+    const partQualifiers = qualifiers.filter((q) => q.appliesTo === 'part' || q.appliesTo === 'both');
+    for (const q of partQualifiers) {
+      qualifierHeaders.push(`qualifier_${q.name}`);
+      if (q.dataType === 'boolean') qualifierExamples.push('true');
+      else if (q.dataType === 'array') qualifierExamples.push('val1|val2');
+      else qualifierExamples.push('value');
+    }
+    return success(res, {
+      headers: [...PART_BASE_HEADERS, ...qualifierHeaders],
+      example: [...PART_BASE_EXAMPLE, ...qualifierExamples],
+    });
+  } catch (err) {
+    console.error('Error getting import template:', err);
+    return error(res, 'INTERNAL_ERROR', 'Failed to get import template', 500);
+  }
 }
 
 export async function importBrands(req: Request, res: Response) {
@@ -280,6 +428,9 @@ export async function importSpas(req: Request, res: Response) {
       return error(res, 'VALIDATION_ERROR', 'Rows array is required', 400);
     }
 
+    const allQualifiers = await qdbService.getAllQualifiers();
+    const qualifierNameToId = new Map(allQualifiers.filter((q) => q.appliesTo === 'spa' || q.appliesTo === 'both').map((q) => [q.name, q.id]));
+
     let created = 0;
     let skipped = 0;
     let brandsAutoCreated = 0;
@@ -381,16 +532,11 @@ export async function importSpas(req: Request, res: Response) {
             seating_capacity: row.seatingCapacity || null,
             jet_count: row.jetCount || null,
             water_capacity_gallons: row.waterCapacityGallons || null,
-            electrical_requirement: row.electricalRequirement || null,
             dimensions_length_inches: row.dimensionsLengthInches || null,
             dimensions_width_inches: row.dimensionsWidthInches || null,
             dimensions_height_inches: row.dimensionsHeightInches || null,
             weight_dry_lbs: row.weightDryLbs || null,
             weight_filled_lbs: row.weightFilledLbs || null,
-            has_ozone: row.hasOzone ?? false,
-            has_uv: row.hasUv ?? false,
-            has_salt_system: row.hasSaltSystem ?? false,
-            has_jacuzzi_true: row.hasJacuzziTrue ?? false,
             image_url: row.imageUrl || null,
             spec_sheet_url: row.specSheetUrl || null,
             notes: row.notes || null,
@@ -407,6 +553,11 @@ export async function importSpas(req: Request, res: Response) {
           inserted,
           userId
         );
+
+        const qualifierValues = parseQualifierValuesFromRow(row as Record<string, unknown>, qualifierNameToId);
+        if (Object.keys(qualifierValues).length > 0) {
+          await qdbService.setSpaQualifiersBatch(inserted.id, qualifierValues, userId);
+        }
 
         created++;
       } catch (err: any) {

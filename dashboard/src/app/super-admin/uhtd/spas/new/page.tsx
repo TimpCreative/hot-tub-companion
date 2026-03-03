@@ -11,7 +11,7 @@ import { DataSourceInput } from '@/components/ui/DataSourceInput';
 import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { QuickCreateBrandModal } from '@/components/uhtd/QuickCreateBrandModal';
 import { QuickCreateModelLineModal } from '@/components/uhtd/QuickCreateModelLineModal';
-import { ElectricalConfigInput, ElectricalConfig } from '@/components/uhtd/ElectricalConfigInput';
+import { SpaQualifiersInput } from '@/components/uhtd/SpaQualifiersInput';
 
 interface Brand {
   id: string;
@@ -37,7 +37,7 @@ function NewSpaForm() {
   const [filteredModelLines, setFilteredModelLines] = useState<ModelLine[]>([]);
   const [showBrandModal, setShowBrandModal] = useState(false);
   const [showModelLineModal, setShowModelLineModal] = useState(false);
-  const [electricalConfigs, setElectricalConfigs] = useState<ElectricalConfig[]>([]);
+  const [qualifierValues, setQualifierValues] = useState<Record<string, unknown>>({});
 
   const [formData, setFormData] = useState({
     brandId: '',
@@ -53,11 +53,6 @@ function NewSpaForm() {
     waterCapacityGallons: '',
     weightDryLbs: '',
     weightFilledLbs: '',
-    electricalRequirement: '',
-    hasOzone: false,
-    hasUv: false,
-    hasSaltSystem: false,
-    hasJacuzziTrue: false,
     imageUrl: '',
     specSheetUrl: '',
     notes: '',
@@ -124,11 +119,6 @@ function NewSpaForm() {
         waterCapacityGallons: formData.waterCapacityGallons ? parseInt(formData.waterCapacityGallons) : null,
         weightDryLbs: formData.weightDryLbs ? parseInt(formData.weightDryLbs) : null,
         weightFilledLbs: formData.weightFilledLbs ? parseInt(formData.weightFilledLbs) : null,
-        electricalRequirement: formData.electricalRequirement || null,
-        hasOzone: formData.hasOzone,
-        hasUv: formData.hasUv,
-        hasSaltSystem: formData.hasSaltSystem,
-        hasJacuzziTrue: formData.hasJacuzziTrue,
         imageUrl: formData.imageUrl || null,
         specSheetUrl: formData.specSheetUrl || null,
         notes: formData.notes || null,
@@ -136,57 +126,28 @@ function NewSpaForm() {
         dataSource: formData.dataSource || null,
       };
 
-      const validConfigs = electricalConfigs.filter(c => c.voltage && c.amperage);
-      const electricalPayload = validConfigs.length > 0 ? {
-        configs: validConfigs.map((c, i) => ({
-          voltage: c.voltage,
-          voltageUnit: c.voltageUnit,
-          frequencyHz: c.frequencyHz || null,
-          amperage: c.amperage,
-          sortOrder: i,
-        })),
-      } : null;
-
       let createdSpas: { id: string }[] = [];
 
       if (formData.selectedYears.length === 1) {
         const res = await fetchWithAuth('/api/dashboard/super-admin/scdb/spa-models', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...basePayload, year: formData.selectedYears[0] }),
+          body: JSON.stringify({ ...basePayload, year: formData.selectedYears[0], qualifierValues: Object.keys(qualifierValues).length > 0 ? qualifierValues : undefined }),
         });
 
         const data = await res.json();
         if (!res.ok) throw new Error(data.error?.message || 'Failed to create spa model');
         createdSpas = [{ id: data.data.id }];
-
-        if (electricalPayload) {
-          await fetchWithAuth(`/api/dashboard/super-admin/scdb/spa-models/${data.data.id}/electrical`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(electricalPayload),
-          });
-        }
       } else {
         const res = await fetchWithAuth('/api/dashboard/super-admin/scdb/spa-models/bulk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...basePayload, years: formData.selectedYears }),
+          body: JSON.stringify({ ...basePayload, years: formData.selectedYears, qualifierValues: Object.keys(qualifierValues).length > 0 ? qualifierValues : undefined }),
         });
 
         const data = await res.json();
         if (!res.ok) throw new Error(data.error?.message || 'Failed to create spa models');
         createdSpas = data.data?.created || [];
-
-        if (electricalPayload && createdSpas.length > 0) {
-          for (const spa of createdSpas) {
-            await fetchWithAuth(`/api/dashboard/super-admin/scdb/spa-models/${spa.id}/electrical`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(electricalPayload),
-            });
-          }
-        }
       }
 
       if (createdSpas.length > 0) {
@@ -238,11 +199,6 @@ function NewSpaForm() {
             dimensionsHeightInches: row.dimensionsHeightInches ? parseInt(row.dimensionsHeightInches) : null,
             weightDryLbs: row.weightDryLbs ? parseInt(row.weightDryLbs) : null,
             weightFilledLbs: row.weightFilledLbs ? parseInt(row.weightFilledLbs) : null,
-            electricalRequirement: row.electricalRequirement || null,
-            hasOzone: row.hasOzone || false,
-            hasUv: row.hasUv || false,
-            hasSaltSystem: row.hasSaltSystem || false,
-            hasJacuzziTrue: row.hasJacuzziTrue || false,
             imageUrl: row.imageUrl || null,
             specSheetUrl: row.specSheetUrl || null,
             notes: row.notes || null,
@@ -318,7 +274,6 @@ function NewSpaForm() {
     { key: 'seatingCapacity', header: 'Seats', type: 'number' as const, placeholder: '5', width: '70px', group: 'Specs' },
     { key: 'jetCount', header: 'Jets', type: 'number' as const, placeholder: '30', width: '70px', group: 'Specs' },
     { key: 'waterCapacityGallons', header: 'Gallons', type: 'number' as const, placeholder: '350', width: '80px', group: 'Specs' },
-    { key: 'electricalRequirement', header: 'Electrical', placeholder: '240V/50A', width: '100px', group: 'Specs' },
     // Dimensions
     { key: 'dimensionsLengthInches', header: 'Length"', type: 'number' as const, placeholder: '85', width: '75px', group: 'Dimensions' },
     { key: 'dimensionsWidthInches', header: 'Width"', type: 'number' as const, placeholder: '85', width: '75px', group: 'Dimensions' },
@@ -326,11 +281,6 @@ function NewSpaForm() {
     // Weight
     { key: 'weightDryLbs', header: 'Dry lbs', type: 'number' as const, placeholder: '725', width: '80px', group: 'Weight' },
     { key: 'weightFilledLbs', header: 'Filled lbs', type: 'number' as const, placeholder: '4200', width: '90px', group: 'Weight' },
-    // Features
-    { key: 'hasOzone', header: 'Ozone', type: 'checkbox' as const, width: '65px', group: 'Features' },
-    { key: 'hasUv', header: 'UV', type: 'checkbox' as const, width: '55px', group: 'Features' },
-    { key: 'hasSaltSystem', header: 'Salt', type: 'checkbox' as const, width: '55px', group: 'Features' },
-    { key: 'hasJacuzziTrue', header: 'JacTrue', type: 'checkbox' as const, width: '70px', group: 'Features' },
     // Media
     { key: 'imageUrl', header: 'Image URL', placeholder: 'https://...', width: '150px', group: 'Media' },
     { key: 'specSheetUrl', header: 'Spec URL', placeholder: 'https://...', width: '150px', group: 'Media' },
@@ -556,10 +506,12 @@ function NewSpaForm() {
                   />
                 </div>
               </div>
-              
-              <ElectricalConfigInput
-                configs={electricalConfigs}
-                onChange={setElectricalConfigs}
+
+              <SpaQualifiersInput
+                brandId={formData.brandId}
+                value={qualifierValues}
+                onChange={setQualifierValues}
+                fetchWithAuth={fetchWithAuth}
               />
 
               <div className="grid grid-cols-3 gap-4">
@@ -620,61 +572,6 @@ function NewSpaForm() {
                     placeholder="4200"
                     min="0"
                   />
-                </div>
-              </div>
-            </div>
-
-            {/* Features */}
-            <div className="bg-gray-50 p-4 rounded-lg space-y-4">
-              <h3 className="font-medium text-gray-900">Sanitization Features</h3>
-              <div className="flex flex-wrap gap-6">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="hasOzone"
-                    checked={formData.hasOzone}
-                    onChange={(e) => setFormData({ ...formData, hasOzone: e.target.checked })}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label htmlFor="hasOzone" className="text-sm text-gray-700">
-                    Has Ozone System
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="hasUv"
-                    checked={formData.hasUv}
-                    onChange={(e) => setFormData({ ...formData, hasUv: e.target.checked })}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label htmlFor="hasUv" className="text-sm text-gray-700">
-                    Has UV System
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="hasSaltSystem"
-                    checked={formData.hasSaltSystem}
-                    onChange={(e) => setFormData({ ...formData, hasSaltSystem: e.target.checked })}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label htmlFor="hasSaltSystem" className="text-sm text-gray-700">
-                    Has Salt System
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="hasJacuzziTrue"
-                    checked={formData.hasJacuzziTrue}
-                    onChange={(e) => setFormData({ ...formData, hasJacuzziTrue: e.target.checked })}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label htmlFor="hasJacuzziTrue" className="text-sm text-gray-700">
-                    Has Jacuzzi True
-                  </label>
                 </div>
               </div>
             </div>

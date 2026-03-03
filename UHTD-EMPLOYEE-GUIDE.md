@@ -376,14 +376,14 @@ When entering possible values:
 **Model Lines CSV:**
 - `brandName` (required), `name` (required), `description`, `dataSource`
 
-**Spas CSV (23 columns - matches single spa form):**
+**Spas CSV (24 columns):**
 - `brandName` (required) - Must exist in database
 - `modelLineName` (required) - Must exist under the brand
 - `name` (required) - The spa model name (e.g., "J-335")
 - `year` (required) - The model year
 - `manufacturerSku` - Manufacturer's part/model number
 - `seatingCapacity`, `jetCount`, `waterCapacityGallons` - Numbers only
-- `electricalRequirement` - e.g., "240V/50A"
+- `electricalConfig1`, `electricalConfig2` - Structured electrical options (e.g., "240V/50A", "120V/15A"). Supports formats: `240V/50A`, `240V/60Hz/50A`, `120V 15A`. Leave empty or use one column for single-config spas.
 - `dimensionsLengthInches`, `dimensionsWidthInches`, `dimensionsHeightInches` - Numbers only (inches)
 - `weightDryLbs`, `weightFilledLbs` - Numbers only (lbs)
 - `hasOzone`, `hasUv`, `hasSaltSystem`, `hasJacuzziTrue` - Boolean (`true`/`false`)

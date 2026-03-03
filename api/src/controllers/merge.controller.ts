@@ -282,11 +282,6 @@ export async function previewSpaMerge(req: Request, res: Response) {
       .count('spa_model_id as count')
       .first();
 
-    const electricalCount = await db('scdb_spa_electrical_configs')
-      .whereIn('spa_model_id', sourceIds)
-      .count('spa_model_id as count')
-      .first();
-
     const profilesCount = await db('spa_profiles')
       .whereIn('uhtd_spa_model_id', sourceIds)
       .count('uhtd_spa_model_id as count')
@@ -299,7 +294,6 @@ export async function previewSpaMerge(req: Request, res: Response) {
         partCompatibility: parseInt(compatibilityCount?.count as string) || 0,
         compSpas: parseInt(compSpasCount?.count as string) || 0,
         qualifiers: parseInt(qualifiersCount?.count as string) || 0,
-        electricalConfigs: parseInt(electricalCount?.count as string) || 0,
         spaProfiles: parseInt(profilesCount?.count as string) || 0,
       },
     };
@@ -336,7 +330,6 @@ export async function mergeSpas(req: Request, res: Response) {
       let compatibilityUpdated = 0;
       let compSpasUpdated = 0;
       let qualifiersUpdated = 0;
-      let electricalUpdated = 0;
       let profilesUpdated = 0;
 
       // 1. Handle part_spa_compatibility (composite PK - delete duplicates first)
@@ -384,12 +377,7 @@ export async function mergeSpas(req: Request, res: Response) {
         .whereIn('spa_model_id', sourceIds)
         .update({ spa_model_id: targetId });
 
-      // 4. Update scdb_spa_electrical_configs directly
-      electricalUpdated = await trx('scdb_spa_electrical_configs')
-        .whereIn('spa_model_id', sourceIds)
-        .update({ spa_model_id: targetId });
-
-      // 5. Update spa_profiles directly
+      // 4. Update spa_profiles directly
       profilesUpdated = await trx('spa_profiles')
         .whereIn('uhtd_spa_model_id', sourceIds)
         .update({ uhtd_spa_model_id: targetId });
@@ -415,7 +403,6 @@ export async function mergeSpas(req: Request, res: Response) {
         compatibilityUpdated,
         compSpasUpdated,
         qualifiersUpdated,
-        electricalUpdated,
         profilesUpdated,
         spasDeleted: sourceIds.length,
       };

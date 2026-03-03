@@ -80,12 +80,6 @@ export interface ScdbSpaModel {
   dimensionsHeightInches: number | null;
   weightDryLbs: number | null;
   weightFilledLbs: number | null;
-  electricalRequirement: string | null;
-  // Features
-  hasOzone: boolean;
-  hasUv: boolean;
-  hasSaltSystem: boolean;
-  hasJacuzziTrue: boolean;
   // Media
   imageUrl: string | null;
   specSheetUrl: string | null;
@@ -115,11 +109,6 @@ export interface CreateSpaModelInput {
   dimensionsHeightInches?: number;
   weightDryLbs?: number;
   weightFilledLbs?: number;
-  electricalRequirement?: string;
-  hasOzone?: boolean;
-  hasUv?: boolean;
-  hasSaltSystem?: boolean;
-  hasJacuzziTrue?: boolean;
   imageUrl?: string;
   specSheetUrl?: string;
   isDiscontinued?: boolean;
@@ -354,17 +343,43 @@ export interface CompNearMatch {
 // Qdb Types (Qualifier Database)
 // =============================================================================
 
-export type QualifierDataType = 'enum' | 'boolean' | 'number' | 'text';
+export type QualifierDataType = 'enum' | 'boolean' | 'number' | 'text' | 'array';
 export type QualifierAppliesTo = 'spa' | 'part' | 'both';
+
+export interface QualifierAllowedValue {
+  value: string;
+  displayName: string;
+  brandIds?: string[] | null; // null = universal, [] = no brands, [id] = brand-specific
+}
+
+export interface QdbSection {
+  id: string;
+  name: string;
+  sortOrder: number;
+  createdAt: Date;
+}
+
+export interface CreateSectionInput {
+  name: string;
+  sortOrder?: number;
+}
+
+export interface UpdateSectionInput {
+  name?: string;
+  sortOrder?: number;
+}
 
 export interface QdbQualifier {
   id: string;
   name: string;
   displayName: string;
   dataType: QualifierDataType;
-  allowedValues: string[] | null;
+  allowedValues: QualifierAllowedValue[] | string[] | null; // string[] legacy, QualifierAllowedValue[] for enum/array
   appliesTo: QualifierAppliesTo;
   description: string | null;
+  sectionId: string | null;
+  isUniversal: boolean;
+  isRequired: boolean;
   createdAt: Date;
 }
 
@@ -372,10 +387,15 @@ export interface CreateQualifierInput {
   name: string;
   displayName: string;
   dataType: QualifierDataType;
-  allowedValues?: string[];
+  allowedValues?: QualifierAllowedValue[] | string[];
   appliesTo: QualifierAppliesTo;
   description?: string;
+  sectionId?: string | null;
+  isUniversal?: boolean;
+  isRequired?: boolean;
 }
+
+export interface UpdateQualifierInput extends Partial<CreateQualifierInput> {}
 
 export interface QdbSpaQualifier {
   spaModelId: string;
@@ -592,11 +612,6 @@ export interface DbScdbSpaModel {
   dimensions_height_inches: number | null;
   weight_dry_lbs: number | null;
   weight_filled_lbs: number | null;
-  electrical_requirement: string | null;
-  has_ozone: boolean;
-  has_uv: boolean;
-  has_salt_system: boolean;
-  has_jacuzzi_true: boolean;
   image_url: string | null;
   spec_sheet_url: string | null;
   is_discontinued: boolean;

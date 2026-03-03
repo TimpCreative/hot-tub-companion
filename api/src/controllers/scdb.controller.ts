@@ -5,6 +5,7 @@
 
 import { Request, Response } from 'express';
 import * as scdbService from '../services/scdb.service';
+import * as qdbService from '../services/qdb.service';
 import { success, error } from '../utils/response';
 
 // =============================================================================
@@ -267,6 +268,7 @@ export async function getSpaModel(req: Request, res: Response) {
 
 export async function createSpaModel(req: Request, res: Response) {
   try {
+    const { qualifierValues, ...spaBody } = req.body;
     const {
       modelLineId,
       brandId,
@@ -281,16 +283,12 @@ export async function createSpaModel(req: Request, res: Response) {
       dimensionsHeightInches,
       weightDryLbs,
       weightFilledLbs,
-      electricalRequirement,
-      hasOzone,
-      hasUv,
-      hasSaltSystem,
       imageUrl,
       specSheetUrl,
       isDiscontinued,
       notes,
       dataSource,
-    } = req.body;
+    } = spaBody;
 
     if (!modelLineId || !brandId || !name || !year) {
       return error(res, 'VALIDATION_ERROR', 'modelLineId, brandId, name, and year are required', 400);
@@ -312,10 +310,6 @@ export async function createSpaModel(req: Request, res: Response) {
         dimensionsHeightInches,
         weightDryLbs,
         weightFilledLbs,
-        electricalRequirement,
-        hasOzone,
-        hasUv,
-        hasSaltSystem,
         imageUrl,
         specSheetUrl,
         isDiscontinued,
@@ -324,6 +318,9 @@ export async function createSpaModel(req: Request, res: Response) {
       },
       userId
     );
+    if (qualifierValues && typeof qualifierValues === 'object' && Object.keys(qualifierValues).length > 0) {
+      await qdbService.setSpaQualifiersBatch(spaModel.id, qualifierValues, userId);
+    }
     res.status(201);
     return success(res, spaModel, 'Spa model created');
   } catch (err: any) {
@@ -334,7 +331,7 @@ export async function createSpaModel(req: Request, res: Response) {
       return error(res, 'VALIDATION_ERROR', 'Invalid brand or model line – verify the brand and model line exist', 400);
     }
     if (err.code === '42703') {
-      return error(res, 'INTERNAL_ERROR', 'Database schema may be outdated – ensure all migrations have run (has_jacuzzi_true)', 500);
+      return error(res, 'INTERNAL_ERROR', 'Database schema may be outdated – ensure all migrations have run', 500);
     }
     if (err.code === '22P02') {
       return error(res, 'VALIDATION_ERROR', 'Invalid UUID format for brand or model line', 400);
@@ -349,33 +346,9 @@ export async function createSpaModel(req: Request, res: Response) {
 
 export async function createSpaModelsBulk(req: Request, res: Response) {
   try {
-    const {
-      modelLineId,
-      brandId,
-      name,
-      years,
-      manufacturerSku,
-      waterCapacityGallons,
-      jetCount,
-      seatingCapacity,
-      dimensionsLengthInches,
-      dimensionsWidthInches,
-      dimensionsHeightInches,
-      weightDryLbs,
-      weightFilledLbs,
-      electricalRequirement,
-      hasOzone,
-      hasUv,
-      hasSaltSystem,
-      hasJacuzziTrue,
-      imageUrl,
-      specSheetUrl,
-      isDiscontinued,
-      notes,
-      dataSource,
-    } = req.body;
+    const { qualifierValues, years, ...baseInput } = req.body;
 
-    if (!modelLineId || !brandId || !name || !years || !Array.isArray(years) || years.length === 0) {
+    if (!baseInput.modelLineId || !baseInput.brandId || !baseInput.name || !years || !Array.isArray(years) || years.length === 0) {
       return error(res, 'VALIDATION_ERROR', 'modelLineId, brandId, name, and years (non-empty array) are required', 400);
     }
 
@@ -386,34 +359,13 @@ export async function createSpaModelsBulk(req: Request, res: Response) {
       return error(res, 'VALIDATION_ERROR', 'At least one valid year is required', 400);
     }
 
-    const results = await scdbService.createSpaModelsForYears(
-      {
-        modelLineId,
-        brandId,
-        name,
-        manufacturerSku,
-        waterCapacityGallons,
-        jetCount,
-        seatingCapacity,
-        dimensionsLengthInches,
-        dimensionsWidthInches,
-        dimensionsHeightInches,
-        weightDryLbs,
-        weightFilledLbs,
-        electricalRequirement,
-        hasOzone,
-        hasUv,
-        hasSaltSystem,
-        hasJacuzziTrue,
-        imageUrl,
-        specSheetUrl,
-        isDiscontinued,
-        notes,
-        dataSource,
-      },
-      validYears,
-      userId
-    );
+    const results = await scdbService.createSpaModelsForYears(baseInput, validYears, userId);
+
+    if (qualifierValues && typeof qualifierValues === 'object' && Object.keys(qualifierValues).length > 0) {
+      for (const spa of results.created) {
+        await qdbService.setSpaQualifiersBatch(spa.id, qualifierValues, userId);
+      }
+    }
 
     res.status(201);
     return success(res, results, `Created ${results.created.length} spa model(s)`);
@@ -427,9 +379,13 @@ export async function updateSpaModel(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const userId = (req as any).superAdminEmail;
-    const spaModel = await scdbService.updateSpaModel(id, req.body, userId);
+    const { qualifierValues, ...spaBody } = req.body;
+    const spaModel = await scdbService.updateSpaModel(id, spaBody, userId);
     if (!spaModel) {
       return error(res, 'NOT_FOUND', 'Spa model not found', 404);
+    }
+    if (qualifierValues && typeof qualifierValues === 'object' && Object.keys(qualifierValues).length > 0) {
+      await qdbService.setSpaQualifiersBatch(id, qualifierValues, userId);
     }
     return success(res, spaModel);
   } catch (err) {
@@ -547,94 +503,3 @@ export async function getPublicSpaModels(req: Request, res: Response) {
   }
 }
 
-// =============================================================================
-// Electrical Configs
-// =============================================================================
-
-export async function getElectricalConfigs(req: Request, res: Response) {
-  try {
-    const { spaModelId } = req.params;
-    const configs = await scdbService.getElectricalConfigsForSpa(spaModelId);
-    return success(res, configs);
-  } catch (err) {
-    console.error('Error getting electrical configs:', err);
-    return error(res, 'INTERNAL_ERROR', 'Failed to get electrical configs', 500);
-  }
-}
-
-export async function createElectricalConfig(req: Request, res: Response) {
-  try {
-    const { spaModelId } = req.params;
-    const { voltage, voltageUnit, frequencyHz, amperage, sortOrder } = req.body;
-
-    if (!voltage || !amperage) {
-      return error(res, 'VALIDATION_ERROR', 'voltage and amperage are required', 400);
-    }
-
-    const config = await scdbService.createElectricalConfig(spaModelId, {
-      voltage,
-      voltageUnit,
-      frequencyHz,
-      amperage,
-      sortOrder,
-    });
-    res.status(201);
-    return success(res, config, 'Electrical config created');
-  } catch (err) {
-    console.error('Error creating electrical config:', err);
-    return error(res, 'INTERNAL_ERROR', 'Failed to create electrical config', 500);
-  }
-}
-
-export async function updateElectricalConfig(req: Request, res: Response) {
-  try {
-    const { id } = req.params;
-    const { voltage, voltageUnit, frequencyHz, amperage, sortOrder } = req.body;
-
-    const config = await scdbService.updateElectricalConfig(id, {
-      voltage,
-      voltageUnit,
-      frequencyHz,
-      amperage,
-      sortOrder,
-    });
-    if (!config) {
-      return error(res, 'NOT_FOUND', 'Electrical config not found', 404);
-    }
-    return success(res, config);
-  } catch (err) {
-    console.error('Error updating electrical config:', err);
-    return error(res, 'INTERNAL_ERROR', 'Failed to update electrical config', 500);
-  }
-}
-
-export async function deleteElectricalConfig(req: Request, res: Response) {
-  try {
-    const { id } = req.params;
-    const deleted = await scdbService.deleteElectricalConfig(id);
-    if (!deleted) {
-      return error(res, 'NOT_FOUND', 'Electrical config not found', 404);
-    }
-    return success(res, null, 'Electrical config deleted');
-  } catch (err) {
-    console.error('Error deleting electrical config:', err);
-    return error(res, 'INTERNAL_ERROR', 'Failed to delete electrical config', 500);
-  }
-}
-
-export async function replaceElectricalConfigs(req: Request, res: Response) {
-  try {
-    const { spaModelId } = req.params;
-    const { configs } = req.body;
-
-    if (!Array.isArray(configs)) {
-      return error(res, 'VALIDATION_ERROR', 'configs must be an array', 400);
-    }
-
-    const result = await scdbService.replaceElectricalConfigs(spaModelId, configs);
-    return success(res, result, 'Electrical configs updated');
-  } catch (err) {
-    console.error('Error replacing electrical configs:', err);
-    return error(res, 'INTERNAL_ERROR', 'Failed to replace electrical configs', 500);
-  }
-}
