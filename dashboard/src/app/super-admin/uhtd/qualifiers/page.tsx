@@ -463,6 +463,7 @@ export default function QualifiersPage() {
           <li>• <strong>Array</strong> – Multiple values; can have fixed options or free-form (e.g. electrical configs)</li>
           <li>• <strong>Universal</strong> – Shows for all brands; otherwise assign to brands on Brand edit page</li>
           <li>• <strong>Required</strong> – Must be set when adding/editing a spa</li>
+          <li>• <strong>Electrical simplification:</strong> Electrical Configurations (array) captures full configs (e.g. 240V/50A). Voltage Requirement (enum) is simpler (120V/240V). You typically only need one—use Electrical Configurations if you need amperage details; otherwise Voltage Requirement is enough.</li>
         </ul>
       </div>
 
@@ -488,7 +489,7 @@ export default function QualifiersPage() {
       </Modal>
 
       {/* Qualifier Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingQualifier ? 'Edit Qualifier' : 'Add Qualifier'}>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingQualifier ? 'Edit Qualifier' : 'Add Qualifier'} size="xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
@@ -605,22 +606,22 @@ export default function QualifiersPage() {
               </div>
               <div className="space-y-2">
                 {formData.allowedValues.map((av, idx) => (
-                  <div key={idx} className="flex gap-2 items-center p-2 bg-gray-50 rounded border border-gray-200">
+                  <div key={idx} className="grid grid-cols-[minmax(100px,1fr)_minmax(120px,1fr)_minmax(220px,1.5fr)_auto] gap-3 items-center p-3 bg-gray-50 rounded border border-gray-200">
                     <input
                       type="text"
                       value={av.value}
                       onChange={(e) => updateAllowedValue(idx, 'value', e.target.value.toLowerCase().replace(/\s+/g, '_'))}
                       placeholder="value"
-                      className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded"
+                      className="w-full min-w-0 px-2 py-1.5 text-sm border border-gray-300 rounded"
                     />
                     <input
                       type="text"
                       value={av.displayName}
                       onChange={(e) => updateAllowedValue(idx, 'displayName', e.target.value)}
                       placeholder="Display name"
-                      className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded"
+                      className="w-full min-w-0 px-2 py-1.5 text-sm border border-gray-300 rounded"
                     />
-                    <div className="flex-1 max-w-xs">
+                    <div className="min-w-0">
                       <span className="text-xs text-gray-500 block mb-1">Brands (empty = universal)</span>
                       <select
                         multiple
@@ -629,14 +630,14 @@ export default function QualifiersPage() {
                           const opts = Array.from(e.target.selectedOptions, (o) => o.value);
                           updateAllowedValue(idx, 'brandIds', opts.length ? opts : null);
                         }}
-                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded max-h-24"
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded max-h-28 min-h-[2.5rem]"
                       >
                         {brands.map((b) => (
                           <option key={b.id} value={b.id}>{b.name}</option>
                         ))}
                       </select>
                     </div>
-                    <button type="button" onClick={() => removeAllowedValue(idx)} className="text-red-600 hover:text-red-800 text-sm">Remove</button>
+                    <button type="button" onClick={() => removeAllowedValue(idx)} className="flex-shrink-0 px-3 py-1.5 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded whitespace-nowrap">Remove</button>
                   </div>
                 ))}
               </div>
