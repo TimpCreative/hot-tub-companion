@@ -328,6 +328,7 @@ export async function createPart(req: Request, res: Response) {
     if (err.code === '22P02') {
       const hint = (err.detail || err.message || '').toString();
       return error(res, 'VALIDATION_ERROR', hint ? `Invalid UUID: ${hint}` : 'Invalid UUID format for category or interchange group', 400);
+    }
     console.error('Error creating part:', err);
     const msg = process.env.NODE_ENV === 'development' && err?.message
       ? `Failed to create part: ${err.message}`
