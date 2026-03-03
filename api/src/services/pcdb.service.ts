@@ -392,11 +392,7 @@ export async function getPartByPartNumber(partNumber: string): Promise<PcdbPart 
 }
 
 export async function createPart(input: CreatePartInput, userId?: string): Promise<PcdbPart> {
-  const interchangeGroupId = input.interchangeGroupId && String(input.interchangeGroupId).trim()
-    ? input.interchangeGroupId
-    : null;
-  const [row] = await db('pcdb_parts')
-    .insert({
+  const insertData: Record<string, unknown> = {
       category_id: input.categoryId,
       part_number: input.partNumber,
       manufacturer_sku: input.manufacturerSku,
@@ -405,7 +401,6 @@ export async function createPart(input: CreatePartInput, userId?: string): Promi
       sku_aliases: input.skuAliases,
       name: input.name,
       manufacturer: input.manufacturer,
-      interchange_group_id: interchangeGroupId,
       is_oem: input.isOem ?? false,
       is_universal: input.isUniversal ?? false,
       is_discontinued: input.isDiscontinued ?? false,
@@ -415,7 +410,13 @@ export async function createPart(input: CreatePartInput, userId?: string): Promi
       spec_sheet_url: input.specSheetUrl,
       notes: input.notes,
       data_source: input.dataSource,
-    })
+    };
+  const interchangeGroupId = input.interchangeGroupId && String(input.interchangeGroupId).trim();
+  if (interchangeGroupId) {
+    insertData.interchange_group_id = interchangeGroupId;
+  }
+  const [row] = await db('pcdb_parts')
+    .insert(insertData)
     .returning('*');
 
   await logAudit('pcdb_parts', row.id, 'INSERT', null, row, userId);

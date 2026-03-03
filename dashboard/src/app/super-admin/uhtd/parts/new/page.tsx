@@ -84,6 +84,11 @@ export default function NewPartPage() {
         errors.push(`Row: Name is required`);
         continue;
       }
+      if (!row.categoryId || !String(row.categoryId).trim()) {
+        failed++;
+        errors.push(`${row.name}: Category is required`);
+        continue;
+      }
 
       try {
         const res = await fetchWithAuth('/api/dashboard/super-admin/pcdb/parts', {
@@ -125,6 +130,7 @@ export default function NewPartPage() {
       header: 'Category',
       type: 'select' as const,
       options: categories.map((c) => ({ value: c.id, label: c.displayName })),
+      required: true,
       width: '140px',
     },
     { key: 'manufacturer', header: 'Manufacturer', placeholder: 'Brand', width: '110px' },

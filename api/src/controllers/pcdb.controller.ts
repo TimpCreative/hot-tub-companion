@@ -284,6 +284,14 @@ export async function createPart(req: Request, res: Response) {
       return error(res, 'VALIDATION_ERROR', 'categoryId and name are required', 400);
     }
 
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(String(categoryIdVal))) {
+      return error(res, 'VALIDATION_ERROR', 'Please select a valid category from the dropdown', 400);
+    }
+    if (interchangeGroupIdVal && !UUID_REGEX.test(String(interchangeGroupIdVal))) {
+      return error(res, 'VALIDATION_ERROR', 'Invalid interchange group format', 400);
+    }
+
     const userId = (req as any).superAdminEmail;
     const part = await pcdbService.createPart(
       {
