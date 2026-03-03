@@ -391,6 +391,13 @@ export async function getPartByPartNumber(partNumber: string): Promise<PcdbPart 
   return row ? mapPartFromDb(row) : null;
 }
 
+function toSkuAliasesArray(value: string[] | string | null | undefined): string[] | null {
+  if (value == null || value === '') return null;
+  if (Array.isArray(value)) return value.length > 0 ? value : null;
+  const arr = String(value).split(',').map((s) => s.trim()).filter(Boolean);
+  return arr.length > 0 ? arr : null;
+}
+
 export async function createPart(input: CreatePartInput, userId?: string): Promise<PcdbPart> {
   const insertData: Record<string, unknown> = {
       category_id: input.categoryId,
@@ -398,7 +405,7 @@ export async function createPart(input: CreatePartInput, userId?: string): Promi
       manufacturer_sku: input.manufacturerSku ?? null,
       upc: input.upc ?? null,
       ean: input.ean ?? null,
-      sku_aliases: input.skuAliases,
+      sku_aliases: toSkuAliasesArray(input.skuAliases),
       name: input.name,
       manufacturer: input.manufacturer ?? null,
       is_oem: input.isOem ?? false,
@@ -461,6 +468,8 @@ export async function updatePart(
         updateData[snakeKey] = JSON.stringify(value);
       } else if (camelKey === 'interchangeGroupId') {
         updateData[snakeKey] = value && String(value).trim() ? value : null;
+      } else if (camelKey === 'skuAliases') {
+        updateData[snakeKey] = toSkuAliasesArray(value as string | string[] | null | undefined);
       } else {
         updateData[snakeKey] = value;
       }
