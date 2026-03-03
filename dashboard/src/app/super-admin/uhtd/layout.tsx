@@ -10,6 +10,7 @@ const UHTD_NAV = [
   { label: 'Model Lines', href: '/super-admin/uhtd/model-lines' },
   { label: 'Spas', href: '/super-admin/uhtd/spas' },
   { label: 'Parts', href: '/super-admin/uhtd/parts' },
+  { label: 'Comp Builder', href: '/super-admin/uhtd/comp-builder' },
   { label: 'Comps', href: '/super-admin/uhtd/comps' },
   { label: 'Categories', href: '/super-admin/uhtd/categories' },
   { label: 'Qualifiers', href: '/super-admin/uhtd/qualifiers' },

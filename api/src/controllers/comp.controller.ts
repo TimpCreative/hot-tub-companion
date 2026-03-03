@@ -67,6 +67,48 @@ export async function createCompatibility(req: Request, res: Response) {
   }
 }
 
+export async function createMatrixCompatibilities(req: Request, res: Response) {
+  try {
+    const { partIds, spaModelIds, status } = req.body;
+
+    if (!partIds || !spaModelIds || !Array.isArray(partIds) || !Array.isArray(spaModelIds)) {
+      return error(res, 'VALIDATION_ERROR', 'partIds and spaModelIds arrays are required', 400);
+    }
+
+    if (partIds.length === 0 || spaModelIds.length === 0) {
+      return error(res, 'VALIDATION_ERROR', 'partIds and spaModelIds must be non-empty', 400);
+    }
+
+    const MAX_PARTS = 500;
+    const MAX_SPAS = 500;
+    if (partIds.length > MAX_PARTS || spaModelIds.length > MAX_SPAS) {
+      return error(
+        res,
+        'VALIDATION_ERROR',
+        `Maximum ${MAX_PARTS} parts and ${MAX_SPAS} spas allowed (250k connections max)`,
+        400
+      );
+    }
+
+    const userId = (req as any).superAdminEmail;
+    const result = await compatibilityService.createMatrixCompatibilities(
+      partIds,
+      spaModelIds,
+      { status: status ?? 'pending', source: 'manual' },
+      userId
+    );
+    res.status(201);
+    return success(
+      res,
+      result,
+      `Created ${result.created} compatibilities${result.skipped > 0 ? `, ${result.skipped} skipped (already exist)` : ''}`
+    );
+  } catch (err) {
+    console.error('Error creating matrix compatibilities:', err);
+    return error(res, 'INTERNAL_ERROR', 'Failed to create matrix compatibilities', 500);
+  }
+}
+
 export async function createBulkCompatibilities(req: Request, res: Response) {
   try {
     const { partId, spaModelIds, status, fitNotes } = req.body;

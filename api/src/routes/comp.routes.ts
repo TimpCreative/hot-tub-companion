@@ -27,6 +27,7 @@ router.post('/assign-part', compController.assignPartToComp);
 router.get('/compatibility/part/:partId', compController.getPartCompatibilities);
 router.get('/compatibility/spa/:spaModelId', compController.getSpaCompatibilities);
 router.post('/compatibility', compController.createCompatibility);
+router.post('/compatibility/matrix', compController.createMatrixCompatibilities);
 router.post('/compatibility/bulk', compController.createBulkCompatibilities);
 router.patch('/compatibility/:partId/:spaModelId/status', compController.updateCompatibilityStatus);
 router.delete('/compatibility/:partId/:spaModelId', compController.deleteCompatibility);

@@ -205,6 +205,71 @@ export async function createBulkCompatibilities(
   return spaModelIds.length;
 }
 
+export async function createMatrixCompatibilities(
+  partIds: string[],
+  spaModelIds: string[],
+  options: {
+    status?: CompatibilityStatus;
+    source?: string;
+  } = {},
+  userId?: string
+): Promise<{ created: number; skipped: number }> {
+  if (partIds.length === 0 || spaModelIds.length === 0) {
+    return { created: 0, skipped: 0 };
+  }
+
+  const pairs: { part_id: string; spa_model_id: string }[] = [];
+  for (const partId of partIds) {
+    for (const spaModelId of spaModelIds) {
+      pairs.push({ part_id: partId, spa_model_id: spaModelId });
+    }
+  }
+
+  const existingRows = await db('part_spa_compatibility')
+    .select('part_id', 'spa_model_id')
+    .whereIn(
+      ['part_id', 'spa_model_id'],
+      pairs.map((p) => [p.part_id, p.spa_model_id])
+    );
+
+  const existingSet = new Set(
+    existingRows.map((r) => `${r.part_id}:${r.spa_model_id}`)
+  );
+
+  const toInsert = pairs.filter(
+    (p) => !existingSet.has(`${p.part_id}:${p.spa_model_id}`)
+  );
+
+  if (toInsert.length > 0) {
+    const insertData = toInsert.map((p) => ({
+      part_id: p.part_id,
+      spa_model_id: p.spa_model_id,
+      status: options.status ?? 'pending',
+      source: options.source ?? 'manual',
+      added_by: userId,
+    }));
+
+    await db('part_spa_compatibility')
+      .insert(insertData)
+      .onConflict(['part_id', 'spa_model_id'])
+      .ignore();
+
+    await logAudit(
+      'part_spa_compatibility',
+      toInsert[0].part_id,
+      'INSERT',
+      null,
+      { matrix: { partCount: partIds.length, spaCount: spaModelIds.length, created: toInsert.length } },
+      userId
+    );
+  }
+
+  return {
+    created: toInsert.length,
+    skipped: pairs.length - toInsert.length,
+  };
+}
+
 export async function updateCompatibilityStatus(
   partId: string,
   spaModelId: string,
