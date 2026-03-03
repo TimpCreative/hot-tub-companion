@@ -39,6 +39,14 @@ interface Compatibility {
   };
 }
 
+interface PartQualifier {
+  qualifierId: string;
+  qualifierName?: string;
+  qualifierDisplayName?: string;
+  value: unknown;
+  isRequired: boolean;
+}
+
 export default function PartDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -47,22 +55,28 @@ export default function PartDetailPage() {
 
   const [part, setPart] = useState<Part | null>(null);
   const [compatibilities, setCompatibilities] = useState<Compatibility[]>([]);
+  const [partQualifiers, setPartQualifiers] = useState<PartQualifier[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [partRes, compatRes] = await Promise.all([
+        const [partRes, compatRes, qualifiersRes] = await Promise.all([
           fetchWithAuth(`/api/dashboard/super-admin/pcdb/parts/${partId}`),
           fetchWithAuth(`/api/dashboard/super-admin/comps/compatibility?partId=${partId}`),
+          fetchWithAuth(`/api/dashboard/super-admin/qdb/part-qualifiers/${partId}`),
         ]);
 
         const partData = await partRes.json();
         const compatData = await compatRes.json();
+        const qualifiersData = await qualifiersRes.json();
 
         if (partData.success) setPart(partData.data);
         if (compatData.success) setCompatibilities(compatData.data || []);
+        if (qualifiersData.success && Array.isArray(qualifiersData.data)) {
+          setPartQualifiers(qualifiersData.data);
+        }
       } catch (err) {
         console.error('Error fetching part:', err);
       } finally {
@@ -252,6 +266,39 @@ export default function PartDetailPage() {
                 Notes
               </h3>
               <p className="text-sm text-gray-600 whitespace-pre-wrap">{part.notes}</p>
+            </div>
+          )}
+
+          {partQualifiers.length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
+                Part Qualifiers
+              </h3>
+              <dl className="space-y-3">
+                {partQualifiers.map((pq) => (
+                  <div key={pq.qualifierId}>
+                    <dt className="text-sm text-gray-500">
+                      {pq.qualifierDisplayName || pq.qualifierName || pq.qualifierId}
+                      {pq.isRequired && (
+                        <span className="ml-1 text-red-500" title="Required for spa compatibility">*</span>
+                      )}
+                    </dt>
+                    <dd className="text-sm font-medium text-gray-900">
+                      {Array.isArray(pq.value)
+                        ? pq.value.join(', ')
+                        : typeof pq.value === 'boolean'
+                          ? pq.value ? 'Yes' : 'No'
+                          : String(pq.value ?? '-')}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <Link
+                href={`/super-admin/uhtd/parts/${partId}/edit`}
+                className="text-sm text-blue-600 hover:text-blue-800 mt-3 inline-block"
+              >
+                Edit qualifiers →
+              </Link>
             </div>
           )}
         </div>

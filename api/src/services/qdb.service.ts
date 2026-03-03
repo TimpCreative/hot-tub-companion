@@ -388,8 +388,15 @@ export async function removeSpaQualifier(
 
 // Part Qualifier operations
 export async function getPartQualifiers(partId: string): Promise<QdbPartQualifier[]> {
-  const rows = await db('qdb_part_qualifiers').where({ part_id: partId });
-  return rows.map(mapPartQualifierFromDb);
+  const rows = await db('qdb_part_qualifiers')
+    .select('qdb_part_qualifiers.*', 'qdb_qualifiers.name as qualifier_name', 'qdb_qualifiers.display_name as qualifier_display_name')
+    .leftJoin('qdb_qualifiers', 'qdb_part_qualifiers.qualifier_id', 'qdb_qualifiers.id')
+    .where('qdb_part_qualifiers.part_id', partId);
+  return rows.map((r: any) => ({
+    ...mapPartQualifierFromDb(r),
+    qualifierName: r.qualifier_name,
+    qualifierDisplayName: r.qualifier_display_name,
+  }));
 }
 
 export async function setPartQualifier(
@@ -465,17 +472,41 @@ export async function removePartQualifier(
 }
 
 // Matching: find parts that match a spa's qualifiers
+// Supports scalar and array qualifier values (e.g. sanitization_systems: ['ozone','uv'])
 export async function findPartsMatchingSpaQualifiers(spaModelId: string): Promise<string[]> {
   const spaQualifiers = await getSpaQualifiers(spaModelId);
   if (spaQualifiers.length === 0) return [];
 
-  // Get parts that have required qualifiers matching the spa's values
-  const partIds = await db('qdb_part_qualifiers')
-    .select('part_id')
-    .where('is_required', true)
-    .whereIn('qualifier_id', spaQualifiers.map((q: QdbSpaQualifier) => q.qualifierId))
-    .whereIn('value', spaQualifiers.map((q: QdbSpaQualifier) => q.value as string))
-    .groupBy('part_id');
+  const spaQualifierIds = spaQualifiers.map((q: QdbSpaQualifier) => q.qualifierId);
+  const spaValueMap = new Map<string, unknown[]>();
+  for (const q of spaQualifiers) {
+    const effective = Array.isArray(q.value) ? q.value : [q.value];
+    spaValueMap.set(q.qualifierId, effective);
+  }
 
-  return partIds.map((row: { part_id: string }) => row.part_id);
+  const requiredPartQualifiers = await db('qdb_part_qualifiers')
+    .where('is_required', true)
+    .whereIn('qualifier_id', spaQualifierIds)
+    .select('part_id', 'qualifier_id', 'value');
+
+  const byPart = new Map<string, { qualifierId: string; value: unknown }[]>();
+  for (const row of requiredPartQualifiers) {
+    const list = byPart.get(row.part_id) ?? [];
+    list.push({ qualifierId: row.qualifier_id, value: row.value });
+    byPart.set(row.part_id, list);
+  }
+
+  const matching: string[] = [];
+  for (const [partId, pqList] of byPart.entries()) {
+    const allMatch = pqList.every((pq) => {
+      const spaValues = spaValueMap.get(pq.qualifierId) ?? [];
+      const partVal = pq.value;
+      if (Array.isArray(partVal)) {
+        return partVal.some((p: unknown) => spaValues.includes(p));
+      }
+      return spaValues.includes(partVal);
+    });
+    if (allMatch) matching.push(partId);
+  }
+  return matching;
 }

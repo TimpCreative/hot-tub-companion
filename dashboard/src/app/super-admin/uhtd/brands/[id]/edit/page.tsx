@@ -15,6 +15,13 @@ interface Brand {
   dataSource: string | null;
 }
 
+interface Qualifier {
+  id: string;
+  name: string;
+  displayName: string;
+  isUniversal: boolean;
+}
+
 export default function EditBrandPage() {
   const params = useParams();
   const router = useRouter();
@@ -31,14 +38,24 @@ export default function EditBrandPage() {
     dataSource: '',
   });
 
-  useEffect(() => {
-    async function fetchBrand() {
-      try {
-        const res = await fetchWithAuth(`/api/dashboard/super-admin/scdb/brands/${params.id}`);
-        const data = await res.json();
+  const [qualifiers, setQualifiers] = useState<Qualifier[]>([]);
+  const [selectedQualifierIds, setSelectedQualifierIds] = useState<string[]>([]);
 
-        if (data.success && data.data) {
-          const brand: Brand = data.data;
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [brandRes, qualifiersRes, brandQualifiersRes] = await Promise.all([
+          fetchWithAuth(`/api/dashboard/super-admin/scdb/brands/${params.id}`),
+          fetchWithAuth('/api/dashboard/super-admin/qdb/qualifiers'),
+          fetchWithAuth(`/api/dashboard/super-admin/qdb/brand-qualifiers/${params.id}`),
+        ]);
+
+        const brandData = await brandRes.json();
+        const qualifiersData = await qualifiersRes.json();
+        const brandQualifiersData = await brandQualifiersRes.json();
+
+        if (brandData.success && brandData.data) {
+          const brand: Brand = brandData.data;
           setFormData({
             name: brand.name,
             logoUrl: brand.logoUrl || '',
@@ -47,14 +64,29 @@ export default function EditBrandPage() {
             dataSource: brand.dataSource || '',
           });
         }
+
+        if (qualifiersData.success && qualifiersData.data) {
+          const all = qualifiersData.data || [];
+          setQualifiers(all.filter((q: Qualifier) => !q.isUniversal));
+        }
+
+        if (brandQualifiersData.success && brandQualifiersData.data) {
+          setSelectedQualifierIds(Array.isArray(brandQualifiersData.data) ? brandQualifiersData.data : []);
+        }
       } catch (err) {
-        console.error('Error fetching brand:', err);
+        console.error('Error fetching data:', err);
       } finally {
         setLoading(false);
       }
     }
-    fetchBrand();
+    fetchData();
   }, [params.id, fetchWithAuth]);
+
+  const toggleQualifier = (id: string) => {
+    setSelectedQualifierIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,6 +105,12 @@ export default function EditBrandPage() {
       if (!res.ok) {
         throw new Error(data.error?.message || 'Failed to update brand');
       }
+
+      await fetchWithAuth(`/api/dashboard/super-admin/qdb/brand-qualifiers/${params.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qualifierIds: selectedQualifierIds }),
+      });
 
       router.push(`/super-admin/uhtd/brands/${params.id}`);
     } catch (err: any) {
@@ -171,6 +209,29 @@ export default function EditBrandPage() {
               Active (visible to customers)
             </label>
           </div>
+
+          {qualifiers.length > 0 && (
+            <div className="pt-4 border-t border-gray-200">
+              <h3 className="text-sm font-medium text-gray-900 mb-2">Brand-Specific Qualifiers</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Assign qualifiers that appear only when adding/editing spas for this brand.
+              </p>
+              <div className="space-y-2">
+                {qualifiers.map((q) => (
+                  <label key={q.id} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedQualifierIds.includes(q.id)}
+                      onChange={() => toggleQualifier(q.id)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">{q.displayName}</span>
+                    <span className="text-xs text-gray-400 font-mono">{q.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-3 pt-4 border-t border-gray-200">
             <Button type="submit" loading={saving}>

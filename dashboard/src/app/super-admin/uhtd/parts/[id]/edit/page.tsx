@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import Link from 'next/link';
 import { PartForm } from '@/components/uhtd/PartForm';
+import type { PartQualifierValue } from '@/components/uhtd/PartQualifiersInput';
 
 interface Part {
   id: string;
@@ -35,6 +36,7 @@ export default function EditPartPage() {
 
   const [part, setPart] = useState<Part | null>(null);
   const [existingSpaIds, setExistingSpaIds] = useState<string[]>([]);
+  const [initialQualifierValues, setInitialQualifierValues] = useState<Record<string, PartQualifierValue>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -42,18 +44,27 @@ export default function EditPartPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [partRes, compatRes] = await Promise.all([
+        const [partRes, compatRes, qualifiersRes] = await Promise.all([
           fetchWithAuth(`/api/dashboard/super-admin/pcdb/parts/${partId}`),
           fetchWithAuth(`/api/dashboard/super-admin/comps/compatibility?partId=${partId}`),
+          fetchWithAuth(`/api/dashboard/super-admin/qdb/part-qualifiers/${partId}`),
         ]);
 
         const partData = await partRes.json();
         const compatData = await compatRes.json();
+        const qualifiersData = await qualifiersRes.json();
 
         if (partData.success) setPart(partData.data);
         if (compatData.success) {
           const ids = (compatData.data || []).map((c: Compatibility) => c.spaModelId);
           setExistingSpaIds(ids);
+        }
+        if (qualifiersData.success && Array.isArray(qualifiersData.data)) {
+          const map: Record<string, PartQualifierValue> = {};
+          for (const pq of qualifiersData.data) {
+            map[pq.qualifierId] = { value: pq.value, isRequired: pq.isRequired ?? false };
+          }
+          setInitialQualifierValues(map);
         }
       } catch (err) {
         console.error('Error fetching part:', err);
@@ -64,7 +75,28 @@ export default function EditPartPage() {
     fetchData();
   }, [partId, fetchWithAuth]);
 
-  const handleSubmit = async (formData: any, spaIds: string[]) => {
+  const savePartQualifiers = async (qualifierValues: Record<string, PartQualifierValue>) => {
+    const currentIds = Object.keys(initialQualifierValues);
+    const newIds = Object.keys(qualifierValues);
+
+    for (const qid of newIds) {
+      const { value, isRequired } = qualifierValues[qid];
+      await fetchWithAuth(`/api/dashboard/super-admin/qdb/part-qualifiers/${partId}/${qid}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value, isRequired }),
+      });
+    }
+    for (const qid of currentIds) {
+      if (!newIds.includes(qid)) {
+        await fetchWithAuth(`/api/dashboard/super-admin/qdb/part-qualifiers/${partId}/${qid}`, {
+          method: 'DELETE',
+        });
+      }
+    }
+  };
+
+  const handleSubmit = async (formData: any, spaIds: string[], qualifierValues?: Record<string, PartQualifierValue>) => {
     setSaving(true);
     setError('');
 
@@ -105,6 +137,16 @@ export default function EditPartPage() {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ partId, spaModelId }),
+          });
+        }
+      }
+
+      if (qualifierValues && Object.keys(qualifierValues).length > 0) {
+        await savePartQualifiers(qualifierValues);
+      } else if (Object.keys(initialQualifierValues).length > 0) {
+        for (const qid of Object.keys(initialQualifierValues)) {
+          await fetchWithAuth(`/api/dashboard/super-admin/qdb/part-qualifiers/${partId}/${qid}`, {
+            method: 'DELETE',
           });
         }
       }
@@ -156,6 +198,7 @@ export default function EditPartPage() {
       )}
 
       <PartForm
+        key={partId}
         initialData={{
           categoryId: part.categoryId,
           partNumber: part.partNumber || '',
@@ -171,6 +214,7 @@ export default function EditPartPage() {
           dataSource: part.dataSource || '',
         }}
         selectedSpaIds={existingSpaIds}
+        initialQualifierValues={initialQualifierValues}
         onSubmit={handleSubmit}
         submitLabel="Save Changes"
         loading={saving}

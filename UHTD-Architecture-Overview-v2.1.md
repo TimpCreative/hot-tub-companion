@@ -178,11 +178,6 @@ Each row represents a single model for a single year — the atomic unit that pa
 | dimensions_height_inches | INTEGER | Height in inches |
 | weight_dry_lbs | INTEGER | Dry weight |
 | weight_filled_lbs | INTEGER | Filled weight |
-| electrical_requirement | VARCHAR(50) | '240V/50A', '120V/15A', etc. |
-| **FEATURES** | | |
-| has_ozone | BOOLEAN, DEFAULT false | Built-in ozone system |
-| has_uv | BOOLEAN, DEFAULT false | Built-in UV sanitization |
-| has_salt_system | BOOLEAN, DEFAULT false | Built-in salt system |
 | **MEDIA & STATUS** | | |
 | image_url | TEXT | Product image URL |
 | spec_sheet_url | TEXT | Spec sheet URL |
@@ -193,6 +188,8 @@ Each row represents a single model for a single year — the atomic unit that pa
 | created_at / updated_at | TIMESTAMPTZ | Audit timestamps |
 
 Unique constraint: `(model_line_id, name, year)` — no duplicate model-year combinations within a model line.
+
+> **Note:** Electrical requirement, ozone, UV, salt system, and sanitization are stored in qdb_spa_qualifiers, not as spa columns. This allows flexible qualifier definitions.
 
 ```sql
 CREATE TABLE scdb_spa_models (
@@ -212,12 +209,6 @@ CREATE TABLE scdb_spa_models (
   dimensions_height_inches INTEGER,
   weight_dry_lbs INTEGER,
   weight_filled_lbs INTEGER,
-  electrical_requirement VARCHAR(50),
-
-  -- Features
-  has_ozone BOOLEAN DEFAULT false,
-  has_uv BOOLEAN DEFAULT false,
-  has_salt_system BOOLEAN DEFAULT false,
 
   -- Media
   image_url TEXT,
@@ -684,70 +675,34 @@ When spas are added to or removed from a Comp, the system cascades changes to pa
 
 The Qdb stores additional attributes that refine compatibility beyond "part fits spa." A chlorine chemical is compatible with a spa at the physical level, but if the customer uses a bromine sanitization system, showing chlorine products is unhelpful. Qualifiers solve this.
 
-## 7.1 Qualifier Types
+## 7.1 Sections
 
-| Qualifier | Data Type | Applies To | Values |
-|---|---|---|---|
-| sanitization_system | enum | spa + part | bromine, chlorine, frog_ease, copper, silver_mineral |
-| voltage_requirement | enum | spa + part | 120V, 240V |
-| ozone_compatible | boolean | part | true/false |
-| uv_compatible | boolean | part | true/false |
-| salt_compatible | boolean | part | true/false |
+Qualifiers are grouped into **sections** (e.g., "Electrical", "Sanitization") for organization. Each section has a `sort_order` for display. Qualifiers reference `section_id` (nullable).
 
-## 7.2 Qualifier Tables
+## 7.2 Qualifier Types and Allowed Values
 
-- **qdb_qualifiers:** Defines each qualifier (name, data type, allowed values, whether it applies to spas, parts, or both).
-- **qdb_spa_qualifiers:** Assigns qualifier values to spa model-year records (e.g., J-335 2022 uses bromine sanitization).
-- **qdb_part_qualifiers:** Assigns qualifier values to parts. Includes an `is_required` flag: if true, the part REQUIRES this qualifier to match the spa's qualifier. If false, informational only.
+- **data_type:** `boolean`, `enum`, `array`, `number`, `text`
+- **enum:** Single value from a fixed list. `allowed_values` is an array of `{ value, displayName, brandIds?: string[] | null }`. Empty `brandIds` means universal option; selected brands make the option brand-specific.
+- **array:** Multiple values (e.g., `sanitization_systems: ['ozone','uv']`). May have fixed options in `allowed_values` or free-form (e.g., electrical_configs).
+- **is_universal:** If true, the qualifier is shown for all brands. If false, it is brand-specific and must be assigned via qdb_brand_qualifiers.
+- **is_required:** If true (for spa qualifiers), the value is required when adding/editing a spa.
 
-```sql
-CREATE TABLE qdb_qualifiers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(100) NOT NULL UNIQUE,
-  display_name VARCHAR(100) NOT NULL,
-  data_type VARCHAR(20) NOT NULL,  -- 'enum', 'boolean', 'number', 'text'
-  allowed_values JSONB,
-  applies_to VARCHAR(20) NOT NULL,  -- 'spa', 'part', 'both'
-  description TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+## 7.3 Qualifier Tables
 
-INSERT INTO qdb_qualifiers (name, display_name, data_type, allowed_values, applies_to) VALUES
-  ('sanitization_system', 'Sanitization System', 'enum', '["bromine", "chlorine", "frog_ease", "copper", "silver_mineral"]', 'both'),
-  ('voltage_requirement', 'Voltage Requirement', 'enum', '["120V", "240V"]', 'both'),
-  ('ozone_compatible', 'Ozone Compatible', 'boolean', NULL, 'part'),
-  ('uv_compatible', 'UV Compatible', 'boolean', NULL, 'part'),
-  ('salt_compatible', 'Salt System Compatible', 'boolean', NULL, 'part');
+- **qdb_sections:** Sections for grouping qualifiers (name, sort_order).
+- **qdb_qualifiers:** Defines each qualifier (name, data_type, section_id, is_universal, is_required, allowed_values, applies_to).
+- **qdb_brand_qualifiers:** Assigns brand-specific qualifiers to brands. Only qualifiers with is_universal=false appear here.
+- **qdb_spa_qualifiers:** Assigns qualifier values to spa model-year records. Value is JSONB (scalar or array).
+- **qdb_part_qualifiers:** Assigns qualifier values to parts. Includes `is_required`: if true, the part REQUIRES the spa to match this qualifier.
 
-CREATE TABLE qdb_spa_qualifiers (
-  spa_model_id UUID NOT NULL REFERENCES scdb_spa_models(id) ON DELETE CASCADE,
-  qualifier_id UUID NOT NULL REFERENCES qdb_qualifiers(id) ON DELETE CASCADE,
-  value JSONB NOT NULL,
-
-  PRIMARY KEY (spa_model_id, qualifier_id)
-);
-
-CREATE INDEX idx_qdb_spa_qualifiers_spa ON qdb_spa_qualifiers(spa_model_id);
-
-CREATE TABLE qdb_part_qualifiers (
-  part_id UUID NOT NULL REFERENCES pcdb_parts(id) ON DELETE CASCADE,
-  qualifier_id UUID NOT NULL REFERENCES qdb_qualifiers(id) ON DELETE CASCADE,
-  value JSONB NOT NULL,
-  is_required BOOLEAN DEFAULT false,
-
-  PRIMARY KEY (part_id, qualifier_id)
-);
-
-CREATE INDEX idx_qdb_part_qualifiers_part ON qdb_part_qualifiers(part_id);
-```
-
-## 7.3 Qualifier Filtering Logic
+## 7.4 Qualifier Filtering and Array Matching
 
 When serving products to a customer, qualifier filtering works as follows:
 
-- If a part has no qualifier requirements (no rows in qdb_part_qualifiers with is_required=true), it passes the qualifier check unconditionally.
-- If a part has a required qualifier, the customer's spa must have a matching value for that qualifier.
-- Multiple required qualifiers are ANDed together.
+- If a part has no qualifier requirements (no rows in qdb_part_qualifiers with is_required=true), it passes unconditionally.
+- If a part has a required qualifier, the spa must have a matching value. Matching supports:
+  - **Scalar:** spa value array includes part value.
+  - **Array:** spa array and part array overlap (e.g., spa has `['ozone','uv']`, part requires `['ozone']` → match).
 
 ---
 
@@ -1208,7 +1163,13 @@ Import behavior: look up Comp IDs, get all spas, add to part_spa_compatibility w
 | GET/POST/DELETE | `/api/v1/super-admin/qdb/spas/:spaId/qualifiers` | Spa qualifier values |
 | GET/POST/DELETE | `/api/v1/super-admin/qdb/parts/:partId/qualifiers` | Part qualifier requirements |
 
-## 13.6 Super Admin Utility Endpoints
+## 13.6 Import Template API
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/dashboard/super-admin/import/templates/:type` | Download CSV template for bulk import. `:type` is one of: `brands`, `model-lines`, `spas`, `parts`, `comps`. Templates include qualifier columns (`qualifier_<name>`) for spas and parts based on current Qdb definitions. |
+
+## 13.7 Super Admin Utility Endpoints
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -1220,7 +1181,7 @@ Import behavior: look up Comp IDs, get all spas, add to part_spa_compatibility w
 | PUT | `/api/v1/super-admin/uhtd/correction-requests/:id` | Resolve correction request |
 | GET | `/api/v1/super-admin/uhtd/audit-log` | Filtered audit log (by table, user, date range) |
 
-## 13.7 Retailer Admin Product Endpoints
+## 13.8 Retailer Admin Product Endpoints
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -1233,7 +1194,7 @@ Import behavior: look up Comp IDs, get all spas, add to part_spa_compatibility w
 | GET | `/api/v1/admin/products/sync-status` | Current sync status |
 | POST | `/api/v1/admin/correction-requests` | Submit UHTD correction request |
 
-## 13.8 Customer Product Endpoints
+## 13.9 Customer Product Endpoints
 
 | Method | Endpoint | Description |
 |---|---|---|

@@ -34,7 +34,7 @@ export default function NewPartPage() {
     fetchCategories();
   }, [fetchWithAuth]);
 
-  const handleSubmit = async (formData: any, spaIds: string[]) => {
+  const handleSubmit = async (formData: any, spaIds: string[], qualifierValues?: Record<string, { value: unknown; isRequired: boolean }>) => {
     setLoading(true);
     setError('');
 
@@ -63,6 +63,16 @@ export default function NewPartPage() {
             status: 'pending',
           }),
         });
+      }
+
+      if (qualifierValues && Object.keys(qualifierValues).length > 0) {
+        for (const [qualifierId, { value, isRequired }] of Object.entries(qualifierValues)) {
+          await fetchWithAuth(`/api/dashboard/super-admin/qdb/part-qualifiers/${partId}/${qualifierId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value, isRequired }),
+          });
+        }
       }
 
       router.push(`/super-admin/uhtd/parts/${partId}`);

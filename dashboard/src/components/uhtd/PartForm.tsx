@@ -8,6 +8,7 @@ import { DataSourceInput } from '../ui/DataSourceInput';
 import { SpaSelector } from './SpaSelector';
 import { CompSidebar } from './CompSidebar';
 import { CompQuickview } from './CompQuickview';
+import { PartQualifiersInput, PartQualifierValue } from './PartQualifiersInput';
 
 interface Category {
   id: string;
@@ -37,7 +38,8 @@ interface PartFormData {
 interface PartFormProps {
   initialData?: Partial<PartFormData>;
   selectedSpaIds?: string[];
-  onSubmit: (data: PartFormData, spaIds: string[]) => Promise<void>;
+  initialQualifierValues?: Record<string, PartQualifierValue>;
+  onSubmit: (data: PartFormData, spaIds: string[], qualifierValues?: Record<string, PartQualifierValue>) => Promise<void>;
   submitLabel?: string;
   loading?: boolean;
 }
@@ -45,6 +47,7 @@ interface PartFormProps {
 export function PartForm({
   initialData,
   selectedSpaIds: initialSpaIds = [],
+  initialQualifierValues = {},
   onSubmit,
   submitLabel = 'Save Part',
   loading = false,
@@ -52,7 +55,16 @@ export function PartForm({
   const fetchWithAuth = useSuperAdminFetch();
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedSpaIds, setSelectedSpaIds] = useState<string[]>(initialSpaIds);
+  const [qualifierValues, setQualifierValues] = useState<Record<string, PartQualifierValue>>(initialQualifierValues);
   const [quickviewCompId, setQuickviewCompId] = useState<string | null>(null);
+  const [qualifiersInitialized, setQualifiersInitialized] = useState(false);
+
+  useEffect(() => {
+    if (!qualifiersInitialized && Object.keys(initialQualifierValues).length > 0) {
+      setQualifierValues(initialQualifierValues);
+      setQualifiersInitialized(true);
+    }
+  }, [initialQualifierValues, qualifiersInitialized]);
 
   const [formData, setFormData] = useState<PartFormData>({
     categoryId: initialData?.categoryId || '',
@@ -113,7 +125,7 @@ export function PartForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onSubmit(formData, selectedSpaIds);
+    await onSubmit(formData, selectedSpaIds, qualifierValues);
   };
 
   return (
@@ -286,6 +298,14 @@ export function PartForm({
               onChange={(value) => setFormData({ ...formData, dataSource: value })}
               placeholder="Where did this info come from?"
             />
+
+            <div className="pt-4 border-t border-gray-200">
+              <PartQualifiersInput
+                value={qualifierValues}
+                onChange={setQualifierValues}
+                fetchWithAuth={fetchWithAuth}
+              />
+            </div>
           </div>
 
           <Button type="submit" loading={loading} className="w-full">

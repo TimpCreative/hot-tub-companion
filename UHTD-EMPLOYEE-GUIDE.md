@@ -92,7 +92,8 @@ Add a brand when you need to enter data for a manufacturer that doesn't exist ye
    - **Logo URL** (optional) - Direct link to the brand logo
    - **Website URL** (optional) - Brand's official website
    - **Data Source** (optional) - Where you got this info (e.g., "manufacturer catalog 2024")
-4. Click **Create Brand**
+4. In the **Qualifiers** section: Assign brand-specific qualifiers (qualifiers that are not universal). Only qualifiers marked as non-universal appear here. Check the ones that apply to this brand.
+5. Click **Create Brand** or **Save** when editing
 
 ### Example
 
@@ -149,10 +150,10 @@ You can add multiple model lines at once:
    - **Model Name** (required) - e.g., "J-345"
    - **Model Year(s)** (required) - Check the years this model applies to (e.g., 2005-2025). Use quick-select buttons for ranges, or check individual years. One spa record is created per selected year.
 6. Fill in optional specifications:
-   - **Specifications**: Seating capacity, jet count, water capacity (gallons), electrical requirement
+   - **Specifications**: Seating capacity, jet count, water capacity (gallons)
    - **Dimensions**: Length, width, height (all in inches - enter just the number)
    - **Weight**: Dry weight and filled weight (both in lbs - enter just the number)
-   - **Features**: Has Ozone, Has UV, Has Salt System checkboxes
+   - **Qualifiers**: Spa specs and options are set via qualifiers (voltage, electrical configs, ozone, UV, salt system, sanitization, etc.). These appear in sections (e.g., Electrical, Sanitization). Required qualifiers must be filled in.
    - **Media**: Image URL, Spec Sheet URL, Notes
 7. Click **Create Spa Model**
 
@@ -198,6 +199,7 @@ When adding a part, you'll see a three-column layout:
    - **Manufacturer** - Who makes this part
    - **OEM Part** - Check if this is the manufacturer's original part
    - **Universal** - Check if this fits ALL spas
+   - **Part Qualifiers** - Set qualifier values for part-only or both qualifiers (e.g., voltage, ozone compatible). Required qualifiers affect spa compatibility matching.
    - **Data Source** - Where you found this info
 4. Select Compatible Spas (unless marking as Universal):
    - Search for spa models by name, brand, or model line
@@ -303,34 +305,46 @@ The Comp detail page shows **Computed Parts** - parts that are compatible with s
 
 Qualifiers add conditional compatibility rules. For example, a pump might fit a spa model but only if it's the 240V version. Qualifiers capture these "it depends" scenarios.
 
-### Types of Qualifiers
+### Sections
 
-- **Boolean** - Simple yes/no value (e.g., "Has Ozonator?")
-- **Single Select** - User must pick one option (e.g., "What is your voltage?" → 120V or 240V)
-- **Multi Select** - User can select multiple options (e.g., "What features does your spa have?" → LED Lights, Ozone, Waterfall)
+Qualifiers are grouped into **sections** (e.g., "Electrical", "Sanitization"). Manage sections at the top of the Qualifiers page: add, edit, delete, and reorder them. Each qualifier can be assigned to a section.
+
+### Universal vs Brand-Specific
+
+- **Universal qualifiers** - Shown for all brands when adding/editing spas or parts. No brand assignment needed.
+- **Brand-specific qualifiers** - Only appear for brands they are assigned to. Assign them on the Brand edit page in the Qualifiers section.
+
+### Required Qualifiers
+
+When adding or editing a spa, qualifiers marked as **Required** must have a value. This ensures specs are complete.
+
+### Data Types
+
+- **Boolean** - Yes/no (e.g., ozone compatible)
+- **Enum** - Single value from a fixed list
+- **Array** - Multiple values (e.g., sanitization_systems: ozone, UV, salt)
+
+### Allowed Values Builder (Enum and Array)
+
+For enum or array qualifiers with fixed options, use the Allowed Values builder:
+- Each row: **value** (internal), **displayName** (shown to users), and optional **brand** multi-select
+- Empty brand selection = universal option; selected brands = brand-specific option (only shown for those brands)
 
 ### Creating a Qualifier
 
 1. Go to **UHTD → Qualifiers**
-2. Click **+ Add Qualifier**
-3. Fill in:
-   - **Internal Name** (required) - e.g., `voltage_rating` (auto-formatted to lowercase with underscores)
+2. Optionally create or select a section first
+3. Click **+ Add Qualifier**
+4. Fill in:
+   - **Internal Name** (required) - e.g., `voltage_rating`
    - **Display Name** (required) - e.g., "Voltage Rating"
-   - **Description** - Help text for users
-   - **Applies To** (required) - Choose one:
-     - **Spa Only** - This is an attribute of spas (e.g., "spa's voltage")
-     - **Part Only** - This is a requirement of parts (e.g., "part requires 240V")
-     - **Both** - Used by both spas and parts
-   - **Data Type** - Boolean (Yes/No), Single Select, or Multi Select
-   - **Allowed Values** - For Select types, enter comma-separated options (e.g., `120V, 240V`)
-4. Click **Create Qualifier**
-
-### Input Formatting
-
-When entering possible values:
-- Separate options with commas: `120V, 240V`
-- Extra spaces are automatically trimmed (so `120V,  240V` becomes `120V, 240V`)
-- Each value becomes a selectable option for the user
+   - **Section** - Optional dropdown
+   - **Universal** - Check if this qualifier applies to all brands
+   - **Required** - Check if value is required when adding/editing spa
+   - **Applies To** - Spa only, Part only, or Both
+   - **Data Type** - Boolean, Enum, Array, Number, or Text
+   - **Allowed Values** - For enum/array with fixed options, use the builder (value, displayName, brand scope)
+5. Click **Create Qualifier**
 
 ---
 
@@ -355,8 +369,8 @@ When entering possible values:
 
 1. Go to **UHTD → Import**
 2. Select the import type (click one of the 5 buttons)
-3. Click **Download Template** to get a sample CSV
-4. Fill in your data following the template format
+3. Click **Download Template** to get a sample CSV. Templates are **dynamic** — they include qualifier columns (`qualifier_<name>`) for spas and parts based on current Qdb definitions.
+4. Fill in your data following the template format. For qualifier columns, use the format specified in the template (e.g., pipe-separated for array qualifiers: `ozone|uv`).
 5. Upload your CSV file
 6. Preview the data and check for errors
 7. Click **Import**
