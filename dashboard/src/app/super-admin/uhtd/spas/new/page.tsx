@@ -1,6 +1,20 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
+
+function sanitizeQualifierValuesForSubmit(v: Record<string, unknown>): Record<string, unknown> | undefined {
+  if (!v || Object.keys(v).length === 0) return undefined;
+  const out: Record<string, unknown> = {};
+  for (const [k, val] of Object.entries(v)) {
+    if (Array.isArray(val) && val.length > 0 && val[0] && typeof val[0] === 'object' && 'voltage' in val[0] && 'amperage' in val[0]) {
+      const valid = val.filter((c: { voltage?: unknown; amperage?: unknown }) => c?.voltage && c?.amperage);
+      if (valid.length > 0) out[k] = valid;
+    } else {
+      out[k] = val;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
@@ -132,7 +146,7 @@ function NewSpaForm() {
         const res = await fetchWithAuth('/api/dashboard/super-admin/scdb/spa-models', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...basePayload, year: formData.selectedYears[0], qualifierValues: Object.keys(qualifierValues).length > 0 ? qualifierValues : undefined }),
+          body: JSON.stringify({ ...basePayload, year: formData.selectedYears[0], qualifierValues: sanitizeQualifierValuesForSubmit(qualifierValues) }),
         });
 
         const data = await res.json();
@@ -142,7 +156,7 @@ function NewSpaForm() {
         const res = await fetchWithAuth('/api/dashboard/super-admin/scdb/spa-models/bulk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...basePayload, years: formData.selectedYears, qualifierValues: Object.keys(qualifierValues).length > 0 ? qualifierValues : undefined }),
+          body: JSON.stringify({ ...basePayload, years: formData.selectedYears, qualifierValues: sanitizeQualifierValuesForSubmit(qualifierValues) }),
         });
 
         const data = await res.json();

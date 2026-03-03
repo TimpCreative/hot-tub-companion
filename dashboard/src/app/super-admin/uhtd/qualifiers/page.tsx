@@ -463,7 +463,8 @@ export default function QualifiersPage() {
           <li>• <strong>Array</strong> – Multiple values; can have fixed options or free-form (e.g. electrical configs)</li>
           <li>• <strong>Universal</strong> – Shows for all brands; otherwise assign to brands on Brand edit page</li>
           <li>• <strong>Required</strong> – Must be set when adding/editing a spa</li>
-          <li>• <strong>Electrical simplification:</strong> Electrical Configurations (array) captures full configs (e.g. 240V/50A). Voltage Requirement (enum) is simpler (120V/240V). You typically only need one—use Electrical Configurations if you need amperage details; otherwise Voltage Requirement is enough.</li>
+          <li>• <strong>Electrical simplification:</strong> Electrical Configurations (array) captures full configs (e.g. 240V/50A). Voltage Requirement (enum) is simpler (120V/240V). You typically only need one.</li>
+          <li>• <strong>Universal qualifier + per-option brands:</strong> Set qualifier as Universal so it shows for all brands. In allowed values, leave Brands empty for options that apply to everyone (e.g. Ozone, UV). Select specific brands only for options that are brand-specific (e.g. Jacuzzi True → select Jacuzzi).</li>
         </ul>
       </div>
 
@@ -489,7 +490,7 @@ export default function QualifiersPage() {
       </Modal>
 
       {/* Qualifier Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingQualifier ? 'Edit Qualifier' : 'Add Qualifier'} size="xl">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingQualifier ? 'Edit Qualifier' : 'Add Qualifier'} size="2xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
@@ -606,7 +607,7 @@ export default function QualifiersPage() {
               </div>
               <div className="space-y-2">
                 {formData.allowedValues.map((av, idx) => (
-                  <div key={idx} className="grid grid-cols-[minmax(100px,1fr)_minmax(120px,1fr)_minmax(220px,1.5fr)_auto] gap-3 items-center p-3 bg-gray-50 rounded border border-gray-200">
+                  <div key={idx} className="grid grid-cols-[minmax(100px,1fr)_minmax(120px,1fr)_minmax(280px,2fr)_auto] gap-4 items-start p-3 bg-gray-50 rounded border border-gray-200">
                     <input
                       type="text"
                       value={av.value}
@@ -622,7 +623,7 @@ export default function QualifiersPage() {
                       className="w-full min-w-0 px-2 py-1.5 text-sm border border-gray-300 rounded"
                     />
                     <div className="min-w-0">
-                      <span className="text-xs text-gray-500 block mb-1">Brands (empty = universal)</span>
+                      <span className="text-xs text-gray-500 block mb-1">Brands — empty = option for all brands; select brands = option only for those brands</span>
                       <select
                         multiple
                         value={av.brandIds || []}

@@ -1,6 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
+function sanitizeQualifierValuesForSubmit(v: Record<string, unknown>): Record<string, unknown> | undefined {
+  if (!v || Object.keys(v).length === 0) return undefined;
+  const out: Record<string, unknown> = {};
+  for (const [k, val] of Object.entries(v)) {
+    if (Array.isArray(val) && val.length > 0 && val[0] && typeof val[0] === 'object' && 'voltage' in val[0] && 'amperage' in val[0]) {
+      const valid = val.filter((c: { voltage?: unknown; amperage?: unknown }) => c?.voltage && c?.amperage);
+      if (valid.length > 0) out[k] = valid;
+    } else {
+      out[k] = val;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
@@ -87,7 +101,7 @@ export default function NewSpaModelPage() {
       dimensionsHeightInches: formData.dimensionsHeightInches ? Number(formData.dimensionsHeightInches) : undefined,
       weightDryLbs: formData.weightDryLbs ? Number(formData.weightDryLbs) : undefined,
       weightFilledLbs: formData.weightFilledLbs ? Number(formData.weightFilledLbs) : undefined,
-      qualifierValues: Object.keys(qualifierValues).length > 0 ? qualifierValues : undefined,
+      qualifierValues: sanitizeQualifierValuesForSubmit(qualifierValues),
     };
 
     try {

@@ -96,14 +96,7 @@ export function SpaQualifiersInput({ brandId, value, onChange, fetchWithAuth }: 
           <ElectricalConfigInput
             configs={electricalConfigs}
             onChange={(next) => {
-              const valid = next.filter((c) => c.voltage && c.amperage);
-              const payload = valid.map((c) => ({
-                voltage: Number(c.voltage),
-                voltageUnit: c.voltageUnit,
-                frequencyHz: c.frequencyHz ? Number(c.frequencyHz) : null,
-                amperage: String(c.amperage),
-              }));
-              updateQualifier(q.id, payload.length > 0 ? payload : undefined);
+              updateQualifier(q.id, next.length > 0 ? next : undefined);
             }}
           />
         </div>

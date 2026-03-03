@@ -45,7 +45,6 @@ export function ElectricalConfigInput({ configs, onChange }: ElectricalConfigInp
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <label className="block text-sm font-medium text-gray-700">Electrical Configurations</label>
         <Button type="button" variant="secondary" size="sm" onClick={handleAdd}>
           + Add Option
         </Button>
