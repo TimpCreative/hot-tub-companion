@@ -394,22 +394,22 @@ export async function getPartByPartNumber(partNumber: string): Promise<PcdbPart 
 export async function createPart(input: CreatePartInput, userId?: string): Promise<PcdbPart> {
   const insertData: Record<string, unknown> = {
       category_id: input.categoryId,
-      part_number: input.partNumber,
-      manufacturer_sku: input.manufacturerSku,
-      upc: input.upc,
-      ean: input.ean,
+      part_number: input.partNumber ?? null,
+      manufacturer_sku: input.manufacturerSku ?? null,
+      upc: input.upc ?? null,
+      ean: input.ean ?? null,
       sku_aliases: input.skuAliases,
       name: input.name,
-      manufacturer: input.manufacturer,
+      manufacturer: input.manufacturer ?? null,
       is_oem: input.isOem ?? false,
       is_universal: input.isUniversal ?? false,
       is_discontinued: input.isDiscontinued ?? false,
       display_importance: input.displayImportance ?? 2,
       dimensions_json: input.dimensionsJson ? JSON.stringify(input.dimensionsJson) : null,
-      image_url: input.imageUrl,
-      spec_sheet_url: input.specSheetUrl,
-      notes: input.notes,
-      data_source: input.dataSource,
+      image_url: input.imageUrl ?? null,
+      spec_sheet_url: input.specSheetUrl ?? null,
+      notes: input.notes ?? null,
+      data_source: input.dataSource ?? null,
     };
   const interchangeGroupId = input.interchangeGroupId && String(input.interchangeGroupId).trim();
   if (interchangeGroupId) {

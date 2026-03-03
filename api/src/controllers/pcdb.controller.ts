@@ -326,8 +326,8 @@ export async function createPart(req: Request, res: Response) {
       return error(res, 'INTERNAL_ERROR', 'Database schema may be outdated – ensure all migrations have run (manufacturer_sku)', 500);
     }
     if (err.code === '22P02') {
-      return error(res, 'VALIDATION_ERROR', 'Invalid UUID format for category or interchange group', 400);
-    }
+      const hint = (err.detail || err.message || '').toString();
+      return error(res, 'VALIDATION_ERROR', hint ? `Invalid UUID: ${hint}` : 'Invalid UUID format for category or interchange group', 400);
     console.error('Error creating part:', err);
     const msg = process.env.NODE_ENV === 'development' && err?.message
       ? `Failed to create part: ${err.message}`
