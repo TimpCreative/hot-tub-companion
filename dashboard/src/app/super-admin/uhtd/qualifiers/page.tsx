@@ -464,7 +464,7 @@ export default function QualifiersPage() {
           <li>• <strong>Universal</strong> – Shows for all brands; otherwise assign to brands on Brand edit page</li>
           <li>• <strong>Required</strong> – Must be set when adding/editing a spa</li>
           <li>• <strong>Electrical simplification:</strong> Electrical Configurations (array) captures full configs (e.g. 240V/50A). Voltage Requirement (enum) is simpler (120V/240V). You typically only need one.</li>
-          <li>• <strong>Universal qualifier + per-option brands:</strong> Set qualifier as Universal so it shows for all brands. In allowed values, leave Brands empty for options that apply to everyone (e.g. Ozone, UV). Select specific brands only for options that are brand-specific (e.g. Jacuzzi True → select Jacuzzi).</li>
+          <li>• <strong>Universal qualifier + per-option brands:</strong> Set qualifier as Universal so it shows for all brands. In allowed values, leave no brands selected for options that apply to everyone (e.g. Ozone, UV). Select specific brands only for options that are brand-specific (e.g. Jacuzzi True → select Jacuzzi).</li>
         </ul>
       </div>
 
@@ -623,7 +623,7 @@ export default function QualifiersPage() {
                       className="w-full min-w-0 px-2 py-1.5 text-sm border border-gray-300 rounded"
                     />
                     <div className="min-w-0">
-                      <span className="text-xs text-gray-500 block mb-1">Brands — empty = option for all brands; select brands = option only for those brands</span>
+                      <span className="text-xs text-gray-500 block mb-1">Brands — no brands selected = option for all; select brands = option only for those. Click to select, Cmd/Ctrl+click to deselect.</span>
                       <select
                         multiple
                         value={av.brandIds || []}

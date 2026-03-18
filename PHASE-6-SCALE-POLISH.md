@@ -141,6 +141,8 @@ DELETE /api/v1/account
 
 After a customer registers their spa and reaches the main app, if their spa profile was created within the last 7 days, show a "Getting Started" card on the My Tub dashboard with a progress checklist:
 
+**Home screen note:** Implement this as a **dashboard widget** so each dealer can choose whether to include it, adjust ordering, or replace it with their own dealer-specific onboarding flow.
+
 **Day 1: Fill & Initial Setup**
 - [ ] "Fill your hot tub" — guide link
 - [ ] "Add initial chemicals" — links to guide + recommended products

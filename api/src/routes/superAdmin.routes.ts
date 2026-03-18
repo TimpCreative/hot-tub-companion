@@ -14,6 +14,10 @@ router.use(superAdminAuth);
 
 router.get('/tenants', superAdminController.listTenants);
 router.post('/tenants', superAdminController.createTenant);
+router.get('/tenants/:id/pos', superAdminController.getTenantPosConfig);
+router.put('/tenants/:id/pos', superAdminController.updateTenantPosConfig);
+router.post('/tenants/:id/pos/test', superAdminController.testTenantPosConnection);
+router.post('/tenants/:id/pos/sync', superAdminController.syncTenantCatalog);
 router.get('/settings', superAdminController.getSettings);
 
 // Whitelist management

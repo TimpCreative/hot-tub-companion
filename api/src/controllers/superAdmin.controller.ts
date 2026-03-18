@@ -181,6 +181,10 @@ export async function createTenant(req: Request, res: Response): Promise<void> {
     primaryColor?: string;
     secondaryColor?: string;
     status?: string;
+    posType?: string | null;
+    shopifyStoreUrl?: string;
+    shopifyStorefrontToken?: string;
+    shopifyAdminToken?: string;
   };
 
   if (!body.name || !body.slug) {
@@ -200,6 +204,10 @@ export async function createTenant(req: Request, res: Response): Promise<void> {
       primary_color: body.primaryColor || '#1B4D7A',
       secondary_color: body.secondaryColor || '#E8A832',
       status: body.status || 'onboarding',
+      pos_type: body.posType || null,
+      shopify_store_url: body.shopifyStoreUrl || null,
+      shopify_storefront_token: body.shopifyStorefrontToken || null,
+      shopify_admin_token: body.shopifyAdminToken || null,
     })
     .returning('*');
 
@@ -213,6 +221,134 @@ export async function createTenant(req: Request, res: Response): Promise<void> {
       apiKey,
     },
   });
+}
+
+/**
+ * Get POS configuration summary for a tenant (no secrets).
+ */
+export async function getTenantPosConfig(req: Request, res: Response): Promise<void> {
+  const { id } = req.params;
+  const tenant = await db('tenants').where({ id }).first();
+  if (!tenant) {
+    error(res, 'NOT_FOUND', 'Tenant not found', 404);
+    return;
+  }
+
+  success(res, {
+    tenantId: tenant.id,
+    posType: tenant.pos_type,
+    shopifyStoreUrl: tenant.shopify_store_url,
+    lastProductSyncAt: tenant.last_product_sync_at,
+  });
+}
+
+/**
+ * Update POS configuration for a tenant (Shopify-only for Phase 1).
+ */
+export async function updateTenantPosConfig(req: Request, res: Response): Promise<void> {
+  const { id } = req.params;
+  const {
+    posType,
+    shopifyStoreUrl,
+    shopifyStorefrontToken,
+    shopifyAdminToken,
+  } = req.body as {
+    posType?: string | null;
+    shopifyStoreUrl?: string;
+    shopifyStorefrontToken?: string;
+    shopifyAdminToken?: string;
+  };
+
+  const tenant = await db('tenants').where({ id }).first();
+  if (!tenant) {
+    error(res, 'NOT_FOUND', 'Tenant not found', 404);
+    return;
+  }
+
+  const update: Record<string, unknown> = {};
+
+  if (posType !== undefined) {
+    if (posType !== null && posType !== 'shopify') {
+      error(res, 'VALIDATION_ERROR', 'Unsupported POS type for this phase', 400);
+      return;
+    }
+    update.pos_type = posType;
+  }
+  if (shopifyStoreUrl !== undefined) update.shopify_store_url = shopifyStoreUrl || null;
+  if (shopifyStorefrontToken !== undefined) update.shopify_storefront_token = shopifyStorefrontToken || null;
+  if (shopifyAdminToken !== undefined) update.shopify_admin_token = shopifyAdminToken || null;
+
+  if (Object.keys(update).length === 0) {
+    success(res, { message: 'No changes applied' });
+    return;
+  }
+
+  const [updated] = await db('tenants').where({ id }).update(update).returning('*');
+
+  success(res, {
+    tenantId: updated.id,
+    posType: updated.pos_type,
+    shopifyStoreUrl: updated.shopify_store_url,
+  });
+}
+
+/**
+ * Test POS connection for a tenant using the registered adapter.
+ */
+export async function testTenantPosConnection(req: Request, res: Response): Promise<void> {
+  const { id } = req.params;
+  const tenant = await db('tenants').where({ id }).first();
+  if (!tenant) {
+    error(res, 'NOT_FOUND', 'Tenant not found', 404);
+    return;
+  }
+
+  const { getPosAdapter } = await import('../services/posAdapterRegistry');
+  const adapter = getPosAdapter(tenant.pos_type);
+  if (!adapter) {
+    error(res, 'CONFIG_ERROR', 'No POS adapter configured for this tenant', 400);
+    return;
+  }
+
+  const result = await adapter.testConnection(tenant.id);
+  success(res, result);
+}
+
+/**
+ * Trigger a catalog sync for a tenant using the registered POS adapter.
+ */
+export async function syncTenantCatalog(req: Request, res: Response): Promise<void> {
+  const { id } = req.params;
+  const { full } = req.body as { full?: boolean };
+
+  const tenant = await db('tenants').where({ id }).first();
+  if (!tenant) {
+    error(res, 'NOT_FOUND', 'Tenant not found', 404);
+    return;
+  }
+
+  const { getPosAdapter } = await import('../services/posAdapterRegistry');
+  const adapter = getPosAdapter(tenant.pos_type);
+  if (!adapter) {
+    error(res, 'CONFIG_ERROR', 'No POS adapter configured for this tenant', 400);
+    return;
+  }
+
+  const since =
+    !full && tenant.last_product_sync_at
+      ? new Date(tenant.last_product_sync_at)
+      : undefined;
+
+  const summary = await adapter.syncCatalog(tenant.id, {
+    full: !!full,
+    since,
+  });
+
+  await db('tenants')
+    .where({ id: tenant.id })
+    .update({ last_product_sync_at: new Date() });
+
+  success(res, summary);
 }
 
 /**

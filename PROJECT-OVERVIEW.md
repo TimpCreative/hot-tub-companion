@@ -57,6 +57,8 @@ TimpCreative manages a single multi-tenant backend that powers all retailer apps
 
 6. **Retailers control their own experience.** Features can be toggled on/off per contract. Content can be retailer-provided or universal. Service types are retailer-defined. Subscription bundles are retailer-configurable.
 
+7. **The customer home screen is modular and dealer-owned.** The "My Tub" home screen should be built as a configurable set of widgets (cards/sections) so each dealer can customize what appears (and in what order), including dealer-specific widgets that integrate their own systems and processes to make the app feel like *theirs*.
+
 ---
 
 ## Data Model Overview (Simplified)

@@ -13,6 +13,8 @@ import mergeRoutes from './merge.routes';
 import statsRoutes from './stats.routes';
 import mediaRoutes from './media.routes';
 import { superAdminAuth } from '../middleware/superAdminAuth';
+import adminRoutes from './admin.routes';
+import productsRoutes from './products.routes';
 
 const router = Router();
 
@@ -23,6 +25,12 @@ router.get('/api/v1/tenant/config', tenantController.getTenantConfig);
 
 // Public SCdb routes (tenant API key required)
 router.use('/api/v1/scdb', scdbPublicRoutes);
+
+// Retailer admin routes (tenant API key + Firebase auth required)
+router.use('/api/v1/admin', adminRoutes);
+
+// Customer product routes (tenant API key required; some endpoints require auth)
+router.use('/api/v1', productsRoutes);
 
 // Super Admin routes
 router.use('/api/v1/super-admin', superAdminRoutes);

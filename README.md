@@ -1,119 +1,149 @@
 # Hot Tub Companion
 
-White-label mobile and web platform for spa retailers.
+Hot Tub Companion is a **white‑label platform** for spa/hot tub retailers: a customer mobile app (per‑retailer branded builds), a multi‑tenant backend API, and a web dashboard for retailer admins + TimpCreative super admins.
+
+If you’re looking for the detailed build spec, start at `PROJECT-OVERVIEW.md` and the `PHASE-*.md` docs. This README is the “how to run + what’s implemented” reference.
+
+## What’s built (high level)
+
+- **Multi-tenant API (Express + TypeScript + PostgreSQL/Knex)** in `api/`
+  - **Tenant resolution** via required `x-tenant-key` header on tenant-scoped routes
+  - **Health**: `GET /health`
+  - **Auth**: `POST /api/v1/auth/*` (Firebase-backed ID tokens for dashboards; JWT utilities for app workflows)
+  - **Tenant config**: `GET /api/v1/tenant/config` (used by the app on launch for branding/features/service types)
+  - **UHTD (Universal Hot Tub Database)**: SCdb/PCdb/Qdb + Comps + audit/import tooling under `/api/v1/super-admin/*` and public SCdb reads under `/api/v1/scdb/*`
+  - **POS adapter framework** with **Shopify adapter** registered (sync + webhook hooks live behind the adapter interface)
+  - **Retailer admin APIs** under `/api/v1/admin/*` (product visibility, mapping workflows, etc.)
+  - **Customer product APIs** under `/api/v1/*` (see `api/src/routes/index.ts` for route mounting)
+
+- **Dashboard (Next.js)** in `dashboard/`
+  - Retailer admin and super admin views (tenant context via querystring fallback for local dev)
+  - UHTD management UI (brands/model lines/spas/parts/comps/qualifiers/import/review queue)
+
+- **Mobile (Expo / React Native)** in `mobile/`
+  - White-label tenant configuration via build/runtime config files (tenant assets live under `mobile/tenants/*`)
+
+## Repo layout
+
+```
+api/        Express API (TypeScript)
+dashboard/  Next.js dashboard (retailer admin + super admin)
+mobile/     Expo mobile app (white-label builds)
+```
 
 ## Prerequisites
 
 - **Node.js** 18+
-- **Railway CLI** – for local API development with Railway env vars
-- **Firebase** – Auth and config
-- **Expo CLI** – for mobile development
+- **PostgreSQL** (local, Railway, or any hosted Postgres)
+- **Firebase project**
+  - Firebase Admin credentials for the API
+  - Firebase web config for dashboard/mobile auth
+- **Expo tooling** (for mobile dev)
 
-## Architecture
+## Quick start (local dev)
 
-- **API** (`/api`) – Express + TypeScript + Knex + PostgreSQL; Railway as single source of truth for env vars
-- **Mobile** (`/mobile`) – React Native (Expo) white-label app
-- **Dashboard** (`/dashboard`) – Next.js retailer admin and super admin
+### Install deps
 
-## Quick Start
-
-### 1. Clone and install
+This is not currently configured as a single “workspace install”, so install per package:
 
 ```bash
-git clone <repo-url>
-cd hot-tub-companion
-npm install
 cd api && npm install
-cd ../mobile && npm install
 cd ../dashboard && npm install
+cd ../mobile && npm install
 ```
 
-### 2. Railway setup (API)
+### API
 
-1. Create a Railway project with PostgreSQL
-2. Add a Node service with root directory `/api`
-3. Add env vars in Railway (no `.env` or `.env.example` for API):
+The API reads env vars from the process (and `dotenv` is enabled), so you can use **Railway env vars** or a local `api/.env` (never commit secrets).
 
-   - `DATABASE_URL` (provided by Postgres)
-   - `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
-   - `JWT_SECRET`, `ENCRYPTION_KEY`
-   - `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`
-   - `SUPER_ADMIN_EMAILS` (comma-separated – super admin dashboard)
-   - `TENANT_ADMIN_EMAILS` (comma-separated – admin whitelist for tenant apps)
-   - `API_URL` (e.g. `https://api.hottubcompanion.com`)
+#### Required environment variables (API)
 
-4. Link and run locally:
+- `DATABASE_URL`
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_CLIENT_EMAIL`
+- `FIREBASE_PRIVATE_KEY` (must include proper newlines; `\n`-escaped is supported)
+- `JWT_SECRET`
+
+#### Optional environment variables (API)
+
+- `PORT` (defaults to `3000`)
+- `API_URL` (defaults to `http://localhost:3000`)
+- `JWT_EXPIRES_IN` (defaults to `7d`)
+- `SENDGRID_API_KEY`
+- `SENDGRID_FROM_EMAIL` / `SENDGRID_FROM_NAME`
+- `ENCRYPTION_KEY`
+- `SUPER_ADMIN_EMAILS` (comma-separated)
+- `TENANT_ADMIN_EMAILS` (comma-separated)
+- `FIREBASE_STORAGE_BUCKET`
+
+#### Run migrations + seed
 
 ```bash
 cd api
-railway link
-railway run npm run dev
+npm run migrate
+npm run seed
 ```
 
-### 3. Migrations and seeds
+#### Start the API
 
 ```bash
 cd api
-railway run npm run migrate
-railway run npm run seed
+npm run dev
 ```
 
-After seeding, the console logs the Take A Break tenant `api_key`. Copy it for mobile/dashboard config.
+### Dashboard
 
-### 4. Mobile
+Create `dashboard/.env.local` (or set env vars in your shell). **Do not commit real values**.
 
-1. Create `mobile/tenants/takeabreak/config.env` from the example (config.env is gitignored):
+- `DATABASE_URL` (same Postgres the API uses)
+- `NEXT_PUBLIC_API_URL` (e.g. `http://localhost:3000`)
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` (if used)
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` (if used)
+- `NEXT_PUBLIC_FIREBASE_APP_ID` (if used)
 
-   ```bash
-   cp mobile/tenants/takeabreak/config.env.example mobile/tenants/takeabreak/config.env
-   ```
-
-   Then fill in real values (API key from seed output, Firebase keys from Firebase Console).
-
-2. Create `mobile/.env` with `TENANT=takeabreak` (or set when running).
-
-3. Run:
-
-```bash
-cd mobile
-npx expo start
-```
-
-### 5. Dashboard
-
-1. Set env vars (or `.env.local`):
-
-   - `DATABASE_URL` – Same Postgres as API (Railway public URL for local dev)
-   - `NEXT_PUBLIC_API_URL` – Railway API URL
-   - `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, etc.
-
-   Tenant API keys are resolved from the database by slug (never hardcoded in dashboard).
-
-2. Local subdomain testing: use `?tenant=takeabreak` or `?tenant=admin`:
-
-   - `http://localhost:3000/?tenant=takeabreak` → retailer admin
-   - `http://localhost:3000/?tenant=admin` → super admin
-
-3. Run:
+Run:
 
 ```bash
 cd dashboard
 npm run dev
 ```
 
-## Phase 0 Verification Checklist
+Local tenant context helpers:
 
-- [ ] API health at `/health`
-- [ ] Core tables exist, TAB tenant seeded
-- [ ] Firebase Auth: register and login work
-- [ ] Mobile: builds, fetches tenant config, shows branded theme, registration and login work
-- [ ] Dashboard: loads for retailer subdomain and admin subdomain, login works
-- [ ] Super admin: can view and create tenants
+- `http://localhost:3000/?tenant=takeabreak` (retailer admin)
+- `http://localhost:3000/?tenant=admin` (super admin)
 
-## Deployment
+### Mobile
 
-- **API** – Railway (Postgres + Node service)
-- **Dashboard** – Vercel (wildcard domain `*.hottubcompanion.com`)
-- **Mobile** – EAS Build
+Tenant builds use tenant-specific config files under `mobile/tenants/<tenant>/`.
 
-See `.github/workflows/deploy.yml` for CI/CD.
+```bash
+cp mobile/tenants/takeabreak/config.env.example mobile/tenants/takeabreak/config.env
+```
+
+Then run:
+
+```bash
+cd mobile
+npm run start
+```
+
+## Tenant + auth model (practical notes)
+
+- **Tenant scoping**: most API routes require `x-tenant-key`. The middleware skips `/health`, `/api/v1/auth/*`, `/api/v1/tenant/config`, and all `/api/v1/super-admin/*` routes.
+- **Super admin auth**: `/api/v1/super-admin/*` uses Firebase ID tokens + `SUPER_ADMIN_EMAILS` allowlist.
+
+## Deployment (current targets)
+
+- **API**: Railway (Node service + Postgres)
+- **Dashboard**: Vercel (supports wildcard subdomains like `*.hottubcompanion.com`)
+- **Mobile**: EAS Build (one app listing per tenant)
+
+## Documentation index
+
+- **Project map**: `PROJECT-OVERVIEW.md`
+- **UHTD spec**: `UHTD-Architecture-Overview-v2.1.md`
+- **Phase specs**: `PHASE-0-FOUNDATION.md` … `PHASE-6-SCALE-POLISH.md`

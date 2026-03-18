@@ -165,6 +165,8 @@ Store the active spa profile ID in local state (React context) and persist it to
 
 The home screen shows a personalized overview for the active spa:
 
+**Modularity requirement (important):** Build the My Tub dashboard as a **widget-based, tenant-configurable home screen** (a stack of cards/sections). Dealers should be able to choose which widgets appear, control ordering, and add dealer-specific widgets that integrate their own systems/workflows so the home experience feels uniquely *theirs*.
+
 **Header section:**
 - Spa model image (from UHTD, or a generic hot tub silhouette if no image)
 - "[Brand] [Model]" title

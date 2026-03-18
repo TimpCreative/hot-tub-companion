@@ -330,6 +330,8 @@ Bundles were defined in Phase 3 (subscription_bundles table). Now we build the f
   - "Subscribe" button (creates subscription)
   - "Buy Once" button (adds all items to cart)
 
+**Home screen note:** If shown on the My Tub dashboard, the "Bundles" section should be a **widget** so each dealer can choose whether it appears and where it sits in their home layout.
+
 **Admin bundle management** (added to `/admin/products` or dedicated `/admin/bundles`):
 - Create custom bundles for their store
 - Select products from their inventory

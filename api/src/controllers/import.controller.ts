@@ -173,6 +173,61 @@ function parseQualifierValuesFromRow(
   return result;
 }
 
+interface QualifierForFilter {
+  id: string;
+  name: string;
+  isUniversal: boolean;
+  allowedValues: { value: string; brandIds?: string[] | null }[] | string[] | null;
+}
+
+/**
+ * Filter qualifier values by brand. Drops qualifiers that don't apply to the brand,
+ * and drops brand-specific option values that don't match (e.g. jacuzzi_true for CalSpa).
+ */
+function filterQualifierValuesForBrand(
+  qualifierValues: Record<string, unknown>,
+  brandId: string,
+  qualifierIdToQualifier: Map<string, QualifierForFilter>,
+  brandQualifierIds: Set<string>
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [qualifierId, value] of Object.entries(qualifierValues)) {
+    const qual = qualifierIdToQualifier.get(qualifierId);
+    if (!qual) continue;
+
+    if (!qual.isUniversal && !brandQualifierIds.has(qualifierId)) continue;
+
+    if (!qual.allowedValues || !Array.isArray(qual.allowedValues)) {
+      result[qualifierId] = value;
+      continue;
+    }
+
+    const allowedOpts = qual.allowedValues.map((av) =>
+      typeof av === 'string' ? { value: av, brandIds: null as string[] | null } : av
+    );
+    const validValuesForBrand = new Set<string>();
+    for (const opt of allowedOpts) {
+      const ids = opt.brandIds;
+      if (ids == null || ids.length === 0 || ids.includes(brandId)) {
+        validValuesForBrand.add(opt.value.toLowerCase());
+      }
+    }
+
+    if (validValuesForBrand.size === 0) continue;
+
+    if (Array.isArray(value)) {
+      const filtered = (value as unknown[]).filter((v) => validValuesForBrand.has(String(v).toLowerCase()));
+      if (filtered.length === 0) continue;
+      result[qualifierId] = filtered;
+    } else {
+      const s = String(value).toLowerCase();
+      if (!validValuesForBrand.has(s)) continue;
+      result[qualifierId] = value;
+    }
+  }
+  return result;
+}
+
 interface CompatibilityImportRow {
   partNumber?: string;
   partName?: string;
@@ -429,7 +484,19 @@ export async function importSpas(req: Request, res: Response) {
     }
 
     const allQualifiers = await qdbService.getAllQualifiers();
-    const qualifierNameToId = new Map(allQualifiers.filter((q) => q.appliesTo === 'spa' || q.appliesTo === 'both').map((q) => [q.name, q.id]));
+    const spaQualifiers = allQualifiers.filter((q) => q.appliesTo === 'spa' || q.appliesTo === 'both');
+    const qualifierNameToId = new Map(spaQualifiers.map((q) => [q.name, q.id]));
+    const qualifierIdToQualifier = new Map(
+      spaQualifiers.map((q) => [
+        q.id,
+        {
+          id: q.id,
+          name: q.name,
+          isUniversal: q.isUniversal,
+          allowedValues: q.allowedValues,
+        },
+      ])
+    );
 
     let created = 0;
     let skipped = 0;
@@ -554,9 +621,18 @@ export async function importSpas(req: Request, res: Response) {
           userId
         );
 
-        const qualifierValues = parseQualifierValuesFromRow(row as Record<string, unknown>, qualifierNameToId);
+        let qualifierValues = parseQualifierValuesFromRow(row as Record<string, unknown>, qualifierNameToId);
         if (Object.keys(qualifierValues).length > 0) {
-          await qdbService.setSpaQualifiersBatch(inserted.id, qualifierValues, userId);
+          const brandQualifierIds = new Set(await qdbService.getBrandQualifiers(brand.id));
+          qualifierValues = filterQualifierValuesForBrand(
+            qualifierValues,
+            brand.id,
+            qualifierIdToQualifier,
+            brandQualifierIds
+          );
+          if (Object.keys(qualifierValues).length > 0) {
+            await qdbService.setSpaQualifiersBatch(inserted.id, qualifierValues, userId);
+          }
         }
 
         created++;

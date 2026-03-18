@@ -6,6 +6,7 @@ import compression from 'compression';
 import routes from './routes';
 import { defaultRateLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
+import { tenantMiddleware } from './middleware/tenant';
 
 const app = express();
 
@@ -16,6 +17,9 @@ app.use(helmet());
 app.use(morgan('combined'));
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
+
+// Attach tenant context for tenant-scoped routes
+app.use(tenantMiddleware);
 
 app.use(
   cors({

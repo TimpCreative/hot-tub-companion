@@ -17,6 +17,9 @@ interface Tenant {
   primaryColor?: string;
   secondaryColor?: string;
   createdAt: string;
+  posType?: string | null;
+  shopifyStoreUrl?: string | null;
+  lastProductSyncAt?: string | null;
 }
 
 export default function TenantDetailPage() {
@@ -28,6 +31,8 @@ export default function TenantDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [posLoading, setPosLoading] = useState(false);
+  const [posError, setPosError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -36,8 +41,32 @@ export default function TenantDetailPage() {
         const api = createSuperAdminApiClient(async () => token);
         const res = await api.get('/tenants') as { data?: { tenants?: Tenant[] } };
         const found = res.data?.tenants?.find((t) => t.id === id);
-        if (found) setTenant(found);
-        else setError('Tenant not found');
+        if (!found) {
+          setError('Tenant not found');
+          return;
+        }
+
+        // Fetch POS summary for this tenant
+        try {
+          const posRes = await api.get(`/tenants/${id}/pos`) as {
+            data?: {
+              tenantId: string;
+              posType?: string | null;
+              shopifyStoreUrl?: string | null;
+              lastProductSyncAt?: string | null;
+            };
+          };
+          const pos = posRes.data;
+          setTenant({
+            ...found,
+            posType: pos?.posType ?? null,
+            shopifyStoreUrl: pos?.shopifyStoreUrl ?? null,
+            lastProductSyncAt: pos?.lastProductSyncAt ?? null,
+          });
+        } catch {
+          // POS config may not exist yet; ignore and keep basic tenant info
+          setTenant(found);
+        }
       } catch (err: unknown) {
         const e = err && typeof err === 'object' ? (err as { error?: { message?: string }; message?: string }) : {};
         const msg = e.error?.message ?? e.message ?? 'Failed to load tenant';
@@ -73,6 +102,43 @@ export default function TenantDetailPage() {
     );
   }
 
+  async function handleTestConnection() {
+    if (!tenant) return;
+    setPosLoading(true);
+    setPosError(null);
+    try {
+      const token = await getIdToken();
+      const api = createSuperAdminApiClient(async () => token);
+      const res = await api.post(`/tenants/${tenant.id}/pos/test`, {}) as {
+        data?: { ok?: boolean; message?: string };
+      };
+      if (!res.data?.ok) {
+        setPosError(res.data?.message || 'Connection test failed');
+      } else {
+        setPosError(null);
+      }
+    } catch (err: any) {
+      setPosError(err?.message || 'Failed to test POS connection');
+    } finally {
+      setPosLoading(false);
+    }
+  }
+
+  async function handleSyncCatalog() {
+    if (!tenant) return;
+    setPosLoading(true);
+    setPosError(null);
+    try {
+      const token = await getIdToken();
+      const api = createSuperAdminApiClient(async () => token);
+      await api.post(`/tenants/${tenant.id}/pos/sync`, { full: true });
+    } catch (err: any) {
+      setPosError(err?.message || 'Failed to sync catalog');
+    } finally {
+      setPosLoading(false);
+    }
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -86,7 +152,7 @@ export default function TenantDetailPage() {
 
       <h2 className="text-2xl font-semibold text-gray-900 mb-6">{tenant.name}</h2>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden max-w-2xl">
+      <div className="bg-white shadow rounded-lg overflow-hidden max-w-2xl mb-8">
         <dl className="divide-y divide-gray-200">
           <div className="px-6 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
             <dt className="text-sm font-medium text-gray-500">ID</dt>
@@ -156,6 +222,48 @@ export default function TenantDetailPage() {
             </dd>
           </div>
         </dl>
+      </div>
+
+      <div className="bg-white shadow rounded-lg overflow-hidden max-w-2xl">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">POS Integration</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Configure how this tenant connects its product catalog to Hot Tub Companion.
+          </p>
+        </div>
+        <div className="px-6 py-4 space-y-4">
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Provider</dt>
+            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+              {tenant.posType || 'Not configured'}
+            </dd>
+          </div>
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Shopify Store URL</dt>
+            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+              {tenant.shopifyStoreUrl || '—'}
+            </dd>
+          </div>
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Last Product Sync</dt>
+            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+              {tenant.lastProductSyncAt
+                ? format(new Date(tenant.lastProductSyncAt), 'MMM d, yyyy HH:mm')
+                : 'Never'}
+            </dd>
+          </div>
+          {posError && (
+            <div className="text-sm text-red-600">{posError}</div>
+          )}
+          <div className="flex gap-3">
+            <Button type="button" variant="secondary" disabled={posLoading} onClick={handleTestConnection}>
+              {posLoading ? 'Testing…' : 'Test Connection'}
+            </Button>
+            <Button type="button" disabled={posLoading} onClick={handleSyncCatalog}>
+              {posLoading ? 'Syncing…' : 'Run Full Sync'}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

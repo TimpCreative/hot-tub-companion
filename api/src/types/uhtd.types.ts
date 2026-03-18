@@ -501,6 +501,84 @@ export interface PosProduct {
   uhtdPartNumber?: string;
 }
 
+// POS sync types and adapter contract
+
+export interface PosSyncOptions {
+  /**
+   * When true, adapters should perform a full catalog sync for the tenant.
+   * When false/omitted, adapters may choose to perform an incremental sync
+   * based on provider capabilities and the tenant's lastProductSyncAt value.
+   */
+  full?: boolean;
+  /**
+   * Optional lower bound for incremental sync. If provided, adapters should
+   * fetch products updated since this timestamp when supported by the provider.
+   */
+  since?: Date;
+}
+
+export interface PosSyncError {
+  /**
+   * Optional provider-specific identifier (e.g. product or variant ID)
+   * associated with this sync error.
+   */
+  id?: string;
+  /**
+   * Human-readable error message describing what went wrong.
+   */
+  message: string;
+}
+
+export interface PosSyncSummary {
+  /**
+   * Number of new pos_products rows created for this tenant during sync.
+   */
+  created: number;
+  /**
+   * Number of existing pos_products rows updated during sync.
+   */
+  updated: number;
+  /**
+   * Number of products that were marked as deleted/archived or otherwise
+   * deactivated as a result of this sync.
+   */
+  deletedOrArchived: number;
+  /**
+   * Collection of non-fatal errors encountered while syncing individual
+   * products or variants. Presence of errors does not imply total failure.
+   */
+  errors: PosSyncError[];
+}
+
+export interface PosAdapter {
+  /**
+   * Performs a lightweight connectivity and credential check for the given
+   * tenant. Implementations should avoid expensive catalog operations.
+   */
+  testConnection(tenantId: string): Promise<{ ok: boolean; message?: string }>;
+
+  /**
+   * Synchronizes the tenant's product catalog into the normalized
+   * pos_products table. Implementations should be idempotent and safe to
+   * call repeatedly.
+   */
+  syncCatalog(tenantId: string, options?: PosSyncOptions): Promise<PosSyncSummary>;
+
+  /**
+   * Optional hook for providers that support webhooks or other push-based
+   * mechanisms. Implementations can register webhooks or ensure they are
+   * up to date for the tenant.
+   */
+  ensureWebhooks?(tenantId: string): Promise<void>;
+
+  /**
+   * Optional webhook handler for providers that call back into the API.
+   * This should be wired by provider-specific routes that can resolve the
+   * appropriate tenant and forward payloads here.
+   */
+  handleWebhook?(tenantId: string, payload: unknown, headers: Record<string, string>): Promise<void>;
+}
+
 // =============================================================================
 // API Response Types
 // =============================================================================
@@ -670,6 +748,41 @@ export interface DbCompatibilityGroup {
   source_category_id: string | null;
   created_by: string | null;
   deleted_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface DbPosProduct {
+  id: string;
+  tenant_id: string;
+  pos_product_id: string;
+  pos_variant_id: string | null;
+  title: string;
+  description: string | null;
+  vendor: string | null;
+  product_type: string | null;
+  tags: string[] | null;
+  price: number;
+  compare_at_price: number | null;
+  sku: string | null;
+  barcode: string | null;
+  images: unknown[] | null;
+  variants: unknown[] | null;
+  inventory_quantity: number;
+  weight: number | null;
+  weight_unit: string | null;
+  is_hidden: boolean;
+  hidden_at: Date | null;
+  hidden_by: string | null;
+  uhtd_part_id: string | null;
+  mapping_status: MappingStatus;
+  mapping_confidence: number | null;
+  mapped_by: string | null;
+  mapped_at: Date | null;
+  pos_status: string | null;
+  pos_updated_at: Date | null;
+  last_synced_at: Date;
+  sync_hash: string | null;
   created_at: Date;
   updated_at: Date;
 }

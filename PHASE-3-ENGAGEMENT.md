@@ -73,6 +73,8 @@ CREATE TABLE chemical_dosage_rules (
 
 Accessible from My Tub dashboard "Test Water" quick action.
 
+**Home screen note:** Any new entry points surfaced on the My Tub dashboard in this phase (Water Care, Maintenance Timeline, Guides, Subscriptions) should be implemented as **dashboard widgets** so tenants can customize visibility and ordering.
+
 **Input form fields:**
 - **pH:** Slider or numeric stepper, range 6.0–9.0, step 0.1. Show color band (red < 7.2, green 7.2–7.8, red > 7.8)
 - **Total Alkalinity:** Numeric input (ppm). Target indicator: 80–120 ppm
