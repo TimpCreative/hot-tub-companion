@@ -1,8 +1,122 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTenant } from '@/contexts/TenantContext';
+import { createTenantApiClient } from '@/services/api';
+import { Button } from '@/components/ui/Button';
+
 export default function AdminSettingsPage() {
+  const { getIdToken } = useAuth();
+  const { config, loading } = useTenant();
+
+  const api = useMemo(() => createTenantApiClient(async () => await getIdToken()), [getIdToken]);
+
+  const [primaryColor, setPrimaryColor] = useState<string>('#1B4D7A');
+  const [secondaryColor, setSecondaryColor] = useState<string>('#E8A832');
+  const [logoUrl, setLogoUrl] = useState<string>('');
+  const [iconUrl, setIconUrl] = useState<string>('');
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!config) return;
+    setPrimaryColor(config.branding.primaryColor || '#1B4D7A');
+    setSecondaryColor(config.branding.secondaryColor || '#E8A832');
+    setLogoUrl(config.branding.logoUrl || '');
+    setIconUrl(config.branding.iconUrl || '');
+  }, [config]);
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await api.put('/admin/settings/branding', {
+        primaryColor,
+        secondaryColor,
+        logoUrl: logoUrl.trim().length > 0 ? logoUrl.trim() : null,
+        iconUrl: iconUrl.trim().length > 0 ? iconUrl.trim() : null,
+      }) as any;
+
+      if (res?.success) {
+        setSuccess(res.message ?? 'Branding saved');
+      } else {
+        setError(res?.error?.message ?? 'Failed to save branding');
+      }
+    } catch (e: any) {
+      setError(e?.error?.message ?? e?.message ?? 'Failed to save branding');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="flex items-center justify-center py-12">Loading...</div>;
+  }
+
   return (
-    <div>
+    <div className="max-w-2xl">
       <h2 className="text-2xl font-semibold text-gray-900 mb-4">Settings</h2>
-      <p className="text-gray-600">Coming in Phase 2</p>
+      <p className="text-gray-600 mb-6">Branding for this retailer (used by the mobile app).</p>
+
+      {error && <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700">{error}</div>}
+      {success && <div className="mb-4 rounded-lg bg-green-50 p-4 text-green-800">{success}</div>}
+
+      <div className="space-y-4 bg-white rounded-lg border border-gray-200 p-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Primary Color</label>
+          <input
+            type="color"
+            value={primaryColor}
+            onChange={(e) => setPrimaryColor(e.target.value)}
+            className="h-10 w-24 rounded border border-gray-200"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Secondary Color</label>
+          <input
+            type="color"
+            value={secondaryColor}
+            onChange={(e) => setSecondaryColor(e.target.value)}
+            className="h-10 w-24 rounded border border-gray-200"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL (full horizontal)</label>
+          <input
+            type="url"
+            value={logoUrl}
+            onChange={(e) => setLogoUrl(e.target.value)}
+            placeholder="https://..."
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Logomark URL (square/icon)</label>
+          <input
+            type="url"
+            value={iconUrl}
+            onChange={(e) => setIconUrl(e.target.value)}
+            placeholder="https://..."
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="flex items-center gap-3 pt-2">
+          <Button type="button" loading={saving} onClick={handleSave}>
+            Save Branding
+          </Button>
+          <p className="text-xs text-gray-500">
+            Upload images in Super Admin → UHTD → Media, then paste the public URLs here.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

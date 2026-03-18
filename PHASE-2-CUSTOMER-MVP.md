@@ -34,6 +34,41 @@ This is the **minimum viable product** for customer-facing functionality.
 
 ## Part 1: Onboarding Flow
 
+### 1.0 Design System & Branding (Tenant-Aware)
+
+Phase 2 must respect each retailer's branding while keeping the app consistent and accessible. Treat all visual decisions as semantic tokens, not hard-coded colors.
+
+**Tenant branding inputs (configured in Super Admin → Tenants):**
+- Primary color (hex) — main brand color.
+- Secondary color (hex) — supporting accent color.
+- Full logo (horizontal) — used on dealer cards, settings, marketing.
+- Logomark (square/icon) — used in app icon, splash, onboarding hero, and small placements.
+
+**Derived palette (computed in mobile app from primary/secondary):**
+- `primary`, `primaryLight`, `primaryDark`, `primarySoftBg`
+- `secondary`, `secondaryLight`, `secondaryDark`
+- `onPrimary`, `onSecondary` (auto-chosen for contrast)
+- Neutral tokens: `background`, `backgroundElevated`, `textDefault`, `textMuted`, `divider`
+
+**Light vs dark mode:**
+- Respect device-level light/dark preference.
+- Light mode: white / light neutrals for backgrounds, `primarySoftBg` for hero panels and cards.
+- Dark mode: dark surfaces with `primary`/`secondary` used for strokes, icons, and text accents.
+- Do **not** require extra tenant-provided dark colors; derive both schemes from the same primary/secondary.
+
+**Water theme without hard-coding blue:**
+- Use soft gradients and shapes that are tinted from the tenant's primary color, instead of fixed blue.
+- Ensure all text has sufficient contrast (WCAG AA) against the generated backgrounds.
+
+**Logo usage:**
+- Onboarding hero and app splash: use `logo_mark` in a circular or rounded container, with retailer name below.
+- Dealer cards and “About / Profile” screens: prefer `logo_full`, fall back to `logo_mark` if full logo missing.
+- If no logos are provided, fall back to a generic Hot Tub Companion icon and neutral theme.
+
+**API / data requirements for branding:**
+- Tenant record must expose: `primary_color`, `secondary_color`, `logo_full_url`, `logo_mark_url`.
+- Super Admin and/or Retailer Admin flows must allow uploading/replacing these assets safely.
+
 ### 1.1 Registration Screen
 
 `/auth/register`
@@ -163,9 +198,46 @@ Store the active spa profile ID in local state (React context) and persist it to
 
 ### 3.1 Dashboard Layout
 
-The home screen shows a personalized overview for the active spa:
+The home screen shows a personalized overview for the active spa.
 
-**Modularity requirement (important):** Build the My Tub dashboard as a **widget-based, tenant-configurable home screen** (a stack of cards/sections). Dealers should be able to choose which widgets appear, control ordering, and add dealer-specific widgets that integrate their own systems/workflows so the home experience feels uniquely *theirs*.
+**Modularity requirement (important):** Build the My Tub dashboard as a **widget-based, tenant-configurable home screen** (a stack of cards/sections). Dealers should be able to choose which widgets appear, control ordering, and configure basic content/CTAs via Retailer Admin so the home experience feels uniquely *theirs* without shipping new app code.
+
+**Widget system design:**
+- The mobile app ships with a fixed **widget registry** (predefined React Native components), for example:
+  - `hero` (spa summary header)
+  - `messages` (inbox preview / message count)
+  - `waterCare` (water care entry point)
+  - `shopCard` (Shop Parts & Chemicals CTA)
+  - `dealerCard` (dealer contact card)
+  - `tips` (Tips from Our Experts list)
+  - `recommendedProducts` (For You / Recommended products for this spa/sanitizer)
+- Each widget type accepts a **simple props object** (titles, subtitles, icon choice, CTA labels, etc.) and is rendered purely on the client; no executable code is downloaded.
+- Per-tenant **layout config** is stored server-side, e.g.:
+
+  ```jsonc
+  {
+    "homeLayout": [
+      { "type": "hero", "enabled": true },
+      { "type": "messages", "enabled": true },
+      { "type": "waterCare", "enabled": true },
+      { "type": "shopCard", "enabled": true },
+      { "type": "dealerCard", "enabled": true },
+      { "type": "tips", "enabled": true },
+      { "type": "recommendedProducts", "enabled": true }
+    ]
+  }
+  ```
+
+- Retailer Admin UI:
+  - Shows available widgets with drag-and-drop ordering and enable/disable toggles.
+  - Allows editing text content (titles, subtitles) and selecting from a safe icon set.
+  - Allows selecting product sources for `recommendedProducts` (e.g. by category, tag, or curated list).
+- The app:
+  - Fetches the tenant's `homeLayout` config (with caching and a sensible default if missing).
+  - Renders widgets in that order using the registry; unknown/disabled widgets are skipped.
+  - Always presents a coherent default layout even if config is empty or misconfigured.
+
+> **Platform compliance note:** This system is configuration-only. Widgets are predefined, compiled components; the server only controls which widgets appear, their order, and their data/content. No executable code or arbitrary HTML is downloaded, keeping the app compliant with Apple/Google store rules.
 
 **Header section:**
 - Spa model image (from UHTD, or a generic hot tub silhouette if no image)
@@ -502,3 +574,77 @@ Before moving to Phase 3, verify:
 - [ ] Spa profile can be edited (sanitization, usage months, serial number)
 - [ ] App displays correctly with TAB's branding (colors, logo, fonts)
 - [ ] App works on both iOS and Android
+
+---
+
+## Deferred: Phase 1 Verification Checklist (Moved to End of Phase 2)
+
+This checklist was originally part of Phase 1, but we are intentionally validating it after Phase 2 flows exist end-to-end.
+
+Before moving to Phase 3, also verify:
+
+### SCdb (Spas)
+- [ ] `scdb_brands`, `scdb_model_lines`, `scdb_spa_models` tables exist with correct columns
+- [ ] Individual year strategy implemented (each year = own row)
+- [ ] Soft delete (`deleted_at`) and `data_source` columns present
+- [ ] At least one brand's full model lineup is populated (Jacuzzi recommended)
+- [ ] SCdb API endpoints return correct cascading data
+- [ ] Consumer flow works: Brand → Year → Model selection
+- [ ] `tenant_brand_visibility` table exists
+
+### PCdb (Parts)
+- [ ] `pcdb_categories`, `pcdb_parts`, `pcdb_interchange_groups` tables exist
+- [ ] Part categories are seeded
+- [ ] Parts have `upc`, `ean`, `sku_aliases`, `display_importance` columns
+- [ ] `is_discontinued` and `discontinued_at` columns present
+- [ ] Interchange groups can be created and parts assigned
+- [ ] Trigram indexes created for typo-tolerant search
+
+### Source of Truth
+- [ ] `part_spa_compatibility` has `status`, `fit_notes`, `quantity_required`, `position` columns
+- [ ] Pending/confirmed workflow works
+- [ ] Review queue shows pending records
+
+### Comps
+- [ ] `compatibility_groups` and `comp_spas` tables exist
+- [ ] Comp IDs are human-readable VARCHAR(50)
+- [ ] Comps can be manually created
+- [ ] Comps auto-generate when conditions met (2+ parts, same category, 2+ spas)
+- [ ] Comp quickview shows spas and computed parts
+- [ ] Selecting a Comp selects all its spas
+- [ ] Near-match suggestions work with percentage overlap
+- [ ] Bulk import with Comp IDs creates `pending` records
+
+### Qdb (Qualifiers)
+- [ ] Qualifiers table seeded with sanitization_system, voltage, etc.
+- [ ] Spas can have qualifiers assigned
+- [ ] Parts can have qualifier requirements with `is_required` flag
+
+### Audit & Provenance
+- [ ] `audit_log` table exists with appropriate indexes
+- [ ] UHTD changes are logged
+- [ ] `correction_requests` table exists
+- [ ] Tenants can submit correction requests
+
+### POS Integration
+- [ ] TAB's POS is connected
+- [ ] Product sync runs successfully
+- [ ] Each variant becomes its own `pos_products` row
+- [ ] `barcode` column populated for UPC matching
+- [ ] Auto-mapping algorithm runs with confidence scores
+- [ ] Sync handles rate limits gracefully
+
+### Retailer Admin
+- [ ] Admin can view synced products with mapping status
+- [ ] Admin can see auto-suggested mappings
+- [ ] Admin can confirm or manually map products
+- [ ] Admin can hide/show products
+- [ ] Admin can trigger manual sync
+- [ ] Admin can submit correction requests
+
+### Customer Queries
+- [ ] Product API returns filtered results based on spa profile
+- [ ] `status='confirmed'` filter applied
+- [ ] Sanitization system filtering works
+- [ ] Universal parts bypass compatibility check
+- [ ] Results ordered by category, display_importance, title
