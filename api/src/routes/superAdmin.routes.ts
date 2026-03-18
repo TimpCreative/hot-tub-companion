@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as superAdminController from '../controllers/superAdmin.controller';
+import * as superAdminBrandingController from '../controllers/superAdminBranding.controller';
 import { superAdminAuth } from '../middleware/superAdminAuth';
 import { authRateLimiter } from '../middleware/rateLimiter';
 
@@ -14,6 +15,8 @@ router.use(superAdminAuth);
 
 router.get('/tenants', superAdminController.listTenants);
 router.post('/tenants', superAdminController.createTenant);
+router.get('/tenants/:id/branding', superAdminBrandingController.getTenantBranding);
+router.put('/tenants/:id/branding', superAdminBrandingController.updateTenantBranding);
 router.get('/tenants/:id/pos', superAdminController.getTenantPosConfig);
 router.put('/tenants/:id/pos', superAdminController.updateTenantPosConfig);
 router.post('/tenants/:id/pos/test', superAdminController.testTenantPosConnection);

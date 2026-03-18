@@ -168,6 +168,10 @@ export async function listTenants(_req: Request, res: Response): Promise<void> {
     apiKey: t.api_key,
     primaryColor: t.primary_color,
     secondaryColor: t.secondary_color,
+    accentColor: t.accent_color,
+    fontFamily: t.font_family,
+    logoUrl: t.logo_url,
+    iconUrl: t.icon_url,
     createdAt: t.created_at,
   }));
   success(res, { tenants: formatted });

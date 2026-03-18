@@ -9,6 +9,7 @@ import * as dataSourceService from '../services/dataSource.service';
 import { success, error } from '../utils/response';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MIN_FILE_SIZE = 1024; // 1KB
 
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',
@@ -31,6 +32,10 @@ export async function uploadFile(req: Request, res: Response) {
     }
 
     const { originalname, mimetype, buffer, size } = req.file;
+
+    if (size < MIN_FILE_SIZE) {
+      return error(res, 'VALIDATION_ERROR', `File too small. Minimum is ${MIN_FILE_SIZE} bytes.`, 400);
+    }
 
     if (size > MAX_FILE_SIZE) {
       return error(res, 'VALIDATION_ERROR', 'File too large. Maximum size is 10MB', 400);

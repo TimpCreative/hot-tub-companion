@@ -101,8 +101,8 @@ async function doProxy(
     );
   }
 
-  const headers = new Headers();
-  headers.set('Content-Type', 'application/json');
+  const headers = new Headers(request.headers);
+  headers.delete('host');
   if (authHeader) {
     headers.set('Authorization', authHeader);
   }
@@ -111,7 +111,7 @@ async function doProxy(
     const res = await fetch(url.toString(), {
       method,
       headers,
-      body: ['GET', 'HEAD'].includes(method) ? undefined : await request.text(),
+      body: ['GET', 'HEAD'].includes(method) ? undefined : request.body ?? undefined,
     });
 
     const data = await res.text();

@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { createSuperAdminApiClient } from '@/services/api';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/Button';
+import { MediaInput } from '@/components/ui/MediaInput';
 
 interface Tenant {
   id: string;
@@ -16,6 +17,10 @@ interface Tenant {
   apiKey?: string;
   primaryColor?: string;
   secondaryColor?: string;
+  accentColor?: string;
+  fontFamily?: string;
+  logoUrl?: string | null;
+  iconUrl?: string | null;
   createdAt: string;
   posType?: string | null;
   shopifyStoreUrl?: string | null;
@@ -40,6 +45,14 @@ export default function TenantDetailPage() {
   const [shopifyStorefrontTokenDraft, setShopifyStorefrontTokenDraft] = useState<string>('');
   const [showShopifyAdminToken, setShowShopifyAdminToken] = useState(false);
   const [showShopifyStorefrontToken, setShowShopifyStorefrontToken] = useState(false);
+
+  const [brandingLoading, setBrandingLoading] = useState(false);
+  const [brandingError, setBrandingError] = useState<string | null>(null);
+  const [brandingSavedMessage, setBrandingSavedMessage] = useState<string | null>(null);
+  const [primaryColorDraft, setPrimaryColorDraft] = useState<string>('#1B4D7A');
+  const [secondaryColorDraft, setSecondaryColorDraft] = useState<string>('#E8A832');
+  const [logoUrlDraft, setLogoUrlDraft] = useState<string>('');
+  const [iconUrlDraft, setIconUrlDraft] = useState<string>('');
 
   useEffect(() => {
     async function load() {
@@ -72,11 +85,21 @@ export default function TenantDetailPage() {
           });
           setPosTypeDraft(pos?.posType ?? '');
           setShopifyStoreUrlDraft(pos?.shopifyStoreUrl ?? '');
+
+          setPrimaryColorDraft(found.primaryColor || '#1B4D7A');
+          setSecondaryColorDraft(found.secondaryColor || '#E8A832');
+          setLogoUrlDraft(found.logoUrl || '');
+          setIconUrlDraft(found.iconUrl || '');
         } catch {
           // POS config may not exist yet; ignore and keep basic tenant info
           setTenant(found);
           setPosTypeDraft(found.posType ?? '');
           setShopifyStoreUrlDraft(found.shopifyStoreUrl ?? '');
+
+          setPrimaryColorDraft(found.primaryColor || '#1B4D7A');
+          setSecondaryColorDraft(found.secondaryColor || '#E8A832');
+          setLogoUrlDraft(found.logoUrl || '');
+          setIconUrlDraft(found.iconUrl || '');
         }
       } catch (err: unknown) {
         const e = err && typeof err === 'object' ? (err as { error?: { message?: string }; message?: string }) : {};
@@ -195,6 +218,45 @@ export default function TenantDetailPage() {
     }
   }
 
+  async function handleSaveBranding() {
+    if (!tenant) return;
+    setBrandingLoading(true);
+    setBrandingError(null);
+    setBrandingSavedMessage(null);
+    try {
+      const token = await getIdToken();
+      const api = createSuperAdminApiClient(async () => token);
+
+      const res = await api.put(`/tenants/${tenant.id}/branding`, {
+        primaryColor: primaryColorDraft,
+        secondaryColor: secondaryColorDraft,
+        logoUrl: logoUrlDraft.trim().length > 0 ? logoUrlDraft.trim() : null,
+        iconUrl: iconUrlDraft.trim().length > 0 ? iconUrlDraft.trim() : null,
+      }) as { data?: { branding?: { primaryColor?: string; secondaryColor?: string; logoUrl?: string | null; iconUrl?: string | null }; message?: string } };
+
+      if (res?.data?.branding) {
+        const b = res.data.branding;
+        setTenant((prev) =>
+          prev
+            ? {
+                ...prev,
+                primaryColor: b.primaryColor ?? primaryColorDraft,
+                secondaryColor: b.secondaryColor ?? secondaryColorDraft,
+                logoUrl: b.logoUrl ?? (logoUrlDraft.trim().length > 0 ? logoUrlDraft.trim() : null),
+                iconUrl: b.iconUrl ?? (iconUrlDraft.trim().length > 0 ? iconUrlDraft.trim() : null),
+              }
+            : prev
+        );
+      }
+
+      setBrandingSavedMessage(res.data?.message ?? 'Branding saved');
+    } catch (err: any) {
+      setBrandingError(err?.message || 'Failed to save branding');
+    } finally {
+      setBrandingLoading(false);
+    }
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -278,6 +340,87 @@ export default function TenantDetailPage() {
             </dd>
           </div>
         </dl>
+      </div>
+
+      <div className="bg-white shadow rounded-lg overflow-hidden max-w-2xl mb-8">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">Branding</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Logo and colors used by the customer mobile app.
+          </p>
+        </div>
+        <div className="px-6 py-4 space-y-5">
+          {brandingError && <div className="text-sm text-red-700">{brandingError}</div>}
+          {brandingSavedMessage && <div className="text-sm text-green-700">{brandingSavedMessage}</div>}
+
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Primary Color</dt>
+            <dd className="mt-1 sm:mt-0 sm:col-span-2">
+              <input
+                type="color"
+                value={primaryColorDraft}
+                onChange={(e) => setPrimaryColorDraft(e.target.value)}
+                className="h-10 w-24 rounded border border-gray-200"
+              />
+            </dd>
+          </div>
+
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Secondary Color</dt>
+            <dd className="mt-1 sm:mt-0 sm:col-span-2">
+              <input
+                type="color"
+                value={secondaryColorDraft}
+                onChange={(e) => setSecondaryColorDraft(e.target.value)}
+                className="h-10 w-24 rounded border border-gray-200"
+              />
+            </dd>
+          </div>
+
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Logo (Full)</dt>
+            <dd className="mt-1 sm:mt-0 sm:col-span-2">
+              <MediaInput
+                label="Upload full logo"
+                value={logoUrlDraft}
+                onChange={setLogoUrlDraft}
+                accept="image/*"
+                entityType="tenant"
+                entityId={tenant?.id}
+                fieldName="logo_url"
+                placeholder="Upload an image"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                Images only. Min 1KB, max 10MB.
+              </p>
+            </dd>
+          </div>
+
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Logomark (Icon)</dt>
+            <dd className="mt-1 sm:mt-0 sm:col-span-2">
+              <MediaInput
+                label="Upload logomark"
+                value={iconUrlDraft}
+                onChange={setIconUrlDraft}
+                accept="image/*"
+                entityType="tenant"
+                entityId={tenant?.id}
+                fieldName="icon_url"
+                placeholder="Upload an image"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                Images only. Min 1KB, max 10MB.
+              </p>
+            </dd>
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <Button type="button" variant="secondary" disabled={brandingLoading} onClick={handleSaveBranding}>
+              {brandingLoading ? 'Saving…' : 'Save Branding'}
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div className="bg-white shadow rounded-lg overflow-hidden max-w-2xl">

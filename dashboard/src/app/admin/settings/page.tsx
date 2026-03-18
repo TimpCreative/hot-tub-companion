@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTenant } from '@/contexts/TenantContext';
 import { createTenantApiClient } from '@/services/api';
 import { Button } from '@/components/ui/Button';
+import { TenantMediaInput } from '@/components/ui/TenantMediaInput';
 
 export default function AdminSettingsPage() {
   const { getIdToken } = useAuth();
@@ -86,25 +87,18 @@ export default function AdminSettingsPage() {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL (full horizontal)</label>
-          <input
-            type="url"
+        <div className="space-y-4">
+          <TenantMediaInput
+            label="Logo (full horizontal)"
             value={logoUrl}
-            onChange={(e) => setLogoUrl(e.target.value)}
-            placeholder="https://..."
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-blue-500"
+            onChange={setLogoUrl}
+            fieldName="logo_url"
           />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Logomark URL (square/icon)</label>
-          <input
-            type="url"
+          <TenantMediaInput
+            label="Logomark (square/icon)"
             value={iconUrl}
-            onChange={(e) => setIconUrl(e.target.value)}
-            placeholder="https://..."
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-blue-500"
+            onChange={setIconUrl}
+            fieldName="icon_url"
           />
         </div>
 
@@ -113,7 +107,7 @@ export default function AdminSettingsPage() {
             Save Branding
           </Button>
           <p className="text-xs text-gray-500">
-            Upload images in Super Admin → UHTD → Media, then paste the public URLs here.
+            After upload, click Save Branding. Images only. Min 1KB, max 10MB.
           </p>
         </div>
       </div>
