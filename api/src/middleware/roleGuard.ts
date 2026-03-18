@@ -26,6 +26,16 @@ export async function adminRoleGuard(
   // Whitelisted override (see authMiddleware): allow global tenant admins/super-admins
   // to access tenant admin routes without requiring an admin_roles row.
   if ((req as any).userIsTenantAdminOverride) {
+    // Attach a permissive adminRole so downstream controllers can enforce permissions uniformly.
+    (req as any).adminRole = {
+      user_id: user.id,
+      tenant_id: tenant.id,
+      can_manage_products: true,
+      can_manage_uhtd: true,
+      can_manage_settings: true,
+      can_manage_users: true,
+      can_view_audit_log: true,
+    };
     next();
     return;
   }
