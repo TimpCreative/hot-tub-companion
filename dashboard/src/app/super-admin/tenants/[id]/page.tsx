@@ -33,6 +33,13 @@ export default function TenantDetailPage() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [posLoading, setPosLoading] = useState(false);
   const [posError, setPosError] = useState<string | null>(null);
+  const [posSavedMessage, setPosSavedMessage] = useState<string | null>(null);
+  const [posTypeDraft, setPosTypeDraft] = useState<string>('');
+  const [shopifyStoreUrlDraft, setShopifyStoreUrlDraft] = useState<string>('');
+  const [shopifyAdminTokenDraft, setShopifyAdminTokenDraft] = useState<string>('');
+  const [shopifyStorefrontTokenDraft, setShopifyStorefrontTokenDraft] = useState<string>('');
+  const [showShopifyAdminToken, setShowShopifyAdminToken] = useState(false);
+  const [showShopifyStorefrontToken, setShowShopifyStorefrontToken] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -63,9 +70,13 @@ export default function TenantDetailPage() {
             shopifyStoreUrl: pos?.shopifyStoreUrl ?? null,
             lastProductSyncAt: pos?.lastProductSyncAt ?? null,
           });
+          setPosTypeDraft(pos?.posType ?? '');
+          setShopifyStoreUrlDraft(pos?.shopifyStoreUrl ?? '');
         } catch {
           // POS config may not exist yet; ignore and keep basic tenant info
           setTenant(found);
+          setPosTypeDraft(found.posType ?? '');
+          setShopifyStoreUrlDraft(found.shopifyStoreUrl ?? '');
         }
       } catch (err: unknown) {
         const e = err && typeof err === 'object' ? (err as { error?: { message?: string }; message?: string }) : {};
@@ -77,6 +88,51 @@ export default function TenantDetailPage() {
     }
     load();
   }, [id, getIdToken]);
+
+  async function handleSavePosConfig() {
+    if (!tenant) return;
+    setPosLoading(true);
+    setPosError(null);
+    setPosSavedMessage(null);
+    try {
+      const token = await getIdToken();
+      const api = createSuperAdminApiClient(async () => token);
+
+      const body: Record<string, unknown> = {
+        posType: posTypeDraft || null,
+        shopifyStoreUrl: shopifyStoreUrlDraft || null,
+      };
+
+      // Only send tokens if user explicitly entered something.
+      if (shopifyAdminTokenDraft.trim().length > 0) body.shopifyAdminToken = shopifyAdminTokenDraft.trim();
+      if (shopifyStorefrontTokenDraft.trim().length > 0) body.shopifyStorefrontToken = shopifyStorefrontTokenDraft.trim();
+
+      const res = await api.put(`/tenants/${tenant.id}/pos`, body) as {
+        data?: { tenantId?: string; posType?: string | null; shopifyStoreUrl?: string | null; message?: string };
+      };
+
+      setTenant((prev) =>
+        prev
+          ? {
+              ...prev,
+              posType: (res.data?.posType ?? posTypeDraft) || null,
+              shopifyStoreUrl: (res.data?.shopifyStoreUrl ?? shopifyStoreUrlDraft) || null,
+            }
+          : prev
+      );
+      setPosSavedMessage(res.data?.message ?? 'POS configuration saved');
+
+      // Clear token drafts after saving so we don't keep them in UI state longer than necessary.
+      setShopifyAdminTokenDraft('');
+      setShopifyStorefrontTokenDraft('');
+      setShowShopifyAdminToken(false);
+      setShowShopifyStorefrontToken(false);
+    } catch (err: any) {
+      setPosError(err?.message || 'Failed to save POS configuration');
+    } finally {
+      setPosLoading(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -235,13 +291,81 @@ export default function TenantDetailPage() {
           <div className="sm:grid sm:grid-cols-3 sm:gap-4">
             <dt className="text-sm font-medium text-gray-500">Provider</dt>
             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-              {tenant.posType || 'Not configured'}
+              <select
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                value={posTypeDraft}
+                onChange={(e) => setPosTypeDraft(e.target.value)}
+                disabled={posLoading}
+              >
+                <option value="">Not configured</option>
+                <option value="shopify">Shopify</option>
+              </select>
             </dd>
           </div>
           <div className="sm:grid sm:grid-cols-3 sm:gap-4">
             <dt className="text-sm font-medium text-gray-500">Shopify Store URL</dt>
             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-              {tenant.shopifyStoreUrl || '—'}
+              <input
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                value={shopifyStoreUrlDraft}
+                onChange={(e) => setShopifyStoreUrlDraft(e.target.value)}
+                disabled={posLoading || posTypeDraft !== 'shopify'}
+                placeholder="https://your-store.myshopify.com"
+              />
+            </dd>
+          </div>
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Shopify Admin Token</dt>
+            <dd className="mt-1 sm:mt-0 sm:col-span-2">
+              <div className="flex items-center gap-2">
+                <input
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
+                  type={showShopifyAdminToken ? 'text' : 'password'}
+                  value={shopifyAdminTokenDraft}
+                  onChange={(e) => setShopifyAdminTokenDraft(e.target.value)}
+                  disabled={posLoading || posTypeDraft !== 'shopify'}
+                  placeholder="Enter to update (leave blank to keep existing)"
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowShopifyAdminToken((v) => !v)}
+                  className="text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                  disabled={posLoading || posTypeDraft !== 'shopify'}
+                >
+                  {showShopifyAdminToken ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              <div className="mt-1 text-xs text-gray-500">
+                Stored securely on the server. This field is intentionally blank unless you update it.
+              </div>
+            </dd>
+          </div>
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Shopify Storefront Token</dt>
+            <dd className="mt-1 sm:mt-0 sm:col-span-2">
+              <div className="flex items-center gap-2">
+                <input
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
+                  type={showShopifyStorefrontToken ? 'text' : 'password'}
+                  value={shopifyStorefrontTokenDraft}
+                  onChange={(e) => setShopifyStorefrontTokenDraft(e.target.value)}
+                  disabled={posLoading || posTypeDraft !== 'shopify'}
+                  placeholder="Enter to update (leave blank to keep existing)"
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowShopifyStorefrontToken((v) => !v)}
+                  className="text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                  disabled={posLoading || posTypeDraft !== 'shopify'}
+                >
+                  {showShopifyStorefrontToken ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              <div className="mt-1 text-xs text-gray-500">
+                Stored securely on the server. This field is intentionally blank unless you update it.
+              </div>
             </dd>
           </div>
           <div className="sm:grid sm:grid-cols-3 sm:gap-4">
@@ -255,7 +379,13 @@ export default function TenantDetailPage() {
           {posError && (
             <div className="text-sm text-red-600">{posError}</div>
           )}
+          {posSavedMessage && (
+            <div className="text-sm text-green-700">{posSavedMessage}</div>
+          )}
           <div className="flex gap-3">
+            <Button type="button" variant="secondary" disabled={posLoading} onClick={handleSavePosConfig}>
+              {posLoading ? 'Saving…' : 'Save POS Config'}
+            </Button>
             <Button type="button" variant="secondary" disabled={posLoading} onClick={handleTestConnection}>
               {posLoading ? 'Testing…' : 'Test Connection'}
             </Button>

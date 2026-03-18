@@ -23,6 +23,13 @@ export async function adminRoleGuard(
     return;
   }
 
+  // Whitelisted override (see authMiddleware): allow global tenant admins/super-admins
+  // to access tenant admin routes without requiring an admin_roles row.
+  if ((req as any).userIsTenantAdminOverride) {
+    next();
+    return;
+  }
+
   const adminRole = await db('admin_roles')
     .where({ user_id: user.id, tenant_id: tenant.id })
     .first();

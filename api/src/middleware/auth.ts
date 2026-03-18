@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getFirebaseAuth } from '../config/firebase';
 import { db } from '../config/database';
+import { env } from '../config/environment';
 import { error } from '../utils/response';
 
 declare global {
@@ -8,6 +9,7 @@ declare global {
     interface Request {
       tenant?: { id: string };
       user?: Record<string, unknown>;
+      userIsTenantAdminOverride?: boolean;
     }
   }
 }
@@ -39,7 +41,25 @@ export async function authMiddleware(
       .first();
 
     if (!user) {
-      error(res, 'UNAUTHORIZED', 'User not found for this tenant', 401);
+      const email = ((decoded.email as string) || '').toLowerCase();
+      const canOverride =
+        (email && env.TENANT_ADMIN_EMAILS.map((e) => e.toLowerCase()).includes(email)) ||
+        (email && env.SUPER_ADMIN_EMAILS.map((e) => e.toLowerCase()).includes(email));
+
+      if (!canOverride) {
+        error(res, 'UNAUTHORIZED', 'User not found for this tenant', 401);
+        return;
+      }
+
+      // Allow whitelisted admins to access tenant apps even if they don't have a users row.
+      // This is intentionally scoped by tenantMiddleware (req.tenant.id must be present).
+      (req as Request & { user: Record<string, unknown>; userIsTenantAdminOverride: boolean }).user = {
+        id: `admin_${decoded.uid}`,
+        email,
+        role: 'admin',
+      };
+      (req as Request & { userIsTenantAdminOverride: boolean }).userIsTenantAdminOverride = true;
+      next();
       return;
     }
 
