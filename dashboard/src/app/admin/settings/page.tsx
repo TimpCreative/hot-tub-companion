@@ -54,6 +54,19 @@ export default function AdminSettingsPage() {
     }
   }
 
+  function normalizeHex(hex: string) {
+    const v = hex.startsWith('#') ? hex : `#${hex}`;
+    return v.toUpperCase();
+  }
+
+  async function copyHex(hex: string) {
+    try {
+      await navigator.clipboard.writeText(normalizeHex(hex));
+    } catch {
+      // Clipboard may be unavailable in some environments; ignore silently.
+    }
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center py-12">Loading...</div>;
   }
@@ -69,22 +82,42 @@ export default function AdminSettingsPage() {
       <div className="space-y-4 bg-white rounded-lg border border-gray-200 p-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Primary Color</label>
-          <input
-            type="color"
-            value={primaryColor}
-            onChange={(e) => setPrimaryColor(e.target.value)}
-            className="h-10 w-24 rounded border border-gray-200"
-          />
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={primaryColor}
+              onChange={(e) => setPrimaryColor(e.target.value)}
+              className="h-10 w-24 rounded border border-gray-200"
+            />
+            <button
+              type="button"
+              onClick={() => copyHex(primaryColor)}
+              className="text-xs font-mono text-gray-700 hover:text-gray-900 underline underline-offset-2"
+              aria-label="Copy primary hex"
+            >
+              {normalizeHex(primaryColor)}
+            </button>
+          </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Secondary Color</label>
-          <input
-            type="color"
-            value={secondaryColor}
-            onChange={(e) => setSecondaryColor(e.target.value)}
-            className="h-10 w-24 rounded border border-gray-200"
-          />
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={secondaryColor}
+              onChange={(e) => setSecondaryColor(e.target.value)}
+              className="h-10 w-24 rounded border border-gray-200"
+            />
+            <button
+              type="button"
+              onClick={() => copyHex(secondaryColor)}
+              className="text-xs font-mono text-gray-700 hover:text-gray-900 underline underline-offset-2"
+              aria-label="Copy secondary hex"
+            >
+              {normalizeHex(secondaryColor)}
+            </button>
+          </div>
         </div>
 
         <div className="space-y-4">

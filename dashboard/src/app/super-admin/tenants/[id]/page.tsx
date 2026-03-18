@@ -257,6 +257,19 @@ export default function TenantDetailPage() {
     }
   }
 
+  function normalizeHex(hex: string) {
+    const v = hex.startsWith('#') ? hex : `#${hex}`;
+    return v.toUpperCase();
+  }
+
+  async function copyHex(hex: string) {
+    try {
+      await navigator.clipboard.writeText(normalizeHex(hex));
+    } catch {
+      // Clipboard may be unavailable in some environments; ignore silently.
+    }
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -356,24 +369,44 @@ export default function TenantDetailPage() {
           <div className="sm:grid sm:grid-cols-3 sm:gap-4">
             <dt className="text-sm font-medium text-gray-500">Primary Color</dt>
             <dd className="mt-1 sm:mt-0 sm:col-span-2">
-              <input
-                type="color"
-                value={primaryColorDraft}
-                onChange={(e) => setPrimaryColorDraft(e.target.value)}
-                className="h-10 w-24 rounded border border-gray-200"
-              />
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={primaryColorDraft}
+                  onChange={(e) => setPrimaryColorDraft(e.target.value)}
+                  className="h-10 w-24 rounded border border-gray-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => copyHex(primaryColorDraft)}
+                  className="text-xs font-mono text-gray-700 hover:text-gray-900 underline underline-offset-2"
+                  aria-label="Copy primary hex"
+                >
+                  {normalizeHex(primaryColorDraft)}
+                </button>
+              </div>
             </dd>
           </div>
 
           <div className="sm:grid sm:grid-cols-3 sm:gap-4">
             <dt className="text-sm font-medium text-gray-500">Secondary Color</dt>
             <dd className="mt-1 sm:mt-0 sm:col-span-2">
-              <input
-                type="color"
-                value={secondaryColorDraft}
-                onChange={(e) => setSecondaryColorDraft(e.target.value)}
-                className="h-10 w-24 rounded border border-gray-200"
-              />
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={secondaryColorDraft}
+                  onChange={(e) => setSecondaryColorDraft(e.target.value)}
+                  className="h-10 w-24 rounded border border-gray-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => copyHex(secondaryColorDraft)}
+                  className="text-xs font-mono text-gray-700 hover:text-gray-900 underline underline-offset-2"
+                  aria-label="Copy secondary hex"
+                >
+                  {normalizeHex(secondaryColorDraft)}
+                </button>
+              </div>
             </dd>
           </div>
 
