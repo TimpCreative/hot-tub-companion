@@ -30,7 +30,7 @@ export async function superAdminAuth(
     message: 'Super admin auth received',
     data: { hasToken, tokenLen: authHeader ? authHeader.length : 0 },
   });
-  if (!hasToken) {
+  if (!authHeader?.startsWith('Bearer ')) {
     error(res, 'UNAUTHORIZED', 'Missing or invalid Authorization header', 401);
     return;
   }
