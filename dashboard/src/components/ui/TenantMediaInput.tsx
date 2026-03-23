@@ -56,8 +56,10 @@ export function TenantMediaInput({
           );
         }
         if (!response.ok) {
-          const err = data?.error as { message?: string } | undefined;
-          throw new Error(err?.message || (data?.message as string) || 'Upload failed');
+          const err = data?.error as { message?: string; details?: { hint?: string } } | undefined;
+          const hint = err?.details?.hint;
+          const msg = err?.message || (data?.message as string) || 'Upload failed';
+          throw new Error(hint ? `${msg}: ${hint}` : msg);
         }
         const url = (data?.data as { publicUrl?: string })?.publicUrl;
         if (url) onChange(url);

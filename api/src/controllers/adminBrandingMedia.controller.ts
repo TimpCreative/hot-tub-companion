@@ -128,7 +128,10 @@ export async function uploadBrandingMedia(req: Request, res: Response): Promise<
       hypothesisId: 'H1,H2,H3,H4',
     });
     console.error('Error uploading branding media:', err);
-    error(res, 'INTERNAL_ERROR', 'Failed to upload branding media', 500);
+    const msg = ex?.message ?? String(err);
+    error(res, 'INTERNAL_ERROR', 'Failed to upload branding media', 500, {
+      hint: msg.slice(0, 200),
+    });
   }
 }
 
