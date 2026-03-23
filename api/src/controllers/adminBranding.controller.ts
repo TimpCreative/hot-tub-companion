@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../config/database';
 import { success, error } from '../utils/response';
+import { toProxyUrl } from '../utils/mediaUrl';
 
 function requireManageSettings(req: Request, res: Response): boolean {
   const role = (req as any).adminRole as Record<string, unknown> | undefined;
@@ -18,8 +19,8 @@ function mapBranding(row: any) {
     secondaryColor: row.secondary_color,
     accentColor: row.accent_color,
     fontFamily: row.font_family,
-    logoUrl: row.logo_url,
-    iconUrl: row.icon_url,
+    logoUrl: toProxyUrl(row.logo_url) ?? row.logo_url,
+    iconUrl: toProxyUrl(row.icon_url) ?? row.icon_url,
   };
 }
 

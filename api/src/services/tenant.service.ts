@@ -1,6 +1,7 @@
 import { db } from '../config/database';
 import { normalizeOnboardingConfig } from './onboardingConfig.service';
 import { mapDealerContact, normalizeHomeDashboardConfig } from './homeDashboardConfig.service';
+import { toProxyUrl } from '../utils/mediaUrl';
 
 const SANITIZATION_SYSTEMS = ['bromine', 'chlorine', 'frog_ease', 'copper', 'silver_mineral'];
 
@@ -21,8 +22,8 @@ export async function getConfig(tenantId: string) {
       secondaryColor: tenant.secondary_color,
       accentColor: tenant.accent_color,
       fontFamily: tenant.font_family,
-      logoUrl: tenant.logo_url,
-      iconUrl: tenant.icon_url,
+      logoUrl: toProxyUrl(tenant.logo_url) ?? tenant.logo_url,
+      iconUrl: toProxyUrl(tenant.icon_url) ?? tenant.icon_url,
     },
     features: {
       subscriptions: tenant.feature_subscriptions,

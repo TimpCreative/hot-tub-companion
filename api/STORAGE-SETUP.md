@@ -1,0 +1,16 @@
+# Firebase Storage Setup for Media Uploads
+
+Media (logos, icons) are served through our **API proxy** at `/api/v1/media/serve`. The bucket stays **private**—no public IAM or CORS config needed.
+
+## Required
+
+1. **FIREBASE_STORAGE_BUCKET** – Set in Railway (e.g. `hot-tub-companion.firebasestorage.app`).
+2. **API_URL** – Base URL of the API (e.g. `https://api.hottubcompanion.com`) so proxy URLs are correct.
+
+The service account (FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY) must have Storage Object Admin on the bucket. Firebase projects grant this by default.
+
+## How it works
+
+- Uploads: API writes to GCS using the service account.
+- Views: Client requests `GET /api/v1/media/serve?path=uhtd/images/xxx.webp`; API streams the file from GCS.
+- No `allUsers`, no CORS, no public bucket access. Compatible with domain-restricted sharing.

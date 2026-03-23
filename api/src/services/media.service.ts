@@ -6,6 +6,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../config/database';
 import { getStorageBucket } from '../config/firebase';
+import { buildProxyUrl } from '../utils/mediaUrl';
 
 export interface MediaFile {
   id: string;
@@ -83,9 +84,8 @@ export async function uploadFile(
     },
   });
   dbg({ location: 'media.service.ts:post-save', message: 'after file.save', hypothesisId: 'H2' });
-  // Skip makePublic() — with uniform bucket-level access, per-object ACLs are disabled.
-  // Configure the bucket for public read via IAM: add allUsers with Storage Object Viewer.
-  const publicUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+  // Use our proxy URL - streams from GCS, no public bucket required (works with domain-restricted orgs)
+  const publicUrl = buildProxyUrl(storagePath);
   dbg({ location: 'media.service.ts:pre-db', message: 'before media_files insert', hypothesisId: 'H3' });
   const [mediaFile] = await db('media_files')
     .insert({

@@ -12,6 +12,7 @@ import importRoutes from './import.routes';
 import mergeRoutes from './merge.routes';
 import statsRoutes from './stats.routes';
 import mediaRoutes from './media.routes';
+import mediaPublicRoutes from './mediaPublic.routes';
 import { superAdminAuth } from '../middleware/superAdminAuth';
 import adminRoutes from './admin.routes';
 import productsRoutes from './products.routes';
@@ -25,6 +26,9 @@ router.use(healthRoutes);
 
 router.use('/api/v1/auth', authRoutes);
 router.get('/api/v1/tenant/config', tenantController.getTenantConfig);
+
+// Public media serve (no auth) - streams from GCS for logos/icons
+router.use('/api/v1/media', mediaPublicRoutes);
 
 // Public SCdb routes (tenant API key required)
 router.use('/api/v1/scdb', scdbPublicRoutes);

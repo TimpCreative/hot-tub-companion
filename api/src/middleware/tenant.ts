@@ -3,13 +3,12 @@ import { db } from '../config/database';
 import { UnauthorizedError } from '../utils/errors';
 import { error } from '../utils/response';
 
-const SKIP_PATHS = ['/health', '/api/v1/auth', '/api/v1/tenant/config'];
-
 function shouldSkipTenant(path: string): boolean {
   return (
     path === '/health' ||
     path.startsWith('/api/v1/auth') ||
     path === '/api/v1/tenant/config' ||
+    path.startsWith('/api/v1/media/serve') ||
     path.startsWith('/api/v1/super-admin')
   );
 }
