@@ -8,7 +8,8 @@ export async function superAdminAuth(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const authHeader = req.headers.authorization || req.headers['x-authorization'];
+  const raw = req.headers.authorization || req.headers['x-authorization'];
+  const authHeader = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : undefined;
   if (!authHeader?.startsWith('Bearer ')) {
     error(res, 'UNAUTHORIZED', 'Missing or invalid Authorization header', 401);
     return;
