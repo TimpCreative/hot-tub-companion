@@ -84,15 +84,43 @@ async function proxy(
   headers.delete('host');
   headers.set('x-tenant-key', apiKey);
 
-  const res = await fetch(url.toString(), {
-    method,
-    headers,
-    body: ['GET', 'HEAD'].includes(method) ? undefined : request.body ?? undefined,
-  });
+  try {
+    const res = await fetch(url.toString(), {
+      method,
+      headers,
+      body: ['GET', 'HEAD'].includes(method) ? undefined : request.body ?? undefined,
+    });
 
-  const data = await res.text();
-  return new NextResponse(data, {
-    status: res.status,
-    headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' },
-  });
+    const data = await res.text();
+    // Ensure 5xx responses have parseable JSON so client doesn't get "Unexpected end of JSON input"
+    if (res.status >= 500 && (!data || !data.trim())) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'INTERNAL_ERROR',
+            message: 'Upstream API returned empty error response. Check API logs.',
+          },
+        },
+        { status: res.status }
+      );
+    }
+    return new NextResponse(data, {
+      status: res.status,
+      headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[proxy] Fetch to API failed:', message);
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'UPSTREAM_ERROR',
+          message: `Proxy could not reach API: ${message}`,
+        },
+      },
+      { status: 502 }
+    );
+  }
 }
