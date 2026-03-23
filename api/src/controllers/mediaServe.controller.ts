@@ -9,8 +9,9 @@ import * as mediaService from '../services/media.service';
 
 const DEBUG_MEDIA = process.env.DEBUG_MEDIA_SERVE === 'true';
 
-function setCors(res: Response): void {
+function setMediaHeaders(res: Response): void {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 }
 
 /** Paths must be under uhtd/ or tenants/, no traversal */
@@ -24,7 +25,7 @@ function isPathAllowed(path: string): boolean {
 }
 
 export async function serveMedia(req: Request, res: Response): Promise<void> {
-  setCors(res);
+  setMediaHeaders(res);
   const path = (req.query.path as string) || '';
   if (!isPathAllowed(path)) {
     res.status(400).json({ error: 'Invalid path' });
@@ -67,7 +68,7 @@ export async function serveMedia(req: Request, res: Response): Promise<void> {
 
 /** Serve by media file ID - looks up storage_path from DB (more reliable than path) */
 export async function serveMediaById(req: Request, res: Response): Promise<void> {
-  setCors(res);
+  setMediaHeaders(res);
   const id = req.params.id;
   if (!id) {
     res.status(400).json({ error: 'Missing id' });
@@ -146,7 +147,7 @@ export async function serveMediaById(req: Request, res: Response): Promise<void>
  * Use: set env var in Railway, deploy, then open https://your-api/api/v1/media/debug/{id} in browser.
  */
 export async function debugMediaById(req: Request, res: Response): Promise<void> {
-  setCors(res);
+  setMediaHeaders(res);
   if (!DEBUG_MEDIA) {
     res.status(404).json({ error: 'Not found' });
     return;
