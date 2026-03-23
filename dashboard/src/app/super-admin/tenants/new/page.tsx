@@ -3,12 +3,11 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
-import { createSuperAdminApiClient } from '@/services/api';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 
 export default function NewTenantPage() {
-  const { getIdToken } = useAuth();
+  const fetchWithAuth = useSuperAdminFetch();
   const router = useRouter();
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -23,20 +22,26 @@ export default function NewTenantPage() {
     setError(null);
     setLoading(true);
     try {
-      const token = await getIdToken();
-      const api = createSuperAdminApiClient(async () => token);
-      const res = await api.post('/tenants', {
+      const res = await fetchWithAuth('/api/dashboard/super-admin/tenants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
         name,
         slug,
         apiKey: apiKey || undefined,
         primaryColor: primaryColor || undefined,
         secondaryColor: secondaryColor || undefined,
-      }) as { data?: { tenant?: { id: string } } };
-      const tenant = res.data?.tenant;
+      }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error?.message || 'Failed to create tenant');
+        return;
+      }
+      const tenant = data.data?.tenant;
       router.push(tenant ? `/super-admin/tenants/${tenant.id}` : '/super-admin/tenants');
     } catch (err: unknown) {
-      const e = err && typeof err === 'object' ? (err as { error?: { message?: string }; message?: string }) : {};
-      const msg = e.error?.message ?? e.message ?? 'Failed to create tenant';
+      const msg = err instanceof Error ? err.message : 'Failed to create tenant';
       setError(msg);
     } finally {
       setLoading(false);

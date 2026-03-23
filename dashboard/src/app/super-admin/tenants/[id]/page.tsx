@@ -3,8 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
-import { createSuperAdminApiClient } from '@/services/api';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/Button';
 import { MediaInput } from '@/components/ui/MediaInput';
@@ -30,7 +29,7 @@ interface Tenant {
 export default function TenantDetailPage() {
   const params = useParams();
   const id = params.id as string;
-  const { getIdToken } = useAuth();
+  const fetchWithAuth = useSuperAdminFetch();
   const router = useRouter();
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,10 +56,9 @@ export default function TenantDetailPage() {
   useEffect(() => {
     async function load() {
       try {
-        const token = await getIdToken();
-        const api = createSuperAdminApiClient(async () => token);
-        const res = await api.get('/tenants') as { data?: { tenants?: Tenant[] } };
-        const found = res.data?.tenants?.find((t) => t.id === id);
+        const tenantsRes = await fetchWithAuth('/api/dashboard/super-admin/tenants');
+        const tenantsData = await tenantsRes.json();
+        const found = tenantsData.data?.tenants?.find((t: Tenant) => t.id === id);
         if (!found) {
           setError('Tenant not found');
           return;
@@ -68,15 +66,9 @@ export default function TenantDetailPage() {
 
         // Fetch POS summary for this tenant
         try {
-          const posRes = await api.get(`/tenants/${id}/pos`) as {
-            data?: {
-              tenantId: string;
-              posType?: string | null;
-              shopifyStoreUrl?: string | null;
-              lastProductSyncAt?: string | null;
-            };
-          };
-          const pos = posRes.data;
+          const posRes = await fetchWithAuth(`/api/dashboard/super-admin/tenants/${id}/pos`);
+          const posData = await posRes.json();
+          const pos = posData.data;
           setTenant({
             ...found,
             posType: pos?.posType ?? null,
@@ -102,15 +94,14 @@ export default function TenantDetailPage() {
           setIconUrlDraft(found.iconUrl || '');
         }
       } catch (err: unknown) {
-        const e = err && typeof err === 'object' ? (err as { error?: { message?: string }; message?: string }) : {};
-        const msg = e.error?.message ?? e.message ?? 'Failed to load tenant';
+        const msg = err instanceof Error ? err.message : 'Failed to load tenant';
         setError(msg);
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [id, getIdToken]);
+  }, [id, fetchWithAuth]);
 
   async function handleSavePosConfig() {
     if (!tenant) return;
@@ -118,40 +109,41 @@ export default function TenantDetailPage() {
     setPosError(null);
     setPosSavedMessage(null);
     try {
-      const token = await getIdToken();
-      const api = createSuperAdminApiClient(async () => token);
-
       const body: Record<string, unknown> = {
         posType: posTypeDraft || null,
         shopifyStoreUrl: shopifyStoreUrlDraft || null,
       };
-
-      // Only send tokens if user explicitly entered something.
       if (shopifyAdminTokenDraft.trim().length > 0) body.shopifyAdminToken = shopifyAdminTokenDraft.trim();
       if (shopifyStorefrontTokenDraft.trim().length > 0) body.shopifyStorefrontToken = shopifyStorefrontTokenDraft.trim();
 
-      const res = await api.put(`/tenants/${tenant.id}/pos`, body) as {
-        data?: { tenantId?: string; posType?: string | null; shopifyStoreUrl?: string | null; message?: string };
-      };
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/tenants/${tenant.id}/pos`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPosError(data.error?.message || 'Failed to save POS configuration');
+        return;
+      }
 
       setTenant((prev) =>
         prev
           ? {
               ...prev,
-              posType: (res.data?.posType ?? posTypeDraft) || null,
-              shopifyStoreUrl: (res.data?.shopifyStoreUrl ?? shopifyStoreUrlDraft) || null,
+              posType: (data.data?.posType ?? posTypeDraft) || null,
+              shopifyStoreUrl: (data.data?.shopifyStoreUrl ?? shopifyStoreUrlDraft) || null,
             }
           : prev
       );
-      setPosSavedMessage(res.data?.message ?? 'POS configuration saved');
+      setPosSavedMessage(data.data?.message ?? 'POS configuration saved');
 
-      // Clear token drafts after saving so we don't keep them in UI state longer than necessary.
       setShopifyAdminTokenDraft('');
       setShopifyStorefrontTokenDraft('');
       setShowShopifyAdminToken(false);
       setShowShopifyStorefrontToken(false);
-    } catch (err: any) {
-      setPosError(err?.message || 'Failed to save POS configuration');
+    } catch (err: unknown) {
+      setPosError(err instanceof Error ? err.message : 'Failed to save POS configuration');
     } finally {
       setPosLoading(false);
     }
@@ -186,18 +178,19 @@ export default function TenantDetailPage() {
     setPosLoading(true);
     setPosError(null);
     try {
-      const token = await getIdToken();
-      const api = createSuperAdminApiClient(async () => token);
-      const res = await api.post(`/tenants/${tenant.id}/pos/test`, {}) as {
-        data?: { ok?: boolean; message?: string };
-      };
-      if (!res.data?.ok) {
-        setPosError(res.data?.message || 'Connection test failed');
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/tenants/${tenant.id}/pos/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!data.data?.ok) {
+        setPosError(data.data?.message || 'Connection test failed');
       } else {
         setPosError(null);
       }
-    } catch (err: any) {
-      setPosError(err?.message || 'Failed to test POS connection');
+    } catch (err: unknown) {
+      setPosError(err instanceof Error ? err.message : 'Failed to test POS connection');
     } finally {
       setPosLoading(false);
     }
@@ -208,11 +201,13 @@ export default function TenantDetailPage() {
     setPosLoading(true);
     setPosError(null);
     try {
-      const token = await getIdToken();
-      const api = createSuperAdminApiClient(async () => token);
-      await api.post(`/tenants/${tenant.id}/pos/sync`, { full: true });
-    } catch (err: any) {
-      setPosError(err?.message || 'Failed to sync catalog');
+      await fetchWithAuth(`/api/dashboard/super-admin/tenants/${tenant.id}/pos/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ full: true }),
+      });
+    } catch (err: unknown) {
+      setPosError(err instanceof Error ? err.message : 'Failed to sync catalog');
     } finally {
       setPosLoading(false);
     }
@@ -224,18 +219,24 @@ export default function TenantDetailPage() {
     setBrandingError(null);
     setBrandingSavedMessage(null);
     try {
-      const token = await getIdToken();
-      const api = createSuperAdminApiClient(async () => token);
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/tenants/${tenant.id}/branding`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryColor: primaryColorDraft,
+          secondaryColor: secondaryColorDraft,
+          logoUrl: logoUrlDraft.trim().length > 0 ? logoUrlDraft.trim() : null,
+          iconUrl: iconUrlDraft.trim().length > 0 ? iconUrlDraft.trim() : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setBrandingError(data.error?.message || 'Failed to save branding');
+        return;
+      }
 
-      const res = await api.put(`/tenants/${tenant.id}/branding`, {
-        primaryColor: primaryColorDraft,
-        secondaryColor: secondaryColorDraft,
-        logoUrl: logoUrlDraft.trim().length > 0 ? logoUrlDraft.trim() : null,
-        iconUrl: iconUrlDraft.trim().length > 0 ? iconUrlDraft.trim() : null,
-      }) as { data?: { branding?: { primaryColor?: string; secondaryColor?: string; logoUrl?: string | null; iconUrl?: string | null }; message?: string } };
-
-      if (res?.data?.branding) {
-        const b = res.data.branding;
+      if (data.data?.branding) {
+        const b = data.data.branding;
         setTenant((prev) =>
           prev
             ? {
@@ -249,9 +250,9 @@ export default function TenantDetailPage() {
         );
       }
 
-      setBrandingSavedMessage(res.data?.message ?? 'Branding saved');
-    } catch (err: any) {
-      setBrandingError(err?.message || 'Failed to save branding');
+      setBrandingSavedMessage(data.data?.message ?? 'Branding saved');
+    } catch (err: unknown) {
+      setBrandingError(err instanceof Error ? err.message : 'Failed to save branding');
     } finally {
       setBrandingLoading(false);
     }

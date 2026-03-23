@@ -5,6 +5,7 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { env } from '../config/environment';
 import { getFirebaseAuth, isFirebaseInitialized, getFirebaseInitError, getFirebaseKeyDebugInfo } from '../config/firebase';
+import { toProxyUrl } from '../utils/mediaUrl';
 import sgMail from '@sendgrid/mail';
 
 // Initialize SendGrid if API key is available
@@ -170,8 +171,8 @@ export async function listTenants(_req: Request, res: Response): Promise<void> {
     secondaryColor: t.secondary_color,
     accentColor: t.accent_color,
     fontFamily: t.font_family,
-    logoUrl: t.logo_url,
-    iconUrl: t.icon_url,
+    logoUrl: toProxyUrl(t.logo_url) ?? t.logo_url,
+    iconUrl: toProxyUrl(t.icon_url) ?? t.icon_url,
     createdAt: t.created_at,
   }));
   success(res, { tenants: formatted });

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -33,7 +34,8 @@ interface SystemInfo {
 }
 
 export default function SettingsPage() {
-  const { user, logout, getIdToken } = useAuth();
+  const { user, logout } = useAuth();
+  const fetchWithAuth = useSuperAdminFetch();
   const [superAdmins, setSuperAdmins] = useState<SuperAdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
@@ -47,18 +49,7 @@ export default function SettingsPage() {
 
   const fetchSettings = useCallback(async () => {
     try {
-      const token = await getIdToken();
-      if (!token) {
-        setFetchError('Not authenticated');
-        setLoading(false);
-        return;
-      }
-
-      const res = await fetch('/api/dashboard/super-admin/settings', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const res = await fetchWithAuth('/api/dashboard/super-admin/settings');
       const data = await res.json();
       if (data.success) {
         setSuperAdmins(data.data?.users || []);
@@ -68,11 +59,11 @@ export default function SettingsPage() {
       }
     } catch (err: any) {
       console.error('Error fetching settings:', err);
-      setFetchError(err.message || 'Network error');
+      setFetchError(err instanceof Error ? err.message : 'Network error');
     } finally {
       setLoading(false);
     }
-  }, [getIdToken]);
+  }, [fetchWithAuth]);
 
   useEffect(() => {
     fetchSettings();
@@ -85,13 +76,9 @@ export default function SettingsPage() {
     setActionMessage(null);
     
     try {
-      const token = await getIdToken();
-      const res = await fetch('/api/dashboard/super-admin/whitelist', {
+      const res = await fetchWithAuth('/api/dashboard/super-admin/whitelist', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: newEmail.trim() }),
       });
       const data = await res.json();
@@ -116,13 +103,9 @@ export default function SettingsPage() {
     setActionMessage(null);
     
     try {
-      const token = await getIdToken();
-      const res = await fetch('/api/dashboard/super-admin/whitelist/invite', {
+      const res = await fetchWithAuth('/api/dashboard/super-admin/whitelist/invite', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
@@ -146,12 +129,8 @@ export default function SettingsPage() {
     setActionMessage(null);
     
     try {
-      const token = await getIdToken();
-      const res = await fetch(`/api/dashboard/super-admin/whitelist/${encodeURIComponent(email)}`, {
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/whitelist/${encodeURIComponent(email)}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
       });
       const data = await res.json();
       

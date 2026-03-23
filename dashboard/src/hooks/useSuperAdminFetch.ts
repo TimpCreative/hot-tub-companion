@@ -18,7 +18,7 @@ export function useSuperAdminFetch() {
       }
       const headers = new Headers(options.headers);
       headers.set('Authorization', `Bearer ${token}`);
-      return fetch(url, { ...options, headers });
+      return fetch(url, { ...options, headers, credentials: 'same-origin' });
     },
     [getIdToken]
   );

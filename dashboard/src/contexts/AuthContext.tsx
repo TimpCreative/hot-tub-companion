@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
@@ -56,10 +56,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsub();
   }, [auth]);
 
-  const getIdToken = async (): Promise<string | null> => {
+  const getIdToken = useCallback(async (): Promise<string | null> => {
     if (!firebaseUser || !auth) return null;
     return firebaseUser.getIdToken();
-  };
+  }, [firebaseUser, auth]);
 
   const login = async (email: string, password: string) => {
     if (!auth) throw new Error('Firebase not configured');

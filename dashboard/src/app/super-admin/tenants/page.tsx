@@ -2,9 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
-import { createSuperAdminApiClient } from '@/services/api';
+import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { format } from 'date-fns';
 
 interface Tenant {
@@ -19,7 +18,7 @@ interface Tenant {
 }
 
 export default function SuperAdminTenantsPage() {
-  const { getIdToken } = useAuth();
+  const fetchWithAuth = useSuperAdminFetch();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,21 +26,23 @@ export default function SuperAdminTenantsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const token = await getIdToken();
-        const api = createSuperAdminApiClient(async () => token);
-        const res = await api.get('/tenants') as { data?: { tenants?: Tenant[] } };
-        setTenants(res.data?.tenants || []);
+        const res = await fetchWithAuth('/api/dashboard/super-admin/tenants');
+        const data = await res.json();
+        if (data.success) {
+          setTenants(data.data?.tenants || []);
+        } else {
+          setError(data.error?.message || 'Failed to load tenants');
+        }
       } catch (err: unknown) {
-        const e = err && typeof err === 'object' ? (err as { error?: { message?: string; status?: number }; message?: string }) : {};
-        const msg = e.error?.message ?? e.message ?? 'Failed to load tenants';
-        const status = e.error?.status;
-        setError(status ? `${msg} (${status})` : msg);
+        const e = err && typeof err === 'object' ? (err as Error) : {};
+        const msg = e instanceof Error ? e.message : 'Failed to load tenants';
+        setError(msg);
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [getIdToken]);
+  }, [fetchWithAuth]);
 
   if (loading) {
     return (
