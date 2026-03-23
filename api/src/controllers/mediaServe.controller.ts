@@ -11,12 +11,12 @@ function setCors(res: Response): void {
   res.setHeader('Access-Control-Allow-Origin', '*');
 }
 
-/** Paths must be under uhtd/, no traversal */
+/** Paths must be under uhtd/ or tenants/, no traversal */
 function isPathAllowed(path: string): boolean {
   if (!path || typeof path !== 'string') return false;
   const trimmed = path.trim();
   if (trimmed.includes('..')) return false;
-  if (!trimmed.startsWith('uhtd/')) return false;
+  if (!trimmed.startsWith('uhtd/') && !trimmed.startsWith('tenants/')) return false;
   if (trimmed.length > 500) return false;
   return true;
 }
@@ -79,7 +79,8 @@ export async function serveMediaById(req: Request, res: Response): Promise<void>
   }
 
   const path = mediaFile.storagePath;
-  if (!path?.startsWith('uhtd/') || path.includes('..')) {
+  const allowed = path?.startsWith('uhtd/') || path?.startsWith('tenants/');
+  if (!path || !allowed || path.includes('..')) {
     res.status(400).json({ error: 'Invalid path' });
     return;
   }

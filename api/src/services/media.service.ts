@@ -68,7 +68,13 @@ export async function uploadFile(
   const extension = originalFilename.split('.').pop() || '';
   const uniqueFilename = `${uuidv4()}.${extension}`;
   const category = getContentTypeCategory(mimeType);
-  const storagePath = `uhtd/${category}/${uniqueFilename}`;
+
+  // Tenant branding: tenants/{tenantId}/branding/{fieldName}/{filename}
+  // Other: uhtd/{category}/{filename}
+  const storagePath =
+    options.entityType === 'tenant' && options.entityId && options.fieldName
+      ? `tenants/${options.entityId}/branding/${options.fieldName}/${uniqueFilename}`
+      : `uhtd/${category}/${uniqueFilename}`;
   
   const file = bucket.file(storagePath);
   
