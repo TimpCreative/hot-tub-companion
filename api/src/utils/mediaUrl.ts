@@ -31,7 +31,6 @@ export function toProxyUrl(existingUrl: string | null): string | null {
   const apiBase = getAbsoluteApiBase();
 
   if (url.includes('/api/v1/media/serve')) {
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
     const idMatch = url.match(/\/serve\/([a-f0-9-]+)(?:\?|$)/i);
     if (idMatch) return `${apiBase}/api/v1/media/serve/${idMatch[1]}`;
     const q = url.includes('?') ? url.substring(url.indexOf('?')) : '';
