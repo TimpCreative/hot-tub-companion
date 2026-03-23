@@ -24,9 +24,15 @@ function requireManageSettings(req: Request, res: Response): boolean {
   return true;
 }
 
-function getUploadedBy(req: Request): string | null {
-  // authMiddleware attaches req.user from the `users` row
-  return ((req as any).user?.email as string | undefined) ?? null;
+function getUploadedById(req: Request): string | null {
+  // authMiddleware attaches req.user from the `users` row. uploaded_by expects users.id (UUID).
+  // Whitelisted admins have synthetic id like 'admin_xxx' — pass null for them.
+  const user = (req as any).user;
+  if (!user?.id || typeof user.id !== 'string') return null;
+  const id = user.id as string;
+  // users.id is UUID; whitelisted admins use 'admin_xxx' and must not be stored in FK column
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return null;
+  return id;
 }
 
 export async function uploadBrandingMedia(req: Request, res: Response): Promise<void> {
@@ -75,7 +81,7 @@ export async function uploadBrandingMedia(req: Request, res: Response): Promise<
       entityType: 'tenant',
       entityId: tenantId,
       fieldName: column,
-      uploadedBy: getUploadedBy(req) || undefined,
+      uploadedBy: getUploadedById(req) || undefined,
     });
 
     await db('tenants').where({ id: tenantId }).update({ [column]: publicFile.publicUrl });

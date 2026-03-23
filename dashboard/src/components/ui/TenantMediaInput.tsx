@@ -44,12 +44,23 @@ export function TenantMediaInput({
           body: formData,
         });
 
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error?.message || data.message || 'Upload failed');
+        const text = await response.text();
+        let data: Record<string, unknown>;
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          throw new Error(
+            response.ok
+              ? 'Invalid response from server'
+              : `Upload failed (${response.status}): ${text || 'Server returned empty response'}`
+          );
         }
-
-        onChange(data.data.publicUrl);
+        if (!response.ok) {
+          const err = data?.error as { message?: string } | undefined;
+          throw new Error(err?.message || (data?.message as string) || 'Upload failed');
+        }
+        const url = (data?.data as { publicUrl?: string })?.publicUrl;
+        if (url) onChange(url);
       } catch (e: any) {
         setError(e?.message || 'Upload failed');
       } finally {
