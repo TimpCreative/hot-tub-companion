@@ -73,6 +73,7 @@ export function initFirebase(): admin.app.App {
 
   try {
     const privateKey = parsePrivateKey(env.FIREBASE_PRIVATE_KEY);
+    const storageBucket = env.FIREBASE_STORAGE_BUCKET;
 
     admin.initializeApp({
       credential: admin.credential.cert({
@@ -80,6 +81,7 @@ export function initFirebase(): admin.app.App {
         clientEmail: env.FIREBASE_CLIENT_EMAIL,
         privateKey,
       }),
+      ...(storageBucket && { storageBucket }),
     });
 
     initialized = true;

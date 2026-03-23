@@ -31,9 +31,20 @@ export async function serveMedia(req: Request, res: Response): Promise<void> {
 
   try {
     const bucket = getStorageBucket();
-    const file = bucket.file(path);
+    let file = bucket.file(path);
 
-    const [exists] = await file.exists();
+    let [exists] = await file.exists();
+    if (!exists) {
+      const altBucketName = bucket.name.endsWith('.firebasestorage.app')
+        ? bucket.name.replace('.firebasestorage.app', '.appspot.com')
+        : bucket.name.replace('.appspot.com', '.firebasestorage.app');
+      const altBucket = (await import('../config/firebase')).getFirebaseStorage().bucket(altBucketName);
+      const altFile = altBucket.file(path);
+      const [altExists] = await altFile.exists();
+      if (altExists) file = altFile;
+      exists = altExists ?? false;
+    }
+
     if (!exists) {
       console.warn('Media serve 404:', { path, bucket: bucket.name });
       res.status(404).json({ error: 'Not found' });
@@ -77,19 +88,34 @@ export async function serveMediaById(req: Request, res: Response): Promise<void>
     const bucket = getStorageBucket();
     const file = bucket.file(path);
 
-    const [exists] = await file.exists();
+    let fileToServe = file;
+    let [exists] = await file.exists();
+
+    if (!exists) {
+      const altBucketName = bucket.name.endsWith('.firebasestorage.app')
+        ? bucket.name.replace('.firebasestorage.app', '.appspot.com')
+        : bucket.name.replace('.appspot.com', '.firebasestorage.app');
+      const altBucket = (await import('../config/firebase')).getFirebaseStorage().bucket(altBucketName);
+      const altFile = altBucket.file(path);
+      const [altExists] = await altFile.exists();
+      if (altExists) {
+        fileToServe = altFile;
+        exists = true;
+      }
+    }
+
     if (!exists) {
       console.warn('Media serve 404 (by id):', { id, path, bucket: bucket.name });
       res.status(404).json({ error: 'Not found' });
       return;
     }
 
-    const [metadata] = await file.getMetadata();
+    const [metadata] = await fileToServe.getMetadata();
     const contentType = metadata?.contentType || mediaFile.mimeType || 'application/octet-stream';
 
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400'); // 24h
-    file.createReadStream().pipe(res);
+    fileToServe.createReadStream().pipe(res);
   } catch (err) {
     console.error('Media serve error:', err);
     res.status(500).json({ error: 'Failed to serve file' });
