@@ -46,8 +46,8 @@ export async function uploadFile(req: Request, res: Response) {
     }
 
     const { entityType, entityId, fieldName } = req.body;
-    // uploaded_by is a UUID FK to users.id. Super admins don't have users rows; pass null.
-    const uploadedBy = null;
+    // uploaded_by is a UUID FK to users.id. Super admins don't have users rows; pass undefined.
+    const uploadedBy: string | undefined = undefined;
 
     const mediaFile = await mediaService.uploadFile(buffer, originalname, mimetype, {
       entityType,
