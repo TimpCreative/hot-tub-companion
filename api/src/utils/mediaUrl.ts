@@ -5,6 +5,9 @@ function getAbsoluteApiBase(): string {
   let base = (env.API_URL || '').trim().replace(/\/+$/, '');
   if (!base) return 'http://localhost:3000';
   if (!/^https?:\/\//i.test(base)) base = `https://${base}`;
+  // #region agent log
+  fetch('http://127.0.0.1:7244/ingest/a47da7ba-8944-40d5-a7b1-3ca8dd181a2c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'97b103'},body:JSON.stringify({sessionId:'97b103',location:'mediaUrl.ts:getAbsoluteApiBase',message:'API base used for media URLs',data:{apiUrl:env.API_URL,resolved:base},hypothesisId:'H4',timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   return base;
 }
 

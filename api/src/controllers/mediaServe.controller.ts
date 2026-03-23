@@ -73,6 +73,10 @@ export async function serveMediaById(req: Request, res: Response): Promise<void>
   }
 
   const mediaFile = await mediaService.getFileById(id);
+  // #region agent log
+  console.log('[MEDIA_DEBUG] DB lookup', { id, found: !!mediaFile, storagePath: mediaFile?.storagePath });
+  fetch('http://127.0.0.1:7244/ingest/a47da7ba-8944-40d5-a7b1-3ca8dd181a2c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'97b103'},body:JSON.stringify({sessionId:'97b103',location:'mediaServe.controller:serveMediaById:afterLookup',message:'DB lookup result',data:{id,found:!!mediaFile,storagePath:mediaFile?.storagePath},hypothesisId:'H2,H3,H5',timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (!mediaFile) {
     res.status(404).json({ error: 'Not found' });
     return;
@@ -81,6 +85,9 @@ export async function serveMediaById(req: Request, res: Response): Promise<void>
   const path = mediaFile.storagePath;
   const allowed = path?.startsWith('uhtd/') || path?.startsWith('tenants/');
   if (!path || !allowed || path.includes('..')) {
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/a47da7ba-8944-40d5-a7b1-3ca8dd181a2c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'97b103'},body:JSON.stringify({sessionId:'97b103',location:'mediaServe.controller:serveMediaById:pathRejected',message:'Path validation failed',data:{path,allowed},hypothesisId:'H5',timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     res.status(400).json({ error: 'Invalid path' });
     return;
   }
@@ -105,6 +112,10 @@ export async function serveMediaById(req: Request, res: Response): Promise<void>
       }
     }
 
+    // #region agent log
+    console.log('[MEDIA_DEBUG] GCS check', { id, path, bucket: bucket.name, exists });
+    fetch('http://127.0.0.1:7244/ingest/a47da7ba-8944-40d5-a7b1-3ca8dd181a2c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'97b103'},body:JSON.stringify({sessionId:'97b103',location:'mediaServe.controller:serveMediaById:gcsCheck',message:'GCS file existence',data:{id,path,bucket:bucket.name,exists},hypothesisId:'H3',timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     if (!exists) {
       console.warn('Media serve 404 (by id):', { id, path, bucket: bucket.name });
       res.status(404).json({ error: 'Not found' });
