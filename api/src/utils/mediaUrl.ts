@@ -21,7 +21,11 @@ export function toProxyUrl(existingUrl: string | null): string | null {
   const url = existingUrl.trim();
   const apiBase = getAbsoluteApiBase();
 
-  if (url.includes('/api/v1/media/serve')) return url;
+  if (url.includes('/api/v1/media/serve')) {
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    const q = url.includes('?') ? url.substring(url.indexOf('?')) : '';
+    return `${apiBase}/api/v1/media/serve${q}`;
+  }
 
   const fbMatch = url.match(/firebasestorage\.googleapis\.com\/v0\/b\/[^/]+\/o\/([^?]+)/);
   if (fbMatch) {

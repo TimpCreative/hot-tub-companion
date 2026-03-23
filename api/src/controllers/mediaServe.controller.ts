@@ -29,6 +29,7 @@ export async function serveMedia(req: Request, res: Response): Promise<void> {
 
     const [exists] = await file.exists();
     if (!exists) {
+      console.warn('Media serve 404:', { path, bucket: bucket.name });
       res.status(404).json({ error: 'Not found' });
       return;
     }
