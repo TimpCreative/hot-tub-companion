@@ -14,6 +14,12 @@ export function buildProxyUrl(storagePath: string): string {
   return `${apiBase}/api/v1/media/serve?path=${encodeURIComponent(storagePath)}`;
 }
 
+/** Build proxy URL by media file ID - more reliable (looks up path from DB) */
+export function buildProxyUrlById(mediaFileId: string): string {
+  const apiBase = getAbsoluteApiBase();
+  return `${apiBase}/api/v1/media/serve/${mediaFileId}`;
+}
+
 /** Convert Firebase/GCS URL to our proxy URL for backwards compatibility */
 export function toProxyUrl(existingUrl: string | null): string | null {
   if (!existingUrl?.trim()) return existingUrl;
@@ -23,6 +29,8 @@ export function toProxyUrl(existingUrl: string | null): string | null {
 
   if (url.includes('/api/v1/media/serve')) {
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    const idMatch = url.match(/\/serve\/([a-f0-9-]+)(?:\?|$)/i);
+    if (idMatch) return `${apiBase}/api/v1/media/serve/${idMatch[1]}`;
     const q = url.includes('?') ? url.substring(url.indexOf('?')) : '';
     return `${apiBase}/api/v1/media/serve${q}`;
   }

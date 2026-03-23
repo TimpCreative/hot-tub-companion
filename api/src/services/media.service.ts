@@ -6,7 +6,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../config/database';
 import { getStorageBucket } from '../config/firebase';
-import { buildProxyUrl } from '../utils/mediaUrl';
+import { buildProxyUrl, buildProxyUrlById } from '../utils/mediaUrl';
 
 export interface MediaFile {
   id: string;
@@ -84,9 +84,8 @@ export async function uploadFile(
     },
   });
   dbg({ location: 'media.service.ts:post-save', message: 'after file.save', hypothesisId: 'H2' });
-  // Use our proxy URL - streams from GCS, no public bucket required (works with domain-restricted orgs)
-  const publicUrl = buildProxyUrl(storagePath);
   dbg({ location: 'media.service.ts:pre-db', message: 'before media_files insert', hypothesisId: 'H3' });
+  const pathUrl = buildProxyUrl(storagePath);
   const [mediaFile] = await db('media_files')
     .insert({
       filename: uniqueFilename,
@@ -94,7 +93,7 @@ export async function uploadFile(
       mime_type: mimeType,
       file_size: fileBuffer.length,
       storage_path: storagePath,
-      public_url: publicUrl,
+      public_url: pathUrl,
       entity_type: options.entityType || null,
       entity_id: options.entityId || null,
       field_name: options.fieldName || null,
@@ -102,7 +101,9 @@ export async function uploadFile(
     })
     .returning('*');
 
-  return mapToMediaFile(mediaFile);
+  const idUrl = buildProxyUrlById(mediaFile.id);
+  await db('media_files').where({ id: mediaFile.id }).update({ public_url: idUrl });
+  return mapToMediaFile({ ...mediaFile, public_url: idUrl });
 }
 
 export async function listFiles(filters: ListFilters = {}): Promise<{ files: MediaFile[]; total: number }> {

@@ -5,6 +5,11 @@
 
 import { Request, Response } from 'express';
 import { getStorageBucket } from '../config/firebase';
+import * as mediaService from '../services/media.service';
+
+function setCors(res: Response): void {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+}
 
 /** Paths must be under uhtd/, no traversal */
 function isPathAllowed(path: string): boolean {
@@ -17,6 +22,7 @@ function isPathAllowed(path: string): boolean {
 }
 
 export async function serveMedia(req: Request, res: Response): Promise<void> {
+  setCors(res);
   const path = (req.query.path as string) || '';
   if (!isPathAllowed(path)) {
     res.status(400).json({ error: 'Invalid path' });
@@ -36,6 +42,50 @@ export async function serveMedia(req: Request, res: Response): Promise<void> {
 
     const [metadata] = await file.getMetadata();
     const contentType = metadata?.contentType || 'application/octet-stream';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // 24h
+    file.createReadStream().pipe(res);
+  } catch (err) {
+    console.error('Media serve error:', err);
+    res.status(500).json({ error: 'Failed to serve file' });
+  }
+}
+
+/** Serve by media file ID - looks up storage_path from DB (more reliable than path) */
+export async function serveMediaById(req: Request, res: Response): Promise<void> {
+  setCors(res);
+  const id = req.params.id;
+  if (!id) {
+    res.status(400).json({ error: 'Missing id' });
+    return;
+  }
+
+  const mediaFile = await mediaService.getFileById(id);
+  if (!mediaFile) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+
+  const path = mediaFile.storagePath;
+  if (!path?.startsWith('uhtd/') || path.includes('..')) {
+    res.status(400).json({ error: 'Invalid path' });
+    return;
+  }
+
+  try {
+    const bucket = getStorageBucket();
+    const file = bucket.file(path);
+
+    const [exists] = await file.exists();
+    if (!exists) {
+      console.warn('Media serve 404 (by id):', { id, path, bucket: bucket.name });
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+
+    const [metadata] = await file.getMetadata();
+    const contentType = metadata?.contentType || mediaFile.mimeType || 'application/octet-stream';
 
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400'); // 24h
