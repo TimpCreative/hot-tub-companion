@@ -14,6 +14,7 @@ function mediaCors(req: Request, res: Response, next: NextFunction): void {
 
 const router = Router();
 router.use(mediaCors);
+router.get('/debug/:id', mediaServeController.debugMediaById);
 router.get('/serve/:id', mediaServeController.serveMediaById);
 router.get('/serve', mediaServeController.serveMedia);
 
