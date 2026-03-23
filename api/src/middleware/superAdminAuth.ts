@@ -8,7 +8,7 @@ export async function superAdminAuth(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const authHeader = req.headers.authorization;
+  const authHeader = req.headers.authorization || req.headers['x-authorization'];
   if (!authHeader?.startsWith('Bearer ')) {
     error(res, 'UNAUTHORIZED', 'Missing or invalid Authorization header', 401);
     return;
@@ -26,7 +26,10 @@ export async function superAdminAuth(
     }
     (req as Request & { superAdminEmail: string }).superAdminEmail = email;
     next();
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Token verification failed';
+    const code = err && typeof err === 'object' && 'code' in err ? (err as { code?: string }).code : undefined;
+    console.warn('Super admin auth failed:', { message: msg, code, error: String(err) });
     error(res, 'UNAUTHORIZED', 'Invalid or expired token', 401);
   }
 }

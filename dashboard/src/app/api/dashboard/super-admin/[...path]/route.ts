@@ -105,6 +105,7 @@ async function doProxy(
   headers.delete('host');
   if (authHeader) {
     headers.set('Authorization', authHeader);
+    headers.set('X-Authorization', authHeader);
   }
 
   try {
