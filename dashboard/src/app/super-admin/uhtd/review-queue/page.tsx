@@ -33,7 +33,16 @@ interface ReviewStats {
   topPendingParts: { partName: string; pendingCount: number }[];
 }
 
-type TabType = 'brands' | 'model-lines' | 'spas' | 'parts' | 'compatibility';
+type ConsumerSuggestionRow = Record<string, unknown> & {
+  id: string;
+  status: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+  user: { email?: string; firstName?: string; lastName?: string };
+  tenantName?: string;
+};
+
+type TabType = 'brands' | 'model-lines' | 'spas' | 'parts' | 'compatibility' | 'consumer-spa';
 
 const TABS: { key: TabType; label: string }[] = [
   { key: 'brands', label: 'Brands' },
@@ -41,6 +50,7 @@ const TABS: { key: TabType; label: string }[] = [
   { key: 'spas', label: 'Spas' },
   { key: 'parts', label: 'Parts' },
   { key: 'compatibility', label: 'Compatibility' },
+  { key: 'consumer-spa', label: 'Consumer spa requests' },
 ];
 
 function PlaceholderTab({ entityType }: { entityType: string }) {
@@ -64,6 +74,7 @@ export default function ReviewQueuePage() {
   const fetchWithAuth = useSuperAdminFetch();
   const [activeTab, setActiveTab] = useState<TabType>('compatibility');
   const [items, setItems] = useState<PendingCompatibility[]>([]);
+  const [consumerItems, setConsumerItems] = useState<ConsumerSuggestionRow[]>([]);
   const [stats, setStats] = useState<ReviewStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -73,6 +84,31 @@ export default function ReviewQueuePage() {
   const [processing, setProcessing] = useState(false);
 
   async function fetchData() {
+    if (activeTab === 'consumer-spa') {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+          status: 'pending',
+        });
+        const res = await fetchWithAuth(`/api/dashboard/super-admin/consumer-uhtd-suggestions?${params}`);
+        const data = await res.json();
+        if (data.success && data.data) {
+          setConsumerItems(data.data.suggestions || []);
+          setTotal(data.data.pagination?.total || 0);
+        } else {
+          setConsumerItems([]);
+          setTotal(0);
+        }
+      } catch (err) {
+        console.error('Error fetching consumer suggestions:', err);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (activeTab !== 'compatibility') {
       setLoading(false);
       return;
@@ -135,6 +171,28 @@ export default function ReviewQueuePage() {
       fetchData();
     } catch (err) {
       console.error('Error confirming:', err);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleConsumerDecision = async (id: string, status: 'approved' | 'rejected') => {
+    const reviewNotes =
+      status === 'rejected'
+        ? typeof window !== 'undefined'
+          ? window.prompt('Optional notes for the team (not shown to customer):') || undefined
+          : undefined
+        : undefined;
+    setProcessing(true);
+    try {
+      await fetchWithAuth(`/api/dashboard/super-admin/consumer-uhtd-suggestions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, reviewNotes }),
+      });
+      fetchData();
+    } catch (err) {
+      console.error('Error updating suggestion:', err);
     } finally {
       setProcessing(false);
     }
@@ -240,7 +298,7 @@ export default function ReviewQueuePage() {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Review Queue</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Review and confirm imported data before it goes live
+            Review imported data and consumer-submitted spa details before they affect UHTD
           </p>
         </div>
       </div>
@@ -264,7 +322,112 @@ export default function ReviewQueuePage() {
         </nav>
       </div>
 
-      {activeTab === 'compatibility' ? (
+      {activeTab === 'consumer-spa' ? (
+        <>
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <strong>Does not add to SCdb.</strong> Approve/reject here is only for workflow tracking. After
+            approval, create or map the spa in UHTD manually, then update the customer&apos;s spa profile with
+            the correct <code className="rounded bg-amber-100 px-1">uhtd_spa_model_id</code>.
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white">
+            <Table
+              columns={[
+                {
+                  key: 'tenant',
+                  header: 'Retailer',
+                  render: (row: ConsumerSuggestionRow) => (
+                    <span className="text-sm text-gray-900">{row.tenantName || '—'}</span>
+                  ),
+                },
+                {
+                  key: 'user',
+                  header: 'Customer',
+                  render: (row: ConsumerSuggestionRow) => (
+                    <span className="text-sm text-gray-700">{row.user?.email || '—'}</span>
+                  ),
+                },
+                {
+                  key: 'details',
+                  header: 'Submitted details',
+                  render: (row: ConsumerSuggestionRow) => {
+                    const p = row.payload;
+                    return (
+                      <div className="text-sm text-gray-800 space-y-0.5 max-w-md">
+                        <div>
+                          <span className="font-medium">Make:</span> {String(p.brandName ?? '—')}
+                        </div>
+                        <div>
+                          <span className="font-medium">Model:</span> {String(p.modelName ?? '—')}
+                          {p.year != null && Number(p.year) > 0 ? ` (${p.year})` : ''}
+                        </div>
+                        {p.modelLineName ? (
+                          <div>
+                            <span className="font-medium">Line:</span> {String(p.modelLineName)}
+                          </div>
+                        ) : null}
+                        <div>
+                          <span className="font-medium">Sanitizer:</span> {String(p.sanitizationSystem ?? '—')}
+                          {p.customSanitizerNote
+                            ? ` — ${String(p.customSanitizerNote)}`
+                            : null}
+                        </div>
+                      </div>
+                    );
+                  },
+                },
+                {
+                  key: 'when',
+                  header: 'Submitted',
+                  render: (row: ConsumerSuggestionRow) => (
+                    <span className="text-xs text-gray-500">
+                      {new Date(row.createdAt).toLocaleString()}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'actions',
+                  header: '',
+                  render: (row: ConsumerSuggestionRow) => (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        loading={processing}
+                        onClick={() => handleConsumerDecision(row.id, 'rejected')}
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        loading={processing}
+                        onClick={() => handleConsumerDecision(row.id, 'approved')}
+                      >
+                        Mark reviewed
+                      </Button>
+                    </div>
+                  ),
+                },
+              ]}
+              data={consumerItems}
+              keyField="id"
+              loading={loading}
+              emptyMessage="No pending consumer spa requests."
+            />
+            {total > 0 && (
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={total}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setPage(1);
+                }}
+              />
+            )}
+          </div>
+        </>
+      ) : activeTab === 'compatibility' ? (
         <>
           {stats && (
             <div className="grid grid-cols-3 gap-4 mb-6">
@@ -348,7 +511,7 @@ export default function ReviewQueuePage() {
           </div>
         </>
       ) : (
-        <PlaceholderTab entityType={TABS.find(t => t.key === activeTab)?.label || ''} />
+        <PlaceholderTab entityType={TABS.find((t) => t.key === activeTab)?.label || ''} />
       )}
     </div>
   );

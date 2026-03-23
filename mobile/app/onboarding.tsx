@@ -66,6 +66,16 @@ export default function OnboardingScreen() {
   const [sanitizerModal, setSanitizerModal] = useState(false);
   const [sanitizer, setSanitizer] = useState<string | null>(null);
 
+  /** Custom / “not listed” paths → POST consumer-uhtd-suggestions (review queue only, no SCdb). */
+  const [useCustomBrand, setUseCustomBrand] = useState(false);
+  const [customBrandName, setCustomBrandName] = useState('');
+  const [useCustomModel, setUseCustomModel] = useState(false);
+  const [customModelName, setCustomModelName] = useState('');
+  const [customModelYear, setCustomModelYear] = useState('');
+  const [customModelLine, setCustomModelLine] = useState('');
+  const [useCustomSanitizer, setUseCustomSanitizer] = useState(false);
+  const [customSanitizerNote, setCustomSanitizerNote] = useState('');
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -127,16 +137,33 @@ export default function OnboardingScreen() {
   }, [modelQuery, modelModal, runSearch]);
 
   useEffect(() => {
-    if (!showSanitizer && sanitizerOptions.length > 0) {
+    if (!showSanitizer && sanitizerOptions.length > 0 && !useCustomSanitizer) {
       setSanitizer(sanitizerOptions[0]);
     }
-  }, [showSanitizer, sanitizerOptions]);
+  }, [showSanitizer, sanitizerOptions, useCustomSanitizer]);
 
-  const canSubmit =
-    !!selectedModel &&
-    !!sanitizer &&
-    (!showBrand || !!selectedBrand) &&
-    !submitting;
+  const brandOk =
+    !showBrand && !useCustomModel
+      ? true
+      : !showBrand && useCustomModel
+        ? customBrandName.trim().length >= 2
+        : showBrand && useCustomBrand
+          ? customBrandName.trim().length >= 2
+          : showBrand
+            ? !!selectedBrand
+            : true;
+
+  const modelOk = useCustomModel
+    ? customModelName.trim().length >= 1
+    : !!selectedModel;
+
+  const sanitizerOk = !showSanitizer
+    ? true
+    : useCustomSanitizer
+      ? customSanitizerNote.trim().length >= 2
+      : !!sanitizer;
+
+  const canSubmit = modelOk && sanitizerOk && brandOk && !submitting;
 
   const screenBg = '#F2F4F8';
   const cardBg = '#FFFFFF';
@@ -144,20 +171,50 @@ export default function OnboardingScreen() {
 
   async function handleSubmit() {
     setError(null);
-    if (!selectedModel || !sanitizer) {
-      setError('Select your model and sanitizer to continue.');
-      return;
-    }
-    if (showBrand && !selectedBrand) {
-      setError('Select a hot tub make.');
+    if (!modelOk || !sanitizerOk || !brandOk) {
+      setError('Fill in make, model, and sanitizer to continue.');
       return;
     }
     setSubmitting(true);
     try {
-      await api.post('/spa-profiles', {
-        uhtdSpaModelId: selectedModel.id,
-        sanitizationSystem: sanitizer,
-      });
+      const needsQueue = useCustomBrand || useCustomModel || useCustomSanitizer;
+
+      if (needsQueue) {
+        let brandId: string | null = null;
+        let brandName: string | undefined;
+        if (showBrand) {
+          if (useCustomBrand) brandName = customBrandName.trim();
+          else brandId = selectedBrand!.id;
+        } else if (useCustomModel) {
+          brandName = customBrandName.trim();
+        } else {
+          brandId = selectedModel!.brandId;
+        }
+
+        const yearParsed = useCustomModel
+          ? parseInt(customModelYear.replace(/\D/g, ''), 10)
+          : undefined;
+        const year = useCustomModel
+          ? Number.isFinite(yearParsed) && (yearParsed as number) > 0
+            ? (yearParsed as number)
+            : 0
+          : selectedModel!.year;
+
+        await api.post('/consumer-uhtd-suggestions', {
+          brandId,
+          brandName: brandId ? undefined : brandName,
+          modelLineName: useCustomModel ? customModelLine.trim() || null : null,
+          modelName: useCustomModel ? customModelName.trim() : selectedModel!.name,
+          year,
+          sanitizationSystem: useCustomSanitizer ? 'other' : sanitizer!,
+          customSanitizerNote: useCustomSanitizer ? customSanitizerNote.trim() : undefined,
+        });
+      } else {
+        await api.post('/spa-profiles', {
+          uhtdSpaModelId: selectedModel!.id,
+          sanitizationSystem: sanitizer!,
+        });
+      }
       await clearSetupSkippedFlag();
       router.replace('/(tabs)/home');
     } catch (err: unknown) {
@@ -213,47 +270,153 @@ export default function OnboardingScreen() {
           {showBrand ? (
             <View style={styles.field}>
               <Text style={styles.label}>Hot Tub Make</Text>
-              <TouchableOpacity
-                style={[styles.inputWell, { backgroundColor: inputWell }]}
-                onPress={() => setBrandModal(true)}
-                accessibilityRole="button"
-              >
-                <Text style={selectedBrand ? styles.inputText : styles.placeholder}>
-                  {selectedBrand ? selectedBrand.name : 'Select make'}
-                </Text>
-                <Text style={styles.chevron}>v</Text>
-              </TouchableOpacity>
+              {useCustomBrand ? (
+                <>
+                  <TextInput
+                    style={[styles.textInput, { backgroundColor: inputWell, borderColor: inputWell }]}
+                    placeholder="Enter your make"
+                    placeholderTextColor="#888"
+                    value={customBrandName}
+                    onChangeText={setCustomBrandName}
+                    autoCorrect={false}
+                  />
+                  <TouchableOpacity
+                    onPress={() => {
+                      setUseCustomBrand(false);
+                      setCustomBrandName('');
+                    }}
+                    style={styles.notListedLink}
+                  >
+                    <Text style={[styles.notListedText, { color: colors.primary }]}>
+                      Choose from list instead
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={[styles.inputWell, { backgroundColor: inputWell }]}
+                    onPress={() => setBrandModal(true)}
+                    accessibilityRole="button"
+                  >
+                    <Text style={selectedBrand ? styles.inputText : styles.placeholder}>
+                      {selectedBrand ? selectedBrand.name : 'Select make'}
+                    </Text>
+                    <Text style={styles.chevron}>v</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSelectedBrand(null);
+                      setSelectedModel(null);
+                      setUseCustomBrand(true);
+                    }}
+                    style={styles.notListedLink}
+                  >
+                    <Text style={[styles.notListedText, { color: colors.primary }]}>Not listed?</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           ) : null}
 
           <View style={styles.field}>
             <Text style={styles.label}>Model</Text>
-            <TouchableOpacity
-              style={[styles.inputWell, { backgroundColor: inputWell }]}
-              onPress={() => {
-                if (showBrand && !selectedBrand) {
-                  setError('Select a make first.');
-                  return;
-                }
-                setError(null);
-                setModelModal(true);
-              }}
-              accessibilityRole="button"
-            >
-              <Text style={selectedModel ? styles.inputText : styles.placeholder} numberOfLines={1}>
-                {selectedModel
-                  ? `${selectedModel.name} (${selectedModel.year})`
-                  : 'Search and select your model'}
-              </Text>
-              <Text style={styles.chevron}>v</Text>
-            </TouchableOpacity>
+            {useCustomModel ? (
+              <>
+                {!showBrand ? (
+                  <TextInput
+                    style={[styles.textInput, { backgroundColor: inputWell, borderColor: inputWell, marginBottom: 10 }]}
+                    placeholder="Hot tub make (required)"
+                    placeholderTextColor="#888"
+                    value={customBrandName}
+                    onChangeText={setCustomBrandName}
+                    autoCorrect={false}
+                  />
+                ) : null}
+                <TextInput
+                  style={[styles.textInput, { backgroundColor: inputWell, borderColor: inputWell, marginBottom: 10 }]}
+                  placeholder="Model name or series"
+                  placeholderTextColor="#888"
+                  value={customModelName}
+                  onChangeText={setCustomModelName}
+                  autoCorrect={false}
+                />
+                <TextInput
+                  style={[styles.textInput, { backgroundColor: inputWell, borderColor: inputWell, marginBottom: 10 }]}
+                  placeholder="Year (optional)"
+                  placeholderTextColor="#888"
+                  value={customModelYear}
+                  onChangeText={setCustomModelYear}
+                  keyboardType="number-pad"
+                />
+                <TextInput
+                  style={[styles.textInput, { backgroundColor: inputWell, borderColor: inputWell, marginBottom: 10 }]}
+                  placeholder="Model line / collection (optional)"
+                  placeholderTextColor="#888"
+                  value={customModelLine}
+                  onChangeText={setCustomModelLine}
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  onPress={() => {
+                    setUseCustomModel(false);
+                    setCustomModelName('');
+                    setCustomModelYear('');
+                    setCustomModelLine('');
+                    if (!showBrand) setCustomBrandName('');
+                  }}
+                  style={styles.notListedLink}
+                >
+                  <Text style={[styles.notListedText, { color: colors.primary }]}>
+                    Search catalog instead
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[styles.inputWell, { backgroundColor: inputWell }]}
+                  onPress={() => {
+                    if (showBrand && !selectedBrand && !useCustomBrand) {
+                      setError('Select a make first.');
+                      return;
+                    }
+                    setError(null);
+                    setModelModal(true);
+                  }}
+                  accessibilityRole="button"
+                >
+                  <Text style={selectedModel ? styles.inputText : styles.placeholder} numberOfLines={1}>
+                    {selectedModel
+                      ? `${selectedModel.name} (${selectedModel.year})`
+                      : 'Search and select your model'}
+                  </Text>
+                  <Text style={styles.chevron}>v</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedModel(null);
+                    setUseCustomModel(true);
+                  }}
+                  style={styles.notListedLink}
+                >
+                  <Text style={[styles.notListedText, { color: colors.primary }]}>Not listed?</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
 
           <View style={styles.field}>
             <Text style={styles.label}>Year</Text>
-            <View style={[styles.inputWell, { backgroundColor: inputWell, opacity: selectedModel ? 1 : 0.6 }]}>
-              <Text style={selectedModel ? styles.inputText : styles.placeholder}>
-                {selectedModel ? String(selectedModel.year) : 'Select model first'}
+            <View style={[styles.inputWell, { backgroundColor: inputWell, opacity: useCustomModel || selectedModel ? 1 : 0.6 }]}>
+              <Text style={useCustomModel || selectedModel ? styles.inputText : styles.placeholder}>
+                {useCustomModel
+                  ? customModelYear.trim()
+                    ? customModelYear.trim()
+                    : 'Not sure (we will verify)'
+                  : selectedModel
+                    ? String(selectedModel.year)
+                    : 'Select model first'}
               </Text>
             </View>
           </View>
@@ -261,17 +424,59 @@ export default function OnboardingScreen() {
           {showSanitizer ? (
             <View style={styles.field}>
               <Text style={styles.label}>Sanitizer System</Text>
-              <TouchableOpacity
-                style={[styles.inputWell, { backgroundColor: inputWell }]}
-                onPress={() => setSanitizerModal(true)}
-                accessibilityRole="button"
-              >
-                <Text style={sanitizer ? styles.inputText : styles.placeholder}>
-                  {sanitizer ? labelForSanitizer(sanitizer) : 'Select sanitizer'}
-                </Text>
-                <Text style={styles.chevron}>v</Text>
-              </TouchableOpacity>
+              {useCustomSanitizer ? (
+                <>
+                  <TextInput
+                    style={[styles.textInput, { backgroundColor: inputWell, borderColor: inputWell, minHeight: 80 }]}
+                    placeholder="Describe your sanitizer system"
+                    placeholderTextColor="#888"
+                    value={customSanitizerNote}
+                    onChangeText={setCustomSanitizerNote}
+                    multiline
+                  />
+                  <TouchableOpacity
+                    onPress={() => {
+                      setUseCustomSanitizer(false);
+                      setCustomSanitizerNote('');
+                    }}
+                    style={styles.notListedLink}
+                  >
+                    <Text style={[styles.notListedText, { color: colors.primary }]}>
+                      Choose from list instead
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={[styles.inputWell, { backgroundColor: inputWell }]}
+                    onPress={() => setSanitizerModal(true)}
+                    accessibilityRole="button"
+                  >
+                    <Text style={sanitizer ? styles.inputText : styles.placeholder}>
+                      {sanitizer ? labelForSanitizer(sanitizer) : 'Select sanitizer'}
+                    </Text>
+                    <Text style={styles.chevron}>v</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setUseCustomSanitizer(true);
+                      setSanitizer('other');
+                    }}
+                    style={styles.notListedLink}
+                  >
+                    <Text style={[styles.notListedText, { color: colors.primary }]}>Not listed?</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
+          ) : null}
+
+          {useCustomBrand || useCustomModel || useCustomSanitizer ? (
+            <Text style={styles.queueHint}>
+              Your details will be sent for review. Nothing is added to the master catalog until our team
+              verifies your hot tub.
+            </Text>
           ) : null}
 
           <View style={styles.ctaWrap}>
@@ -300,6 +505,8 @@ export default function OnboardingScreen() {
                   <TouchableOpacity
                     style={styles.modalRow}
                     onPress={() => {
+                      setUseCustomBrand(false);
+                      setCustomBrandName('');
                       setSelectedBrand(item);
                       setSelectedModel(null);
                       setBrandModal(false);
@@ -309,6 +516,21 @@ export default function OnboardingScreen() {
                   </TouchableOpacity>
                 )}
                 ListEmptyComponent={<Text style={styles.placeholder}>No brands available.</Text>}
+                ListFooterComponent={
+                  <TouchableOpacity
+                    style={styles.modalRow}
+                    onPress={() => {
+                      setSelectedBrand(null);
+                      setSelectedModel(null);
+                      setUseCustomBrand(true);
+                      setBrandModal(false);
+                    }}
+                  >
+                    <Text style={[styles.modalRowText, { color: colors.primary, fontWeight: '600' }]}>
+                      Not listed? Enter your make on the form
+                    </Text>
+                  </TouchableOpacity>
+                }
               />
             )}
             <TouchableOpacity onPress={() => setBrandModal(false)} style={styles.modalClose}>
@@ -334,10 +556,14 @@ export default function OnboardingScreen() {
             <FlatList
               data={searchHits}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
+                renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.modalRow}
                   onPress={() => {
+                    setUseCustomModel(false);
+                    setCustomModelName('');
+                    setCustomModelYear('');
+                    setCustomModelLine('');
                     setSelectedModel(item);
                     setModelModal(false);
                     setModelQuery('');
@@ -358,6 +584,21 @@ export default function OnboardingScreen() {
                   <Text style={styles.placeholder}>No matches.</Text>
                 )
               }
+              ListFooterComponent={
+                <TouchableOpacity
+                  style={styles.modalRow}
+                  onPress={() => {
+                    setSelectedModel(null);
+                    setUseCustomModel(true);
+                    setModelModal(false);
+                    setModelQuery('');
+                  }}
+                >
+                  <Text style={[styles.modalRowText, { color: colors.primary, fontWeight: '600' }]}>
+                    Not listed? Enter your model on the form
+                  </Text>
+                </TouchableOpacity>
+              }
             />
             <TouchableOpacity onPress={() => setModelModal(false)} style={styles.modalClose}>
               <Text style={{ color: colors.primary }}>Close</Text>
@@ -377,6 +618,8 @@ export default function OnboardingScreen() {
                 <TouchableOpacity
                   style={styles.modalRow}
                   onPress={() => {
+                    setUseCustomSanitizer(false);
+                    setCustomSanitizerNote('');
                     setSanitizer(item);
                     setSanitizerModal(false);
                   }}
@@ -384,6 +627,20 @@ export default function OnboardingScreen() {
                   <Text style={styles.modalRowText}>{labelForSanitizer(item)}</Text>
                 </TouchableOpacity>
               )}
+              ListFooterComponent={
+                <TouchableOpacity
+                  style={styles.modalRow}
+                  onPress={() => {
+                    setUseCustomSanitizer(true);
+                    setSanitizer('other');
+                    setSanitizerModal(false);
+                  }}
+                >
+                  <Text style={[styles.modalRowText, { color: colors.primary, fontWeight: '600' }]}>
+                    Not listed? Describe on the form
+                  </Text>
+                </TouchableOpacity>
+              }
             />
             <TouchableOpacity onPress={() => setSanitizerModal(false)} style={styles.modalClose}>
               <Text style={{ color: colors.primary }}>Close</Text>
@@ -490,6 +747,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
+    marginBottom: 8,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#222',
+  },
+  notListedLink: {
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  notListedText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  queueHint: {
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 19,
     marginBottom: 8,
   },
 });

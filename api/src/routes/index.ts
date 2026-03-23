@@ -16,6 +16,7 @@ import { superAdminAuth } from '../middleware/superAdminAuth';
 import adminRoutes from './admin.routes';
 import productsRoutes from './products.routes';
 import spaProfilesRoutes from './spaProfiles.routes';
+import consumerUhtdSuggestionsRoutes from './consumerUhtdSuggestions.routes';
 
 const router = Router();
 
@@ -35,6 +36,9 @@ router.use('/api/v1', productsRoutes);
 
 // Customer spa profiles (tenant API key + Firebase auth)
 router.use('/api/v1', spaProfilesRoutes);
+
+// Consumer UHTD review queue (tenant API key + Firebase auth; no SCdb writes)
+router.use('/api/v1', consumerUhtdSuggestionsRoutes);
 
 // Super Admin routes
 router.use('/api/v1/super-admin', superAdminRoutes);

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as superAdminController from '../controllers/superAdmin.controller';
 import * as superAdminBrandingController from '../controllers/superAdminBranding.controller';
+import * as superAdminConsumerUhtdController from '../controllers/superAdminConsumerUhtd.controller';
 import { superAdminAuth } from '../middleware/superAdminAuth';
 import { authRateLimiter } from '../middleware/rateLimiter';
 
@@ -22,6 +23,9 @@ router.put('/tenants/:id/pos', superAdminController.updateTenantPosConfig);
 router.post('/tenants/:id/pos/test', superAdminController.testTenantPosConnection);
 router.post('/tenants/:id/pos/sync', superAdminController.syncTenantCatalog);
 router.get('/settings', superAdminController.getSettings);
+
+router.get('/consumer-uhtd-suggestions', superAdminConsumerUhtdController.listConsumerSuggestions);
+router.patch('/consumer-uhtd-suggestions/:id', superAdminConsumerUhtdController.updateConsumerSuggestion);
 
 // Whitelist management
 router.post('/whitelist', superAdminController.addWhitelistEmail);

@@ -19,6 +19,8 @@ function mapProfile(row: Record<string, unknown>) {
     sanitizationSystem: row.sanitization_system,
     usageMonths: row.usage_months,
     uhtdSpaModelId: row.uhtd_spa_model_id,
+    uhtdVerificationStatus: row.uhtd_verification_status ?? 'linked',
+    consumerSuggestionId: row.consumer_suggestion_id ?? null,
     isPrimary: row.is_primary,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

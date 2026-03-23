@@ -5,6 +5,7 @@ export const SANITIZATION_LABELS: Record<string, string> = {
   frog_ease: 'Frog @Ease',
   copper: 'Copper',
   silver_mineral: 'Silver / Mineral stick',
+  other: 'Other (describe below)',
 };
 
 export function labelForSanitizer(key: string): string {
