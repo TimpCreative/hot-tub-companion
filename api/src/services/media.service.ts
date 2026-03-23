@@ -45,14 +45,25 @@ function getContentTypeCategory(mimeType: string): string {
   return 'other';
 }
 
+function dbg(payload: Record<string, unknown>) {
+  // #region agent log
+  fetch('http://127.0.0.1:7244/ingest/a47da7ba-8944-40d5-a7b1-3ca8dd181a2c', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '97b103' },
+    body: JSON.stringify({ sessionId: '97b103', ...payload, timestamp: Date.now() }),
+  }).catch(() => {});
+  // #endregion
+}
+
 export async function uploadFile(
   fileBuffer: Buffer,
   originalFilename: string,
   mimeType: string,
   options: UploadOptions = {}
 ): Promise<MediaFile> {
+  dbg({ location: 'media.service.ts:pre-bucket', message: 'before getStorageBucket', hypothesisId: 'H1' });
   const bucket = getStorageBucket();
-  
+  dbg({ location: 'media.service.ts:post-bucket', message: 'after getStorageBucket', data: { bucketName: bucket?.name }, hypothesisId: 'H2' });
   const extension = originalFilename.split('.').pop() || '';
   const uniqueFilename = `${uuidv4()}.${extension}`;
   const category = getContentTypeCategory(mimeType);
@@ -71,10 +82,11 @@ export async function uploadFile(
       },
     },
   });
-
+  dbg({ location: 'media.service.ts:post-save', message: 'after file.save', hypothesisId: 'H2' });
   await file.makePublic();
+  dbg({ location: 'media.service.ts:post-makePublic', message: 'after makePublic', hypothesisId: 'H2' });
   const publicUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
-
+  dbg({ location: 'media.service.ts:pre-db', message: 'before media_files insert', hypothesisId: 'H3' });
   const [mediaFile] = await db('media_files')
     .insert({
       filename: uniqueFilename,

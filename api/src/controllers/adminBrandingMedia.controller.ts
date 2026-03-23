@@ -35,10 +35,26 @@ function getUploadedById(req: Request): string | null {
   return id;
 }
 
+function dbg(payload: Record<string, unknown>) {
+  // #region agent log
+  fetch('http://127.0.0.1:7244/ingest/a47da7ba-8944-40d5-a7b1-3ca8dd181a2c', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '97b103' },
+    body: JSON.stringify({ sessionId: '97b103', ...payload, timestamp: Date.now() }),
+  }).catch(() => {});
+  // #endregion
+}
+
 export async function uploadBrandingMedia(req: Request, res: Response): Promise<void> {
   if (!requireManageSettings(req, res)) return;
 
   const tenantId = (req as any).tenant?.id as string | undefined;
+  dbg({
+    location: 'adminBrandingMedia.controller.ts:entry',
+    message: 'uploadBrandingMedia reached',
+    data: { tenantId, hasFile: !!(req as any).file, fieldName: (req.body?.fieldName as string) ?? '' },
+    hypothesisId: 'H5',
+  });
   if (!tenantId) {
     error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
     return;
@@ -77,17 +93,40 @@ export async function uploadBrandingMedia(req: Request, res: Response): Promise<
 
   try {
     // Multer memoryStorage provides `buffer`.
+    dbg({
+      location: 'adminBrandingMedia.controller.ts:pre-upload',
+      message: 'before mediaService.uploadFile',
+      data: { tenantId, column, fileSize: file.buffer?.length },
+      hypothesisId: 'H1,H2,H3',
+    });
     const publicFile = await mediaService.uploadFile(file.buffer, file.originalname, mimetype, {
       entityType: 'tenant',
       entityId: tenantId,
       fieldName: column,
       uploadedBy: getUploadedById(req) || undefined,
     });
-
+    dbg({
+      location: 'adminBrandingMedia.controller.ts:post-upload',
+      message: 'after uploadFile, before tenants update',
+      data: { publicUrl: publicFile?.publicUrl },
+      hypothesisId: 'H4',
+    });
     await db('tenants').where({ id: tenantId }).update({ [column]: publicFile.publicUrl });
 
     success(res, { publicUrl: publicFile.publicUrl }, 'Branding media uploaded');
-  } catch (err) {
+  } catch (err: unknown) {
+    const ex = err as Error & { code?: string };
+    dbg({
+      location: 'adminBrandingMedia.controller.ts:catch',
+      message: 'upload error',
+      data: {
+        errName: ex?.name,
+        errMessage: ex?.message,
+        errCode: ex?.code,
+        errStack: ex?.stack?.slice(0, 300),
+      },
+      hypothesisId: 'H1,H2,H3,H4',
+    });
     console.error('Error uploading branding media:', err);
     error(res, 'INTERNAL_ERROR', 'Failed to upload branding media', 500);
   }
