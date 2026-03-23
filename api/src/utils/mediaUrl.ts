@@ -1,8 +1,16 @@
 import { env } from '../config/environment';
 
+/** Ensure API URL is absolute (required for img src, etc.) */
+function getAbsoluteApiBase(): string {
+  let base = (env.API_URL || '').trim().replace(/\/+$/, '');
+  if (!base) return 'http://localhost:3000';
+  if (!/^https?:\/\//i.test(base)) base = `https://${base}`;
+  return base;
+}
+
 /** Build proxy URL for a storage path */
 export function buildProxyUrl(storagePath: string): string {
-  const apiBase = (env.API_URL || '').replace(/\/+$/, '');
+  const apiBase = getAbsoluteApiBase();
   return `${apiBase}/api/v1/media/serve?path=${encodeURIComponent(storagePath)}`;
 }
 
@@ -11,7 +19,7 @@ export function toProxyUrl(existingUrl: string | null): string | null {
   if (!existingUrl?.trim()) return existingUrl;
 
   const url = existingUrl.trim();
-  const apiBase = (env.API_URL || '').replace(/\/+$/, '');
+  const apiBase = getAbsoluteApiBase();
 
   if (url.includes('/api/v1/media/serve')) return url;
 

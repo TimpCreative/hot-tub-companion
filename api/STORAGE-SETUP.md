@@ -5,7 +5,7 @@ Media (logos, icons) are served through our **API proxy** at `/api/v1/media/serv
 ## Required
 
 1. **FIREBASE_STORAGE_BUCKET** – Set in Railway (e.g. `hot-tub-companion.firebasestorage.app`).
-2. **API_URL** – Base URL of the API (e.g. `https://api.hottubcompanion.com`) so proxy URLs are correct.
+2. **API_URL** – Base URL of the API (e.g. `https://api.hottubcompanion.com` or `2wb9n1e3.up.railway.app`). `https://` is added if omitted.
 
 The service account (FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY) must have Storage Object Admin on the bucket. Firebase projects grant this by default.
 
