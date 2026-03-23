@@ -67,6 +67,16 @@ const PUBLIC_PATHS = [
   'auth/register',
 ];
 
+const DEBUG_LOG = (data: Record<string, unknown>) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7244/ingest/a47da7ba-8944-40d5-a7b1-3ca8dd181a2c', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '97b103' },
+    body: JSON.stringify({ sessionId: '97b103', ...data, timestamp: Date.now() }),
+  }).catch(() => {});
+  // #endregion
+};
+
 async function doProxy(
   request: NextRequest,
   params: Promise<{ path: string[] }>,
@@ -74,11 +84,19 @@ async function doProxy(
 ): Promise<NextResponse> {
   const { path } = await params;
   const pathStr = path.join('/');
-  
+
   const isPublicPath = PUBLIC_PATHS.some((p) => pathStr === p || pathStr.startsWith(p + '/'));
-  
+
   const authHeader = request.headers.get('authorization');
-  if (!isPublicPath && !authHeader?.startsWith('Bearer ')) {
+  const hasAuth = !!authHeader?.startsWith('Bearer ');
+  DEBUG_LOG({
+    hypothesisId: 'H1',
+    location: 'proxy:entry',
+    message: 'Proxy received request',
+    data: { pathStr, hasAuth, authHeaderLen: authHeader?.length ?? 0 },
+  });
+  if (!isPublicPath && !hasAuth) {
+    DEBUG_LOG({ hypothesisId: 'H1', location: 'proxy:401', message: 'Proxy returning 401 - no auth header', data: {} });
     return NextResponse.json(
       { success: false, error: { code: 'UNAUTHORIZED', message: 'Missing or invalid Authorization header' } },
       { status: 401 }
@@ -119,6 +137,12 @@ async function doProxy(
 
     // For 4xx/5xx, ensure we return JSON with a helpful message for debugging
     if (res.status >= 400) {
+      DEBUG_LOG({
+        hypothesisId: 'H2',
+        location: 'proxy:api4xx',
+        message: 'API returned error',
+        data: { status: res.status, bodyPreview: data.slice(0, 200) },
+      });
       let parsed: { error?: { message?: string }; message?: string } = {};
       try {
         parsed = JSON.parse(data) as { error?: { message?: string }; message?: string };
