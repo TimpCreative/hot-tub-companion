@@ -38,6 +38,7 @@ export async function authMiddleware(
 
     const user = await db('users')
       .where({ firebase_uid: decoded.uid, tenant_id: tenantId })
+      .whereNull('deleted_at')
       .first();
 
     if (!user) {

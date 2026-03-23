@@ -33,6 +33,11 @@ interface DealerContact {
   address: string | null;
 }
 
+interface Legal {
+  termsUrl: string | null;
+  privacyUrl: string | null;
+}
+
 const STEP_LABELS: Record<StepId, string> = {
   brand: 'Hot tub make (brand)',
   modelPick: 'Model selection (UHTD)',
@@ -71,11 +76,13 @@ export default function AdminAppSetupPage() {
   const { getIdToken } = useAuth();
   const api = useMemo(() => createTenantApiClient(async () => await getIdToken()), [getIdToken]);
 
-  const [tab, setTab] = useState<'onboarding' | 'home'>('onboarding');
+  const [tab, setTab] = useState<'onboarding' | 'home' | 'legal'>('onboarding');
   const [onboarding, setOnboarding] = useState<OnboardingConfig | null>(null);
   const [homeDashboard, setHomeDashboard] = useState<HomeDashboardConfig | null>(null);
   const [dealerPhone, setDealerPhone] = useState('');
   const [dealerAddress, setDealerAddress] = useState('');
+  const [termsUrl, setTermsUrl] = useState('');
+  const [privacyUrl, setPrivacyUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +98,7 @@ export default function AdminAppSetupPage() {
           onboarding?: OnboardingConfig;
           homeDashboard?: HomeDashboardConfig;
           dealerContact?: DealerContact;
+          legal?: Legal;
         };
       };
       if (body?.data?.onboarding) setOnboarding(body.data.onboarding);
@@ -99,6 +107,11 @@ export default function AdminAppSetupPage() {
       if (dc) {
         setDealerPhone(dc.phone ?? '');
         setDealerAddress(dc.address ?? '');
+      }
+      const legal = body?.data?.legal;
+      if (legal) {
+        setTermsUrl(legal.termsUrl ?? '');
+        setPrivacyUrl(legal.privacyUrl ?? '');
       }
     } catch (e: unknown) {
       const msg =
@@ -214,6 +227,38 @@ export default function AdminAppSetupPage() {
     }
   }
 
+  async function saveLegal() {
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const body = (await api.put('/admin/settings/app-setup', {
+        legal: {
+          termsUrl: termsUrl.trim() || null,
+          privacyUrl: privacyUrl.trim() || null,
+        },
+      })) as {
+        success?: boolean;
+        data?: { legal?: Legal };
+        message?: string;
+      };
+      const legal = body?.data?.legal;
+      if (legal) {
+        setTermsUrl(legal.termsUrl ?? '');
+        setPrivacyUrl(legal.privacyUrl ?? '');
+      }
+      setSuccess(body.message ?? 'Saved');
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === 'object' && 'error' in e
+          ? (e as { error?: { message?: string } }).error?.message
+          : 'Failed to save';
+      setError(msg ?? 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center py-12">Loading...</div>;
   }
@@ -245,6 +290,15 @@ export default function AdminAppSetupPage() {
           }`}
         >
           Home dashboard
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('legal')}
+          className={`pb-3 px-1 text-sm font-medium border-b-2 ${
+            tab === 'legal' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'
+          }`}
+        >
+          Legal
         </button>
       </div>
 
@@ -553,6 +607,38 @@ export default function AdminAppSetupPage() {
 
           <Button type="button" loading={saving} onClick={() => void saveHome()}>
             Save home dashboard
+          </Button>
+        </div>
+      )}
+
+      {tab === 'legal' && (
+        <div className="space-y-6 bg-white rounded-lg border border-gray-200 p-6">
+          <h3 className="text-sm font-semibold text-gray-900">Legal URLs</h3>
+          <p className="text-xs text-gray-500">
+            Links shown in the mobile app Profile section (Terms of Service, Privacy Policy).
+          </p>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Terms of Service URL</label>
+            <input
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+              type="url"
+              value={termsUrl}
+              onChange={(e) => setTermsUrl(e.target.value)}
+              placeholder="https://example.com/terms"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Privacy Policy URL</label>
+            <input
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+              type="url"
+              value={privacyUrl}
+              onChange={(e) => setPrivacyUrl(e.target.value)}
+              placeholder="https://example.com/privacy"
+            />
+          </div>
+          <Button type="button" loading={saving} onClick={() => void saveLegal()}>
+            Save legal
           </Button>
         </div>
       )}

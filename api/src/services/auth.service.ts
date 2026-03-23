@@ -24,7 +24,10 @@ export async function register(tenantId: string, body: RegisterBody) {
     throw new ValidationError('Invalid email format');
   }
 
-  const existing = await db('users').where({ tenant_id: tenantId, email }).first();
+  const existing = await db('users')
+    .where({ tenant_id: tenantId, email })
+    .whereNull('deleted_at')
+    .first();
   if (existing) {
     throw new ValidationError('Email already registered for this tenant');
   }
@@ -66,10 +69,18 @@ export async function verifyToken(token: string, tenantId?: string) {
 
   const user = await db('users')
     .where({ firebase_uid: decoded.uid, tenant_id: tenantIdToUse })
+    .whereNull('deleted_at')
     .first();
 
   if (user) {
-    return formatUser(user);
+    const dbEmail = (user.email as string) || '';
+    const firebaseEmail = (decoded.email as string) || '';
+    if (dbEmail !== firebaseEmail) {
+      await db('users')
+        .where({ id: user.id })
+        .update({ email: firebaseEmail, updated_at: db.fn.now() });
+    }
+    return formatUser({ ...user, email: firebaseEmail || user.email });
   }
 
   // Whitelist override: same rules as authMiddleware (no users row for this tenant)

@@ -40,6 +40,10 @@ export async function getAppSetup(req: Request, res: Response): Promise<void> {
     onboarding: normalizeOnboardingConfig(tenant.onboarding_config),
     homeDashboard: normalizeHomeDashboardConfig(tenant.home_dashboard_config),
     dealerContact: mapDealerContact(tenant),
+    legal: {
+      termsUrl: (tenant as any).terms_url?.trim() || null,
+      privacyUrl: (tenant as any).privacy_url?.trim() || null,
+    },
   });
 }
 
@@ -61,6 +65,7 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
     onboarding?: OnboardingConfigDTO;
     homeDashboard?: HomeDashboardConfigDTO;
     dealerContact?: { phone?: string | null; address?: string | null };
+    legal?: { termsUrl?: string | null; privacyUrl?: string | null };
   };
 
   const hasOnboarding = body.onboarding && typeof body.onboarding === 'object';
@@ -69,9 +74,13 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
     body.dealerContact &&
     typeof body.dealerContact === 'object' &&
     (body.dealerContact.phone !== undefined || body.dealerContact.address !== undefined);
+  const hasLegal =
+    body.legal &&
+    typeof body.legal === 'object' &&
+    (body.legal.termsUrl !== undefined || body.legal.privacyUrl !== undefined);
 
-  if (!hasOnboarding && !hasHome && !hasDealer) {
-    error(res, 'VALIDATION_ERROR', 'Provide onboarding, homeDashboard, and/or dealerContact', 400);
+  if (!hasOnboarding && !hasHome && !hasDealer && !hasLegal) {
+    error(res, 'VALIDATION_ERROR', 'Provide onboarding, homeDashboard, dealerContact, and/or legal', 400);
     return;
   }
 
@@ -96,6 +105,15 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
       update.public_contact_address = a;
     }
   }
+  if (hasLegal) {
+    const legal = body.legal!;
+    if (legal.termsUrl !== undefined) {
+      update.terms_url = legal.termsUrl === null || legal.termsUrl === '' ? null : String(legal.termsUrl).trim().slice(0, 2000);
+    }
+    if (legal.privacyUrl !== undefined) {
+      update.privacy_url = legal.privacyUrl === null || legal.privacyUrl === '' ? null : String(legal.privacyUrl).trim().slice(0, 2000);
+    }
+  }
 
   await db('tenants').where({ id: tenantId }).update(update);
 
@@ -106,6 +124,10 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
       onboarding: normalizeOnboardingConfig(next!.onboarding_config),
       homeDashboard: normalizeHomeDashboardConfig(next!.home_dashboard_config),
       dealerContact: mapDealerContact(next!),
+      legal: {
+        termsUrl: (next as any).terms_url?.trim() || null,
+        privacyUrl: (next as any).privacy_url?.trim() || null,
+      },
     },
     'App setup updated'
   );

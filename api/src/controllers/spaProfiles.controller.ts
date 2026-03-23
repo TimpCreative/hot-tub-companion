@@ -22,6 +22,8 @@ function mapProfile(row: Record<string, unknown>) {
     uhtdVerificationStatus: row.uhtd_verification_status ?? 'linked',
     consumerSuggestionId: row.consumer_suggestion_id ?? null,
     isPrimary: row.is_primary,
+    warrantyExpirationDate: row.warranty_expiration_date ?? null,
+    lastFilterChange: row.last_filter_change ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -137,6 +139,86 @@ export async function createSpaProfile(req: Request, res: Response): Promise<voi
 
   res.status(201);
   success(res, { spaProfile: mapProfile(row) }, 'Spa profile created');
+}
+
+/** Updates a single spa profile (sanitization, usage months, serial, nickname, warranty, last filter change). */
+export async function updateSpaProfile(req: Request, res: Response): Promise<void> {
+  const userId = requireCustomerUser(req, res);
+  if (!userId) return;
+
+  const tenantId = (req as any).tenant?.id as string;
+  const id = req.params.id as string;
+  const body = req.body as {
+    sanitizationSystem?: string;
+    usageMonths?: number[];
+    serialNumber?: string | null;
+    nickname?: string | null;
+    warrantyExpirationDate?: string | null;
+    lastFilterChange?: string | null;
+  };
+
+  const existing = await db('spa_profiles')
+    .where({ id, user_id: userId, tenant_id: tenantId })
+    .first();
+  if (!existing) {
+    error(res, 'NOT_FOUND', 'Spa profile not found', 404);
+    return;
+  }
+
+  const update: Record<string, unknown> = { updated_at: db.fn.now() };
+
+  if (body.sanitizationSystem !== undefined) {
+    if (typeof body.sanitizationSystem !== 'string' || !SANITIZATION_SYSTEMS.includes(body.sanitizationSystem as (typeof SANITIZATION_SYSTEMS)[number])) {
+      error(res, 'VALIDATION_ERROR', `Invalid sanitizationSystem. Allowed: ${SANITIZATION_SYSTEMS.join(', ')}`, 400);
+      return;
+    }
+    update.sanitization_system = body.sanitizationSystem;
+  }
+  if (body.usageMonths !== undefined) {
+    if (!Array.isArray(body.usageMonths) || body.usageMonths.some((m) => typeof m !== 'number' || m < 1 || m > 12)) {
+      error(res, 'VALIDATION_ERROR', 'usageMonths must be an array of integers 1-12', 400);
+      return;
+    }
+    update.usage_months = body.usageMonths;
+  }
+  if (body.serialNumber !== undefined) update.serial_number = body.serialNumber?.trim() || null;
+  if (body.nickname !== undefined) update.nickname = body.nickname?.trim() || null;
+  if (body.warrantyExpirationDate !== undefined) {
+    update.warranty_expiration_date = body.warrantyExpirationDate
+      ? new Date(body.warrantyExpirationDate)
+      : null;
+  }
+  if (body.lastFilterChange !== undefined) {
+    update.last_filter_change = body.lastFilterChange
+      ? new Date(body.lastFilterChange)
+      : null;
+  }
+
+  const [row] = await db('spa_profiles')
+    .where({ id })
+    .update(update)
+    .returning('*');
+
+  success(res, { spaProfile: mapProfile(row) }, 'Spa profile updated');
+}
+
+/** Deletes a single spa profile. */
+export async function deleteSpaProfile(req: Request, res: Response): Promise<void> {
+  const userId = requireCustomerUser(req, res);
+  if (!userId) return;
+
+  const tenantId = (req as any).tenant?.id as string;
+  const id = req.params.id as string;
+
+  const deleted = await db('spa_profiles')
+    .where({ id, user_id: userId, tenant_id: tenantId })
+    .del();
+
+  if (deleted === 0) {
+    error(res, 'NOT_FOUND', 'Spa profile not found', 404);
+    return;
+  }
+  success(res, { deleted: true });
 }
 
 /** Deletes all spa profiles for the current user in this tenant (e.g. QA / reset onboarding). */

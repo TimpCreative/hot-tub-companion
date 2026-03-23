@@ -13,7 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTenant } from '../contexts/TenantContext';
 import { useTheme } from '../theme/ThemeProvider';
@@ -43,6 +43,7 @@ function stepEnabled(
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const insets = useSafeAreaInsets();
   const { config, loading: tenantLoading } = useTenant();
   const { colors } = useTheme();
@@ -216,7 +217,7 @@ export default function OnboardingScreen() {
         });
       }
       await clearSetupSkippedFlag();
-      router.replace('/(tabs)/home');
+      router.replace(returnTo === 'profile' ? '/(tabs)/profile' : '/(tabs)/home');
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'error' in err
@@ -230,7 +231,7 @@ export default function OnboardingScreen() {
 
   async function handleSkip() {
     await setSetupSkippedFlag(true);
-    router.replace('/(tabs)/home');
+    router.replace(returnTo === 'profile' ? '/(tabs)/profile' : '/(tabs)/home');
   }
 
   if (tenantLoading || !config) {

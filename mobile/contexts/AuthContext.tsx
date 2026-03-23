@@ -26,6 +26,7 @@ interface AuthContextType {
   register: (email: string, password: string, firstName?: string, lastName?: string, phone?: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -96,6 +97,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Stubbed for Phase 0
   };
 
+  const refreshUser = async () => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return;
+    try {
+      const token = await firebaseUser.getIdToken();
+      await SecureStore.setItemAsync('firebase_token', token);
+      const res = (await api.post('/auth/verify')) as { data?: { user?: AuthUser }; success?: boolean };
+      setUser(res.data?.user ?? null);
+    } catch {
+      setUser(null);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -105,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         logout,
         resetPassword,
+        refreshUser,
       }}
     >
       {children}

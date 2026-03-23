@@ -43,6 +43,8 @@ export async function getConfig(tenantId: string) {
     onboarding: normalizeOnboardingConfig(tenant.onboarding_config),
     homeDashboard: normalizeHomeDashboardConfig(tenant.home_dashboard_config),
     dealerContact: mapDealerContact(tenant),
+    termsUrl: (tenant as any).terms_url?.trim() || null,
+    privacyUrl: (tenant as any).privacy_url?.trim() || null,
   };
 }
 

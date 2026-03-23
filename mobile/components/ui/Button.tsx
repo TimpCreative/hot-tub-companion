@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useTheme } from '../../theme/ThemeProvider';
 
 interface ButtonProps {
@@ -7,19 +7,25 @@ interface ButtonProps {
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'outline';
   disabled?: boolean;
+  loading?: boolean;
 }
 
-export function Button({ title, onPress, variant = 'primary', disabled }: ButtonProps) {
+export function Button({ title, onPress, variant = 'primary', disabled, loading }: ButtonProps) {
   const { colors } = useTheme();
   const bgColor = variant === 'primary' ? colors.primary : variant === 'secondary' ? colors.secondary : 'transparent';
   const textColor = variant === 'outline' ? colors.primary : '#fff';
+  const isDisabled = disabled || loading;
   return (
     <TouchableOpacity
       style={[styles.button, { backgroundColor: bgColor, borderColor: colors.primary }]}
       onPress={onPress}
-      disabled={disabled}
+      disabled={isDisabled}
     >
-      <Text style={[styles.text, { color: textColor }]}>{title}</Text>
+      {loading ? (
+        <ActivityIndicator size="small" color={textColor} />
+      ) : (
+        <Text style={[styles.text, { color: textColor }]}>{title}</Text>
+      )}
     </TouchableOpacity>
   );
 }

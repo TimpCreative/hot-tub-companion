@@ -47,6 +47,8 @@ interface TenantConfig {
   onboarding?: TenantOnboardingConfig;
   homeDashboard?: HomeDashboardConfig;
   dealerContact?: DealerContact;
+  termsUrl?: string | null;
+  privacyUrl?: string | null;
 }
 
 interface TenantContextType {
