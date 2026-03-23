@@ -1,9 +1,9 @@
 /**
  * Home dashboard widget config for the customer mobile app.
- * Types are a fixed catalog; props are validated server-side.
+ * Quick Links (icon tiles) are separate from Home Dashboard Widgets (dealer_card, tips_list, product_strip).
  */
 
-export type HomeWidgetType = 'link_tile' | 'dealer_card' | 'tips_list' | 'product_strip';
+export type HomeWidgetType = 'dealer_card' | 'tips_list' | 'product_strip';
 
 export interface HomeWidgetDTO {
   id: string;
@@ -13,12 +13,26 @@ export interface HomeWidgetDTO {
   props: Record<string, unknown>;
 }
 
+export interface QuickLinkDTO {
+  id: string;
+  title: string;
+  subtitle?: string;
+  iconKey: string;
+  targetRoute: string;
+  iconColor?: string;
+  iconBgColor?: string;
+  enabled: boolean;
+  order: number;
+}
+
 export interface HomeDashboardConfigDTO {
   version: number;
+  quickLinks: QuickLinkDTO[];
+  quickLinksLayout: 'single' | 'double';
   widgets: HomeWidgetDTO[];
 }
 
-const ALLOWED_TYPES = new Set<HomeWidgetType>(['link_tile', 'dealer_card', 'tips_list', 'product_strip']);
+const ALLOWED_WIDGET_TYPES = new Set<HomeWidgetType>(['dealer_card', 'tips_list', 'product_strip']);
 
 /** Internal routes allowed for link_tile targetRoute (Expo Router paths). */
 export const HOME_DASHBOARD_ALLOWED_ROUTES = new Set<string>([
@@ -35,45 +49,40 @@ const MAX_SUBTITLE = 200;
 const MAX_BODY = 500;
 const MAX_TIPS = 12;
 
+const DEFAULT_QUICK_LINKS: QuickLinkDTO[] = [
+  { id: 'tile_messages', title: 'Messages', subtitle: 'Stay updated with your retailer', iconKey: 'mail', targetRoute: '/inbox', enabled: true, order: 0 },
+  { id: 'tile_water_care', title: 'Water Care', subtitle: 'Test water, guides & maintenance log', iconKey: 'water', targetRoute: '/water-care', enabled: true, order: 1 },
+  { id: 'tile_shop', title: 'Shop Parts & Chemicals', subtitle: 'Curated products for your spa', iconKey: 'cart', targetRoute: '/shop', enabled: true, order: 2 },
+  { id: 'tile_dealer', title: 'Dealer', subtitle: 'Contact your dealership', iconKey: 'build', targetRoute: '/dealer', enabled: true, order: 3 },
+];
+
+function isValidHex(s: unknown): boolean {
+  if (typeof s !== 'string') return false;
+  return /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/.test(s.trim());
+}
+
+function validateQuickLink(raw: unknown, fallbackOrder: number): QuickLinkDTO | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const id = clampStr(r.id, 64);
+  if (!id) return null;
+  const title = clampStr(r.title, MAX_TITLE) || 'Link';
+  const subtitle = clampStr(r.subtitle, MAX_SUBTITLE);
+  const iconKey = clampStr(r.iconKey, 40) || 'ellipse';
+  let targetRoute = clampStr(r.targetRoute, 120);
+  if (!HOME_DASHBOARD_ALLOWED_ROUTES.has(targetRoute)) targetRoute = '/shop';
+  const iconColor = typeof r.iconColor === 'string' && isValidHex(r.iconColor) ? r.iconColor.trim() : undefined;
+  const iconBgColor = typeof r.iconBgColor === 'string' && isValidHex(r.iconBgColor) ? r.iconBgColor.trim() : undefined;
+  const enabled = r.enabled !== false;
+  const order = typeof r.order === 'number' && Number.isFinite(r.order) ? Math.floor(r.order) : fallbackOrder;
+  return { id, title, subtitle: subtitle || undefined, iconKey, targetRoute, iconColor, iconBgColor, enabled, order };
+}
+
 export const DEFAULT_HOME_DASHBOARD_CONFIG: HomeDashboardConfigDTO = {
   version: 1,
+  quickLinks: DEFAULT_QUICK_LINKS.map((q) => ({ ...q })),
+  quickLinksLayout: 'single',
   widgets: [
-    {
-      id: 'tile_messages',
-      type: 'link_tile',
-      enabled: true,
-      order: 0,
-      props: {
-        title: 'Messages',
-        subtitle: 'Stay updated with your retailer',
-        iconKey: 'mail',
-        targetRoute: '/inbox',
-      },
-    },
-    {
-      id: 'tile_water_care',
-      type: 'link_tile',
-      enabled: true,
-      order: 1,
-      props: {
-        title: 'Water Care',
-        subtitle: 'Test water, guides & maintenance log',
-        iconKey: 'water',
-        targetRoute: '/water-care',
-      },
-    },
-    {
-      id: 'tile_shop',
-      type: 'link_tile',
-      enabled: true,
-      order: 2,
-      props: {
-        title: 'Shop Parts & Chemicals',
-        subtitle: 'Curated products for your spa',
-        iconKey: 'cart',
-        targetRoute: '/shop',
-      },
-    },
     {
       id: 'dealer_card',
       type: 'dealer_card',
@@ -126,22 +135,6 @@ function clampStr(s: unknown, max: number): string {
   return s.trim().slice(0, max);
 }
 
-function validateLinkTileProps(props: Record<string, unknown>): Record<string, unknown> {
-  const title = clampStr(props.title, MAX_TITLE) || 'Link';
-  const subtitle = clampStr(props.subtitle, MAX_SUBTITLE);
-  const iconKey = clampStr(props.iconKey, 40) || 'ellipse';
-  const targetRoute = clampStr(props.targetRoute, 120);
-  if (!HOME_DASHBOARD_ALLOWED_ROUTES.has(targetRoute)) {
-    return {
-      title,
-      subtitle,
-      iconKey,
-      targetRoute: '/shop',
-    };
-  }
-  return { title, subtitle, iconKey, targetRoute };
-}
-
 function validateDealerCardProps(props: Record<string, unknown>): Record<string, unknown> {
   return {
     title: clampStr(props.title, MAX_TITLE) || 'Your Dealership',
@@ -181,24 +174,49 @@ function normalizeWidget(raw: unknown, fallbackOrder: number): HomeWidgetDTO | n
   const r = raw as Record<string, unknown>;
   const id = clampStr(r.id, 64);
   const type = r.type as HomeWidgetType;
-  if (!id || !ALLOWED_TYPES.has(type)) return null;
+  if (!id || !ALLOWED_WIDGET_TYPES.has(type)) return null;
   const enabled = r.enabled !== false;
   const order = typeof r.order === 'number' && Number.isFinite(r.order) ? Math.floor(r.order) : fallbackOrder;
   let props: Record<string, unknown> =
     r.props && typeof r.props === 'object' ? { ...(r.props as Record<string, unknown>) } : {};
 
-  if (type === 'link_tile') props = validateLinkTileProps(props);
-  else if (type === 'dealer_card') props = validateDealerCardProps(props);
+  if (type === 'dealer_card') props = validateDealerCardProps(props);
   else if (type === 'tips_list') props = validateTipsListProps(props);
   else if (type === 'product_strip') props = validateProductStripProps(props);
 
   return { id, type, enabled, order, props };
 }
 
+function migrateLinkTilesToQuickLinks(widgets: unknown[]): QuickLinkDTO[] {
+  const links: QuickLinkDTO[] = [];
+  for (const w of widgets) {
+    if (!w || typeof w !== 'object') continue;
+    const r = w as Record<string, unknown>;
+    if (r.type !== 'link_tile') continue;
+    const id = clampStr(r.id, 64);
+    if (!id) continue;
+    const props = r.props && typeof r.props === 'object' ? (r.props as Record<string, unknown>) : {};
+    const raw = {
+      id,
+      title: props.title ?? 'Link',
+      subtitle: props.subtitle,
+      iconKey: props.iconKey ?? 'ellipse',
+      targetRoute: props.targetRoute ?? '/shop',
+      enabled: r.enabled !== false,
+      order: typeof r.order === 'number' ? r.order : links.length,
+    };
+    const ql = validateQuickLink(raw, links.length);
+    if (ql) links.push(ql);
+  }
+  return links;
+}
+
 export function normalizeHomeDashboardConfig(raw: unknown): HomeDashboardConfigDTO {
   if (!raw || typeof raw !== 'object') {
     return {
       version: DEFAULT_HOME_DASHBOARD_CONFIG.version,
+      quickLinks: DEFAULT_QUICK_LINKS.map((q) => ({ ...q })),
+      quickLinksLayout: 'single',
       widgets: DEFAULT_HOME_DASHBOARD_CONFIG.widgets.map((w) => ({
         ...w,
         props: { ...w.props, ...(w.props.items ? { items: [...(w.props.items as unknown[])] } : {}) },
@@ -208,20 +226,56 @@ export function normalizeHomeDashboardConfig(raw: unknown): HomeDashboardConfigD
   const r = raw as Record<string, unknown>;
   const version = typeof r.version === 'number' ? r.version : DEFAULT_HOME_DASHBOARD_CONFIG.version;
 
+  // Quick Links: use existing or migrate from link_tile widgets
+  let quickLinks: QuickLinkDTO[] = [];
+  if (Array.isArray(r.quickLinks) && r.quickLinks.length > 0) {
+    const seen = new Set<string>();
+    r.quickLinks.forEach((q: unknown, i: number) => {
+      const ql = validateQuickLink(q, i);
+      if (ql && !seen.has(ql.id)) {
+        seen.add(ql.id);
+        quickLinks.push(ql);
+      }
+    });
+  }
+  if (quickLinks.length === 0 && Array.isArray(r.widgets)) {
+    quickLinks = migrateLinkTilesToQuickLinks(r.widgets);
+  }
+  if (quickLinks.length < 4) {
+    const existingIds = new Set(quickLinks.map((q) => q.id));
+    for (const def of DEFAULT_QUICK_LINKS) {
+      if (!existingIds.has(def.id)) {
+        quickLinks.push({ ...def, order: quickLinks.length });
+        existingIds.add(def.id);
+      }
+      if (quickLinks.length >= 4) break;
+    }
+  }
+  quickLinks = quickLinks.slice(0, 4).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+
+  const layout = r.quickLinksLayout === 'double' ? 'double' : 'single';
+
   const byId = new Map<string, HomeWidgetDTO>();
   if (Array.isArray(r.widgets)) {
     r.widgets.forEach((w, i) => {
+      const rw = w as Record<string, unknown>;
+      if (rw.type === 'link_tile') return; // Exclude link_tile; they live in quickLinks now
       const nw = normalizeWidget(w, i);
       if (nw) byId.set(nw.id, nw);
     });
   }
 
+  let widgets: HomeWidgetDTO[];
   if (byId.size === 0) {
-    return normalizeHomeDashboardConfig(null);
+    widgets = DEFAULT_HOME_DASHBOARD_CONFIG.widgets.map((w) => ({
+      ...w,
+      props: { ...w.props, ...(w.props.items ? { items: [...(w.props.items as unknown[])] } : {}) },
+    }));
+  } else {
+    widgets = Array.from(byId.values()).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
   }
 
-  const widgets = Array.from(byId.values()).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
-  return { version, widgets };
+  return { version, quickLinks, quickLinksLayout: layout, widgets };
 }
 
 export function mergePartialHomeDashboard(
@@ -232,6 +286,8 @@ export function mergePartialHomeDashboard(
   const p = partial as Record<string, unknown>;
   const merged = {
     version: typeof p.version === 'number' ? p.version : current.version,
+    quickLinks: Array.isArray(p.quickLinks) ? p.quickLinks : current.quickLinks,
+    quickLinksLayout: p.quickLinksLayout === 'double' ? 'double' : current.quickLinksLayout,
     widgets: Array.isArray(p.widgets) ? p.widgets : current.widgets,
   };
   return normalizeHomeDashboardConfig(merged);

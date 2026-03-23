@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Switch,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import { Button } from '../components/ui/Button';
 import api from '../services/api';
 import { clearSetupSkippedFlag, setSetupSkippedFlag } from '../lib/setupSkippedStorage';
+import { getWelcomeSeenFlag } from '../lib/welcomeSeenStorage';
 import { labelForSanitizer } from '../constants/sanitizationSystems';
 
 type ScdbBrand = { id: string; name: string };
@@ -79,6 +81,7 @@ export default function OnboardingScreen() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shareWaterTestsWithRetailer, setShareWaterTestsWithRetailer] = useState(true);
 
   const sanitizerOptions = useMemo(() => {
     const list = config?.sanitizationSystems ?? [];
@@ -217,7 +220,25 @@ export default function OnboardingScreen() {
         });
       }
       await clearSetupSkippedFlag();
-      router.replace(returnTo === 'profile' ? '/(tabs)/profile' : '/(tabs)/home');
+      if (shareWaterTestsWithRetailer) {
+        try {
+          await api.put('/users/me', { shareWaterTestsWithRetailer: true });
+        } catch {
+          // Non-fatal; user can enable in Profile later
+        }
+      }
+      if (returnTo === 'profile') {
+        router.replace('/(tabs)/profile');
+      } else {
+        const welcomeSeen = await getWelcomeSeenFlag();
+        if (welcomeSeen) {
+          router.replace('/(tabs)/home');
+        } else {
+          const modelDisplayName =
+            selectedModel?.name ?? customModelName?.trim() ?? 'your spa';
+          router.replace(`/welcome?modelName=${encodeURIComponent(modelDisplayName)}`);
+        }
+      }
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'error' in err
@@ -480,6 +501,21 @@ export default function OnboardingScreen() {
             </Text>
           ) : null}
 
+          <View style={[styles.field, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }]}>
+            <Text style={[styles.label, { flex: 1, marginBottom: 0 }]}>
+              Share water test data with {config?.name ?? 'your retailer'}?
+            </Text>
+            <Switch
+              value={shareWaterTestsWithRetailer}
+              onValueChange={setShareWaterTestsWithRetailer}
+              trackColor={{ false: '#ccc', true: colors.primary }}
+              thumbColor="#fff"
+            />
+          </View>
+          <Text style={[styles.queueHint, { marginTop: 4 }]}>
+            When enabled, your retailer can view water test results to help with recommendations.
+          </Text>
+
           <View style={styles.ctaWrap}>
             <Button title={submitting ? 'Saving...' : 'Get Started'} onPress={handleSubmit} disabled={!canSubmit} />
           </View>
@@ -488,6 +524,17 @@ export default function OnboardingScreen() {
         {allowSkip ? (
           <TouchableOpacity onPress={handleSkip} style={styles.skipWrap} accessibilityRole="button">
             <Text style={[styles.skip, { color: colors.textSecondary }]}>Skip for now</Text>
+          </TouchableOpacity>
+        ) : null}
+        {__DEV__ ? (
+          <TouchableOpacity
+            onPress={() => router.replace('/welcome?modelName=Test+Spa')}
+            style={[styles.skipWrap, { marginTop: 8 }]}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.skip, { color: colors.primary, fontSize: 13 }]}>
+              [Dev] Test Welcome Screen
+            </Text>
           </TouchableOpacity>
         ) : null}
       </ScrollView>

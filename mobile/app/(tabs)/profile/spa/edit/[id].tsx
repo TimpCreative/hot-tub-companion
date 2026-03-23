@@ -7,6 +7,8 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button } from '../../../../../components/ui/Button';
@@ -120,7 +122,8 @@ export default function EditSpaScreen() {
   const readOnlyLine = [spa.brand, spa.modelLine || spa.model, spa.year].filter(Boolean).join(' · ');
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.scrollContent}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
       <View style={[styles.section, { backgroundColor: colors.contentBackground }]}>
         <Text style={[styles.label, { color: colors.textMuted }]}>Spa (cannot change)</Text>
         <Text style={[styles.readOnly, { color: colors.text }]}>{readOnlyLine}</Text>
@@ -209,7 +212,8 @@ export default function EditSpaScreen() {
       </View>
 
       <Button title="Save" onPress={handleSave} loading={saving} />
-    </ScrollView>
+      </ScrollView>
+    </TouchableWithoutFeedback>
   );
 }
 

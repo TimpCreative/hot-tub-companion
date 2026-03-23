@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTenant } from '../../contexts/TenantContext';
 import { useTheme } from '../../theme/ThemeProvider';
 
@@ -7,12 +8,18 @@ export default function DealerScreen() {
   const { config } = useTenant();
   const { colors, typography, spacing } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const name = config?.name ?? 'Your retailer';
   const phone = config?.dealerContact?.phone;
   const address = config?.dealerContact?.address;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+      >
       <Text style={[styles.title, { color: colors.text }]}>{name}</Text>
       {phone ? (
         <Text style={[typography.body, { color: colors.primary, marginTop: spacing.sm }]}>{phone}</Text>
@@ -33,15 +40,15 @@ export default function DealerScreen() {
       >
         <Text style={styles.ctaText}>Services & scheduling</Text>
       </Pressable>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 24,
-  },
+  container: { flex: 1 },
+  scroll: { flex: 1 },
+  content: { padding: 24 },
   title: {
     fontSize: 22,
     fontWeight: '700',

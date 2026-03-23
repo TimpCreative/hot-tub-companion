@@ -17,6 +17,8 @@ export default function TabLayout() {
         tabBarActiveTintColor: primary,
         tabBarInactiveTintColor: INACTIVE,
         headerShown: true,
+        headerStyle: { backgroundColor: primary },
+        headerTintColor: '#fff',
       }}
     >
       <Tabs.Screen
@@ -61,6 +63,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" size={size} color={color} />,
         }}
       />

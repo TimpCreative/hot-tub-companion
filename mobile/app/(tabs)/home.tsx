@@ -1,11 +1,13 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FinishSetupBanner } from '../../components/FinishSetupBanner';
+import { StatusBarBar } from '../../components/StatusBarBar';
 import { HomeHeroBubbles } from '../../components/home/HomeHeroBubbles';
 import { HomeWidgetRenderer } from '../../components/home/HomeWidgetRenderer';
+import { QuickLinksGrid } from '../../components/home/QuickLinksGrid';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTenant } from '../../contexts/TenantContext';
 import { useFinishSetupNudge } from '../../hooks/useFinishSetupNudge';
@@ -46,6 +48,10 @@ export default function Home() {
   const [spa, setSpa] = useState<SpaProfile | null>(null);
 
   const dashboard = config?.homeDashboard ?? DEFAULT_HOME_DASHBOARD;
+  const quickLinks = [...(dashboard.quickLinks ?? [])]
+    .filter((q) => q.enabled)
+    .sort((a, b) => a.order - b.order);
+  const quickLinksLayout = dashboard.quickLinksLayout ?? 'single';
   const widgets = [...(dashboard.widgets ?? [])]
     .filter((w) => w.enabled)
     .sort((a, b) => a.order - b.order);
@@ -74,16 +80,20 @@ export default function Home() {
   const primaryHex = colors.primary ?? '#1B4D7A';
   const gradientStart = shiftHueSaturateHex(primaryHex, 16, 1.25);
   const gradientColors = [gradientStart, primaryHex] as const;
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView
+      <StatusBarBar primaryColor={primaryHex} scrollY={scrollY} />
+      <Animated.ScrollView
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
           { paddingBottom: 24 + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+        scrollEventThrottle={16}
       >
         <LinearGradient
           colors={gradientColors}
@@ -143,6 +153,9 @@ export default function Home() {
               zIndex: -1,
             }}
           />
+        {quickLinks.length > 0 ? (
+          <QuickLinksGrid links={quickLinks} layout={quickLinksLayout} />
+        ) : null}
         {widgets.map((w) => (
           <HomeWidgetRenderer
             key={w.id}
@@ -154,7 +167,7 @@ export default function Home() {
         ))}
           </View>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
       {showNudge ? (
         <FinishSetupBanner
           onContinue={() => router.push('/onboarding')}

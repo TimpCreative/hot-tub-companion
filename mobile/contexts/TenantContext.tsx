@@ -3,13 +3,19 @@ import api from '../services/api';
 
 export type OnboardingStepId = 'brand' | 'modelPick' | 'sanitizer';
 
+export interface WelcomeBlock {
+  greetingLine1: string;
+  greetingLine2: string;
+}
+
 export interface TenantOnboardingConfig {
   version: number;
   allowSkip: boolean;
   steps: { id: OnboardingStepId; enabled: boolean }[];
+  welcomeBlock?: WelcomeBlock;
 }
 
-export type HomeWidgetType = 'link_tile' | 'dealer_card' | 'tips_list' | 'product_strip';
+export type HomeWidgetType = 'dealer_card' | 'tips_list' | 'product_strip';
 
 export interface HomeWidget {
   id: string;
@@ -19,8 +25,22 @@ export interface HomeWidget {
   props: Record<string, unknown>;
 }
 
+export interface QuickLink {
+  id: string;
+  title: string;
+  subtitle?: string;
+  iconKey: string;
+  targetRoute: string;
+  iconColor?: string;
+  iconBgColor?: string;
+  enabled: boolean;
+  order: number;
+}
+
 export interface HomeDashboardConfig {
   version: number;
+  quickLinks: QuickLink[];
+  quickLinksLayout: 'single' | 'double';
   widgets: HomeWidget[];
 }
 

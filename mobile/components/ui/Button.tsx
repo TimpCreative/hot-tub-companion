@@ -17,9 +17,14 @@ export function Button({ title, onPress, variant = 'primary', disabled, loading 
   const isDisabled = disabled || loading;
   return (
     <TouchableOpacity
-      style={[styles.button, { backgroundColor: bgColor, borderColor: colors.primary }]}
+      style={[
+        styles.button,
+        { backgroundColor: bgColor, borderColor: colors.primary },
+        isDisabled && { opacity: 0.5 },
+      ]}
       onPress={onPress}
       disabled={isDisabled}
+      activeOpacity={isDisabled ? 1 : undefined}
     >
       {loading ? (
         <ActivityIndicator size="small" color={textColor} />

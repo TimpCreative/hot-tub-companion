@@ -7,13 +7,19 @@ import { Button } from '@/components/ui/Button';
 
 type StepId = 'brand' | 'modelPick' | 'sanitizer';
 
+interface WelcomeBlock {
+  greetingLine1: string;
+  greetingLine2: string;
+}
+
 interface OnboardingConfig {
   version: number;
   allowSkip: boolean;
   steps: { id: StepId; enabled: boolean }[];
+  welcomeBlock?: WelcomeBlock;
 }
 
-type WidgetType = 'link_tile' | 'dealer_card' | 'tips_list' | 'product_strip';
+type WidgetType = 'dealer_card' | 'tips_list' | 'product_strip';
 
 interface HomeWidget {
   id: string;
@@ -23,8 +29,22 @@ interface HomeWidget {
   props: Record<string, unknown>;
 }
 
+interface QuickLink {
+  id: string;
+  title: string;
+  subtitle?: string;
+  iconKey: string;
+  targetRoute: string;
+  iconColor?: string;
+  iconBgColor?: string;
+  enabled: boolean;
+  order: number;
+}
+
 interface HomeDashboardConfig {
   version: number;
+  quickLinks: QuickLink[];
+  quickLinksLayout: 'single' | 'double';
   widgets: HomeWidget[];
 }
 
@@ -102,7 +122,15 @@ export default function AdminAppSetupPage() {
         };
       };
       if (body?.data?.onboarding) setOnboarding(body.data.onboarding);
-      if (body?.data?.homeDashboard) setHomeDashboard(body.data.homeDashboard);
+      if (body?.data?.homeDashboard) {
+        const hd = body.data.homeDashboard as unknown as Record<string, unknown>;
+        const base = body.data.homeDashboard as HomeDashboardConfig;
+        setHomeDashboard({
+          ...base,
+          quickLinks: Array.isArray(hd.quickLinks) ? (hd.quickLinks as QuickLink[]) : [],
+          quickLinksLayout: hd.quickLinksLayout === 'double' ? 'double' : 'single',
+        });
+      }
       const dc = body?.data?.dealerContact;
       if (dc) {
         setDealerPhone(dc.phone ?? '');
@@ -164,6 +192,32 @@ export default function AdminAppSetupPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function sortedQuickLinks(): QuickLink[] {
+    if (!homeDashboard?.quickLinks) return [];
+    return [...homeDashboard.quickLinks].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  }
+
+  function updateQuickLink(id: string, fn: (q: QuickLink) => QuickLink) {
+    setHomeDashboard((prev) => {
+      if (!prev?.quickLinks) return prev;
+      return {
+        ...prev,
+        quickLinks: prev.quickLinks.map((q) => (q.id === id ? fn(q) : q)),
+      };
+    });
+  }
+
+  function moveQuickLink(id: string, dir: -1 | 1) {
+    const list = sortedQuickLinks();
+    const idx = list.findIndex((q) => q.id === id);
+    const j = idx + dir;
+    if (idx < 0 || j < 0 || j >= list.length) return;
+    const a = list[idx];
+    const b = list[j];
+    updateQuickLink(a.id, (q) => ({ ...q, order: b.order }));
+    updateQuickLink(b.id, (q) => ({ ...q, order: a.order }));
   }
 
   function sortedWidgets(): HomeWidget[] {
@@ -307,6 +361,62 @@ export default function AdminAppSetupPage() {
 
       {tab === 'onboarding' && (
         <div className="space-y-6 bg-white rounded-lg border border-gray-200 p-6">
+          <div className="border-b border-gray-100 pb-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">Welcome screen</h3>
+            <p className="text-xs text-gray-500 mb-3">
+              Shown once after first spa registration. Use {'{{name}}'} for first name, {'{{retailer}}'} for your business name.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Greeting (line 1)</label>
+                <input
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  value={onboarding.welcomeBlock?.greetingLine1 ?? 'Hey {{name}}!'}
+                  onChange={(e) =>
+                    setOnboarding((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            welcomeBlock: {
+                              ...(prev.welcomeBlock ?? {
+                                greetingLine1: 'Hey {{name}}!',
+                                greetingLine2: 'Welcome to {{retailer}}',
+                              }),
+                              greetingLine1: e.target.value,
+                            },
+                          }
+                        : prev
+                    )
+                  }
+                  placeholder="Hey {{name}}!"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Greeting (line 2)</label>
+                <input
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  value={onboarding.welcomeBlock?.greetingLine2 ?? 'Welcome to {{retailer}}'}
+                  onChange={(e) =>
+                    setOnboarding((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            welcomeBlock: {
+                              ...(prev.welcomeBlock ?? {
+                                greetingLine1: 'Hey {{name}}!',
+                                greetingLine2: 'Welcome to {{retailer}}',
+                              }),
+                              greetingLine2: e.target.value,
+                            },
+                          }
+                        : prev
+                    )
+                  }
+                  placeholder="Welcome to {{retailer}}"
+                />
+              </div>
+            </div>
+          </div>
           <p className="text-sm text-gray-600">
             Model selection always stays on (UHTD link required for compatibility).
           </p>
@@ -384,9 +494,164 @@ export default function AdminAppSetupPage() {
           </div>
 
           <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-            <h3 className="text-sm font-semibold text-gray-900">Home widgets</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Quick Links</h3>
             <p className="text-xs text-gray-500">
-              Order, enable/disable, and labels. Link targets must match allowed app routes.
+              Icon links shown first on the home screen. Up to 4 items.
+            </p>
+            <div className="flex items-center gap-4">
+              <span className="text-xs font-medium text-gray-700">Layout:</span>
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="quickLinksLayout"
+                  className="border-gray-300"
+                  checked={homeDashboard.quickLinksLayout === 'single'}
+                  onChange={() =>
+                    setHomeDashboard((p) => (p ? { ...p, quickLinksLayout: 'single' } : p))
+                  }
+                />
+                <span className="text-sm text-gray-700">Single column (full cards)</span>
+              </label>
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="quickLinksLayout"
+                  className="border-gray-300"
+                  checked={homeDashboard.quickLinksLayout === 'double'}
+                  onChange={() =>
+                    setHomeDashboard((p) => (p ? { ...p, quickLinksLayout: 'double' } : p))
+                  }
+                />
+                <span className="text-sm text-gray-700">Double column (compact, icon + title only)</span>
+              </label>
+            </div>
+            {sortedQuickLinks().map((q, i) => (
+              <div key={q.id} className="border border-gray-100 rounded-lg p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm font-medium text-gray-800">{q.title}</div>
+                  <div className="flex items-center gap-2">
+                    <label className="inline-flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="rounded border-gray-300"
+                        checked={q.enabled}
+                        onChange={() =>
+                          updateQuickLink(q.id, (x) => ({ ...x, enabled: !x.enabled }))
+                        }
+                      />
+                      <span className="ml-1 text-gray-700">On</span>
+                    </label>
+                    <button
+                      type="button"
+                      className="text-xs text-blue-600 disabled:opacity-40"
+                      disabled={i === 0}
+                      onClick={() => moveQuickLink(q.id, -1)}
+                    >
+                      Up
+                    </button>
+                    <button
+                      type="button"
+                      className="text-xs text-blue-600 disabled:opacity-40"
+                      disabled={i === sortedQuickLinks().length - 1}
+                      onClick={() => moveQuickLink(q.id, 1)}
+                    >
+                      Down
+                    </button>
+                  </div>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <label className="text-xs text-gray-600">Title</label>
+                    <input
+                      className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                      value={q.title}
+                      onChange={(e) =>
+                        updateQuickLink(q.id, (x) => ({ ...x, title: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">Subtitle</label>
+                    <input
+                      className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                      value={q.subtitle ?? ''}
+                      onChange={(e) =>
+                        updateQuickLink(q.id, (x) => ({
+                          ...x,
+                          subtitle: e.target.value || undefined,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">Icon key</label>
+                    <select
+                      className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                      value={q.iconKey}
+                      onChange={(e) =>
+                        updateQuickLink(q.id, (x) => ({ ...x, iconKey: e.target.value }))
+                      }
+                    >
+                      {ICON_OPTIONS.map((k) => (
+                        <option key={k} value={k}>
+                          {k}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">Target route</label>
+                    <select
+                      className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                      value={q.targetRoute}
+                      onChange={(e) =>
+                        updateQuickLink(q.id, (x) => ({ ...x, targetRoute: e.target.value }))
+                      }
+                    >
+                      {ROUTE_OPTIONS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">Icon color (hex)</label>
+                    <input
+                      className="w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono"
+                      value={q.iconColor ?? ''}
+                      onChange={(e) =>
+                        updateQuickLink(q.id, (x) => ({
+                          ...x,
+                          iconColor: e.target.value.trim() || undefined,
+                        }))
+                      }
+                      placeholder="#0d9488"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">Background color (hex, e.g. #0d948818)</label>
+                    <input
+                      className="w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono"
+                      value={q.iconBgColor ?? ''}
+                      onChange={(e) =>
+                        updateQuickLink(q.id, (x) => ({
+                          ...x,
+                          iconBgColor: e.target.value.trim() || undefined,
+                        }))
+                      }
+                      placeholder="#0d948818"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+            <h3 className="text-sm font-semibold text-gray-900">Home Dashboard Widgets</h3>
+            <p className="text-xs text-gray-500">
+              Dealer card, tips, product strip. Order and configure.
             </p>
             {sortedWidgets().map((w, i) => (
               <div key={w.id} className="border border-gray-100 rounded-lg p-4 space-y-3">
@@ -396,14 +661,14 @@ export default function AdminAppSetupPage() {
                     <span className="text-gray-400 font-normal">({w.type})</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <label className="inline-flex items-center text-xs">
+                    <label className="inline-flex items-center text-xs cursor-pointer">
                       <input
                         type="checkbox"
                         className="rounded border-gray-300"
                         checked={w.enabled}
                         onChange={() => updateWidget(w.id, (x) => ({ ...x, enabled: !x.enabled }))}
                       />
-                      <span className="ml-1">On</span>
+                      <span className="ml-1 text-gray-700">On</span>
                     </label>
                     <button
                       type="button"
@@ -423,75 +688,6 @@ export default function AdminAppSetupPage() {
                     </button>
                   </div>
                 </div>
-
-                {w.type === 'link_tile' && (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div>
-                      <label className="text-xs text-gray-600">Title</label>
-                      <input
-                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                        value={String(w.props.title ?? '')}
-                        onChange={(e) =>
-                          updateWidget(w.id, (x) => ({
-                            ...x,
-                            props: { ...x.props, title: e.target.value },
-                          }))
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600">Subtitle</label>
-                      <input
-                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                        value={String(w.props.subtitle ?? '')}
-                        onChange={(e) =>
-                          updateWidget(w.id, (x) => ({
-                            ...x,
-                            props: { ...x.props, subtitle: e.target.value },
-                          }))
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600">Icon key</label>
-                      <select
-                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                        value={String(w.props.iconKey ?? 'mail')}
-                        onChange={(e) =>
-                          updateWidget(w.id, (x) => ({
-                            ...x,
-                            props: { ...x.props, iconKey: e.target.value },
-                          }))
-                        }
-                      >
-                        {ICON_OPTIONS.map((k) => (
-                          <option key={k} value={k}>
-                            {k}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600">Target route</label>
-                      <select
-                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                        value={String(w.props.targetRoute ?? '/shop')}
-                        onChange={(e) =>
-                          updateWidget(w.id, (x) => ({
-                            ...x,
-                            props: { ...x.props, targetRoute: e.target.value },
-                          }))
-                        }
-                      >
-                        {ROUTE_OPTIONS.map((r) => (
-                          <option key={r} value={r}>
-                            {r}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
 
                 {w.type === 'dealer_card' && (
                   <div className="grid gap-2 sm:grid-cols-2">

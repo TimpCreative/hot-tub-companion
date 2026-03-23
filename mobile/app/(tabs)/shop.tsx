@@ -2,13 +2,15 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FinishSetupBanner } from '../../components/FinishSetupBanner';
 import { useFinishSetupNudge } from '../../hooks/useFinishSetupNudge';
+import { useTheme } from '../../theme/ThemeProvider';
 
 export default function Shop() {
   const router = useRouter();
   const { showNudge, dismiss } = useFinishSetupNudge();
+  const { colors } = useTheme();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <View style={styles.center}>
         <Text style={styles.title}>Shop</Text>

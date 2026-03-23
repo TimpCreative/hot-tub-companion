@@ -7,6 +7,8 @@ import { HeaderProfileButton } from '../components/HeaderProfileButton';
 
 SplashScreen.preventAutoHideAsync();
 
+const PRIMARY = '#1B4D7A';
+
 export default function RootLayout() {
   return (
     <TenantProvider>
@@ -17,6 +19,7 @@ export default function RootLayout() {
             <Stack.Screen name="auth/login" />
             <Stack.Screen name="auth/register" />
             <Stack.Screen name="onboarding" />
+            <Stack.Screen name="welcome" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="profile" options={{ headerShown: false }} />
             <Stack.Screen
@@ -26,6 +29,8 @@ export default function RootLayout() {
                 title: 'Services',
                 headerBackTitle: 'Back',
                 headerRight: () => <HeaderProfileButton />,
+                headerStyle: { backgroundColor: PRIMARY },
+                headerTintColor: '#fff',
               }}
             />
           </Stack>

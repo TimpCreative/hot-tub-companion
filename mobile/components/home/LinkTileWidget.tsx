@@ -9,11 +9,53 @@ export interface LinkTileProps {
   subtitle?: string;
   targetRoute: string;
   iconKey: string;
+  iconColor?: string;
+  iconBgColor?: string;
+  compact?: boolean;
 }
 
-export function LinkTileWidget({ title, subtitle, targetRoute, iconKey }: LinkTileProps) {
+export function LinkTileWidget({
+  title,
+  subtitle,
+  targetRoute,
+  iconKey,
+  iconColor,
+  iconBgColor,
+  compact = false,
+}: LinkTileProps) {
   const router = useRouter();
   const { colors, typography, spacing } = useTheme();
+  const iconFill = iconColor ?? colors.primary ?? '#0d9488';
+  const iconBg = iconBgColor ?? `${colors.primary ?? '#0d9488'}18`;
+
+  if (compact) {
+    return (
+      <Pressable
+        style={({ pressed }) => [
+          styles.compactCard,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            opacity: pressed ? 0.92 : 1,
+            marginBottom: spacing.sm ?? 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05,
+            shadowRadius: 4,
+            elevation: 2,
+          },
+        ]}
+        onPress={() => router.push(targetRoute as Href)}
+      >
+        <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
+          {iconForWidgetKey(iconKey, 24, iconFill)}
+        </View>
+        <Text style={[typography.body, { color: colors.text, fontSize: 13, marginTop: 6 }]} numberOfLines={1}>
+          {title}
+        </Text>
+      </Pressable>
+    );
+  }
 
   return (
     <Pressable
@@ -33,8 +75,8 @@ export function LinkTileWidget({ title, subtitle, targetRoute, iconKey }: LinkTi
       ]}
       onPress={() => router.push(targetRoute as Href)}
     >
-      <View style={[styles.iconWrap, { backgroundColor: `${colors.primary}18` }]}>
-        {iconForWidgetKey(iconKey, 26, colors.primary ?? '#0d9488')}
+      <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
+        {iconForWidgetKey(iconKey, 26, iconFill)}
       </View>
       <View style={styles.textCol}>
         <Text style={[typography.h3, { color: colors.text, fontSize: 17 }]}>{title}</Text>
@@ -52,6 +94,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  compactCard: {
+    alignItems: 'center',
+    padding: 12,
     borderRadius: 12,
     borderWidth: 1,
   },
