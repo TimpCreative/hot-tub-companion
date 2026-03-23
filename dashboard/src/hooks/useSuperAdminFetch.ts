@@ -12,7 +12,7 @@ export function useSuperAdminFetch() {
 
   const fetchWithAuth = useCallback(
     async (url: string, options: RequestInit = {}): Promise<Response> => {
-      const token = await getIdToken();
+      const token = await getIdToken(true);
       if (!token) {
         throw new Error('Not authenticated');
       }

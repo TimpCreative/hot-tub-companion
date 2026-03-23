@@ -21,7 +21,8 @@ export async function superAdminAuth(
   try {
     const decoded = await auth.verifyIdToken(token);
     const email = decoded.email as string;
-    if (!email || !env.SUPER_ADMIN_EMAILS.includes(email)) {
+    const allowed = env.SUPER_ADMIN_EMAILS.map((e) => e.toLowerCase());
+    if (!email || !allowed.includes(email.toLowerCase())) {
       error(res, 'FORBIDDEN', 'Super admin access required', 403);
       return;
     }

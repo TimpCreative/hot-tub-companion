@@ -21,7 +21,7 @@ interface AuthContextType {
   user: AuthUser | null;
   firebaseUser: FirebaseUser | null;
   loading: boolean;
-  getIdToken: () => Promise<string | null>;
+  getIdToken: (forceRefresh?: boolean) => Promise<string | null>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -56,9 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsub();
   }, [auth]);
 
-  const getIdToken = useCallback(async (): Promise<string | null> => {
+  const getIdToken = useCallback(async (forceRefresh = false): Promise<string | null> => {
     if (!firebaseUser || !auth) return null;
-    return firebaseUser.getIdToken();
+    return firebaseUser.getIdToken(forceRefresh);
   }, [firebaseUser, auth]);
 
   const login = async (email: string, password: string) => {
