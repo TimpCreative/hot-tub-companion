@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { initializeAuth, getAuth, type Auth } from '@firebase/auth';
-import { getReactNativePersistence } from '@firebase/auth/dist/rn/index.js';
+// @ts-expect-error TS2305 — getReactNativePersistence is RN-only; public typings omit it; Metro bundles dist/rn.
+import { getReactNativePersistence } from '@firebase/auth';
 import Constants from 'expo-constants';
 import { firebaseAuthSecureStorage } from './firebaseSecurePersistence';
 

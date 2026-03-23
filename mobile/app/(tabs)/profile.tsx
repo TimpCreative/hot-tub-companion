@@ -7,11 +7,17 @@ import api from '../../services/api';
 import { clearSetupSkippedFlag } from '../../lib/setupSkippedStorage';
 import { getApiErrorMessage } from '../../lib/apiError';
 
+/** Retailer staff / super-admin “override” login: Firebase auth works, but there is no customer row for this tenant (id is synthetic). Spa profile APIs require a real customer account. */
+function isStaffTenantAppLogin(user: { id: string } | null): boolean {
+  return Boolean(user?.id?.startsWith('admin_'));
+}
+
 export default function Profile() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+  const staffAppLogin = isStaffTenantAppLogin(user);
 
   const handleLogout = async () => {
     await logout();
@@ -42,6 +48,13 @@ export default function Profile() {
         <View style={styles.info}>
           <Text>{user.firstName} {user.lastName}</Text>
           <Text>{user.email}</Text>
+          {staffAppLogin ? (
+            <Text style={styles.staffNote}>
+              Staff login: your email is allowed in this app as a retailer admin, not as an end-customer
+              account. Hot tub profiles and “reset onboarding” only apply to users registered as customers
+              for this retailer.
+            </Text>
+          ) : null}
         </View>
       )}
       <View style={styles.actions}>
@@ -49,13 +62,14 @@ export default function Profile() {
           title={resetting ? 'Resetting…' : 'Reset onboarding'}
           onPress={handleResetOnboarding}
           variant="outline"
-          disabled={resetting}
+          disabled={resetting || staffAppLogin}
         />
         {resetting && <ActivityIndicator style={styles.spinner} />}
         {resetError ? <Text style={styles.error}>{resetError}</Text> : null}
         <Text style={styles.hint}>
-          Removes your spa profile for this retailer and opens setup again (for testing). Requires the API
-          to support DELETE /spa-profiles (deploy latest API or point the app at your dev server).
+          {staffAppLogin
+            ? 'Use Register or a separate test customer email (not on the retailer admin allowlist) to try onboarding and reset.'
+            : 'Removes your spa profile for this retailer and opens setup again (for testing). Requires the API to support DELETE /spa-profiles (deploy latest API or point the app at your dev server).'}
         </Text>
         <Button title="Sign Out" onPress={handleLogout} />
       </View>
@@ -90,5 +104,11 @@ const styles = StyleSheet.create({
   error: {
     color: '#dc2626',
     fontSize: 14,
+  },
+  staffNote: {
+    marginTop: 12,
+    fontSize: 13,
+    color: '#475569',
+    lineHeight: 19,
   },
 });

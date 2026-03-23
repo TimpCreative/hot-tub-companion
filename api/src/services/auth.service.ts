@@ -72,14 +72,19 @@ export async function verifyToken(token: string, tenantId?: string) {
     return formatUser(user);
   }
 
-  // Whitelist override: allow tenant admin emails to log in to any tenant app
-  const email = (decoded.email as string) || '';
-  if (email && env.TENANT_ADMIN_EMAILS.includes(email)) {
-    const nameParts = (decoded.name as string || '').split(' ').filter(Boolean);
+  // Whitelist override: same rules as authMiddleware (no users row for this tenant)
+  const email = ((decoded.email as string) || '').toLowerCase();
+  const canOverride =
+    (email && env.TENANT_ADMIN_EMAILS.map((e) => e.toLowerCase()).includes(email)) ||
+    (email && env.SUPER_ADMIN_EMAILS.map((e) => e.toLowerCase()).includes(email));
+
+  if (canOverride) {
+    const displayEmail = (decoded.email as string) || email;
+    const nameParts = ((decoded.name as string) || '').split(' ').filter(Boolean);
     return {
       id: `admin_${decoded.uid}`,
-      email,
-      firstName: nameParts[0] || email.split('@')[0],
+      email: displayEmail,
+      firstName: nameParts[0] || displayEmail.split('@')[0],
       lastName: nameParts.slice(1).join(' ') || undefined,
       phone: undefined,
       role: 'admin',
