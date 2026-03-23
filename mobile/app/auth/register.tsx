@@ -29,7 +29,7 @@ export default function Register() {
     setLoading(true);
     try {
       await register(email, password, firstName || undefined, lastName || undefined, phone || undefined);
-      router.replace('/(tabs)/home');
+      router.replace('/');
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'error' in err
         ? (err as { error?: { message?: string } }).error?.message ?? 'Registration failed'

@@ -15,6 +15,7 @@ import mediaRoutes from './media.routes';
 import { superAdminAuth } from '../middleware/superAdminAuth';
 import adminRoutes from './admin.routes';
 import productsRoutes from './products.routes';
+import spaProfilesRoutes from './spaProfiles.routes';
 
 const router = Router();
 
@@ -31,6 +32,9 @@ router.use('/api/v1/admin', adminRoutes);
 
 // Customer product routes (tenant API key required; some endpoints require auth)
 router.use('/api/v1', productsRoutes);
+
+// Customer spa profiles (tenant API key + Firebase auth)
+router.use('/api/v1', spaProfilesRoutes);
 
 // Super Admin routes
 router.use('/api/v1/super-admin', superAdminRoutes);

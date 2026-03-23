@@ -5,7 +5,7 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   type User,
-} from 'firebase/auth';
+} from '@firebase/auth';
 import * as SecureStore from 'expo-secure-store';
 import { getFirebaseAuth } from '../lib/firebase';
 import api from '../services/api';
@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }) as { data?: { token?: string; user?: AuthUser }; success?: boolean };
     const data = res.data ?? res as { token?: string; user?: AuthUser };
     if (data?.token) {
-      const { signInWithCustomToken } = await import('firebase/auth');
+      const { signInWithCustomToken } = await import('@firebase/auth');
       await signInWithCustomToken(auth, data.token);
       setUser(data.user ?? null);
     }

@@ -477,9 +477,10 @@ export async function deleteSpaModel(id: string, userId?: string): Promise<boole
 
 export async function searchSpaModels(
   query: string,
-  limit = 50
+  limit = 50,
+  brandId?: string
 ): Promise<ScdbSpaModel[]> {
-  const rows = await db('scdb_spa_models')
+  let q = db('scdb_spa_models')
     .select(
       'scdb_spa_models.*',
       'scdb_brands.name as brand_name',
@@ -492,7 +493,13 @@ export async function searchSpaModels(
       this.whereRaw('scdb_spa_models.name ILIKE ?', [`%${query}%`])
         .orWhereRaw('scdb_brands.name ILIKE ?', [`%${query}%`])
         .orWhereRaw("CONCAT(scdb_brands.name, ' ', scdb_spa_models.name, ' ', scdb_spa_models.year) ILIKE ?", [`%${query}%`]);
-    })
+    });
+
+  if (brandId) {
+    q = q.where('scdb_spa_models.brand_id', brandId);
+  }
+
+  const rows = await q
     .orderBy('scdb_brands.name')
     .orderBy('scdb_spa_models.name')
     .orderBy('scdb_spa_models.year', 'desc')

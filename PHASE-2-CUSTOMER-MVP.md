@@ -32,6 +32,20 @@ This is the **minimum viable product** for customer-facing functionality.
 
 ---
 
+## Hot tub onboarding (MVP — implemented)
+
+**Skippable first-run setup (Figma-aligned card):**
+
+- **Mobile route:** `/onboarding` — header (tenant logomark, retailer name, “Hot Tub Companion App”, helper copy), white card with **Hot Tub Make** (SCdb brands), **Model** (opens search; user picks a concrete UHTD `scdb_spa_models` row), **Year** (read-only from selected row), **Sanitizer** (from tenant `sanitizationSystems`), primary **Get Started**, unobtrusive **Skip for now**.
+- **Entry routing:** After login/register the app hits `/` (`mobile/app/index.tsx`), loads `GET /api/v1/spa-profiles`; if empty and user has not skipped → `/onboarding`; else tabs.
+- **Skip:** `AsyncStorage` key `setup_skipped_v1`. While skipped and still no profiles, **Home** and **Shop** show a **Finish setup** banner with **Continue setup** → `/onboarding`. Completing setup removes the skip flag.
+- **Customer API:** `GET /api/v1/spa-profiles`, `POST /api/v1/spa-profiles` (Firebase Bearer + `x-tenant-key`). Body includes `uhtdSpaModelId`, `sanitizationSystem`; server fills `brand` / `model_line` / `model` / `year` from SCdb. Admin override users cannot use these endpoints (403).
+- **SCdb:** `GET /api/v1/scdb/brands`, `GET /api/v1/scdb/search?q=&brandId=` (optional `brandId` after make is chosen).
+- **Retailer Admin — App setup:** `GET/PUT /api/v1/admin/settings/app-setup` with `can_manage_settings`. Persists `tenants.onboarding_config` (jsonb): `{ version, allowSkip, steps[] }` with step ids `brand`, `modelPick`, `sanitizer`. **`modelPick` is always treated as enabled** in the API normalizer (spa profile requires a UHTD model).
+- **Tenant config:** `GET /api/v1/tenant/config` includes `onboarding` for the mobile app.
+
+---
+
 ## Part 1: Onboarding Flow
 
 ### 1.0 Design System & Branding (Tenant-Aware)

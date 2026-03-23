@@ -411,13 +411,14 @@ export async function deleteSpaModel(req: Request, res: Response) {
 
 export async function searchSpaModels(req: Request, res: Response) {
   try {
-    const { q, limit } = req.query;
+    const { q, limit, brandId } = req.query;
     if (!q) {
       return error(res, 'VALIDATION_ERROR', 'Query parameter q is required', 400);
     }
     const spaModels = await scdbService.searchSpaModels(
       q as string,
-      limit ? parseInt(limit as string, 10) : 50
+      limit ? parseInt(limit as string, 10) : 50,
+      typeof brandId === 'string' && brandId.length > 0 ? brandId : undefined
     );
     return success(res, spaModels);
   } catch (err) {

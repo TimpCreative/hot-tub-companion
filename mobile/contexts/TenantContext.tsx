@@ -1,6 +1,14 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import api from '../services/api';
 
+export type OnboardingStepId = 'brand' | 'modelPick' | 'sanitizer';
+
+export interface TenantOnboardingConfig {
+  version: number;
+  allowSkip: boolean;
+  steps: { id: OnboardingStepId; enabled: boolean }[];
+}
+
 interface TenantConfig {
   tenantId: string;
   name: string;
@@ -16,6 +24,7 @@ interface TenantConfig {
   features: Record<string, boolean>;
   serviceTypes: unknown[];
   sanitizationSystems: string[];
+  onboarding?: TenantOnboardingConfig;
 }
 
 interface TenantContextType {

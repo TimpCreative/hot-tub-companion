@@ -22,7 +22,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email, password);
-      router.replace('/(tabs)/home');
+      router.replace('/');
     } catch (err: unknown) {
       let msg = 'Login failed';
       if (err && typeof err === 'object') {

@@ -1,7 +1,8 @@
-import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
-import { initializeAuth, getAuth, getReactNativePersistence, type Auth } from 'firebase/auth';
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { initializeAuth, getAuth, type Auth } from '@firebase/auth';
+import { getReactNativePersistence } from '@firebase/auth/dist/rn/index.js';
 import Constants from 'expo-constants';
+import { firebaseAuthSecureStorage } from './firebaseSecurePersistence';
 
 const extra = Constants.expoConfig?.extra as {
   firebaseApiKey?: string;
@@ -15,16 +16,31 @@ const firebaseConfig = {
   projectId: extra?.firebaseProjectId || '',
 };
 
-let authInstance: Auth;
+let cachedAuth: Auth | undefined;
 
+/**
+ * Use @firebase/auth (React Native entry) so session persistence works.
+ * The firebase/auth subpath resolves to the browser bundle under Metro.
+ */
 export function getFirebaseAuth(): Auth {
-  if (getApps().length === 0) {
-    const app = initializeApp(firebaseConfig);
-    authInstance = initializeAuth(app, {
-      persistence: getReactNativePersistence(ReactNativeAsyncStorage),
-    });
-    return authInstance;
+  if (cachedAuth) {
+    return cachedAuth;
   }
-  authInstance = getAuth(getApps()[0] as FirebaseApp);
-  return authInstance;
+
+  const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+  try {
+    cachedAuth = initializeAuth(app, {
+      persistence: getReactNativePersistence(firebaseAuthSecureStorage),
+    });
+  } catch (e: unknown) {
+    const code = e && typeof e === 'object' && 'code' in e ? String((e as { code: string }).code) : '';
+    if (code === 'auth/already-initialized') {
+      cachedAuth = getAuth(app);
+    } else {
+      throw e;
+    }
+  }
+
+  return cachedAuth;
 }

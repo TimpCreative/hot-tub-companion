@@ -1,4 +1,5 @@
 import { db } from '../config/database';
+import { normalizeOnboardingConfig } from './onboardingConfig.service';
 
 const SANITIZATION_SYSTEMS = ['bromine', 'chlorine', 'frog_ease', 'copper', 'silver_mineral'];
 
@@ -34,6 +35,7 @@ export async function getConfig(tenantId: string) {
     sanitizationSystems: SANITIZATION_SYSTEMS,
     fulfillmentMode: tenant.fulfillment_mode,
     shopifyStoreUrl: tenant.shopify_store_url,
+    onboarding: normalizeOnboardingConfig(tenant.onboarding_config),
   };
 }
 

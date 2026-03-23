@@ -12,6 +12,7 @@ const ADMIN_NAV = [
   { label: 'Notifications', href: '/notifications', comingPhase: 3 },
   { label: 'Analytics', href: '/analytics', comingPhase: 5 },
   { label: 'Settings', href: '/settings', comingPhase: 2 },
+  { label: 'App setup', href: '/app-setup', comingPhase: 2 },
 ];
 
 export default async function AdminLayout({
