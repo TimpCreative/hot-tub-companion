@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
+import { isFinishSetupBannerSuppressed } from '../lib/finishSetupDismissStorage';
 import { getSetupSkippedFlag } from '../lib/setupSkippedStorage';
 
 export function useFinishSetupNudge() {
@@ -9,6 +10,11 @@ export function useFinishSetupNudge() {
   const refresh = useCallback(async () => {
     const skipped = await getSetupSkippedFlag();
     if (!skipped) {
+      setShowNudge(false);
+      return;
+    }
+    const suppressed = await isFinishSetupBannerSuppressed();
+    if (suppressed) {
       setShowNudge(false);
       return;
     }
@@ -21,11 +27,15 @@ export function useFinishSetupNudge() {
     }
   }, []);
 
+  const dismiss = useCallback(() => {
+    setShowNudge(false);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       refresh();
     }, [refresh])
   );
 
-  return { showNudge, refresh };
+  return { showNudge, refresh, dismiss };
 }

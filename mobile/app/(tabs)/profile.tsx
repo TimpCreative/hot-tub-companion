@@ -7,12 +7,11 @@ import api from '../../services/api';
 import { clearSetupSkippedFlag } from '../../lib/setupSkippedStorage';
 import { getApiErrorMessage } from '../../lib/apiError';
 
-/** Retailer staff / super-admin “override” login: Firebase auth works, but there is no customer row for this tenant (id is synthetic). Spa profile APIs require a real customer account. */
 function isStaffTenantAppLogin(user: { id: string } | null): boolean {
   return Boolean(user?.id?.startsWith('admin_'));
 }
 
-export default function Profile() {
+export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [resetting, setResetting] = useState(false);
@@ -43,15 +42,16 @@ export default function Profile() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Profile</Text>
       {user && (
         <View style={styles.info}>
-          <Text>{user.firstName} {user.lastName}</Text>
+          <Text>
+            {user.firstName} {user.lastName}
+          </Text>
           <Text>{user.email}</Text>
           {staffAppLogin ? (
             <Text style={styles.staffNote}>
               Staff login: your email is allowed in this app as a retailer admin, not as an end-customer
-              account. Hot tub profiles and “reset onboarding” only apply to users registered as customers
+              account. Hot tub profiles and "reset onboarding" only apply to users registered as customers
               for this retailer.
             </Text>
           ) : null}
@@ -81,11 +81,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 24,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 24,
   },
   info: {
     marginBottom: 24,

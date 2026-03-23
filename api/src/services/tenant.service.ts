@@ -1,5 +1,6 @@
 import { db } from '../config/database';
 import { normalizeOnboardingConfig } from './onboardingConfig.service';
+import { mapDealerContact, normalizeHomeDashboardConfig } from './homeDashboardConfig.service';
 
 const SANITIZATION_SYSTEMS = ['bromine', 'chlorine', 'frog_ease', 'copper', 'silver_mineral'];
 
@@ -30,12 +31,18 @@ export async function getConfig(tenantId: string) {
       waterCare: tenant.feature_water_care,
       serviceScheduling: tenant.feature_service_scheduling,
       seasonalTimeline: tenant.feature_seasonal_timeline,
+      /** When false, mobile app hides the Inbox tab */
+      tabInbox: tenant.feature_tab_inbox !== false,
+      /** When false, mobile app hides the Dealer tab */
+      tabDealer: tenant.feature_tab_dealer !== false,
     },
     serviceTypes: [],
     sanitizationSystems: SANITIZATION_SYSTEMS,
     fulfillmentMode: tenant.fulfillment_mode,
     shopifyStoreUrl: tenant.shopify_store_url,
     onboarding: normalizeOnboardingConfig(tenant.onboarding_config),
+    homeDashboard: normalizeHomeDashboardConfig(tenant.home_dashboard_config),
+    dealerContact: mapDealerContact(tenant),
   };
 }
 

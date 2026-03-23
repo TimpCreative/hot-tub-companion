@@ -43,7 +43,7 @@ This is the **minimum viable product** for customer-facing functionality.
 - **Customer API:** `GET /api/v1/spa-profiles`, `POST /api/v1/spa-profiles` (Firebase Bearer + `x-tenant-key`). Body includes `uhtdSpaModelId`, `sanitizationSystem`; server fills `brand` / `model_line` / `model` / `year` from SCdb. **`POST /api/v1/consumer-uhtd-suggestions`** — queue-only submission + pending `spa_profile` (see above). Admin override users cannot use these endpoints (403).
 - **SCdb:** `GET /api/v1/scdb/brands`, `GET /api/v1/scdb/search?q=&brandId=` (optional `brandId` after make is chosen).
 - **Retailer Admin — App setup:** `GET/PUT /api/v1/admin/settings/app-setup` with `can_manage_settings`. Persists `tenants.onboarding_config` (jsonb): `{ version, allowSkip, steps[] }` with step ids `brand`, `modelPick`, `sanitizer`. **`modelPick` is always treated as enabled** in the API normalizer (spa profile requires a UHTD model).
-- **Tenant config:** `GET /api/v1/tenant/config` includes `onboarding` for the mobile app.
+- **Tenant config:** `GET /api/v1/tenant/config` includes `onboarding`, **`homeDashboard`** (normalized from `tenants.home_dashboard_config`), **`dealerContact`** (`public_contact_phone` / `public_contact_address`), and **`features.tabInbox` / `features.tabDealer`** (optional tab visibility; default show). Mobile home renders widgets from `homeDashboard.widgets` with server-side validation and route whitelist.
 
 ---
 
@@ -190,16 +190,23 @@ DELETE /api/v1/spa-profiles/:id
 
 ### 2.1 Tab Bar Layout
 
-After onboarding, the app uses a bottom tab bar with 4 tabs:
+After onboarding, the app uses a **bottom tab bar with 5 tabs** (IA-aligned):
 
-| Tab | Icon | Label | Screen |
-|-----|------|-------|--------|
-| 1 | 🏠 Home icon | Home | My Tub Dashboard |
-| 2 | 🛒 Shopping bag | Shop | Product Browsing |
-| 3 | 🔧 Wrench | Services | Service Requests (placeholder in Phase 2, built in Phase 4) |
-| 4 | 👤 Person | Profile | Account Settings |
+| Tab | Label | Screen |
+|-----|-------|--------|
+| 1 | Home | My Tub / home dashboard (configurable widgets + hero + spa summary) |
+| 2 | Shop | Product browsing (MVP placeholder until catalog UI ships) |
+| 3 | Water Care | Water care hub (placeholder → Phase 3) |
+| 4 | Inbox | Messages (placeholder) — hidden if `features.tabInbox === false` |
+| 5 | Dealer | Dealership info (uses `dealerContact` from tenant) — hidden if `features.tabDealer === false` |
+
+**Profile** is **not** a tab: a **header right** control on tab roots (and the Services stack screen) opens **`/profile`**.
+
+**Services** (scheduling / repairs narrative) is a **root Stack** screen at **`/services`**, separate from Water Care — opened from home widgets, dealer CTAs, or deep links; not a sixth tab.
 
 The tab bar uses the retailer's primary color for the active tab indicator.
+
+**Retailer Admin — App setup:** besides onboarding, the **Home dashboard** tab edits `homeDashboard` and dealer public phone/address (`GET/PUT /api/v1/admin/settings/app-setup`).
 
 ### 2.2 Spa Selector (Global)
 
@@ -217,28 +224,22 @@ The home screen shows a personalized overview for the active spa.
 
 **Modularity requirement (important):** Build the My Tub dashboard as a **widget-based, tenant-configurable home screen** (a stack of cards/sections). Dealers should be able to choose which widgets appear, control ordering, and configure basic content/CTAs via Retailer Admin so the home experience feels uniquely *theirs* without shipping new app code.
 
-**Widget system design:**
-- The mobile app ships with a fixed **widget registry** (predefined React Native components), for example:
-  - `hero` (spa summary header)
-  - `messages` (inbox preview / message count)
-  - `waterCare` (water care entry point)
-  - `shopCard` (Shop Parts & Chemicals CTA)
-  - `dealerCard` (dealer contact card)
-  - `tips` (Tips from Our Experts list)
-  - `recommendedProducts` (For You / Recommended products for this spa/sanitizer)
-- Each widget type accepts a **simple props object** (titles, subtitles, icon choice, CTA labels, etc.) and is rendered purely on the client; no executable code is downloaded.
-- Per-tenant **layout config** is stored server-side, e.g.:
+**Widget system design (implemented v1):**
+- **Storage:** `tenants.home_dashboard_config` (jsonb), normalized by API (`homeDashboardConfig.service.ts`).
+- **Mobile registry (fixed types):** `link_tile`, `dealer_card`, `tips_list`, `product_strip`. Unknown types are dropped server-side.
+- **`link_tile` props:** `title`, `subtitle`, `iconKey` (safe set), `targetRoute` (whitelist: `/shop`, `/water-care`, `/inbox`, `/dealer`, `/services`, `/onboarding`).
+- **`dealer_card`:** uses tenant name + `dealerContact` columns.
+- **`tips_list`:** `title`, `items[]` with `{ title, body }`.
+- **`product_strip`:** title/subtitle; client loads `GET /api/v1/products` when the user is authenticated (tenant context).
+- **Hero + spa summary** are fixed above the widget list on Home (not a configurable widget type in v1).
+- Example shape:
 
   ```jsonc
   {
-    "homeLayout": [
-      { "type": "hero", "enabled": true },
-      { "type": "messages", "enabled": true },
-      { "type": "waterCare", "enabled": true },
-      { "type": "shopCard", "enabled": true },
-      { "type": "dealerCard", "enabled": true },
-      { "type": "tips", "enabled": true },
-      { "type": "recommendedProducts", "enabled": true }
+    "version": 1,
+    "widgets": [
+      { "id": "tile_messages", "type": "link_tile", "enabled": true, "order": 0, "props": { "title": "Messages", "targetRoute": "/inbox", "iconKey": "mail" } }
+      // … defaults provided by API normalizer
     ]
   }
   ```

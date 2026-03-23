@@ -5,6 +5,12 @@ import {
   normalizeOnboardingConfig,
   type OnboardingConfigDTO,
 } from '../services/onboardingConfig.service';
+import {
+  mergePartialHomeDashboard,
+  normalizeHomeDashboardConfig,
+  type HomeDashboardConfigDTO,
+  mapDealerContact,
+} from '../services/homeDashboardConfig.service';
 
 function requireManageSettings(req: Request, res: Response): boolean {
   const role = (req as any).adminRole as Record<string, unknown> | undefined;
@@ -30,7 +36,11 @@ export async function getAppSetup(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  success(res, { onboarding: normalizeOnboardingConfig(tenant.onboarding_config) });
+  success(res, {
+    onboarding: normalizeOnboardingConfig(tenant.onboarding_config),
+    homeDashboard: normalizeHomeDashboardConfig(tenant.home_dashboard_config),
+    dealerContact: mapDealerContact(tenant),
+  });
 }
 
 export async function updateAppSetup(req: Request, res: Response): Promise<void> {
@@ -41,18 +51,62 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
     return;
   }
 
-  const body = req.body as { onboarding?: OnboardingConfigDTO };
-  if (!body.onboarding || typeof body.onboarding !== 'object') {
-    error(res, 'VALIDATION_ERROR', 'onboarding object is required', 400);
+  const tenant = await db('tenants').where({ id: tenantId }).first();
+  if (!tenant) {
+    error(res, 'NOT_FOUND', 'Tenant not found', 404);
     return;
   }
 
-  const normalized = normalizeOnboardingConfig(body.onboarding);
+  const body = req.body as {
+    onboarding?: OnboardingConfigDTO;
+    homeDashboard?: HomeDashboardConfigDTO;
+    dealerContact?: { phone?: string | null; address?: string | null };
+  };
 
-  await db('tenants').where({ id: tenantId }).update({
-    onboarding_config: normalized,
-    updated_at: db.fn.now(),
-  });
+  const hasOnboarding = body.onboarding && typeof body.onboarding === 'object';
+  const hasHome = body.homeDashboard && typeof body.homeDashboard === 'object';
+  const hasDealer =
+    body.dealerContact &&
+    typeof body.dealerContact === 'object' &&
+    (body.dealerContact.phone !== undefined || body.dealerContact.address !== undefined);
 
-  success(res, { onboarding: normalized }, 'App setup updated');
+  if (!hasOnboarding && !hasHome && !hasDealer) {
+    error(res, 'VALIDATION_ERROR', 'Provide onboarding, homeDashboard, and/or dealerContact', 400);
+    return;
+  }
+
+  const update: Record<string, unknown> = { updated_at: db.fn.now() };
+
+  if (hasOnboarding) {
+    update.onboarding_config = normalizeOnboardingConfig(body.onboarding);
+  }
+  if (hasHome) {
+    const currentHd = normalizeHomeDashboardConfig(tenant.home_dashboard_config);
+    update.home_dashboard_config = mergePartialHomeDashboard(currentHd, body.homeDashboard);
+  }
+  if (hasDealer) {
+    const dc = body.dealerContact!;
+    if (dc.phone !== undefined) {
+      const p = dc.phone === null || dc.phone === '' ? null : String(dc.phone).trim().slice(0, 40);
+      update.public_contact_phone = p;
+    }
+    if (dc.address !== undefined) {
+      const a =
+        dc.address === null || dc.address === '' ? null : String(dc.address).trim().slice(0, 2000);
+      update.public_contact_address = a;
+    }
+  }
+
+  await db('tenants').where({ id: tenantId }).update(update);
+
+  const next = await db('tenants').where({ id: tenantId }).first();
+  success(
+    res,
+    {
+      onboarding: normalizeOnboardingConfig(next!.onboarding_config),
+      homeDashboard: normalizeHomeDashboardConfig(next!.home_dashboard_config),
+      dealerContact: mapDealerContact(next!),
+    },
+    'App setup updated'
+  );
 }

@@ -9,6 +9,26 @@ export interface TenantOnboardingConfig {
   steps: { id: OnboardingStepId; enabled: boolean }[];
 }
 
+export type HomeWidgetType = 'link_tile' | 'dealer_card' | 'tips_list' | 'product_strip';
+
+export interface HomeWidget {
+  id: string;
+  type: HomeWidgetType;
+  enabled: boolean;
+  order: number;
+  props: Record<string, unknown>;
+}
+
+export interface HomeDashboardConfig {
+  version: number;
+  widgets: HomeWidget[];
+}
+
+export interface DealerContact {
+  phone: string | null;
+  address: string | null;
+}
+
 interface TenantConfig {
   tenantId: string;
   name: string;
@@ -25,6 +45,8 @@ interface TenantConfig {
   serviceTypes: unknown[];
   sanitizationSystems: string[];
   onboarding?: TenantOnboardingConfig;
+  homeDashboard?: HomeDashboardConfig;
+  dealerContact?: DealerContact;
 }
 
 interface TenantContextType {

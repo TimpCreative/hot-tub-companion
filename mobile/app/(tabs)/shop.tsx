@@ -5,22 +5,28 @@ import { useFinishSetupNudge } from '../../hooks/useFinishSetupNudge';
 
 export default function Shop() {
   const router = useRouter();
-  const { showNudge } = useFinishSetupNudge();
+  const { showNudge, dismiss } = useFinishSetupNudge();
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-      {showNudge ? (
-        <FinishSetupBanner onContinue={() => router.push('/onboarding')} />
-      ) : null}
+    <View style={styles.container}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <View style={styles.center}>
         <Text style={styles.title}>Shop</Text>
         <Text style={styles.subtitle}>Coming in Phase 2</Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+      {showNudge ? (
+        <FinishSetupBanner
+          onContinue={() => router.push('/onboarding')}
+          onDismiss={dismiss}
+        />
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1 },
   scroll: { flex: 1 },
   content: { flexGrow: 1, paddingBottom: 24 },
   center: {
