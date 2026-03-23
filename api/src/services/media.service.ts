@@ -83,8 +83,8 @@ export async function uploadFile(
     },
   });
   dbg({ location: 'media.service.ts:post-save', message: 'after file.save', hypothesisId: 'H2' });
-  await file.makePublic();
-  dbg({ location: 'media.service.ts:post-makePublic', message: 'after makePublic', hypothesisId: 'H2' });
+  // Skip makePublic() — with uniform bucket-level access, per-object ACLs are disabled.
+  // Configure the bucket for public read via IAM: add allUsers with Storage Object Viewer.
   const publicUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
   dbg({ location: 'media.service.ts:pre-db', message: 'before media_files insert', hypothesisId: 'H3' });
   const [mediaFile] = await db('media_files')
