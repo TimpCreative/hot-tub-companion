@@ -30,9 +30,6 @@ export function ThemeProvider({ children, initialTheme }: { children: React.Reac
     if (initialTheme) return initialTheme;
     const cookie = getCookie(COOKIE_NAME);
     if (cookie === 'dark' || cookie === 'light') return cookie;
-    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
-      return 'dark' as Theme;
-    }
     return 'light';
   });
   const [mounted, setMounted] = useState(false);
