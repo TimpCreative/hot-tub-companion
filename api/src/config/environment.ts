@@ -21,6 +21,8 @@ export const env = {
   NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: parseInt(process.env.PORT || '3000', 10),
   API_URL: process.env.API_URL || 'http://localhost:3000',
+  /** Base for retailer dashboard URLs (e.g. https://hottubcompanion.com). Used for invite emails. */
+  DASHBOARD_BASE: process.env.DASHBOARD_BASE || 'https://hottubcompanion.com',
   DATABASE_URL: process.env.DATABASE_URL!,
   FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID!,
   FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL!,

@@ -1,16 +1,23 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenant } from '@/contexts/TenantContext';
+import { useAdminPermissions } from '@/contexts/AdminPermissionsContext';
 import { Sidebar } from '@/components/ui/Sidebar';
 import { Header } from '@/components/ui/Header';
 
+interface NavItem {
+  label: string;
+  href: string;
+  comingPhase?: number;
+  requiresCanManageUsers?: boolean;
+}
+
 interface AdminLayoutClientProps {
   children: React.ReactNode;
-  navItems: { label: string; href: string; comingPhase?: number }[];
+  navItems: NavItem[];
   basePath: string;
 }
 
@@ -21,8 +28,16 @@ export default function AdminLayoutClient({
 }: AdminLayoutClientProps) {
   const { user, loading: authLoading } = useAuth();
   const { config, loading: tenantLoading, error } = useTenant();
+  const { permissions, loading: permissionsLoading } = useAdminPermissions();
   const pathname = usePathname();
   const router = useRouter();
+
+  const filteredNavItems = useMemo(() => {
+    return navItems.filter((item) => {
+      if (item.requiresCanManageUsers && !permissions?.can_manage_users) return false;
+      return true;
+    });
+  }, [navItems, permissions?.can_manage_users]);
 
   if (authLoading) {
     return (
@@ -52,7 +67,7 @@ export default function AdminLayoutClient({
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <Sidebar navItems={navItems} basePath={basePath} title={title} />
+      <Sidebar navItems={filteredNavItems} basePath={basePath} title={title} />
       <div className="flex-1 flex flex-col">
         <Header tenantName={config?.name} logoUrl={config?.branding?.logoUrl} />
         <main className="flex-1 p-6 overflow-auto">{children}</main>

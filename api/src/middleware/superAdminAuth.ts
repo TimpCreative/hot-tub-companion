@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getFirebaseAuth } from '../config/firebase';
+import { db } from '../config/database';
 import { env } from '../config/environment';
 import { error } from '../utils/response';
 
@@ -40,9 +41,23 @@ export async function superAdminAuth(
 
   try {
     const decoded = await auth.verifyIdToken(token);
-    const email = decoded.email as string;
-    const allowed = env.SUPER_ADMIN_EMAILS.map((e) => e.toLowerCase());
-    if (!email || !allowed.includes(email.toLowerCase())) {
+    const email = (decoded.email as string)?.toLowerCase();
+    if (!email) {
+      error(res, 'FORBIDDEN', 'Super admin access required', 403);
+      return;
+    }
+    const inEnv = env.SUPER_ADMIN_EMAILS.map((e) => e.toLowerCase()).includes(email);
+    let inDb = false;
+    try {
+      const dbEntry = await db('platform_users')
+        .whereRaw('LOWER(email) = ?', [email])
+        .where('platform_role', 'super_admin')
+        .first();
+      inDb = !!dbEntry;
+    } catch {
+      /* table might not exist yet */
+    }
+    if (!inEnv && !inDb) {
       error(res, 'FORBIDDEN', 'Super admin access required', 403);
       return;
     }

@@ -6,6 +6,28 @@
 
 ---
 
+## Phase 2 Status Review (as of review)
+
+| Area | Status | Notes |
+|------|--------|-------|
+| **Manual steps** | ⏳ | Needs verification |
+| **Registration & login** | ✅ | Done |
+| **Spa registration (onboarding)** | ✅ | MVP card flow (SCdb search, Not listed?, consumer suggestions) |
+| **Welcome screen** | ✅ | Done |
+| **Tab bar (5 tabs)** | ✅ | Home, Shop, Water Care, Inbox, Dealer; Profile in header |
+| **Spa selector (multi-spa)** | ❌ | Not implemented; Home uses primary spa only |
+| **My Tub dashboard** | ✅ | Hero + spa summary + Quick Links + widgets (dealer_card, tips_list, product_strip) |
+| **Quick Links** | ✅ | Refactored from link_tile; configurable, icon/color picker |
+| **Info cards** | ❌ | Warranty, Filter Reminder, Seasonal Alert, Recent Orders — none on Home |
+| **Shop tab** | ❌ | Placeholder ("Coming in Phase 2"); API exists |
+| **Cart & checkout** | ❌ | Not implemented |
+| **Push notifications** | ❌ | expo-notifications in package; no FCM registration or backend |
+| **Profile & settings** | ✅ | Account, My Spas, notifications, privacy, app info, sign out |
+| **Edit spa flow** | ✅ | Sanitization, usage months, serial, nickname, warranty |
+| **Retailer Admin app-setup** | ✅ | Onboarding config, home dashboard (Quick Links + widgets), dealer contact |
+
+---
+
 ## Manual Steps Required (Do These First)
 
 1. **Obtain TAB's branding package.** Collect from Take A Break: primary logo (SVG/PNG, light and dark background versions), brand colors (hex codes), preferred font (or approve a suggestion), app icon artwork, splash screen artwork. Place these in `/mobile/tenants/takeabreak/`.
@@ -21,12 +43,12 @@
 ## What Phase 2 Builds
 
 At the end of this phase, you should have a fully functional customer-facing app where a user can:
-- Register and log in
-- Register their spa (brand, model line, model, year, sanitization system, serial number)
-- See a personalized "My Tub" dashboard
-- Browse products filtered to their spa's compatibility
-- Add products to cart and complete checkout via Shopify Checkout Kit
-- Receive basic push notifications (order confirmation, welcome)
+- ✅ Register and log in
+- ✅ Register their spa (brand, model line, model, year, sanitization system, serial number)
+- ✅ See a personalized "My Tub" dashboard
+- ❌ Browse products filtered to their spa's compatibility
+- ❌ Add products to cart and complete checkout via Shopify Checkout Kit
+- ❌ Receive basic push notifications (order confirmation, welcome)
 
 This is the **minimum viable product** for customer-facing functionality.
 
@@ -49,7 +71,7 @@ This is the **minimum viable product** for customer-facing functionality.
 
 ## Part 1: Onboarding Flow
 
-### 1.0 Design System & Branding (Tenant-Aware)
+### 1.0 Design System & Branding (Tenant-Aware) — ✅ Implemented
 
 Phase 2 must respect each retailer's branding while keeping the app consistent and accessible. Treat all visual decisions as semantic tokens, not hard-coded colors.
 
@@ -84,7 +106,7 @@ Phase 2 must respect each retailer's branding while keeping the app consistent a
 - Tenant record must expose: `primary_color`, `secondary_color`, `logo_full_url`, `logo_mark_url`.
 - Super Admin and/or Retailer Admin flows must allow uploading/replacing these assets safely.
 
-### 1.1 Registration Screen
+### 1.1 Registration Screen — ✅ Implemented
 
 `/auth/register`
 
@@ -105,6 +127,8 @@ Phase 2 must respect each retailer's branding while keeping the app consistent a
 - Link to "Already have an account? Sign In" at bottom
 
 ### 1.2 Spa Registration Flow
+
+> **Status:** Superseded by MVP card flow (see "Hot tub onboarding (MVP — implemented)" above). The doc below describes a 7-step wizard; we implemented a single-card flow with SCdb search, Not listed?, and consumer-uhtd-suggestions.
 
 This is a multi-step wizard. The user must complete this before accessing the main app. The registration system should be **easily extensible** — built so that adding new fields later requires minimal code changes.
 
@@ -148,7 +172,7 @@ This is a multi-step wizard. The user must complete this before accessing the ma
 - "This looks right" button → calls `POST /api/v1/spa-profiles` → navigates to Welcome screen
 - "Let me change something" → goes back to relevant step
 
-### 1.3 Welcome Screen
+### 1.3 Welcome Screen — ✅ Implemented
 
 Brief welcome with retailer branding:
 - "Welcome to [Retailer Name], [First Name]!"
@@ -158,7 +182,7 @@ Brief welcome with retailer branding:
   - "💧 Track your water care"
 - "Get Started" button → navigates to main app (tabs)
 
-### 1.4 Spa Registration API
+### 1.4 Spa Registration API — ✅ Implemented
 
 ```
 POST /api/v1/spa-profiles
@@ -188,7 +212,7 @@ DELETE /api/v1/spa-profiles/:id
 
 ## Part 2: Main App Navigation
 
-### 2.1 Tab Bar Layout
+### 2.1 Tab Bar Layout — ✅ Implemented
 
 After onboarding, the app uses a **bottom tab bar with 5 tabs** (IA-aligned):
 
@@ -208,7 +232,7 @@ The tab bar uses the retailer's primary color for the active tab indicator.
 
 **Retailer Admin — App setup:** besides onboarding, the **Home dashboard** tab edits `homeDashboard` and dealer public phone/address (`GET/PUT /api/v1/admin/settings/app-setup`).
 
-### 2.2 Spa Selector (Global)
+### 2.2 Spa Selector (Global) — ❌ Not implemented
 
 If the user has multiple spas, a spa selector appears in the header of the Home and Shop tabs. It's a dropdown/pill that shows the active spa's nickname or model name. Tapping it lets the user switch between spas. The selected spa determines what products are shown in Shop and what data displays on the Dashboard.
 
@@ -216,18 +240,18 @@ Store the active spa profile ID in local state (React context) and persist it to
 
 ---
 
-## Part 3: My Tub Dashboard (Home Tab)
+## Part 3: My Tub Dashboard (Home Tab) — ✅ Partial
 
 ### 3.1 Dashboard Layout
 
-The home screen shows a personalized overview for the active spa.
+The home screen shows a personalized overview for the active spa. Hero + spa summary + Quick Links + widgets implemented. Info cards (Warranty, Filter Reminder, Seasonal Alert, Recent Orders) not implemented.
 
 **Modularity requirement (important):** Build the My Tub dashboard as a **widget-based, tenant-configurable home screen** (a stack of cards/sections). Dealers should be able to choose which widgets appear, control ordering, and configure basic content/CTAs via Retailer Admin so the home experience feels uniquely *theirs* without shipping new app code.
 
 **Widget system design (implemented v1):**
 - **Storage:** `tenants.home_dashboard_config` (jsonb), normalized by API (`homeDashboardConfig.service.ts`).
-- **Mobile registry (fixed types):** `link_tile`, `dealer_card`, `tips_list`, `product_strip`. Unknown types are dropped server-side.
-- **`link_tile` props:** `title`, `subtitle`, `iconKey` (safe set), `targetRoute` (whitelist: `/shop`, `/water-care`, `/inbox`, `/dealer`, `/services`, `/onboarding`).
+- **Quick Links (replaces link_tile):** Separate configurable icon tiles with `iconKey`, `targetRoute`, `iconColor`, `iconBgColor`, `quickLinksLayout` (single/double). ✅ Implemented.
+- **Mobile registry (fixed types):** `dealer_card`, `tips_list`, `product_strip`. Unknown types are dropped server-side. ~~`link_tile`~~ migrated to Quick Links.
 - **`dealer_card`:** uses tenant name + `dealerContact` columns.
 - **`tips_list`:** `title`, `items[]` with `{ title, body }`.
 - **`product_strip`:** title/subtitle; client loads `GET /api/v1/products` when the user is authenticated (tenant context).
@@ -237,10 +261,9 @@ The home screen shows a personalized overview for the active spa.
   ```jsonc
   {
     "version": 1,
-    "widgets": [
-      { "id": "tile_messages", "type": "link_tile", "enabled": true, "order": 0, "props": { "title": "Messages", "targetRoute": "/inbox", "iconKey": "mail" } }
-      // … defaults provided by API normalizer
-    ]
+    "quickLinks": [ { "id": "tile_messages", "title": "Messages", "subtitle": "...", "iconKey": "mail", "targetRoute": "/inbox", "enabled": true, "order": 0 } ],
+    "quickLinksLayout": "single",
+    "widgets": [ { "id": "dealer_card", "type": "dealer_card", ... }, ... ]
   }
   ```
 
@@ -255,19 +278,14 @@ The home screen shows a personalized overview for the active spa.
 
 > **Platform compliance note:** This system is configuration-only. Widgets are predefined, compiled components; the server only controls which widgets appear, their order, and their data/content. No executable code or arbitrary HTML is downloaded, keeping the app compliant with Apple/Google store rules.
 
-**Header section:**
-- Spa model image (from UHTD, or a generic hot tub silhouette if no image)
-- "[Brand] [Model]" title
-- "[Year] • [Sanitization System]" subtitle
-- Serial number (if entered)
+**Header section:** ✅ Implemented
+- Spa model info in hero card (Brand · Model · Year, sanitization)
+- ~~Spa model image~~ (not shown; could add)
+- Serial number editable in profile, not shown in hero
 
-**Quick Actions row (horizontal scroll):**
-- "Shop Supplies" → navigates to Shop tab
-- "Schedule Service" → navigates to Services tab (placeholder in Phase 2)
-- "Test Water" → navigates to Water Care (placeholder, built in Phase 3)
-- "My Subscriptions" → navigates to Subscriptions (placeholder, built in Phase 3)
+**Quick Actions:** ✅ Replaced by Quick Links (configurable tiles → Shop, Water Care, Inbox, Dealer, Services, etc.)
 
-**Info Cards (vertical scroll below quick actions):**
+**Info Cards (vertical scroll below quick actions):** ❌ Not implemented
 
 1. **Warranty Card** (if warranty expiration date is set)
    - "Warranty Status"
@@ -289,7 +307,9 @@ The home screen shows a personalized overview for the active spa.
 
 ---
 
-## Part 4: Product Browsing (Shop Tab)
+## Part 4: Product Browsing (Shop Tab) — ❌ Not implemented
+
+Shop tab currently shows "Coming in Phase 2" placeholder. API exists: `GET /products`, `GET /products/compatible/:spaProfileId`.
 
 ### 4.1 Shop Screen Layout
 
@@ -459,7 +479,9 @@ const REMOVE_FROM_CART = gql`
 
 ---
 
-## Part 5: Push Notifications (Basic)
+## Part 5: Push Notifications (Basic) — ❌ Not implemented
+
+`expo-notifications` is in package.json but not wired up. No FCM registration, backend service, or webhooks.
 
 ### 5.1 FCM Setup
 
@@ -544,7 +566,7 @@ POST /admin/api/2025-01/webhooks.json
 
 ## Part 6: Profile & Settings (Profile Tab)
 
-### 6.1 Profile Screen
+### 6.1 Profile Screen — ✅ Implemented
 
 - **Account section:** Name, email, phone, address (editable)
 - **My Spas section:** List of registered spas with edit/delete. "Add Another Spa" button.
@@ -554,7 +576,7 @@ POST /admin/api/2025-01/webhooks.json
 - **Sign Out** button
 - **Delete Account** button (with confirmation dialog)
 
-### 6.2 Edit Spa Flow
+### 6.2 Edit Spa Flow — ✅ Implemented
 
 Tapping a spa in the profile opens an edit screen where the user can change:
 - Sanitization system (with warning: "Changing your sanitization system will update your product recommendations")
@@ -570,8 +592,8 @@ Tapping a spa in the profile opens an edit screen where the user can change:
 
 Before moving to Phase 3, verify:
 
-- [ ] New user can register, complete spa onboarding, and land on My Tub dashboard
-- [ ] Spa registration correctly links to UHTD model
+- [x] New user can register, complete spa onboarding, and land on My Tub dashboard
+- [x] Spa registration correctly links to UHTD model
 - [ ] My Tub dashboard shows correct spa info, warranty status, filter reminder
 - [ ] Seasonal alerts appear at appropriate times
 - [ ] Shop tab shows products filtered to the user's spa model
@@ -586,9 +608,9 @@ Before moving to Phase 3, verify:
 - [ ] Order webhook fires and creates a notification
 - [ ] Push notifications are received on device
 - [ ] User with multiple spas can switch between them
-- [ ] Profile settings are editable and persist
-- [ ] Spa profile can be edited (sanitization, usage months, serial number)
-- [ ] App displays correctly with TAB's branding (colors, logo, fonts)
+- [x] Profile settings are editable and persist
+- [x] Spa profile can be edited (sanitization, usage months, serial number)
+- [x] App displays correctly with TAB's branding (colors, logo, fonts)
 - [ ] App works on both iOS and Android
 
 ---

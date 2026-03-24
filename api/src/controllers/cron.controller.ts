@@ -13,22 +13,29 @@ export async function dispatchNotifications(req: Request, res: Response): Promis
 
   let processed = 0;
   for (const row of rows) {
-    const { id, tenant_id, title, body } = row as {
+    const { id, tenant_id, title, body, link_type, link_id, image_url } = row as {
       id: string;
       tenant_id: string;
       title: string;
       body: string;
+      link_type: string | null;
+      link_id: string | null;
+      image_url: string | null;
       created_by: string | null;
       created_by_email: string | null;
     };
 
     const createdById = row.created_by ?? row.created_by_email ?? 'cron';
 
+    const opts: notificationService.SendNotificationOptions = {};
+    if (link_type && link_id) opts.data = { linkType: link_type, linkId: link_id };
+    if (image_url) opts.imageUrl = image_url;
+
     const { sent, failed } = await notificationService.sendToTenantCustomers(
       tenant_id,
       title,
       body,
-      undefined,
+      opts,
       'promotional',
       {
         type: 'promotional',

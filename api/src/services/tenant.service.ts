@@ -46,6 +46,7 @@ export async function getConfig(tenantId: string) {
     dealerContact: mapDealerContact(tenant),
     termsUrl: (tenant as any).terms_url?.trim() || null,
     privacyUrl: (tenant as any).privacy_url?.trim() || null,
+    timezone: (tenant as any).timezone || 'America/Denver',
   };
 }
 

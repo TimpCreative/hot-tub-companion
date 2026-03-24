@@ -3,6 +3,21 @@ import { db } from '../config/database';
 import { error, success } from '../utils/response';
 import * as notificationService from '../services/notification.service';
 
+function buildNotificationPayload(
+  linkType: string | null,
+  linkId: string | null,
+  imageUrl: string | null
+): notificationService.SendNotificationOptions {
+  const opts: notificationService.SendNotificationOptions = {};
+  if (linkType && linkId) {
+    opts.data = { linkType, linkId };
+  }
+  if (imageUrl) {
+    opts.imageUrl = imageUrl;
+  }
+  return opts;
+}
+
 interface AdminRole {
   can_send_notifications?: boolean;
 }
@@ -48,6 +63,7 @@ export async function createNotification(req: Request, res: Response): Promise<v
     body?: string;
     linkType?: string;
     linkId?: string;
+    imageUrl?: string | null;
     sendAt?: string;
     target?: string;
   };
@@ -62,6 +78,7 @@ export async function createNotification(req: Request, res: Response): Promise<v
   const target = body.target === 'segment' ? 'segment' : 'all_customers';
   const linkType = typeof body.linkType === 'string' ? body.linkType.slice(0, 30) : null;
   const linkId = typeof body.linkId === 'string' ? body.linkId.slice(0, 255) : null;
+  const imageUrl = typeof body.imageUrl === 'string' && body.imageUrl.trim() ? body.imageUrl.trim() : null;
 
   let sendAt: Date;
   if (body.sendAt && typeof body.sendAt === 'string') {
@@ -88,6 +105,7 @@ export async function createNotification(req: Request, res: Response): Promise<v
       body: bodyText,
       link_type: linkType,
       link_id: linkId,
+      image_url: imageUrl,
       target,
       send_at: sendAt,
       status: 'scheduled',
@@ -95,11 +113,12 @@ export async function createNotification(req: Request, res: Response): Promise<v
     .returning('*');
 
   if (sendAt <= new Date()) {
+    const notifOpts = buildNotificationPayload(linkType, linkId, imageUrl);
     const { sent, failed } = await notificationService.sendToTenantCustomers(
       tenantId,
       title,
       bodyText,
-      undefined,
+      notifOpts,
       'promotional',
       {
         type: 'promotional',

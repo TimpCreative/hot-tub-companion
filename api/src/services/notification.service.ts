@@ -113,27 +113,52 @@ function stringifyData(data: Record<string, string>): Record<string, string> {
   );
 }
 
+export interface SendNotificationOptions {
+  data?: Record<string, string>;
+  imageUrl?: string;
+}
+
+function normalizeNotificationOptions(
+  opts?: SendNotificationOptions | Record<string, string>
+): { data?: Record<string, string>; imageUrl?: string } {
+  if (!opts || typeof opts !== 'object') return {};
+  if ('imageUrl' in opts || 'data' in opts) {
+    return { data: (opts as SendNotificationOptions).data, imageUrl: (opts as SendNotificationOptions).imageUrl };
+  }
+  return { data: opts as Record<string, string> };
+}
+
 export async function sendToTenantCustomers(
   tenantId: string,
   title: string,
   body: string,
-  data?: Record<string, string>,
+  opts?: SendNotificationOptions | Record<string, string>,
   prefKey: PrefKey = 'promotional',
   logParams?: { type: string; createdByType?: string; createdById?: string }
 ): Promise<{ sent: number; failed: number }> {
   const users = await getTenantCustomerTokens(tenantId, prefKey);
   if (users.length === 0) return { sent: 0, failed: 0 };
 
+  const { data: finalData, imageUrl } = normalizeNotificationOptions(opts);
+  const strData = finalData ? stringifyData(finalData) : undefined;
+
   const messaging = getFirebaseMessaging();
   const tokens = users.map((u) => u.fcm_token);
-  const strData = data ? stringifyData(data) : undefined;
+
+  const notification: Record<string, string> = { title, body };
+  if (imageUrl?.trim()) (notification as any).imageUrl = imageUrl.trim();
+
+  const apnsConfig: import('firebase-admin/messaging').ApnsConfig = {
+    payload: { aps: { sound: 'default', ...(imageUrl ? { 'mutable-content': 1 } : {}) } },
+  };
+  if (imageUrl?.trim()) (apnsConfig as any).fcmOptions = { imageUrl: imageUrl.trim() };
 
   const message: import('firebase-admin/messaging').MulticastMessage = {
     tokens,
-    notification: { title, body },
+    notification,
     data: strData,
     android: { priority: 'high' as const },
-    apns: { payload: { aps: { sound: 'default' } } },
+    apns: apnsConfig,
   };
 
   let sent = 0;

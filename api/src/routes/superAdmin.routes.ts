@@ -3,6 +3,7 @@ import * as superAdminController from '../controllers/superAdmin.controller';
 import * as superAdminBrandingController from '../controllers/superAdminBranding.controller';
 import * as superAdminConsumerUhtdController from '../controllers/superAdminConsumerUhtd.controller';
 import * as superAdminAnnouncementsController from '../controllers/superAdminAnnouncements.controller';
+import * as platformUsersController from '../controllers/platformUsers.controller';
 import { superAdminAuth } from '../middleware/superAdminAuth';
 import { authRateLimiter, superAdminAnnouncementRateLimiter } from '../middleware/rateLimiter';
 
@@ -34,6 +35,12 @@ router.post(
   superAdminAnnouncementRateLimiter,
   superAdminAnnouncementsController.sendAnnouncement
 );
+
+// Platform users (super/tenant admins in DB)
+router.get('/platform-users', platformUsersController.listPlatformUsers);
+router.post('/platform-users', platformUsersController.addPlatformUser);
+router.put('/platform-users/:id', platformUsersController.updatePlatformUser);
+router.delete('/platform-users/:id', platformUsersController.removePlatformUser);
 
 // Whitelist management
 router.post('/whitelist', superAdminController.addWhitelistEmail);

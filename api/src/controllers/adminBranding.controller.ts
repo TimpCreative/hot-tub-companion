@@ -21,6 +21,7 @@ function mapBranding(row: any) {
     fontFamily: row.font_family,
     logoUrl: toProxyUrl(row.logo_url) ?? row.logo_url,
     iconUrl: toProxyUrl(row.icon_url) ?? row.icon_url,
+    timezone: row.timezone ?? 'America/Denver',
   };
 }
 
@@ -56,6 +57,7 @@ export async function updateBranding(req: Request, res: Response): Promise<void>
     iconUrl?: string | null;
     accentColor?: string | null;
     fontFamily?: string | null;
+    timezone?: string | null;
   };
 
   const update: Record<string, unknown> = {};
@@ -65,6 +67,7 @@ export async function updateBranding(req: Request, res: Response): Promise<void>
   if (body.iconUrl !== undefined) update.icon_url = body.iconUrl || null;
   if (body.accentColor !== undefined) update.accent_color = body.accentColor || null;
   if (body.fontFamily !== undefined) update.font_family = body.fontFamily || null;
+  if (body.timezone !== undefined) update.timezone = body.timezone?.trim() || 'America/Denver';
 
   if (Object.keys(update).length === 0) {
     error(res, 'VALIDATION_ERROR', 'No branding fields provided', 400);

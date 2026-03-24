@@ -19,6 +19,7 @@ export default function AdminSettingsPage() {
   const [secondaryColor, setSecondaryColor] = useState<string>('#E8A832');
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [iconUrl, setIconUrl] = useState<string>('');
+  const [timezone, setTimezone] = useState<string>('America/Denver');
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +31,7 @@ export default function AdminSettingsPage() {
     setSecondaryColor(config.branding.secondaryColor || '#E8A832');
     setLogoUrl(config.branding.logoUrl || '');
     setIconUrl(config.branding.iconUrl || '');
+    setTimezone(config.branding?.timezone ?? config.timezone ?? 'America/Denver');
     setUnsavedChanges(false);
   }, [config, setUnsavedChanges]);
 
@@ -43,6 +45,7 @@ export default function AdminSettingsPage() {
         secondaryColor,
         logoUrl: logoUrl.trim().length > 0 ? logoUrl.trim() : null,
         iconUrl: iconUrl.trim().length > 0 ? iconUrl.trim() : null,
+        timezone: timezone.trim() || 'America/Denver',
       }) as any;
 
       if (res?.success) {
@@ -128,6 +131,30 @@ export default function AdminSettingsPage() {
               {normalizeHex(secondaryColor)}
             </button>
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Retailer timezone</label>
+          <p className="text-xs text-gray-500 mb-2">
+            Used for notification scheduling. Shown next to &quot;Send at&quot; so schedulers know the system time.
+          </p>
+          <select
+            value={timezone}
+            onChange={(e) => {
+              setUnsavedChanges(true);
+              setTimezone(e.target.value);
+            }}
+            className="w-full max-w-md rounded-lg border border-gray-300 px-3 py-2"
+          >
+            <option value="America/New_York">Eastern (America/New_York)</option>
+            <option value="America/Chicago">Central (America/Chicago)</option>
+            <option value="America/Denver">Mountain (America/Denver)</option>
+            <option value="America/Phoenix">Arizona (America/Phoenix)</option>
+            <option value="America/Los_Angeles">Pacific (America/Los_Angeles)</option>
+            <option value="America/Anchorage">Alaska (America/Anchorage)</option>
+            <option value="Pacific/Honolulu">Hawaii (Pacific/Honolulu)</option>
+            <option value="UTC">UTC</option>
+          </select>
         </div>
 
         <div className="space-y-4">

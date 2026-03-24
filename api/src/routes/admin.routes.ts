@@ -8,6 +8,7 @@ import * as adminBrandingController from '../controllers/adminBranding.controlle
 import * as adminBrandingMediaController from '../controllers/adminBrandingMedia.controller';
 import * as adminAppSetupController from '../controllers/adminAppSetup.controller';
 import * as adminNotificationsController from '../controllers/adminNotifications.controller';
+import * as adminTeamController from '../controllers/adminTeam.controller';
 
 const router = Router();
 
@@ -21,6 +22,14 @@ const upload = multer({
 // All admin routes require tenant context + Firebase auth + admin role
 router.use(authMiddleware);
 router.use(adminRoleGuard);
+
+// Admin me (permissions for nav) + Team management
+router.get('/me', adminTeamController.getMe);
+router.get('/team', adminTeamController.listTeam);
+router.get('/team/audit', adminTeamController.getTeamAudit);
+router.post('/team/invite', adminTeamController.inviteTeamMember);
+router.put('/team/:userId', adminTeamController.updateTeamMember);
+router.delete('/team/:userId', adminTeamController.removeTeamMember);
 
 // Products & mapping
 router.get('/products', adminProductsController.listProducts);

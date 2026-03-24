@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { TenantProvider } from '@/contexts/TenantContext';
+import { AdminPermissionsProvider } from '@/contexts/AdminPermissionsContext';
 import AdminLayoutClient from './AdminLayoutClient';
 
 const ADMIN_NAV = [
@@ -11,6 +12,7 @@ const ADMIN_NAV = [
   { label: 'Content', href: '/content', comingPhase: 3 },
   { label: 'Notifications', href: '/notifications' },
   { label: 'Analytics', href: '/analytics', comingPhase: 5 },
+  { label: 'Team', href: '/team', requiresCanManageUsers: true },
   { label: 'Settings', href: '/settings', comingPhase: 2 },
   { label: 'App setup', href: '/app-setup', comingPhase: 2 },
 ];
@@ -25,9 +27,11 @@ export default async function AdminLayout({
 
   return (
     <TenantProvider tenantSlug={tenantSlug}>
-      <AdminLayoutClient navItems={ADMIN_NAV} basePath="/admin">
-        {children}
-      </AdminLayoutClient>
+      <AdminPermissionsProvider>
+        <AdminLayoutClient navItems={ADMIN_NAV} basePath="/admin">
+          {children}
+        </AdminLayoutClient>
+      </AdminPermissionsProvider>
     </TenantProvider>
   );
 }

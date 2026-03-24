@@ -43,9 +43,24 @@ export async function authMiddleware(
 
     if (!user) {
       const email = ((decoded.email as string) || '').toLowerCase();
-      const canOverride =
+      let canOverride =
         (email && env.TENANT_ADMIN_EMAILS.map((e) => e.toLowerCase()).includes(email)) ||
         (email && env.SUPER_ADMIN_EMAILS.map((e) => e.toLowerCase()).includes(email));
+
+      if (!canOverride && email) {
+        try {
+          const dbEntry = await db('platform_users')
+            .whereRaw('LOWER(email) = ?', [email])
+            .where('platform_role', 'tenant_admin')
+            .first();
+          if (dbEntry) {
+            const scope = dbEntry.tenant_scope as string[] | null;
+            canOverride = !scope || scope.length === 0 || scope.includes(tenantId);
+          }
+        } catch {
+          /* table might not exist yet */
+        }
+      }
 
       if (!canOverride) {
         error(res, 'UNAUTHORIZED', 'User not found for this tenant', 401);

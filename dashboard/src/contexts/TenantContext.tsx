@@ -12,10 +12,12 @@ interface TenantConfig {
     accentColor?: string;
     logoUrl?: string;
     iconUrl?: string;
+    timezone?: string;
   };
   features: Record<string, boolean>;
   serviceTypes: string[];
   sanitizationSystems: string[];
+  timezone?: string;
 }
 
 interface TenantContextType {
