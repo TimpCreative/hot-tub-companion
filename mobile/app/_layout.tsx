@@ -13,9 +13,9 @@ const PRIMARY = '#1B4D7A';
 export default function RootLayout() {
   return (
     <TenantProvider>
-      <AuthProvider>
-        <PushTokenRegistration />
-        <ThemeProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <PushTokenRegistration />
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="index" />
             <Stack.Screen name="auth/login" />
@@ -36,8 +36,8 @@ export default function RootLayout() {
               }}
             />
           </Stack>
-        </ThemeProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </TenantProvider>
   );
 }
