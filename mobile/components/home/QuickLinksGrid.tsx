@@ -34,9 +34,9 @@ export function QuickLinksGrid({
 
   const gap = spacing.sm ?? 8;
   return (
-    <View style={[styles.grid, { marginHorizontal: -gap / 2, marginBottom: spacing.md }]}>
+    <View style={[styles.grid, { gap, marginBottom: spacing.md }]}>
       {links.map((link) => (
-        <View key={link.id} style={[styles.gridItem, { padding: gap / 2 }]}>
+        <View key={link.id} style={styles.gridItem}>
           <LinkTileWidget
             title={link.title}
             targetRoute={link.targetRoute}
@@ -60,6 +60,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   gridItem: {
-    width: '50%',
+    width: '48%',
   },
 });

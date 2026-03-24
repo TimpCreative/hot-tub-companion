@@ -37,7 +37,7 @@ export function LinkTileWidget({
             backgroundColor: colors.surface,
             borderColor: colors.border,
             opacity: pressed ? 0.92 : 1,
-            marginBottom: spacing.sm ?? 8,
+            padding: 12,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.05,
@@ -47,10 +47,16 @@ export function LinkTileWidget({
         ]}
         onPress={() => router.push(targetRoute as Href)}
       >
-        <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
-          {iconForWidgetKey(iconKey, 24, iconFill)}
+        <View style={[styles.compactIconWrap, { backgroundColor: iconBg }]}>
+          {iconForWidgetKey(iconKey, 22, iconFill)}
         </View>
-        <Text style={[typography.body, { color: colors.text, fontSize: 13, marginTop: 6 }]} numberOfLines={1}>
+        <Text
+          style={[
+            typography.body,
+            { color: colors.text, fontSize: 13, fontWeight: '600', marginTop: 8, textAlign: 'center' },
+          ]}
+          numberOfLines={1}
+        >
           {title}
         </Text>
       </Pressable>
@@ -99,7 +105,7 @@ const styles = StyleSheet.create({
   },
   compactCard: {
     alignItems: 'center',
-    padding: 12,
+    justifyContent: 'center',
     borderRadius: 12,
     borderWidth: 1,
   },
@@ -110,6 +116,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
+  },
+  compactIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   textCol: { flex: 1 },
 });

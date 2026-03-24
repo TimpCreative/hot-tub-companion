@@ -284,10 +284,12 @@ export function mergePartialHomeDashboard(
 ): HomeDashboardConfigDTO {
   if (!partial || typeof partial !== 'object') return current;
   const p = partial as Record<string, unknown>;
+  const layout =
+    p.quickLinksLayout === 'double' ? 'double' : p.quickLinksLayout === 'single' ? 'single' : current.quickLinksLayout;
   const merged = {
     version: typeof p.version === 'number' ? p.version : current.version,
     quickLinks: Array.isArray(p.quickLinks) ? p.quickLinks : current.quickLinks,
-    quickLinksLayout: p.quickLinksLayout === 'double' ? 'double' : current.quickLinksLayout,
+    quickLinksLayout: layout,
     widgets: Array.isArray(p.widgets) ? p.widgets : current.widgets,
   };
   return normalizeHomeDashboardConfig(merged);

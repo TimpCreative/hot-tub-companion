@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTenant } from '@/contexts/TenantContext';
 import { createTenantApiClient } from '@/services/api';
 import { Button } from '@/components/ui/Button';
+import { HomeDashboardMockup } from '@/components/HomeDashboardMockup';
 
 type StepId = 'brand' | 'modelPick' | 'sanitizer';
 
@@ -94,7 +96,9 @@ function parseTipsText(text: string): { title: string; body: string }[] {
 
 export default function AdminAppSetupPage() {
   const { getIdToken } = useAuth();
+  const { config } = useTenant();
   const api = useMemo(() => createTenantApiClient(async () => await getIdToken()), [getIdToken]);
+  const primaryColor = config?.branding?.primaryColor ?? '#1B4D7A';
 
   const [tab, setTab] = useState<'onboarding' | 'home' | 'legal'>('onboarding');
   const [onboarding, setOnboarding] = useState<OnboardingConfig | null>(null);
@@ -322,7 +326,7 @@ export default function AdminAppSetupPage() {
   }
 
   return (
-    <div className="max-w-3xl">
+    <div className={tab === 'home' ? 'max-w-6xl' : 'max-w-3xl'}>
       <h2 className="text-2xl font-semibold text-gray-900 mb-2">App setup</h2>
       <p className="text-gray-600 mb-4">Customer mobile app: onboarding flow and home dashboard.</p>
 
@@ -466,7 +470,8 @@ export default function AdminAppSetupPage() {
       )}
 
       {tab === 'home' && (
-        <div className="space-y-6">
+        <div className="flex gap-8">
+          <div className="min-w-0 flex-1 space-y-6">
           <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
             <h3 className="text-sm font-semibold text-gray-900">Dealer contact (app)</h3>
             <p className="text-xs text-gray-500">
@@ -615,33 +620,52 @@ export default function AdminAppSetupPage() {
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-600">Icon color (hex)</label>
-                    <input
-                      className="w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono"
-                      value={q.iconColor ?? ''}
-                      onChange={(e) =>
-                        updateQuickLink(q.id, (x) => ({
-                          ...x,
-                          iconColor: e.target.value.trim() || undefined,
-                        }))
-                      }
-                      placeholder="#0d9488"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-600">Background color (hex, e.g. #0d948818)</label>
-                    <input
-                      className="w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono"
-                      value={q.iconBgColor ?? ''}
-                      onChange={(e) =>
-                        updateQuickLink(q.id, (x) => ({
-                          ...x,
-                          iconBgColor: e.target.value.trim() || undefined,
-                        }))
-                      }
-                      placeholder="#0d948818"
-                    />
+                  <div className="flex items-center gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Icon color</label>
+                      <input
+                        type="color"
+                        className="h-9 w-14 cursor-pointer rounded border border-gray-300 p-0.5 bg-white"
+                        value={q.iconColor || '#0d9488'}
+                        onChange={(e) =>
+                          updateQuickLink(q.id, (x) => ({
+                            ...x,
+                            iconColor: e.target.value,
+                          }))
+                        }
+                        title="Icon color"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Background color</label>
+                      <input
+                        type="color"
+                        className="h-9 w-14 cursor-pointer rounded border border-gray-300 p-0.5 bg-white"
+                        value={q.iconBgColor ? q.iconBgColor.slice(0, 7) : '#0d9488'}
+                        onChange={(e) =>
+                          updateQuickLink(q.id, (x) => ({
+                            ...x,
+                            iconBgColor: `${e.target.value}18`,
+                          }))
+                        }
+                        title="Background color (lighter tint)"
+                      />
+                    </div>
+                    {(q.iconColor || q.iconBgColor) ? (
+                      <button
+                        type="button"
+                        className="self-end text-xs text-gray-500 hover:text-gray-700"
+                        onClick={() =>
+                          updateQuickLink(q.id, (x) => ({
+                            ...x,
+                            iconColor: undefined,
+                            iconBgColor: undefined,
+                          }))
+                        }
+                      >
+                        Reset
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -804,6 +828,15 @@ export default function AdminAppSetupPage() {
           <Button type="button" loading={saving} onClick={() => void saveHome()}>
             Save home dashboard
           </Button>
+          </div>
+          <HomeDashboardMockup
+            quickLinks={sortedQuickLinks()}
+            quickLinksLayout={homeDashboard.quickLinksLayout}
+            widgets={sortedWidgets()}
+            dealerPhone={dealerPhone}
+            dealerAddress={dealerAddress}
+            primaryColor={primaryColor}
+          />
         </div>
       )}
 
