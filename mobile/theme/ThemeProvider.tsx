@@ -1,12 +1,8 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useTenant } from '../contexts/TenantContext';
-import * as colorsModule from './colors';
-import * as typographyModule from './typography';
-import * as spacingModule from './spacing';
-
-const defaultColors = colorsModule.colors;
-const typography = typographyModule.typography;
-const spacing = spacingModule.spacing;
+import { colors as defaultColors } from './colors';
+import { typography } from './typography';
+import { spacing } from './spacing';
 
 interface ThemeContextType {
   colors: typeof defaultColors & { primary?: string; secondary?: string };
