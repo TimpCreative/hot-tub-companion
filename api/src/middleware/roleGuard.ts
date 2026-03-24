@@ -35,6 +35,7 @@ export async function adminRoleGuard(
       can_manage_settings: true,
       can_manage_users: true,
       can_view_audit_log: true,
+      can_send_notifications: true,
     };
     next();
     return;

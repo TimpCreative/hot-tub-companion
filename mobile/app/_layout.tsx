@@ -4,6 +4,7 @@ import { TenantProvider } from '../contexts/TenantContext';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ThemeProvider } from '../theme/ThemeProvider';
 import { HeaderProfileButton } from '../components/HeaderProfileButton';
+import { PushTokenRegistration } from '../components/PushTokenRegistration';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -13,6 +14,7 @@ export default function RootLayout() {
   return (
     <TenantProvider>
       <AuthProvider>
+        <PushTokenRegistration />
         <ThemeProvider>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="index" />

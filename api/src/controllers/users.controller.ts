@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { error, success } from '../utils/response';
 import * as usersService from '../services/users.service';
+import * as authService from '../services/auth.service';
 
 function requireCustomerUser(req: Request, res: Response): string | null {
   if ((req as any).userIsTenantAdminOverride) {
@@ -48,6 +49,33 @@ export async function putMe(req: Request, res: Response): Promise<void> {
     } else {
       throw err;
     }
+  }
+}
+
+export async function putFcmToken(req: Request, res: Response): Promise<void> {
+  const userId = requireCustomerUser(req, res);
+  if (!userId) return;
+
+  const body = (req.body || {}) as { fcmToken?: string | null };
+  let fcmToken: string | null = null;
+  if (body.fcmToken != null) {
+    if (typeof body.fcmToken !== 'string') {
+      error(res, 'VALIDATION_ERROR', 'fcmToken must be a string or null', 400);
+      return;
+    }
+    const trimmed = body.fcmToken.trim();
+    if (trimmed.length > 500) {
+      error(res, 'VALIDATION_ERROR', 'fcmToken must be at most 500 characters', 400);
+      return;
+    }
+    fcmToken = trimmed || null;
+  }
+
+  try {
+    await authService.updateFcmToken(userId, fcmToken);
+    success(res, { updated: true }, 'FCM token updated');
+  } catch (err) {
+    throw err;
   }
 }
 

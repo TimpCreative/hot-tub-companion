@@ -9,7 +9,9 @@ function shouldSkipTenant(path: string): boolean {
     path.startsWith('/api/v1/auth') ||
     path === '/api/v1/tenant/config' ||
     path.startsWith('/api/v1/media/') ||
-    path.startsWith('/api/v1/super-admin')
+    path.startsWith('/api/v1/super-admin') ||
+    path.startsWith('/api/v1/internal/cron') ||
+    path.startsWith('/api/v1/webhooks/')
   );
 }
 

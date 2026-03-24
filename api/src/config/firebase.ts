@@ -99,6 +99,11 @@ export function getFirebaseAuth(): admin.auth.Auth {
   return admin.auth();
 }
 
+export function getFirebaseMessaging(): admin.messaging.Messaging {
+  initFirebase();
+  return admin.messaging();
+}
+
 export function getFirebaseStorage(): admin.storage.Storage {
   initFirebase();
   return admin.storage();

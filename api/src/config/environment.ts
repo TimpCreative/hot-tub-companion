@@ -35,4 +35,6 @@ export const env = {
   /** Emails allowed to log in to any tenant app as admin (whitelist override when no users row) */
   TENANT_ADMIN_EMAILS: (process.env.TENANT_ADMIN_EMAILS || '').split(',').map((e) => e.trim()).filter(Boolean),
   FIREBASE_STORAGE_BUCKET: process.env.FIREBASE_STORAGE_BUCKET,
+  /** Secret for cron dispatch endpoint; min 32 chars. Required when cron is used. */
+  CRON_SECRET: process.env.CRON_SECRET,
 };

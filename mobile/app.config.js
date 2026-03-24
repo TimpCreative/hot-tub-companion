@@ -50,7 +50,17 @@ export default ({ config: expoConfig }) => ({
     package: config.bundleId,
   },
   scheme: 'hottubcompanion',
-  plugins: ['expo-router', 'expo-secure-store'],
+  plugins: [
+    'expo-router',
+    'expo-secure-store',
+    [
+      'expo-notifications',
+      {
+        icon: './assets/icon.png',
+        color: '#1B4D7A',
+      },
+    ],
+  ],
   extra: {
     tenantSlug: config.slug,
     apiUrl: process.env.API_URL || 'https://api.hottubcompanion.com',

@@ -9,7 +9,7 @@ const ADMIN_NAV = [
   { label: 'Products', href: '/products', comingPhase: 2 },
   { label: 'Services', href: '/services', comingPhase: 4 },
   { label: 'Content', href: '/content', comingPhase: 3 },
-  { label: 'Notifications', href: '/notifications', comingPhase: 3 },
+  { label: 'Notifications', href: '/notifications' },
   { label: 'Analytics', href: '/analytics', comingPhase: 5 },
   { label: 'Settings', href: '/settings', comingPhase: 2 },
   { label: 'App setup', href: '/app-setup', comingPhase: 2 },

@@ -6,6 +6,7 @@ const SUPER_ADMIN_NAV = [
   { label: 'UHTD', href: '/uhtd' },
   { label: 'Messages', href: '/messages', comingPhase: 3 },
   { label: 'Banners', href: '/banners', comingPhase: 3 },
+  { label: 'Announcements', href: '/announcements' },
   { label: 'Analytics', href: '/analytics', comingPhase: 5 },
 ];
 

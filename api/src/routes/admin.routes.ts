@@ -2,10 +2,12 @@ import { Router } from 'express';
 import multer from 'multer';
 import { authMiddleware } from '../middleware/auth';
 import { adminRoleGuard } from '../middleware/roleGuard';
+import { notificationSendRateLimiter } from '../middleware/rateLimiter';
 import * as adminProductsController from '../controllers/adminProducts.controller';
 import * as adminBrandingController from '../controllers/adminBranding.controller';
 import * as adminBrandingMediaController from '../controllers/adminBrandingMedia.controller';
 import * as adminAppSetupController from '../controllers/adminAppSetup.controller';
+import * as adminNotificationsController from '../controllers/adminNotifications.controller';
 
 const router = Router();
 
@@ -35,6 +37,30 @@ router.put('/settings/branding', adminBrandingController.updateBranding);
 // App setup (onboarding config, etc.)
 router.get('/settings/app-setup', adminAppSetupController.getAppSetup);
 router.put('/settings/app-setup', adminAppSetupController.updateAppSetup);
+
+// Notifications (requires can_send_notifications)
+router.get(
+  '/notifications',
+  adminNotificationsController.listNotifications
+);
+router.post(
+  '/notifications',
+  notificationSendRateLimiter,
+  adminNotificationsController.createNotification
+);
+router.put(
+  '/notifications/:id',
+  notificationSendRateLimiter,
+  adminNotificationsController.updateNotification
+);
+router.delete(
+  '/notifications/:id/cancel',
+  adminNotificationsController.cancelNotification
+);
+router.get(
+  '/notifications/:id/stats',
+  adminNotificationsController.getNotificationStats
+);
 
 // Branding media uploads (logos)
 router.post(

@@ -261,13 +261,13 @@ Currently, admin roles must be granted via direct database access:
 -- Find the user
 SELECT id, email FROM users WHERE tenant_id = '{tenant_uuid}' AND email = 'admin@retailer.com';
 
--- Create admin role
-INSERT INTO admin_roles (tenant_id, user_id, role, can_view_customers, can_view_orders, can_manage_products, can_manage_content, can_manage_service_requests, can_send_notifications, can_view_analytics, can_manage_subscriptions, can_manage_settings)
+-- Create admin role (can_send_notifications defaults to true)
+INSERT INTO admin_roles (tenant_id, user_id, role, can_view_customers, can_view_orders, can_manage_products, can_manage_content, can_manage_service_requests, can_view_analytics, can_manage_subscriptions, can_manage_settings)
 VALUES (
   '{tenant_uuid}',
   '{user_uuid}',
   'owner',
-  true, true, true, true, true, true, true, true, true
+  true, true, true, true, true, true, true, true
 );
 ```
 

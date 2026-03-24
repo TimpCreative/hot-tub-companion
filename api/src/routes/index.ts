@@ -14,6 +14,8 @@ import statsRoutes from './stats.routes';
 import mediaRoutes from './media.routes';
 import mediaPublicRoutes from './mediaPublic.routes';
 import { superAdminAuth } from '../middleware/superAdminAuth';
+import { cronAuth } from '../middleware/cronAuth';
+import * as cronController from '../controllers/cron.controller';
 import adminRoutes from './admin.routes';
 import productsRoutes from './products.routes';
 import spaProfilesRoutes from './spaProfiles.routes';
@@ -26,6 +28,13 @@ router.use(healthRoutes);
 
 router.use('/api/v1/auth', authRoutes);
 router.get('/api/v1/tenant/config', tenantController.getTenantConfig);
+
+// Internal cron (CRON_SECRET required)
+router.post(
+  '/api/v1/internal/cron/dispatch-notifications',
+  cronAuth,
+  cronController.dispatchNotifications
+);
 
 // Public media serve (no auth) - streams from GCS for logos/icons
 router.use('/api/v1/media', mediaPublicRoutes);

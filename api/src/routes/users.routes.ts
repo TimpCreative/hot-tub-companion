@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth';
+import { fcmTokenRateLimiter } from '../middleware/rateLimiter';
 import * as usersController from '../controllers/users.controller';
 
 const router = Router();
@@ -8,6 +9,7 @@ router.use(authMiddleware);
 
 router.get('/users/me', usersController.getMe);
 router.put('/users/me', usersController.putMe);
+router.put('/users/me/fcm-token', fcmTokenRateLimiter, usersController.putFcmToken);
 router.delete('/users/me', usersController.deleteMe);
 
 export default router;

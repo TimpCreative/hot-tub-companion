@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../config/database';
 import { success, error } from '../utils/response';
 import * as scdbService from '../services/scdb.service';
+import * as notificationService from '../services/notification.service';
 
 const SANITIZATION_SYSTEMS = ['bromine', 'chlorine', 'frog_ease', 'copper', 'silver_mineral', 'other'] as const;
 
@@ -152,6 +153,14 @@ export async function submitConsumerSuggestion(req: Request, res: Response): Pro
       .returning('*');
 
     await trx.commit();
+
+    if (isPrimary) {
+      const tenant = (req as any).tenant as { name?: string } | undefined;
+      const tenantName = tenant?.name ?? 'Your retailer';
+      void notificationService
+        .sendWelcomeNotification(userId, tenantId, tenantName, modelName)
+        .catch((err) => console.warn('[consumerUhtd] welcome notification failed:', err));
+    }
 
     res.status(201);
     success(
