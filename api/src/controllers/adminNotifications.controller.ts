@@ -66,6 +66,9 @@ export async function createNotification(req: Request, res: Response): Promise<v
     imageUrl?: string | null;
     sendAt?: string;
     target?: string;
+    scheduleMode?: string;
+    sendAtTime?: string;
+    pastTimezoneHandling?: string;
   };
 
   const title = typeof body.title === 'string' ? body.title.trim().slice(0, 255) : '';
@@ -79,6 +82,18 @@ export async function createNotification(req: Request, res: Response): Promise<v
   const linkType = typeof body.linkType === 'string' ? body.linkType.slice(0, 30) : null;
   const linkId = typeof body.linkId === 'string' ? body.linkId.slice(0, 255) : null;
   const imageUrl = typeof body.imageUrl === 'string' && body.imageUrl.trim() ? body.imageUrl.trim() : null;
+  const scheduleMode =
+    body.scheduleMode === 'user_local_time' ? 'user_local_time' : 'retailer_time';
+  let sendAtTime: string | null = null;
+  if (typeof body.sendAtTime === 'string' && body.sendAtTime.trim()) {
+    const t = body.sendAtTime.trim();
+    if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(t)) {
+      const [h, m] = t.split(':').map(Number);
+      sendAtTime = `${String(h ?? 0).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}`;
+    }
+  }
+  const pastTimezoneHandling =
+    body.pastTimezoneHandling === 'push_next_day' ? 'push_next_day' : 'send_immediately';
 
   let sendAt: Date;
   if (body.sendAt && typeof body.sendAt === 'string') {
@@ -108,6 +123,9 @@ export async function createNotification(req: Request, res: Response): Promise<v
       image_url: imageUrl,
       target,
       send_at: sendAt,
+      schedule_mode: scheduleMode,
+      send_at_time: scheduleMode === 'user_local_time' ? sendAtTime || '09:00' : null,
+      past_timezone_handling: scheduleMode === 'user_local_time' ? pastTimezoneHandling : null,
       status: 'scheduled',
     })
     .returning('*');

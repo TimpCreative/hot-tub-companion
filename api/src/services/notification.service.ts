@@ -46,6 +46,30 @@ async function getTenantCustomerTokens(
     .map((r) => ({ id: r.id, fcm_token: r.fcm_token as string }));
 }
 
+export async function getTenantCustomerTokensWithTimezone(
+  tenantId: string,
+  retailerTimezone: string,
+  prefKey: PrefKey = 'promotional'
+): Promise<{ id: string; fcm_token: string; timezone: string }[]> {
+  const rows = (await db('users')
+    .select('id', 'fcm_token', 'timezone')
+    .where({ tenant_id: tenantId })
+    .whereNull('deleted_at')
+    .whereNotNull('fcm_token')
+    .where(prefColumn(prefKey), true)) as { id: string; fcm_token: string; timezone: string | null }[];
+  return rows
+    .filter((r) => r.fcm_token && typeof r.fcm_token === 'string')
+    .map((r) => ({ id: r.id, fcm_token: r.fcm_token, timezone: r.timezone?.trim() || retailerTimezone }));
+}
+
+export async function getAlreadySentUserIds(scheduledNotificationId: string): Promise<Set<string>> {
+  const rows = await db('notification_log')
+    .where({ scheduled_notification_id: scheduledNotificationId })
+    .whereNotNull('recipient_user_id')
+    .select('recipient_user_id');
+  return new Set(rows.map((r: { recipient_user_id: string }) => r.recipient_user_id));
+}
+
 export async function logNotification(params: {
   tenantId?: string | null;
   recipientUserId?: string | null;
@@ -54,6 +78,7 @@ export async function logNotification(params: {
   type: string;
   createdByType?: string | null;
   createdById?: string | null;
+  scheduledNotificationId?: string | null;
 }): Promise<void> {
   await db('notification_log').insert({
     tenant_id: params.tenantId ?? null,
@@ -63,6 +88,7 @@ export async function logNotification(params: {
     type: params.type,
     created_by_type: params.createdByType ?? null,
     created_by_id: params.createdById ?? null,
+    scheduled_notification_id: params.scheduledNotificationId ?? null,
   });
 }
 
@@ -188,6 +214,72 @@ export async function sendToTenantCustomers(
     failed = users.length;
   }
 
+  return { sent, failed };
+}
+
+export async function sendToSpecificUsers(
+  userIds: string[],
+  tenantId: string,
+  title: string,
+  body: string,
+  opts?: SendNotificationOptions | Record<string, string>,
+  logParams?: { type: string; createdByType?: string; createdById?: string; scheduledNotificationId?: string }
+): Promise<{ sent: number; failed: number }> {
+  if (userIds.length === 0) return { sent: 0, failed: 0 };
+  const users = await db('users')
+    .select('id', 'fcm_token')
+    .where({ tenant_id: tenantId })
+    .whereIn('id', userIds)
+    .whereNull('deleted_at')
+    .whereNotNull('fcm_token');
+  const valid = users.filter((u: { fcm_token: string | null }) => u.fcm_token && typeof u.fcm_token === 'string');
+  if (valid.length === 0) return { sent: 0, failed: 0 };
+
+  const { data: finalData, imageUrl } = normalizeNotificationOptions(opts);
+  const strData = finalData ? stringifyData(finalData) : undefined;
+  const notification: Record<string, string> = { title, body };
+  if (imageUrl?.trim()) (notification as any).imageUrl = imageUrl.trim();
+  const apnsConfig: import('firebase-admin/messaging').ApnsConfig = {
+    payload: { aps: { sound: 'default', ...(imageUrl ? { 'mutable-content': 1 } : {}) } },
+  };
+  if (imageUrl?.trim()) (apnsConfig as any).fcmOptions = { imageUrl: imageUrl.trim() };
+
+  const messaging = getFirebaseMessaging();
+  const tokens = valid.map((u: { fcm_token: string }) => u.fcm_token);
+  const message: import('firebase-admin/messaging').MulticastMessage = {
+    tokens,
+    notification,
+    data: strData,
+    android: { priority: 'high' as const },
+    apns: apnsConfig,
+  };
+
+  let sent = 0;
+  let failed = 0;
+  try {
+    const res = await messaging.sendEachForMulticast(message);
+    sent = res.successCount;
+    failed = res.failureCount;
+    if (logParams && sent > 0) {
+      for (let i = 0; i < res.responses.length; i++) {
+        if (res.responses[i].success && valid[i]) {
+          await logNotification({
+            tenantId,
+            recipientUserId: (valid[i] as { id: string }).id,
+            title,
+            body,
+            type: logParams.type,
+            createdByType: logParams.createdByType,
+            createdById: logParams.createdById,
+            scheduledNotificationId: logParams.scheduledNotificationId,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[notification] sendToSpecificUsers failed:', tenantId, err instanceof Error ? err.message : err);
+    failed = valid.length;
+  }
   return { sent, failed };
 }
 

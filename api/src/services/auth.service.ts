@@ -105,13 +105,18 @@ export async function verifyToken(token: string, tenantId?: string) {
   throw new NotFoundError('User not found for this tenant');
 }
 
-export async function updateFcmToken(userId: string, fcmToken: string | null) {
-  await db('users')
-    .where({ id: userId })
-    .update({
-      fcm_token: fcmToken,
-      fcm_token_updated_at: fcmToken ? new Date() : null,
-    });
+export async function updateFcmToken(userId: string, fcmToken: string | null, timezone?: string | null) {
+  const update: Record<string, unknown> = {
+    fcm_token: fcmToken,
+    fcm_token_updated_at: fcmToken ? new Date() : null,
+  };
+  if (timezone !== undefined) {
+    const tz = typeof timezone === 'string' && timezone.trim().length > 0 && timezone.length <= 64
+      ? timezone.trim()
+      : null;
+    update.timezone = tz;
+  }
+  await db('users').where({ id: userId }).update(update);
 }
 
 function formatUser(row: Record<string, unknown>) {

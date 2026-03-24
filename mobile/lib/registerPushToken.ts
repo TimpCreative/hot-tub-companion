@@ -1,11 +1,20 @@
 /**
  * Registers the device's FCM/push token with the API.
+ * Also sends device timezone for user-local notification scheduling.
  * Call when user is authenticated (customer account, not staff override).
  */
 
 import * as Notifications from 'expo-notifications';
-import { AppState, AppStateStatus } from 'react-native';
 import api from '../services/api';
+
+function getDeviceTimezone(): string | null {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return typeof tz === 'string' && tz.length > 0 && tz.length <= 64 ? tz : null;
+  } catch {
+    return null;
+  }
+}
 
 async function requestPermissions(): Promise<boolean> {
   const { status: existing } = await Notifications.getPermissionsAsync();
@@ -21,8 +30,12 @@ export async function registerPushToken(): Promise<void> {
 
     const res = await Notifications.getDevicePushTokenAsync();
     const token = res?.data && typeof res.data === 'string' ? res.data : null;
+    const timezone = getDeviceTimezone();
 
-    await api.put('/users/me/fcm-token', { fcmToken: token ?? null });
+    await api.put('/users/me/fcm-token', {
+      fcmToken: token ?? null,
+      ...(timezone && { timezone }),
+    });
   } catch (err) {
     console.warn('[registerPushToken] Failed:', err instanceof Error ? err.message : err);
   }

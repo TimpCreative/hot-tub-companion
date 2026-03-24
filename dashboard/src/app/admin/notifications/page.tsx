@@ -30,6 +30,8 @@ interface ScheduledNotification {
   link_type?: string | null;
   link_id?: string | null;
   image_url?: string | null;
+  schedule_mode?: string | null;
+  send_at_time?: string | null;
 }
 
 interface ProductOption {
@@ -71,6 +73,8 @@ export default function AdminNotificationsPage() {
   const [composeTitle, setComposeTitle] = useState('');
   const [composeBody, setComposeBody] = useState('');
   const [composeSendAt, setComposeSendAt] = useState('');
+  const [composeScheduleMode, setComposeScheduleMode] = useState<'retailer_time' | 'user_local_time'>('retailer_time');
+  const [composePastHandling, setComposePastHandling] = useState<'send_immediately' | 'push_next_day'>('send_immediately');
   const [composeLinkType, setComposeLinkType] = useState<string>('');
   const [composeLinkId, setComposeLinkId] = useState('');
   const [composeImageUrl, setComposeImageUrl] = useState('');
@@ -168,6 +172,13 @@ export default function AdminNotificationsPage() {
       const sendAt = composeSendAt.trim()
         ? new Date(composeSendAt).toISOString()
         : new Date().toISOString();
+      const sendAtTime =
+        composeScheduleMode === 'user_local_time' && composeSendAt.trim()
+          ? composeSendAt.trim().includes('T')
+            ? composeSendAt.trim().split('T')[1]?.slice(0, 5) || '09:00'
+            : '09:00'
+          : undefined;
+
       await api.post('/admin/notifications', {
         title,
         body,
@@ -176,11 +187,16 @@ export default function AdminNotificationsPage() {
         linkType: linkType ?? null,
         linkId: linkId ?? null,
         imageUrl: composeImageUrl.trim() || null,
+        scheduleMode: composeScheduleMode,
+        sendAtTime: sendAtTime ?? undefined,
+        pastTimezoneHandling: composeScheduleMode === 'user_local_time' ? composePastHandling : undefined,
       });
       setSuccess('Notification scheduled');
       setComposeTitle('');
       setComposeBody('');
       setComposeSendAt('');
+      setComposeScheduleMode('retailer_time');
+      setComposePastHandling('send_immediately');
       setComposeLinkType('');
       setComposeLinkId('');
       setComposeImageUrl('');
@@ -318,8 +334,8 @@ export default function AdminNotificationsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Send at (leave empty for now)</label>
-            <div className="flex flex-wrap items-center gap-2 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Schedule</label>
+            <div className="flex flex-wrap items-center gap-2 mb-2">
               <span className="text-xs text-gray-500">
                 Retailer timezone: <strong>{retailerTimezone}</strong>
               </span>
@@ -328,6 +344,60 @@ export default function AdminNotificationsPage() {
                 Current retailer time: <RetailerTimeDisplay timezone={retailerTimezone} />
               </span>
             </div>
+            <div className="space-y-2 mb-3">
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scheduleMode"
+                    checked={composeScheduleMode === 'retailer_time'}
+                    onChange={() => setComposeScheduleMode('retailer_time')}
+                  />
+                  <span className="text-sm">Retailer time</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scheduleMode"
+                    checked={composeScheduleMode === 'user_local_time'}
+                    onChange={() => setComposeScheduleMode('user_local_time')}
+                  />
+                  <span className="text-sm">Each user&apos;s local time</span>
+                </label>
+              </div>
+              <p className="text-xs text-gray-500">
+                {composeScheduleMode === 'retailer_time'
+                  ? 'All recipients get the notification at the same moment (retailer timezone).'
+                  : 'Each recipient gets it at this time in their timezone. Users without a timezone use retailer timezone.'}
+              </p>
+              {composeScheduleMode === 'user_local_time' && (
+                <div className="pt-2 border-t border-gray-100">
+                  <label className="block text-xs font-medium text-gray-600 mb-2">
+                    If the time has already passed for some timezones:
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="pastHandling"
+                        checked={composePastHandling === 'send_immediately'}
+                        onChange={() => setComposePastHandling('send_immediately')}
+                      />
+                      <span className="text-sm">Send immediately</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="pastHandling"
+                        checked={composePastHandling === 'push_next_day'}
+                        onChange={() => setComposePastHandling('push_next_day')}
+                      />
+                      <span className="text-sm">Push to next day at same time</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
             <input
               type="datetime-local"
               value={composeSendAt}
@@ -335,7 +405,9 @@ export default function AdminNotificationsPage() {
               className="rounded-lg border border-gray-300 px-3 py-2"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Time is in your browser&apos;s local timezone. Use retailer time above to confirm.
+              {composeScheduleMode === 'retailer_time'
+                ? 'Time is in your browser\'s local timezone. Use retailer time above to confirm.'
+                : 'Date and time slot for each user (in their timezone).'}
             </p>
           </div>
           <Button
@@ -392,12 +464,14 @@ export default function AdminNotificationsPage() {
                 <p className="text-sm text-gray-600 mt-1 line-clamp-2">{n.body}</p>
                 <p className="text-xs text-gray-400 mt-2">
                   {n.status === 'scheduled'
-                    ? `Scheduled: ${new Date(n.send_at).toLocaleString('en-US', {
-                        timeZone: retailerTimezone,
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                        timeZoneName: 'short',
-                      })}`
+                    ? n.schedule_mode === 'user_local_time'
+                      ? `Scheduled: ${new Date(n.send_at).toISOString().slice(0, 10)} at ${n.send_at_time || '09:00'} (each user's local time)`
+                      : `Scheduled: ${new Date(n.send_at).toLocaleString('en-US', {
+                          timeZone: retailerTimezone,
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                          timeZoneName: 'short',
+                        })}`
                     : `Sent: ${n.sent_at ? new Date(n.sent_at).toLocaleString('en-US', {
                         timeZone: retailerTimezone,
                         dateStyle: 'medium',

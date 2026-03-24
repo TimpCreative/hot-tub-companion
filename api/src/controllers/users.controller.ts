@@ -56,7 +56,7 @@ export async function putFcmToken(req: Request, res: Response): Promise<void> {
   const userId = requireCustomerUser(req, res);
   if (!userId) return;
 
-  const body = (req.body || {}) as { fcmToken?: string | null };
+  const body = (req.body || {}) as { fcmToken?: string | null; timezone?: string | null };
   let fcmToken: string | null = null;
   if (body.fcmToken != null) {
     if (typeof body.fcmToken !== 'string') {
@@ -71,8 +71,10 @@ export async function putFcmToken(req: Request, res: Response): Promise<void> {
     fcmToken = trimmed || null;
   }
 
+  const timezone = body.timezone != null ? (typeof body.timezone === 'string' ? body.timezone : null) : undefined;
+
   try {
-    await authService.updateFcmToken(userId, fcmToken);
+    await authService.updateFcmToken(userId, fcmToken, timezone);
     success(res, { updated: true }, 'FCM token updated');
   } catch (err) {
     throw err;
