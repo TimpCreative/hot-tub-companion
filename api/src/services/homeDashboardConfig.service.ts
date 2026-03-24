@@ -53,7 +53,7 @@ const DEFAULT_QUICK_LINKS: QuickLinkDTO[] = [
   { id: 'tile_messages', title: 'Messages', subtitle: 'Stay updated with your retailer', iconKey: 'mail', targetRoute: '/inbox', enabled: true, order: 0 },
   { id: 'tile_water_care', title: 'Water Care', subtitle: 'Test water, guides & maintenance log', iconKey: 'water', targetRoute: '/water-care', enabled: true, order: 1 },
   { id: 'tile_shop', title: 'Shop Parts & Chemicals', subtitle: 'Curated products for your spa', iconKey: 'cart', targetRoute: '/shop', enabled: true, order: 2 },
-  { id: 'tile_dealer', title: 'Dealer', subtitle: 'Contact your dealership', iconKey: 'build', targetRoute: '/dealer', enabled: true, order: 3 },
+  { id: 'tile_dealer', title: 'Dealer', subtitle: 'Contact your dealership', iconKey: 'storefront', targetRoute: '/dealer', enabled: true, order: 3 },
 ];
 
 function isValidHex(s: unknown): boolean {

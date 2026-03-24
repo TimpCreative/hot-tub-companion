@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenant } from '@/contexts/TenantContext';
+import { useUnsavedChanges } from '@/contexts/UnsavedChangesContext';
 import { createTenantApiClient } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { HomeDashboardMockup } from '@/components/HomeDashboardMockup';
@@ -67,7 +68,7 @@ const STEP_LABELS: Record<StepId, string> = {
 };
 
 const ROUTE_OPTIONS = ['/shop', '/water-care', '/inbox', '/dealer', '/services', '/onboarding'] as const;
-const ICON_OPTIONS = ['mail', 'water', 'cart', 'book', 'medkit', 'build'] as const;
+const ICON_OPTIONS = ['mail', 'water', 'cart', 'book', 'medkit', 'build', 'storefront'] as const;
 
 function tipsItemsToText(items: unknown): string {
   if (!Array.isArray(items)) return '';
@@ -97,8 +98,11 @@ function parseTipsText(text: string): { title: string; body: string }[] {
 export default function AdminAppSetupPage() {
   const { getIdToken } = useAuth();
   const { config } = useTenant();
+  const { setUnsavedChanges } = useUnsavedChanges();
   const api = useMemo(() => createTenantApiClient(async () => await getIdToken()), [getIdToken]);
   const primaryColor = config?.branding?.primaryColor ?? '#1B4D7A';
+
+  const markDirty = useCallback(() => setUnsavedChanges(true), [setUnsavedChanges]);
 
   const [tab, setTab] = useState<'onboarding' | 'home' | 'legal'>('onboarding');
   const [onboarding, setOnboarding] = useState<OnboardingConfig | null>(null);
@@ -153,14 +157,16 @@ export default function AdminAppSetupPage() {
       setError(msg ?? 'Failed to load app setup');
     } finally {
       setLoading(false);
+      setUnsavedChanges(false);
     }
-  }, [api]);
+  }, [api, setUnsavedChanges]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   function toggleStep(id: StepId) {
+    markDirty();
     setOnboarding((prev) => {
       if (!prev) return prev;
       return {
@@ -171,6 +177,7 @@ export default function AdminAppSetupPage() {
   }
 
   function setAllowSkip(v: boolean) {
+    markDirty();
     setOnboarding((prev) => (prev ? { ...prev, allowSkip: v } : prev));
   }
 
@@ -187,6 +194,7 @@ export default function AdminAppSetupPage() {
       };
       if (body?.data?.onboarding) setOnboarding(body.data.onboarding);
       setSuccess(body.message ?? 'Saved');
+      setUnsavedChanges(false);
     } catch (e: unknown) {
       const msg =
         e && typeof e === 'object' && 'error' in e
@@ -204,6 +212,7 @@ export default function AdminAppSetupPage() {
   }
 
   function updateQuickLink(id: string, fn: (q: QuickLink) => QuickLink) {
+    markDirty();
     setHomeDashboard((prev) => {
       if (!prev?.quickLinks) return prev;
       return {
@@ -214,6 +223,7 @@ export default function AdminAppSetupPage() {
   }
 
   function moveQuickLink(id: string, dir: -1 | 1) {
+    markDirty();
     const list = sortedQuickLinks();
     const idx = list.findIndex((q) => q.id === id);
     const j = idx + dir;
@@ -230,6 +240,7 @@ export default function AdminAppSetupPage() {
   }
 
   function updateWidget(id: string, fn: (w: HomeWidget) => HomeWidget) {
+    markDirty();
     setHomeDashboard((prev) => {
       if (!prev) return prev;
       return {
@@ -240,6 +251,7 @@ export default function AdminAppSetupPage() {
   }
 
   function moveWidget(id: string, dir: -1 | 1) {
+    markDirty();
     const list = sortedWidgets();
     const idx = list.findIndex((w) => w.id === id);
     const j = idx + dir;
@@ -274,6 +286,7 @@ export default function AdminAppSetupPage() {
         setDealerAddress(dc.address ?? '');
       }
       setSuccess(body.message ?? 'Saved');
+      setUnsavedChanges(false);
     } catch (e: unknown) {
       const msg =
         e && typeof e === 'object' && 'error' in e
@@ -306,6 +319,7 @@ export default function AdminAppSetupPage() {
         setPrivacyUrl(legal.privacyUrl ?? '');
       }
       setSuccess(body.message ?? 'Saved');
+      setUnsavedChanges(false);
     } catch (e: unknown) {
       const msg =
         e && typeof e === 'object' && 'error' in e
@@ -376,7 +390,8 @@ export default function AdminAppSetupPage() {
                 <input
                   className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                   value={onboarding.welcomeBlock?.greetingLine1 ?? 'Hey {{name}}!'}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    markDirty();
                     setOnboarding((prev) =>
                       prev
                         ? {
@@ -390,8 +405,8 @@ export default function AdminAppSetupPage() {
                             },
                           }
                         : prev
-                    )
-                  }
+                    );
+                  }}
                   placeholder="Hey {{name}}!"
                 />
               </div>
@@ -400,7 +415,8 @@ export default function AdminAppSetupPage() {
                 <input
                   className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                   value={onboarding.welcomeBlock?.greetingLine2 ?? 'Welcome to {{retailer}}'}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    markDirty();
                     setOnboarding((prev) =>
                       prev
                         ? {
@@ -414,8 +430,8 @@ export default function AdminAppSetupPage() {
                             },
                           }
                         : prev
-                    )
-                  }
+                    );
+                  }}
                   placeholder="Welcome to {{retailer}}"
                 />
               </div>
@@ -482,7 +498,10 @@ export default function AdminAppSetupPage() {
               <input
                 className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                 value={dealerPhone}
-                onChange={(e) => setDealerPhone(e.target.value)}
+                onChange={(e) => {
+                  markDirty();
+                  setDealerPhone(e.target.value);
+                }}
                 placeholder="(555) 123-4567"
               />
             </div>
@@ -492,7 +511,10 @@ export default function AdminAppSetupPage() {
                 className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                 rows={2}
                 value={dealerAddress}
-                onChange={(e) => setDealerAddress(e.target.value)}
+                onChange={(e) => {
+                  markDirty();
+                  setDealerAddress(e.target.value);
+                }}
                 placeholder="Street, city, state, ZIP"
               />
             </div>
@@ -511,9 +533,10 @@ export default function AdminAppSetupPage() {
                   name="quickLinksLayout"
                   className="border-gray-300"
                   checked={homeDashboard.quickLinksLayout === 'single'}
-                  onChange={() =>
-                    setHomeDashboard((p) => (p ? { ...p, quickLinksLayout: 'single' } : p))
-                  }
+                  onChange={() => {
+                    markDirty();
+                    setHomeDashboard((p) => (p ? { ...p, quickLinksLayout: 'single' } : p));
+                  }}
                 />
                 <span className="text-sm text-gray-700">Single column (full cards)</span>
               </label>
@@ -523,9 +546,10 @@ export default function AdminAppSetupPage() {
                   name="quickLinksLayout"
                   className="border-gray-300"
                   checked={homeDashboard.quickLinksLayout === 'double'}
-                  onChange={() =>
-                    setHomeDashboard((p) => (p ? { ...p, quickLinksLayout: 'double' } : p))
-                  }
+                  onChange={() => {
+                    markDirty();
+                    setHomeDashboard((p) => (p ? { ...p, quickLinksLayout: 'double' } : p));
+                  }}
                 />
                 <span className="text-sm text-gray-700">Double column (compact, icon + title only)</span>
               </label>
@@ -852,7 +876,10 @@ export default function AdminAppSetupPage() {
               className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
               type="url"
               value={termsUrl}
-              onChange={(e) => setTermsUrl(e.target.value)}
+              onChange={(e) => {
+                markDirty();
+                setTermsUrl(e.target.value);
+              }}
               placeholder="https://example.com/terms"
             />
           </div>
@@ -862,7 +889,10 @@ export default function AdminAppSetupPage() {
               className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
               type="url"
               value={privacyUrl}
-              onChange={(e) => setPrivacyUrl(e.target.value)}
+              onChange={(e) => {
+                markDirty();
+                setPrivacyUrl(e.target.value);
+              }}
               placeholder="https://example.com/privacy"
             />
           </div>

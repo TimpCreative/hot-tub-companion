@@ -10,6 +10,7 @@ const MAP: Record<string, IconName> = {
   book: 'book-outline',
   medkit: 'medkit-outline',
   build: 'build-outline',
+  storefront: 'storefront-outline',
   ellipse: 'ellipse-outline',
 };
 

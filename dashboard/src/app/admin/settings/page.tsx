@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenant } from '@/contexts/TenantContext';
+import { useUnsavedChanges } from '@/contexts/UnsavedChangesContext';
 import { createTenantApiClient } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { TenantMediaInput } from '@/components/ui/TenantMediaInput';
@@ -10,6 +11,7 @@ import { TenantMediaInput } from '@/components/ui/TenantMediaInput';
 export default function AdminSettingsPage() {
   const { getIdToken } = useAuth();
   const { config, loading } = useTenant();
+  const { setUnsavedChanges } = useUnsavedChanges();
 
   const api = useMemo(() => createTenantApiClient(async () => await getIdToken()), [getIdToken]);
 
@@ -28,7 +30,8 @@ export default function AdminSettingsPage() {
     setSecondaryColor(config.branding.secondaryColor || '#E8A832');
     setLogoUrl(config.branding.logoUrl || '');
     setIconUrl(config.branding.iconUrl || '');
-  }, [config]);
+    setUnsavedChanges(false);
+  }, [config, setUnsavedChanges]);
 
   async function handleSave() {
     setSaving(true);
@@ -44,6 +47,7 @@ export default function AdminSettingsPage() {
 
       if (res?.success) {
         setSuccess(res.message ?? 'Branding saved');
+        setUnsavedChanges(false);
       } else {
         setError(res?.error?.message ?? 'Failed to save branding');
       }
@@ -86,7 +90,10 @@ export default function AdminSettingsPage() {
             <input
               type="color"
               value={primaryColor}
-              onChange={(e) => setPrimaryColor(e.target.value)}
+              onChange={(e) => {
+                setUnsavedChanges(true);
+                setPrimaryColor(e.target.value);
+              }}
               className="h-10 w-24 rounded border border-gray-200"
             />
             <button
@@ -106,7 +113,10 @@ export default function AdminSettingsPage() {
             <input
               type="color"
               value={secondaryColor}
-              onChange={(e) => setSecondaryColor(e.target.value)}
+              onChange={(e) => {
+                setUnsavedChanges(true);
+                setSecondaryColor(e.target.value);
+              }}
               className="h-10 w-24 rounded border border-gray-200"
             />
             <button
@@ -124,13 +134,19 @@ export default function AdminSettingsPage() {
           <TenantMediaInput
             label="Logo (full horizontal)"
             value={logoUrl}
-            onChange={setLogoUrl}
+            onChange={(v) => {
+              setUnsavedChanges(true);
+              setLogoUrl(v);
+            }}
             fieldName="logo_url"
           />
           <TenantMediaInput
             label="Logomark (square/icon)"
             value={iconUrl}
-            onChange={setIconUrl}
+            onChange={(v) => {
+              setUnsavedChanges(true);
+              setIconUrl(v);
+            }}
             fieldName="icon_url"
           />
         </div>

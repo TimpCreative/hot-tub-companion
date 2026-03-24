@@ -2,7 +2,8 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useUnsavedChanges } from '@/contexts/UnsavedChangesContext';
 
 interface NavItem {
   label: string;
@@ -20,6 +21,8 @@ interface SidebarProps {
 
 export function Sidebar({ navItems, bottomItems, basePath, title }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { confirmNavigate } = useUnsavedChanges();
 
   const renderNavItem = (item: NavItem) => {
     const href = item.href.startsWith('/') ? item.href : `${basePath}${item.href}`;
@@ -28,6 +31,14 @@ export function Sidebar({ navItems, bottomItems, basePath, title }: SidebarProps
       <Link
         key={item.href}
         href={href}
+        onClick={(e) => {
+          if (isActive) {
+            e.preventDefault();
+            return;
+          }
+          e.preventDefault();
+          confirmNavigate(href, () => router.push(href));
+        }}
         className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors ${
           isActive ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
         }`}

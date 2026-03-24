@@ -8,6 +8,7 @@ import {
   BookOpenIcon,
   HeartIcon,
   CircleStackIcon,
+  BuildingStorefrontIcon,
 } from '@heroicons/react/24/outline';
 import type { ComponentType, SVGProps } from 'react';
 
@@ -47,6 +48,7 @@ const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement> & { classNa
   build: WrenchScrewdriverIcon,
   book: BookOpenIcon,
   medkit: HeartIcon,
+  storefront: BuildingStorefrontIcon,
   ellipse: CircleStackIcon,
 };
 
@@ -72,7 +74,7 @@ function MockupQuickLinkTile({
         >
           <IconComponent className="h-5 w-5" style={{ color: iconColor }} />
         </div>
-        <span className="text-center text-[11px] font-semibold text-gray-800" style={{ lineHeight: 1.2 }}>
+        <span className="text-center text-[11px] font-semibold text-gray-800 break-words" style={{ lineHeight: 1.2 }}>
           {link.title}
         </span>
       </div>
@@ -90,7 +92,7 @@ function MockupQuickLinkTile({
       <div className="min-w-0 flex-1">
         <span className="block text-xs font-semibold text-gray-800">{link.title}</span>
         {link.subtitle ? (
-          <span className="block truncate text-[10px] text-gray-500">{link.subtitle}</span>
+          <span className="block text-[10px] text-gray-500 break-words">{link.subtitle}</span>
         ) : null}
       </div>
       <span className="text-gray-400">›</span>
@@ -115,13 +117,13 @@ export function HomeDashboardMockup({
 
   return (
     <div
-      className="sticky top-6 shrink-0 overflow-hidden rounded-2xl border border-gray-200 bg-gray-100 shadow-xl"
-      style={{ width: 280 }}
+      className="sticky top-6 self-start shrink-0 overflow-hidden rounded-2xl border border-gray-200 bg-gray-100 shadow-xl"
+      style={{ width: 280, maxHeight: 'calc(100vh - 3rem)' }}
     >
-      <div className="border-b border-gray-300 bg-gray-700 px-4 py-2 text-center">
+      <div className="border-b border-gray-300 bg-gray-700 px-4 py-2 text-center shrink-0">
         <span className="text-xs font-medium text-white">App preview</span>
       </div>
-      <div className="max-h-[calc(100vh-180px)] overflow-y-auto p-4">
+      <div className="overflow-y-auto p-4" style={{ maxHeight: 'calc(100vh - 8rem)' }}>
         {/* Hero placeholder */}
         <div
           className="mb-4 rounded-xl px-3 py-4"
@@ -170,33 +172,37 @@ export function HomeDashboardMockup({
             const subtitle = String(w.props.subtitle ?? 'We are here to help');
             return (
               <div key={w.id} className="mb-4 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-                <div className="text-xs font-semibold text-gray-800">{title}</div>
-                <div className="mt-0.5 text-[10px] text-gray-600">{subtitle}</div>
+                <div className="text-xs font-semibold text-gray-800 break-words">{title}</div>
+                <div className="mt-0.5 text-[10px] text-gray-600 break-words">{subtitle}</div>
                 {dealerPhone ? (
-                  <div className="mt-2 text-[10px] font-medium" style={{ color: primaryColor }}>
+                  <div className="mt-2 text-[10px] font-medium break-words" style={{ color: primaryColor }}>
                     {dealerPhone}
                   </div>
                 ) : null}
                 {dealerAddress ? (
-                  <div className="mt-0.5 text-[10px] text-gray-500">{dealerAddress}</div>
+                  <div className="mt-0.5 text-[10px] text-gray-500 break-words whitespace-pre-wrap">{dealerAddress}</div>
                 ) : null}
               </div>
             );
           }
           if (w.type === 'tips_list') {
             const title = String(w.props.title ?? 'Tips');
+            const subtitle = String(w.props.subtitle ?? '');
             const items = Array.isArray(w.props.items) ? w.props.items : [];
             return (
               <div key={w.id} className="mb-4 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
                 <div className="text-xs font-semibold text-gray-800">{title}</div>
+                {subtitle ? (
+                  <div className="mt-0.5 text-[10px] text-gray-500 break-words">{subtitle}</div>
+                ) : null}
                 <div className="mt-2 space-y-1.5">
-                  {(items.slice(0, 2) as { title?: string; body?: string }[]).map((item, i) => (
+                  {(items as { title?: string; body?: string }[]).map((item, i) => (
                     <div key={i}>
                       <div className="text-[10px] font-medium text-gray-700">
                         {String(item?.title ?? 'Tip')}
                       </div>
                       {item?.body ? (
-                        <div className="text-[9px] text-gray-500">{String(item.body).slice(0, 40)}…</div>
+                        <div className="text-[9px] text-gray-500 break-words">{String(item.body)}</div>
                       ) : null}
                     </div>
                   ))}
@@ -209,9 +215,9 @@ export function HomeDashboardMockup({
             const subtitle = String(w.props.subtitle ?? '');
             return (
               <div key={w.id} className="mb-4 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-                <div className="text-xs font-semibold text-gray-800">{title}</div>
+                <div className="text-xs font-semibold text-gray-800 break-words">{title}</div>
                 {subtitle ? (
-                  <div className="mt-0.5 text-[10px] text-gray-500">{subtitle}</div>
+                  <div className="mt-0.5 text-[10px] text-gray-500 break-words">{subtitle}</div>
                 ) : null}
                 <div className="mt-2 flex gap-2">
                   {[1, 2, 3].map((i) => (
