@@ -451,7 +451,7 @@ function NewSpaForm() {
                       Clear
                     </Button>
                   </div>
-                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-white">
+                  <div className="max-h-40 overflow-y-auto border rounded-lg p-3 bg-card">
                     <div className="grid grid-cols-5 sm:grid-cols-8 gap-2">
                       {years.map((year) => (
                         <label

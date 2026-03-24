@@ -86,7 +86,7 @@ export default function AdminSettingsPage() {
       {error && <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700">{error}</div>}
       {success && <div className="mb-4 rounded-lg bg-green-50 p-4 text-green-800">{success}</div>}
 
-      <div className="space-y-4 bg-white rounded-lg border border-gray-200 p-6">
+      <div className="card space-y-4 rounded-lg p-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Primary Color</label>
           <div className="flex items-center gap-3">

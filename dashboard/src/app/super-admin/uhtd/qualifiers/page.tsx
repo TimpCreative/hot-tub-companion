@@ -406,7 +406,7 @@ export default function QualifiersPage() {
       </div>
 
       {/* Sections */}
-      <div className="mb-8 bg-white rounded-lg border border-gray-200 p-6">
+      <div className="mb-8 card rounded-lg p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Sections</h3>
         <p className="text-sm text-gray-500 mb-4">Group qualifiers in Add Spa form. Reorder to control display order.</p>
         <div className="space-y-2">
@@ -445,7 +445,7 @@ export default function QualifiersPage() {
       </div>
 
       {/* Qualifiers Table */}
-      <div className="bg-white rounded-lg border border-gray-200">
+      <div className="card rounded-lg">
         <Table
           columns={columns as any}
           data={qualifiers as any}

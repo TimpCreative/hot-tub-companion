@@ -143,7 +143,7 @@ export default function EditBrandPage() {
         <h1 className="text-2xl font-semibold text-gray-900 mt-2">Edit Brand</h1>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 max-w-2xl">
+      <div className="card rounded-lg max-w-2xl">
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {error && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">

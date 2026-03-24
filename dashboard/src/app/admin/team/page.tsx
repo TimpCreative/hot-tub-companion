@@ -224,8 +224,8 @@ export default function AdminTeamPage() {
   if (!permissions?.can_manage_users) {
     return (
       <div className="max-w-2xl">
-        <h1 className="text-2xl font-semibold text-gray-900">Team</h1>
-        <p className="mt-4 text-gray-600">You don&apos;t have permission to manage the team.</p>
+        <h1 className="text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Team</h1>
+        <p className="mt-4" style={{ color: 'var(--text-secondary)' }}>You don&apos;t have permission to manage the team.</p>
       </div>
     );
   }
@@ -234,8 +234,8 @@ export default function AdminTeamPage() {
     <div className="max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Team</h1>
-          <p className="mt-1 text-gray-600">Manage admins and their permissions for {config?.name ?? 'this tenant'}.</p>
+          <h1 className="text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Team</h1>
+          <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>Manage admins and their permissions for {config?.name ?? 'this tenant'}.</p>
         </div>
         <Button onClick={() => setInviteOpen(true)}>Invite admin</Button>
       </div>
@@ -251,25 +251,25 @@ export default function AdminTeamPage() {
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
         </div>
       ) : (
-        <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="card mt-6 overflow-hidden rounded-lg shadow">
+          <table className="min-w-full divide-theme">
             <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Role</th>
-                <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Role</th>
+                <th className="px-6 py-3 text-right text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-theme">
               {members.map((m) => (
                 <tr key={m.id}>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                  <td className="whitespace-nowrap px-6 py-4 text-sm" style={{ color: 'var(--text-primary)' }}>
                     {m.firstName || m.lastName ? `${m.firstName ?? ''} ${m.lastName ?? ''}`.trim() || m.email : m.email}
                     {m.email && (m.firstName || m.lastName) && (
-                      <span className="block text-xs text-gray-500">{m.email}</span>
+                      <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>{m.email}</span>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                  <td className="whitespace-nowrap px-6 py-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
                     {ROLE_LABELS[m.role] ?? m.role}
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
@@ -279,7 +279,7 @@ export default function AdminTeamPage() {
                     >
                       Edit
                     </button>
-                    <span className="mx-2 text-gray-300">|</span>
+                    <span className="mx-2" style={{ color: 'var(--card-border)' }}>|</span>
                     <button
                       onClick={() => removeMember(m)}
                       disabled={removing === m.userId}
@@ -293,33 +293,33 @@ export default function AdminTeamPage() {
             </tbody>
           </table>
           {members.length === 0 && (
-            <div className="px-6 py-12 text-center text-gray-500">No team members yet. Use Invite admin to add someone.</div>
+            <div className="px-6 py-12 text-center" style={{ color: 'var(--text-muted)' }}>No team members yet. Use Invite admin to add someone.</div>
           )}
         </div>
       )}
 
       {auditEntries.length > 0 && (
         <div className="mt-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Recent permission changes</h2>
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Recent permission changes</h2>
+          <div className="card shadow rounded-lg overflow-hidden">
+            <table className="min-w-full divide-theme">
+              <thead className="thead-theme">
                 <tr>
-                  <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase">When</th>
-                  <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                  <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase">By</th>
-                  <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase">Target</th>
+                  <th className="px-6 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>When</th>
+                  <th className="px-6 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Action</th>
+                  <th className="px-6 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>By</th>
+                  <th className="px-6 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Target</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-theme">
                 {auditEntries.map((e) => (
                   <tr key={e.id}>
-                    <td className="px-6 py-2 text-sm text-gray-600">
+                    <td className="px-6 py-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
                       {new Date(e.created_at).toLocaleString()}
                     </td>
-                    <td className="px-6 py-2 text-sm">{e.action.replace(/_/g, ' ')}</td>
-                    <td className="px-6 py-2 text-sm">{e.actor_email || '—'}</td>
-                    <td className="px-6 py-2 text-sm">{e.target_email || '—'}</td>
+                    <td className="px-6 py-2 text-sm" style={{ color: 'var(--foreground)' }}>{e.action.replace(/_/g, ' ')}</td>
+                    <td className="px-6 py-2 text-sm" style={{ color: 'var(--foreground)' }}>{e.actor_email || '—'}</td>
+                    <td className="px-6 py-2 text-sm" style={{ color: 'var(--foreground)' }}>{e.target_email || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -330,24 +330,24 @@ export default function AdminTeamPage() {
 
       {inviteOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-            <h2 className="text-lg font-semibold">Invite admin</h2>
+          <div className="card w-full max-w-md rounded-lg p-6 shadow-xl">
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Invite admin</h2>
             <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <label className="block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Email</label>
               <input
                 type="email"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="admin@example.com"
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="mt-1 block w-full rounded-md border px-3 py-2 text-sm"
               />
             </div>
             <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700">Role</label>
+              <label className="block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Role</label>
               <select
                 value={inviteRole}
                 onChange={(e) => setInviteRole(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="mt-1 block w-full rounded-md border px-3 py-2 text-sm"
               >
                 {Object.entries(ROLE_LABELS).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
@@ -368,14 +368,14 @@ export default function AdminTeamPage() {
 
       {editing && editForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-lg bg-white p-6 shadow-xl">
-            <h2 className="text-lg font-semibold">Edit {editing.email}</h2>
+          <div className="card max-h-[90vh] w-full max-w-lg overflow-auto rounded-lg p-6 shadow-xl">
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Edit {editing.email}</h2>
             <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700">Role</label>
+              <label className="block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Role</label>
               <select
                 value={editForm.role}
                 onChange={(e) => applyRoleTemplate(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="mt-1 block w-full rounded-md border px-3 py-2 text-sm"
               >
                 {Object.entries(ROLE_LABELS).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
@@ -383,15 +383,15 @@ export default function AdminTeamPage() {
               </select>
             </div>
             <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700">Permissions</label>
+              <label className="block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Permissions</label>
               <div className="mt-2 space-y-2">
                 {Object.entries(PERMISSION_LABELS).map(([key, label]) => (
-                  <label key={key} className="flex items-center gap-2">
+                  <label key={key} className="flex items-center gap-2" style={{ color: 'var(--foreground)' }}>
                     <input
                       type="checkbox"
                       checked={!!editForm.permissions[key]}
                       onChange={() => togglePermission(key)}
-                      className="rounded border-gray-300"
+                      className="rounded"
                     />
                     <span className="text-sm">{label}</span>
                   </label>

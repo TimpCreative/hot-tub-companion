@@ -284,7 +284,7 @@ export default function TenantDetailPage() {
 
       <h2 className="text-2xl font-semibold text-gray-900 mb-6">{tenant.name}</h2>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden max-w-2xl mb-8">
+      <div className="card shadow rounded-lg overflow-hidden max-w-2xl mb-8">
         <dl className="divide-y divide-gray-200">
           <div className="px-6 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
             <dt className="text-sm font-medium text-gray-500">ID</dt>
@@ -356,7 +356,7 @@ export default function TenantDetailPage() {
         </dl>
       </div>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden max-w-2xl mb-8">
+      <div className="card shadow rounded-lg overflow-hidden max-w-2xl mb-8">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Branding</h3>
           <p className="mt-1 text-sm text-gray-500">
@@ -457,7 +457,7 @@ export default function TenantDetailPage() {
         </div>
       </div>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden max-w-2xl">
+      <div className="card shadow rounded-lg overflow-hidden max-w-2xl">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">POS Integration</h3>
           <p className="mt-1 text-sm text-gray-500">

@@ -133,7 +133,7 @@ export function PartForm({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Part Details - Left column */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+          <div className="card rounded-lg p-6 space-y-4">
             <h3 className="text-lg font-semibold text-gray-900">Part Details</h3>
 
             <div>
@@ -315,7 +315,7 @@ export function PartForm({
 
         {/* Spa Selection - Middle column */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg border border-gray-200 h-[600px] flex flex-col">
+          <div className="card rounded-lg h-[600px] flex flex-col">
             <div className="p-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">Compatible Spas</h3>
               <p className="text-sm text-gray-500">Select which spas this part fits</p>

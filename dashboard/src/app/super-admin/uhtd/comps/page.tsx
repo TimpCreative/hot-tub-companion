@@ -127,7 +127,7 @@ export default function CompsListPage() {
         </Link>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200">
+      <div className="card rounded-lg">
         <div className="p-4 border-b border-gray-200">
           <SearchInput
             value={search}

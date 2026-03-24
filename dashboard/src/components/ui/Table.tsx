@@ -93,7 +93,7 @@ export function Table<T extends Record<string, unknown>>({
             ))}
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-card divide-y divide-theme">
           {loading ? (
             <tr>
               <td colSpan={columns.length} className="px-6 py-12 text-center">

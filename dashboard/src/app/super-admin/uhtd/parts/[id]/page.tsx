@@ -224,7 +224,7 @@ export default function PartDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="card rounded-lg p-6">
             <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
               Part Details
             </h3>
@@ -261,7 +261,7 @@ export default function PartDetailPage() {
           </div>
 
           {part.notes && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="card rounded-lg p-6">
               <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-2">
                 Notes
               </h3>
@@ -270,7 +270,7 @@ export default function PartDetailPage() {
           )}
 
           {partQualifiers.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="card rounded-lg p-6">
               <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
                 Part Qualifiers
               </h3>
@@ -304,7 +304,7 @@ export default function PartDetailPage() {
         </div>
 
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg border border-gray-200">
+          <div className="card rounded-lg">
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-gray-900">Compatible Spas</h3>

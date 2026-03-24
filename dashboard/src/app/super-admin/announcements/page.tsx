@@ -94,7 +94,7 @@ export default function SuperAdminAnnouncementsPage() {
         <div className="mb-4 rounded-lg bg-green-50 p-4 text-green-800">{success}</div>
       )}
 
-      <div className="rounded-lg border border-gray-200 bg-white p-6 space-y-4">
+      <div className="rounded-lg card p-6 space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Target</label>
           <select

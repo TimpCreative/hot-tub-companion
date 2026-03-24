@@ -194,7 +194,7 @@ export default function CompBuilderPage() {
 
       <div className="mt-6 grid grid-cols-2 gap-6">
         {/* Parts Column */}
-        <div className="flex flex-col bg-white rounded-lg border border-gray-200 min-h-[400px]">
+        <div className="flex flex-col card rounded-lg min-h-[400px]">
           <div className="p-4 border-b border-gray-200 space-y-3">
             <h3 className="font-medium text-gray-900">Parts</h3>
             <SearchInput
@@ -282,7 +282,7 @@ export default function CompBuilderPage() {
         </div>
 
         {/* Spas Column */}
-        <div className="flex flex-col bg-white rounded-lg border border-gray-200 min-h-[400px]">
+        <div className="flex flex-col card rounded-lg min-h-[400px]">
           <div className="p-4 border-b border-gray-200 space-y-3">
             <h3 className="font-medium text-gray-900">Spas</h3>
             <SearchInput

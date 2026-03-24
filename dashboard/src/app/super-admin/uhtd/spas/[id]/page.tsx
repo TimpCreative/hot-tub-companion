@@ -228,7 +228,7 @@ export default function SpaDetailPage() {
       <div className="grid grid-cols-3 gap-6 mb-8">
         <div className="col-span-2 space-y-6">
           {/* Specifications */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="card rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Specifications</h3>
             <dl className="grid grid-cols-3 gap-x-6 gap-y-4">
               <div>
@@ -270,7 +270,7 @@ export default function SpaDetailPage() {
 
           {/* Qualifiers */}
           {spaQualifiers.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="card rounded-lg p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Specifications & Options</h3>
               <dl className="space-y-3">
                 {spaQualifiers.map((sq) => (
@@ -309,7 +309,7 @@ export default function SpaDetailPage() {
 
           {/* Notes */}
           {spa.notes && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="card rounded-lg p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Notes</h3>
               <p className="text-sm text-gray-600 whitespace-pre-wrap">{spa.notes}</p>
             </div>
@@ -319,7 +319,7 @@ export default function SpaDetailPage() {
         <div className="space-y-6">
           {/* Media */}
           {(spa.imageUrl || spa.specSheetUrl) && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="card rounded-lg p-6">
               <h3 className="text-sm font-medium text-gray-500 mb-4">Media</h3>
               <div className="space-y-3">
                 {spa.imageUrl && (
@@ -347,7 +347,7 @@ export default function SpaDetailPage() {
           )}
 
           {/* Details */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="card rounded-lg p-6">
             <h3 className="text-sm font-medium text-gray-500 mb-4">Details</h3>
             <dl className="space-y-3">
               <div>
@@ -367,7 +367,7 @@ export default function SpaDetailPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200">
+      <div className="card rounded-lg">
         <div className="p-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Compatible Parts ({parts.length})</h3>
           <p className="text-sm text-gray-500 mt-1">Parts that fit this spa model</p>

@@ -53,7 +53,7 @@ export function Pagination({
   if (total === 0) return null;
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200">
+    <div className="flex items-center justify-between px-4 py-3 bg-card border-t border-[var(--card-border)]">
       <div className="flex items-center gap-4 text-sm text-gray-700">
         <span>
           Showing <span className="font-medium">{startItem}</span> to{' '}
@@ -78,7 +78,7 @@ export function Pagination({
         <button
           onClick={() => onPageChange(page - 1)}
           disabled={page === 1}
-          className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-1 text-sm font-medium rounded-md border bg-card hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Previous
         </button>
@@ -94,7 +94,7 @@ export function Pagination({
               className={`px-3 py-1 text-sm font-medium rounded-md ${
                 page === p
                   ? 'bg-blue-600 text-white'
-                  : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                  : 'bg-card border hover:opacity-90'
               }`}
             >
               {p}
@@ -104,7 +104,7 @@ export function Pagination({
         <button
           onClick={() => onPageChange(page + 1)}
           disabled={page === totalPages}
-          className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-1 text-sm font-medium rounded-md border bg-card hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Next
         </button>

@@ -196,7 +196,7 @@ export function BulkAddTable({ columns, onSubmit, minRows = 5, maxRows = 50, tit
           <th
             key={i}
             colSpan={g.span}
-            className={`px-2 py-1 text-xs font-semibold text-gray-600 text-center border-l border-gray-200 first:border-l-0 ${g.name ? 'bg-gray-100' : 'bg-white'}`}
+            className={`px-2 py-1 text-xs font-semibold text-gray-600 text-center border-l border-gray-200 first:border-l-0 ${g.name ? 'bg-[var(--table-header-bg)]' : 'bg-card'}`}
           >
             {g.name}
           </th>
@@ -225,10 +225,10 @@ export function BulkAddTable({ columns, onSubmit, minRows = 5, maxRows = 50, tit
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-100">
+          <tbody className="bg-card divide-y divide-theme">
             {rows.map((row, rowIndex) => (
               <tr key={rowIndex} className="hover:bg-gray-50">
-                <td className="px-2 py-1 text-xs text-gray-400 sticky left-0 bg-white z-10">{rowIndex + 1}</td>
+                <td className="px-2 py-1 text-xs text-gray-400 sticky left-0 bg-card z-10">{rowIndex + 1}</td>
                 {columns.map((col) => (
                   <td key={col.key} className="px-1 py-1" style={{ minWidth: col.width || '120px' }}>
                     {renderInput(col, row, rowIndex)}

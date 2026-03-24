@@ -67,7 +67,7 @@ function MockupQuickLinkTile({
 
   if (layout === 'double') {
     return (
-      <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+      <div className="flex flex-col items-center justify-center rounded-xl card p-3 shadow-sm">
         <div
           className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg"
           style={{ backgroundColor: iconBg }}
@@ -82,7 +82,7 @@ function MockupQuickLinkTile({
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+    <div className="flex items-center gap-3 rounded-xl card p-3 shadow-sm">
       <div
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
         style={{ backgroundColor: iconBg }}
@@ -171,7 +171,7 @@ export function HomeDashboardMockup({
             const title = String(w.props.title ?? 'Your Dealership');
             const subtitle = String(w.props.subtitle ?? 'We are here to help');
             return (
-              <div key={w.id} className="mb-4 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+              <div key={w.id} className="mb-4 rounded-xl card p-3 shadow-sm">
                 <div className="text-xs font-semibold text-gray-800 break-words">{title}</div>
                 <div className="mt-0.5 text-[10px] text-gray-600 break-words">{subtitle}</div>
                 {dealerPhone ? (
@@ -190,7 +190,7 @@ export function HomeDashboardMockup({
             const subtitle = String(w.props.subtitle ?? '');
             const items = Array.isArray(w.props.items) ? w.props.items : [];
             return (
-              <div key={w.id} className="mb-4 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+              <div key={w.id} className="mb-4 rounded-xl card p-3 shadow-sm">
                 <div className="text-xs font-semibold text-gray-800">{title}</div>
                 {subtitle ? (
                   <div className="mt-0.5 text-[10px] text-gray-500 break-words">{subtitle}</div>
@@ -214,7 +214,7 @@ export function HomeDashboardMockup({
             const title = String(w.props.title ?? 'Recommended');
             const subtitle = String(w.props.subtitle ?? '');
             return (
-              <div key={w.id} className="mb-4 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+              <div key={w.id} className="mb-4 rounded-xl card p-3 shadow-sm">
                 <div className="text-xs font-semibold text-gray-800 break-words">{title}</div>
                 {subtitle ? (
                   <div className="mt-0.5 text-[10px] text-gray-500 break-words">{subtitle}</div>

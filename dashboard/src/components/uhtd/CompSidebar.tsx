@@ -110,7 +110,7 @@ export function CompSidebar({
             {nearMatches.map((match) => (
               <div
                 key={match.comp.id}
-                className="bg-white rounded-lg border border-gray-200 p-3 hover:border-blue-300 transition-colors"
+                className="card rounded-lg p-3 hover:border-blue-300 transition-colors"
               >
                 <div className="flex items-start justify-between mb-2">
                   <button
@@ -143,7 +143,7 @@ export function CompSidebar({
 
       <div className="p-4 border-t border-gray-200">
         <button
-          className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full px-4 py-2 text-sm font-medium rounded-lg border bg-card hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={() => setShowCreateModal(true)}
           disabled={selectedSpaIds.length === 0}
         >

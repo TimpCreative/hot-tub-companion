@@ -155,21 +155,21 @@ export default function AuditLogPage() {
 
       {stats && (
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="card rounded-lg p-4">
             <div className="text-2xl font-bold text-gray-900">{stats.total.toLocaleString()}</div>
             <div className="text-sm text-gray-500">Total Changes</div>
           </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="card rounded-lg p-4">
             <div className="text-2xl font-bold text-gray-900">{stats.last24Hours}</div>
             <div className="text-sm text-gray-500">Last 24 Hours</div>
           </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="card rounded-lg p-4">
             <div className="text-2xl font-bold text-green-600">
               {stats.byAction.find((a) => a.action === 'INSERT')?.count || 0}
             </div>
             <div className="text-sm text-gray-500">Inserts</div>
           </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="card rounded-lg p-4">
             <div className="text-2xl font-bold text-blue-600">
               {stats.byAction.find((a) => a.action === 'UPDATE')?.count || 0}
             </div>
@@ -178,7 +178,7 @@ export default function AuditLogPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg border border-gray-200">
+      <div className="card rounded-lg">
         <div className="p-4 border-b border-gray-200 flex gap-4">
           <select
             value={filters.tableName}
@@ -227,13 +227,13 @@ export default function AuditLogPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="font-medium text-gray-700 mb-2">Old Values</h4>
-                    <pre className="text-xs bg-white p-3 rounded border overflow-auto max-h-64">
+                    <pre className="text-xs bg-card p-3 rounded border overflow-auto max-h-64">
                       {log.oldValues ? JSON.stringify(log.oldValues, null, 2) : 'N/A'}
                     </pre>
                   </div>
                   <div>
                     <h4 className="font-medium text-gray-700 mb-2">New Values</h4>
-                    <pre className="text-xs bg-white p-3 rounded border overflow-auto max-h-64">
+                    <pre className="text-xs bg-card p-3 rounded border overflow-auto max-h-64">
                       {log.newValues ? JSON.stringify(log.newValues, null, 2) : 'N/A'}
                     </pre>
                   </div>

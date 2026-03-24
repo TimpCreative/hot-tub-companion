@@ -191,7 +191,7 @@ export default function BrandDetailPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="card rounded-lg p-6">
           <h3 className="text-sm font-medium text-gray-500 mb-4">Details</h3>
           <dl className="space-y-3">
             <div>
@@ -213,7 +213,7 @@ export default function BrandDetailPage() {
           </dl>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="card rounded-lg p-6">
           <h3 className="text-sm font-medium text-gray-500 mb-4">Summary</h3>
           <dl className="space-y-3">
             <div>
@@ -224,7 +224,7 @@ export default function BrandDetailPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200">
+      <div className="card rounded-lg">
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">Model Lines</h3>
           <Link href={`/super-admin/uhtd/model-lines/new?brandId=${brand.id}`}>

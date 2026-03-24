@@ -130,7 +130,7 @@ export default function NewCompPage() {
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-6">
-            <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+            <div className="card rounded-lg p-6 space-y-4">
               <h3 className="text-lg font-semibold text-gray-900">Comp Details</h3>
 
               <div className="grid grid-cols-2 gap-4">
@@ -220,7 +220,7 @@ export default function NewCompPage() {
           </div>
 
           <div>
-            <div className="bg-white rounded-lg border border-gray-200 h-[500px] flex flex-col">
+            <div className="card rounded-lg h-[500px] flex flex-col">
               <div className="p-4 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900">Select Spas</h3>
                 <p className="text-sm text-gray-500">

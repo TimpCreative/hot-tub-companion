@@ -15,6 +15,7 @@
   --text-muted: #6b7280;
   --input-bg: #ffffff;
   --input-border: #d1d5db;
+  --table-header-bg: #f9fafb;
   color-scheme: light;
 }
 
@@ -33,6 +34,7 @@
   --text-muted: #9ca3af;
   --input-bg: #374151;
   --input-border: #4b5563;
+  --table-header-bg: #1f2937;
   color-scheme: dark;
 }
 
@@ -68,4 +70,25 @@ textarea::placeholder {
   background-color: var(--card-bg);
   border: 1px solid var(--card-border);
   color: var(--foreground);
+}
+
+/* Card background only (for tbody, pagination, dropdowns, etc.) */
+.bg-card {
+  background-color: var(--card-bg);
+}
+
+.bg-card\/50 {
+  background-color: color-mix(in srgb, var(--card-bg) 50%, transparent);
+}
+
+/* Theme-aware table dividers (use with divide-y divide-theme) */
+.divide-theme > * + * {
+  border-top-width: 1px;
+  border-top-style: solid;
+  border-top-color: var(--card-border);
+}
+
+/* Theme-aware table header */
+.thead-theme {
+  background-color: var(--table-header-bg);
 }

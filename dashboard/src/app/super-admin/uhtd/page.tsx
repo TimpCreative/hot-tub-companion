@@ -144,7 +144,7 @@ export default function UhtdOverviewPage() {
           className="w-full"
         />
         {searchResults.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-64 overflow-y-auto">
+          <div className="absolute top-full left-0 right-0 mt-1 bg-card border rounded-lg shadow-lg z-10 max-h-64 overflow-y-auto">
             {searchResults.map((result, i) => (
               <button
                 key={`${result.type}-${result.id}-${i}`}
@@ -203,7 +203,7 @@ export default function UhtdOverviewPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-3 gap-6 mb-6">
         {/* SCdb Stats */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="card rounded-lg p-6">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
             Spa Configuration (SCdb)
           </h3>
@@ -224,7 +224,7 @@ export default function UhtdOverviewPage() {
         </div>
 
         {/* PCdb Stats */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="card rounded-lg p-6">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
             Parts Catalog (PCdb)
           </h3>
@@ -241,7 +241,7 @@ export default function UhtdOverviewPage() {
         </div>
 
         {/* Compatibility Stats */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="card rounded-lg p-6">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
             Compatibility
           </h3>
@@ -264,7 +264,7 @@ export default function UhtdOverviewPage() {
 
       {/* Recent Activity */}
       <div className="grid grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="card rounded-lg p-6">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
             Recent Brands
           </h3>
@@ -289,7 +289,7 @@ export default function UhtdOverviewPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="card rounded-lg p-6">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
             Recent Parts
           </h3>

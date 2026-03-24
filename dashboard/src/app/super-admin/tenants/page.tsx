@@ -65,7 +65,7 @@ export default function SuperAdminTenantsPage() {
         <div className="mb-6 rounded-lg bg-red-50 p-4 text-red-700">{error}</div>
       )}
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="card shadow rounded-lg overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -86,7 +86,7 @@ export default function SuperAdminTenantsPage() {
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-card divide-theme">
             {tenants.map((tenant) => (
               <tr key={tenant.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">

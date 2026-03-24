@@ -378,7 +378,7 @@ export default function AdminAppSetupPage() {
       {success && <div className="mb-4 rounded-lg bg-green-50 p-4 text-green-800">{success}</div>}
 
       {tab === 'onboarding' && (
-        <div className="space-y-6 bg-white rounded-lg border border-gray-200 p-6">
+        <div className="card space-y-6 rounded-lg p-6">
           <div className="border-b border-gray-100 pb-4">
             <h3 className="text-sm font-semibold text-gray-900 mb-2">Welcome screen</h3>
             <p className="text-xs text-gray-500 mb-3">
@@ -488,7 +488,7 @@ export default function AdminAppSetupPage() {
       {tab === 'home' && (
         <div className="flex gap-8">
           <div className="min-w-0 flex-1 space-y-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+          <div className="card rounded-lg p-6 space-y-4">
             <h3 className="text-sm font-semibold text-gray-900">Dealer contact (app)</h3>
             <p className="text-xs text-gray-500">
               Shown on the home dealer card and dealer tab. Not the same as customer account address.
@@ -520,7 +520,7 @@ export default function AdminAppSetupPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+          <div className="card rounded-lg p-6 space-y-6">
             <h3 className="text-sm font-semibold text-gray-900">Quick Links</h3>
             <p className="text-xs text-gray-500">
               Icon links shown first on the home screen. Up to 4 items.
@@ -649,7 +649,7 @@ export default function AdminAppSetupPage() {
                       <label className="block text-xs text-gray-600 mb-1">Icon color</label>
                       <input
                         type="color"
-                        className="h-9 w-14 cursor-pointer rounded border border-gray-300 p-0.5 bg-white"
+                        className="h-9 w-14 cursor-pointer rounded border p-0.5 bg-card"
                         value={q.iconColor || '#0d9488'}
                         onChange={(e) =>
                           updateQuickLink(q.id, (x) => ({
@@ -664,7 +664,7 @@ export default function AdminAppSetupPage() {
                       <label className="block text-xs text-gray-600 mb-1">Background color</label>
                       <input
                         type="color"
-                        className="h-9 w-14 cursor-pointer rounded border border-gray-300 p-0.5 bg-white"
+                        className="h-9 w-14 cursor-pointer rounded border p-0.5 bg-card"
                         value={q.iconBgColor ? q.iconBgColor.slice(0, 7) : '#0d9488'}
                         onChange={(e) =>
                           updateQuickLink(q.id, (x) => ({
@@ -696,7 +696,7 @@ export default function AdminAppSetupPage() {
             ))}
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+          <div className="card rounded-lg p-6 space-y-6">
             <h3 className="text-sm font-semibold text-gray-900">Home Dashboard Widgets</h3>
             <p className="text-xs text-gray-500">
               Dealer card, tips, product strip. Order and configure.
@@ -865,7 +865,7 @@ export default function AdminAppSetupPage() {
       )}
 
       {tab === 'legal' && (
-        <div className="space-y-6 bg-white rounded-lg border border-gray-200 p-6">
+        <div className="card space-y-6 rounded-lg p-6">
           <h3 className="text-sm font-semibold text-gray-900">Legal URLs</h3>
           <p className="text-xs text-gray-500">
             Links shown in the mobile app Profile section (Terms of Service, Privacy Policy).

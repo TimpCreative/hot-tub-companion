@@ -185,7 +185,7 @@ export function DataSourceInput({
       {showSuggestions && suggestions.length > 0 && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+          className="absolute z-50 w-full mt-1 card rounded-lg shadow-lg max-h-60 overflow-y-auto"
         >
           {value && !suggestions.some((s) => s.value.toLowerCase() === value.toLowerCase()) && (
             <div className="px-3 py-2 text-xs text-gray-500 border-b border-gray-100">

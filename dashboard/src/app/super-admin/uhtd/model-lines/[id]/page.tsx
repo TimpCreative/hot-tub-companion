@@ -171,7 +171,7 @@ export default function ModelLineDetailPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 mb-6 p-6">
+      <div className="card rounded-lg mb-6 p-6">
         <h3 className="text-sm font-medium text-gray-500 mb-4">Details</h3>
         <dl className="grid grid-cols-2 gap-4">
           <div>
@@ -185,7 +185,7 @@ export default function ModelLineDetailPage() {
         </dl>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200">
+      <div className="card rounded-lg">
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">Spa Models</h3>
           <Link href={`/super-admin/uhtd/model-lines/${modelLine.id}/models/new`}>

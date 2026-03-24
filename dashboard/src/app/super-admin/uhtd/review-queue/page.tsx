@@ -55,7 +55,7 @@ const TABS: { key: TabType; label: string }[] = [
 
 function PlaceholderTab({ entityType }: { entityType: string }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+    <div className="card rounded-lg p-8 text-center">
       <div className="text-gray-400 mb-4">
         <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -329,7 +329,7 @@ export default function ReviewQueuePage() {
             approval, create or map the spa in UHTD manually, then update the customer&apos;s spa profile with
             the correct <code className="rounded bg-amber-100 px-1">uhtd_spa_model_id</code>.
           </div>
-          <div className="rounded-lg border border-gray-200 bg-white">
+          <div className="rounded-lg card">
             <Table
               columns={[
                 {
@@ -439,7 +439,7 @@ export default function ReviewQueuePage() {
                 <div className="text-2xl font-bold text-green-700">{stats.confirmed}</div>
                 <div className="text-sm text-green-600">Confirmed</div>
               </div>
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="card rounded-lg p-4">
                 <div className="text-sm font-medium text-gray-700 mb-2">Top Pending Parts</div>
                 {stats.topPendingParts.length > 0 ? (
                   <ul className="text-xs text-gray-600 space-y-1">
@@ -456,7 +456,7 @@ export default function ReviewQueuePage() {
             </div>
           )}
 
-          <div className="bg-white rounded-lg border border-gray-200">
+          <div className="card rounded-lg">
             {selectedIds.length > 0 && (
               <div className="p-4 border-b border-gray-200 bg-blue-50 flex items-center justify-between">
                 <span className="text-sm text-blue-700">

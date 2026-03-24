@@ -186,7 +186,7 @@ export default function PlatformUsersPage() {
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
         </div>
       ) : (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="card shadow rounded-lg overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -243,7 +243,7 @@ export default function PlatformUsersPage() {
 
       {addOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+          <div className="card w-full max-w-md rounded-lg p-6 shadow-xl">
             <h3 className="text-lg font-semibold">Add Platform User</h3>
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700">Email</label>
@@ -295,7 +295,7 @@ export default function PlatformUsersPage() {
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+          <div className="card w-full max-w-md rounded-lg p-6 shadow-xl">
             <h3 className="text-lg font-semibold">Edit {editing.email}</h3>
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700">Role</label>

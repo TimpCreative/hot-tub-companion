@@ -167,7 +167,7 @@ export default function SettingsPage() {
 
       <div className="space-y-6">
         {/* Current User */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="card rounded-lg p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Account</h3>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
@@ -195,7 +195,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Super Admin Users - Accordion */}
-        <div className="bg-white rounded-lg border border-gray-200">
+        <div className="card rounded-lg">
           <button
             onClick={() => setUsersExpanded(!usersExpanded)}
             className="w-full p-6 flex items-center justify-between text-left"
@@ -252,7 +252,7 @@ export default function SettingsPage() {
                         {diagnostics.firebaseKeyDebug && (
                           <details className="mt-2">
                             <summary className="cursor-pointer text-xs font-medium">Key Debug Info</summary>
-                            <div className="mt-1 p-2 bg-white/50 rounded text-xs font-mono">
+                            <div className="mt-1 p-2 bg-card/50 rounded text-xs font-mono">
                               {Object.entries(diagnostics.firebaseKeyDebug).map(([k, v]) => (
                                 <div key={k}>{k}: {String(v)}</div>
                               ))}
@@ -339,7 +339,7 @@ export default function SettingsPage() {
         </div>
 
         {/* System Information */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="card rounded-lg p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">System Information</h3>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
@@ -363,28 +363,28 @@ export default function SettingsPage() {
           <div className="grid grid-cols-2 gap-4">
             <a
               href="/super-admin/uhtd/audit-log"
-              className="block p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
+              className="block p-4 card rounded-lg hover:border-blue-300 transition-colors"
             >
               <div className="text-sm font-medium text-gray-900">Audit Log</div>
               <div className="text-xs text-gray-500">View all UHTD changes</div>
             </a>
             <a
               href="/super-admin/uhtd/review-queue"
-              className="block p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
+              className="block p-4 card rounded-lg hover:border-blue-300 transition-colors"
             >
               <div className="text-sm font-medium text-gray-900">Review Queue</div>
               <div className="text-xs text-gray-500">Pending compatibility records</div>
             </a>
             <a
               href="/super-admin/uhtd/import"
-              className="block p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
+              className="block p-4 card rounded-lg hover:border-blue-300 transition-colors"
             >
               <div className="text-sm font-medium text-gray-900">Bulk Import</div>
               <div className="text-xs text-gray-500">Import data from CSV</div>
             </a>
             <a
               href="/super-admin/tenants"
-              className="block p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
+              className="block p-4 card rounded-lg hover:border-blue-300 transition-colors"
             >
               <div className="text-sm font-medium text-gray-900">Tenants</div>
               <div className="text-xs text-gray-500">Manage tenant organizations</div>

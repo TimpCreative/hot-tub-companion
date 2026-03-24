@@ -237,15 +237,15 @@ export default function CompDetailPage() {
       </div>
 
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="card rounded-lg p-4">
           <div className="text-2xl font-bold text-gray-900">{spas.length}</div>
           <div className="text-sm text-gray-500">Spas in Group</div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="card rounded-lg p-4">
           <div className="text-2xl font-bold text-gray-900">{parts.length}</div>
           <div className="text-sm text-gray-500">Compatible Parts (computed)</div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="card rounded-lg p-4">
           <div className="text-2xl font-bold text-gray-900">
             {parts.filter((p) => p.matchingSpas === p.totalSpas).length}
           </div>
@@ -253,7 +253,7 @@ export default function CompDetailPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200">
+      <div className="card rounded-lg">
         <div className="border-b border-gray-200">
           <nav className="flex -mb-px">
             <button

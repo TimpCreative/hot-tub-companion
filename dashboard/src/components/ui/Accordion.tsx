@@ -33,7 +33,7 @@ export function Accordion({ title, subtitle, defaultOpen = false, children }: Ac
         </svg>
       </button>
       {isOpen && (
-        <div className="p-4 border-t border-gray-200 bg-white">
+        <div className="p-4 border-t bg-card">
           {children}
         </div>
       )}

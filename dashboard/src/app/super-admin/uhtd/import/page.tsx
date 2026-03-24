@@ -205,7 +205,7 @@ export default function ImportPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="card rounded-lg p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Import Type</h3>
             <div className="grid grid-cols-5 gap-3">
               {(['brands', 'model-lines', 'spas', 'parts', 'comps'] as ImportType[]).map((type) => (
@@ -230,7 +230,7 @@ export default function ImportPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="card rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Upload CSV</h3>
               <Button variant="secondary" size="sm" onClick={downloadTemplate}>
@@ -555,7 +555,7 @@ export default function ImportPage() {
             </div>
           )}
 
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="card rounded-lg p-4">
             <h3 className="font-medium text-gray-900 mb-2">Expected Columns</h3>
             <div className="text-xs font-mono text-gray-600 space-y-1">
               {templates[importType].headers.map((header) => (

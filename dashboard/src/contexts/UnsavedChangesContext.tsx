@@ -55,7 +55,7 @@ export function UnsavedChangesProvider({ children }: { children: React.ReactNode
       {children}
       {pendingNav ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 max-w-md rounded-lg bg-white p-6 shadow-xl">
+          <div className="mx-4 max-w-md rounded-lg card p-6 shadow-xl">
             <h3 className="text-lg font-semibold text-gray-900">Unsaved changes</h3>
             <p className="mt-2 text-sm text-gray-600">
               You have unsaved changes. Are you sure you want to leave? Your changes will be lost.
@@ -64,7 +64,7 @@ export function UnsavedChangesProvider({ children }: { children: React.ReactNode
               <button
                 type="button"
                 onClick={handleCancel}
-                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-lg border px-4 py-2 text-sm font-medium bg-card hover:opacity-90"
               >
                 Stay
               </button>

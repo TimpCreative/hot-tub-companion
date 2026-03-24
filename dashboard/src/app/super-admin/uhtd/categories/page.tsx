@@ -239,7 +239,7 @@ export default function CategoriesPage() {
         <Button onClick={() => openCreateModal()}>+ Add Category</Button>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="card rounded-lg overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-500">Loading...</div>
         ) : categories.length === 0 ? (

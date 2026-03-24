@@ -139,7 +139,7 @@ export default function PartsListPage() {
         </Link>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200">
+      <div className="card rounded-lg">
         <div className="p-4 border-b border-gray-200 flex gap-4">
           <SearchInput
             value={search}
