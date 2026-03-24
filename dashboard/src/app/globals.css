@@ -8,6 +8,13 @@
   --header-border: #e5e7eb;
   --header-text: #111827;
   --header-muted: #4b5563;
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --input-bg: #ffffff;
+  --input-border: #d1d5db;
   color-scheme: light;
 }
 
@@ -19,6 +26,13 @@
   --header-border: #374151;
   --header-text: #f9fafb;
   --header-muted: #9ca3af;
+  --card-bg: #1f2937;
+  --card-border: #374151;
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
+  --text-muted: #9ca3af;
+  --input-bg: #374151;
+  --input-border: #4b5563;
   color-scheme: dark;
 }
 
@@ -35,14 +49,23 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Ensure input text is always dark and readable */
+/* Theme-aware form elements */
 input,
 textarea,
 select {
-  color: #000000;
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--foreground);
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #6b7280; /* medium gray for placeholders only */
+  color: var(--text-muted);
+}
+
+/* Card - use for content panels */
+.card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--foreground);
 }

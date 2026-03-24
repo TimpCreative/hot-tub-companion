@@ -54,7 +54,7 @@ function RetailerTimeDisplay({ timezone }: { timezone: string }) {
     minute: '2-digit',
     timeZoneName: 'short',
   });
-  return <span className="text-sm font-medium text-gray-700">{formatted}</span>;
+  return <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{formatted}</span>;
 }
 
 export default function AdminNotificationsPage() {
@@ -226,8 +226,8 @@ export default function AdminNotificationsPage() {
 
   return (
     <div className="max-w-3xl">
-      <h2 className="text-2xl font-semibold text-gray-900 mb-4">Push Notifications</h2>
-      <p className="text-gray-600 mb-6">
+      <h2 className="text-2xl font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Push Notifications</h2>
+      <p className="mb-6" style={{ color: 'var(--text-secondary)' }}>
         Compose and schedule push notifications to customers with promotional preferences enabled.
       </p>
 
@@ -238,34 +238,34 @@ export default function AdminNotificationsPage() {
         <div className="mb-4 rounded-lg bg-green-50 p-4 text-green-800">{success}</div>
       )}
 
-      <div className="mb-8 rounded-lg border border-gray-200 bg-white p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Compose</h3>
+      <div className="card mb-8 rounded-lg p-6">
+        <h3 className="text-lg font-medium mb-4" style={{ color: 'var(--text-primary)' }}>Compose</h3>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Title (max 255)</label>
+            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Title (max 255)</label>
             <input
               type="text"
               value={composeTitle}
               onChange={(e) => setComposeTitle(e.target.value)}
               placeholder="e.g. Spring sale!"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              className="w-full rounded-lg border px-3 py-2"
               maxLength={255}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Body (max 2000)</label>
+            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Body (max 2000)</label>
             <textarea
               value={composeBody}
               onChange={(e) => setComposeBody(e.target.value)}
               placeholder="e.g. 20% off all chemicals this weekend."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 min-h-[80px]"
+              className="w-full rounded-lg border px-3 py-2 min-h-[80px]"
               maxLength={2000}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Deep link (optional)</label>
-            <p className="text-xs text-gray-500 mb-2">
+            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Deep link (optional)</label>
+            <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
               Where to open when the user taps the notification.
             </p>
             <select
@@ -274,7 +274,7 @@ export default function AdminNotificationsPage() {
                 setComposeLinkType(e.target.value);
                 setComposeLinkId('');
               }}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 mb-2"
+              className="w-full rounded-lg border px-3 py-2 mb-2"
             >
               {LINK_TYPES.map((opt) => (
                 <option key={opt.value || 'none'} value={opt.value}>
@@ -289,14 +289,14 @@ export default function AdminNotificationsPage() {
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
                   placeholder="Search products..."
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 mb-2"
+                  className="w-full rounded-lg border px-3 py-2 mb-2"
                 />
-                {productSearching && <p className="text-sm text-gray-500">Searching...</p>}
+                {productSearching && <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Searching...</p>}
                 {productOptions.length > 0 && (
                   <select
                     value={composeLinkId}
                     onChange={(e) => setComposeLinkId(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                    className="w-full rounded-lg border px-3 py-2"
                   >
                     <option value="">Select a product</option>
                     {productOptions.map((p) => (
@@ -314,14 +314,14 @@ export default function AdminNotificationsPage() {
                 value={composeLinkId}
                 onChange={(e) => setComposeLinkId(e.target.value)}
                 placeholder="https://..."
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 mt-2"
+                className="w-full rounded-lg border px-3 py-2 mt-2"
               />
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Image URL (optional)</label>
-            <p className="text-xs text-gray-500 mb-2">
+            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Image URL (optional)</label>
+            <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
               Public image URL for rich notification. JPEG, PNG, under 1MB recommended.
             </p>
             <input
@@ -329,18 +329,18 @@ export default function AdminNotificationsPage() {
               value={composeImageUrl}
               onChange={(e) => setComposeImageUrl(e.target.value)}
               placeholder="https://..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              className="w-full rounded-lg border px-3 py-2"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Schedule</label>
+            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Schedule</label>
             <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="text-xs text-gray-500">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 Retailer timezone: <strong>{retailerTimezone}</strong>
               </span>
-              <span className="text-xs text-gray-400">•</span>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>•</span>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 Current retailer time: <RetailerTimeDisplay timezone={retailerTimezone} />
               </span>
             </div>
@@ -365,14 +365,14 @@ export default function AdminNotificationsPage() {
                   <span className="text-sm">Each user&apos;s local time</span>
                 </label>
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 {composeScheduleMode === 'retailer_time'
                   ? 'All recipients get the notification at the same moment (retailer timezone).'
                   : 'Each recipient gets it at this time in their timezone. Users without a timezone use retailer timezone.'}
               </p>
               {composeScheduleMode === 'user_local_time' && (
-                <div className="pt-2 border-t border-gray-100">
-                  <label className="block text-xs font-medium text-gray-600 mb-2">
+                <div className="pt-2 border-t" style={{ borderColor: 'var(--card-border)' }}>
+                  <label className="block text-xs font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                     If the time has already passed for some timezones:
                   </label>
                   <div className="flex items-center gap-4">
@@ -402,9 +402,9 @@ export default function AdminNotificationsPage() {
               type="datetime-local"
               value={composeSendAt}
               onChange={(e) => setComposeSendAt(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2"
+              className="rounded-lg border px-3 py-2"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
               {composeScheduleMode === 'retailer_time'
                 ? 'Time is in your browser\'s local timezone. Use retailer time above to confirm.'
                 : 'Date and time slot for each user (in their timezone).'}
@@ -424,11 +424,17 @@ export default function AdminNotificationsPage() {
           type="button"
           onClick={() => setStatusFilter('scheduled')}
           className={`px-4 py-2 rounded-lg text-sm font-medium ${
-            statusFilter === 'scheduled'
-              ? 'text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            statusFilter === 'scheduled' ? 'text-white' : ''
           }`}
-          style={statusFilter === 'scheduled' ? { backgroundColor: primaryColor } : {}}
+          style={
+            statusFilter === 'scheduled'
+              ? { backgroundColor: primaryColor }
+              : {
+                  backgroundColor: 'var(--input-bg)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--input-border)',
+                }
+          }
         >
           Scheduled
         </button>
@@ -436,20 +442,26 @@ export default function AdminNotificationsPage() {
           type="button"
           onClick={() => setStatusFilter('sent')}
           className={`px-4 py-2 rounded-lg text-sm font-medium ${
-            statusFilter === 'sent'
-              ? 'text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            statusFilter === 'sent' ? 'text-white' : ''
           }`}
-          style={statusFilter === 'sent' ? { backgroundColor: primaryColor } : {}}
+          style={
+            statusFilter === 'sent'
+              ? { backgroundColor: primaryColor }
+              : {
+                  backgroundColor: 'var(--input-bg)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--input-border)',
+                }
+          }
         >
           Sent
         </button>
       </div>
 
       {loading ? (
-        <div className="py-8 text-center text-gray-500">Loading...</div>
+        <div className="py-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading...</div>
       ) : list.length === 0 ? (
-        <div className="py-8 text-center text-gray-500">
+        <div className="py-8 text-center" style={{ color: 'var(--text-muted)' }}>
           No {statusFilter} notifications.
         </div>
       ) : (
@@ -457,12 +469,12 @@ export default function AdminNotificationsPage() {
           {list.map((n) => (
             <li
               key={n.id}
-              className="rounded-lg border border-gray-200 bg-white p-4 flex justify-between items-start"
+              className="card rounded-lg p-4 flex justify-between items-start"
             >
               <div>
-                <p className="font-medium text-gray-900">{n.title}</p>
-                <p className="text-sm text-gray-600 mt-1 line-clamp-2">{n.body}</p>
-                <p className="text-xs text-gray-400 mt-2">
+                <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{n.title}</p>
+                <p className="text-sm mt-1 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>{n.body}</p>
+                <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
                   {n.status === 'scheduled'
                     ? n.schedule_mode === 'user_local_time'
                       ? `Scheduled: ${new Date(n.send_at).toISOString().slice(0, 10)} at ${n.send_at_time || '09:00'} (each user's local time)`
