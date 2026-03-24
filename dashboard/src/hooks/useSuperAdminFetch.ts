@@ -13,6 +13,18 @@ const DEBUG_LOG = (data: Record<string, unknown>) => {
   // #endregion
 };
 
+function isTokenExpiredOrExpiringSoon(token: string, bufferSeconds = 60): boolean {
+  try {
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(b64));
+    const exp = payload.exp as number | undefined;
+    if (!exp) return true;
+    return exp <= Math.floor(Date.now() / 1000) + bufferSeconds;
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Returns a fetch function that automatically adds the Firebase Bearer token
  * for super-admin API requests. Use for all /api/dashboard/super-admin/* calls.
@@ -22,7 +34,10 @@ export function useSuperAdminFetch() {
 
   const fetchWithAuth = useCallback(
     async (url: string, options: RequestInit = {}): Promise<Response> => {
-      const token = await getIdToken(true);
+      let token = await getIdToken();
+      if (token && isTokenExpiredOrExpiringSoon(token)) {
+        token = await getIdToken(true);
+      }
       DEBUG_LOG({
         hypothesisId: 'H4',
         location: 'useSuperAdminFetch:beforeFetch',
