@@ -3,6 +3,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  color-scheme: light;
 }
 
 @theme inline {
@@ -14,8 +15,11 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
+    --background: #1a1a1a;
     --foreground: #ededed;
+  }
+  html {
+    color-scheme: dark;
   }
 }
 
@@ -29,10 +33,10 @@ body {
 input,
 textarea,
 select {
-  color: #111827; /* text-gray-900 equivalent */
+  color: #000000;
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #9ca3af; /* text-gray-400 equivalent */
+  color: #6b7280; /* medium gray for placeholders only */
 }
