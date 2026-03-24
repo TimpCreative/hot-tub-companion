@@ -127,11 +127,13 @@ async function doProxy(
   }
 
   try {
-    const res = await fetch(url.toString(), {
+    const body = ['GET', 'HEAD'].includes(method) ? undefined : request.body ?? undefined;
+    const fetchOpts: RequestInit = {
       method,
       headers,
-      body: ['GET', 'HEAD'].includes(method) ? undefined : request.body ?? undefined,
-    });
+      ...(body && { body, duplex: 'half' }),
+    };
+    const res = await fetch(url.toString(), fetchOpts);
 
     const data = await res.text();
 

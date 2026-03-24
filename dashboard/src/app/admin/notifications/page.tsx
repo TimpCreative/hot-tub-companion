@@ -39,6 +39,22 @@ interface ProductOption {
   title: string;
 }
 
+function formatDateTime(iso: string | null | undefined, timeZone: string): string {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '—';
+    const tz = timeZone && timeZone.trim() ? timeZone.trim() : 'UTC';
+    return d.toLocaleString('en-US', {
+      timeZone: tz,
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
+  } catch {
+    return '—';
+  }
+}
+
 function RetailerTimeDisplay({ timezone }: { timezone: string }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -179,7 +195,7 @@ export default function AdminNotificationsPage() {
             : '09:00'
           : undefined;
 
-      await api.post('/admin/notifications', {
+      const res = (await api.post('/admin/notifications', {
         title,
         body,
         sendAt,
@@ -190,8 +206,9 @@ export default function AdminNotificationsPage() {
         scheduleMode: composeScheduleMode,
         sendAtTime: sendAtTime ?? undefined,
         pastTimezoneHandling: composeScheduleMode === 'user_local_time' ? composePastHandling : undefined,
-      });
-      setSuccess('Notification scheduled');
+      })) as { data?: { status?: string }; error?: { message?: string } };
+      const status = res?.data?.status;
+      setSuccess(status === 'sent' ? 'Notification sent' : 'Notification scheduled');
       setComposeTitle('');
       setComposeBody('');
       setComposeSendAt('');
@@ -478,18 +495,8 @@ export default function AdminNotificationsPage() {
                   {n.status === 'scheduled'
                     ? n.schedule_mode === 'user_local_time'
                       ? `Scheduled: ${new Date(n.send_at).toISOString().slice(0, 10)} at ${n.send_at_time || '09:00'} (each user's local time)`
-                      : `Scheduled: ${new Date(n.send_at).toLocaleString('en-US', {
-                          timeZone: retailerTimezone,
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                          timeZoneName: 'short',
-                        })}`
-                    : `Sent: ${n.sent_at ? new Date(n.sent_at).toLocaleString('en-US', {
-                        timeZone: retailerTimezone,
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                        timeZoneName: 'short',
-                      }) : '—'}`}
+                      : `Scheduled: ${formatDateTime(n.send_at, retailerTimezone)}`
+                    : `Sent: ${n.sent_at ? formatDateTime(n.sent_at, retailerTimezone) : '—'}`}
                   {n.recipients_count > 0 && ` • ${n.delivered_count}/${n.recipients_count} delivered`}
                 </p>
               </div>

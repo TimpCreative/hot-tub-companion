@@ -287,7 +287,7 @@ export async function sendToAllCustomers(
   tenantIds: string[] | undefined,
   title: string,
   body: string,
-  data?: Record<string, string>,
+  opts?: SendNotificationOptions | Record<string, string>,
   prefKey: PrefKey = 'promotional',
   logParams?: { type: string; createdByType?: string; createdById?: string }
 ): Promise<{ sent: number; failed: number }> {
@@ -305,16 +305,25 @@ export async function sendToAllCustomers(
   const valid = rows.filter((r) => r.fcm_token && typeof r.fcm_token === 'string');
   if (valid.length === 0) return { sent: 0, failed: 0 };
 
+  const { data: finalData, imageUrl } = normalizeNotificationOptions(opts);
+  const strData = finalData ? stringifyData(finalData) : undefined;
+
   const messaging = getFirebaseMessaging();
   const tokens = valid.map((r) => r.fcm_token);
-  const strData = data ? stringifyData(data) : undefined;
+  const notification: Record<string, string> = { title, body };
+  if (imageUrl?.trim()) (notification as Record<string, unknown>).imageUrl = imageUrl.trim();
+
+  const apnsConfig: import('firebase-admin/messaging').ApnsConfig = {
+    payload: { aps: { sound: 'default', ...(imageUrl ? { 'mutable-content': 1 } : {}) } },
+  };
+  if (imageUrl?.trim()) (apnsConfig as Record<string, unknown>).fcmOptions = { imageUrl: imageUrl.trim() };
 
   const message: import('firebase-admin/messaging').MulticastMessage = {
     tokens,
-    notification: { title, body },
+    notification,
     data: strData,
     android: { priority: 'high' as const },
-    apns: { payload: { aps: { sound: 'default' } } },
+    apns: apnsConfig,
   };
 
   let sent = 0;

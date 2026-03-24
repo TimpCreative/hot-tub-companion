@@ -13,6 +13,9 @@ export async function sendAnnouncement(req: Request, res: Response): Promise<voi
     targetTenantId?: string;
     title?: string;
     body?: string;
+    linkType?: string;
+    linkId?: string;
+    imageUrl?: string | null;
   };
 
   const target = body.target;
@@ -40,6 +43,15 @@ export async function sendAnnouncement(req: Request, res: Response): Promise<voi
     return;
   }
 
+  const linkType = typeof body.linkType === 'string' ? body.linkType.trim().slice(0, 30) : null;
+  const linkId = typeof body.linkId === 'string' ? body.linkId.trim().slice(0, 255) : null;
+  const imageUrl =
+    typeof body.imageUrl === 'string' && body.imageUrl.trim() ? body.imageUrl.trim() : null;
+
+  const notifOpts: { data?: Record<string, string>; imageUrl?: string } = {};
+  if (linkType && linkId) notifOpts.data = { linkType, linkId };
+  if (imageUrl) notifOpts.imageUrl = imageUrl;
+
   let sent = 0;
   let failed = 0;
 
@@ -48,7 +60,7 @@ export async function sendAnnouncement(req: Request, res: Response): Promise<voi
       undefined,
       title,
       bodyText,
-      undefined,
+      Object.keys(notifOpts).length ? notifOpts : undefined,
       'promotional',
       { type: 'global_announcement', createdByType: 'super_admin', createdById: email }
     );
@@ -59,7 +71,7 @@ export async function sendAnnouncement(req: Request, res: Response): Promise<voi
       body.targetTenantId!,
       title,
       bodyText,
-      undefined,
+      Object.keys(notifOpts).length ? notifOpts : undefined,
       'promotional',
       { type: 'global_announcement', createdByType: 'super_admin', createdById: email }
     );
@@ -76,6 +88,9 @@ export async function sendAnnouncement(req: Request, res: Response): Promise<voi
     target_tenant_id: target === 'tenant_customers' ? body.targetTenantId : null,
     title,
     body: bodyText,
+    link_type: linkType,
+    link_id: linkId,
+    image_url: imageUrl,
   });
 
   success(res, { sent, failed }, 'Announcement sent');

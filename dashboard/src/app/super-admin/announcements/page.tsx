@@ -4,6 +4,17 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 
+const LINK_TYPES = [
+  { value: '', label: 'None' },
+  { value: 'shop', label: 'Shop' },
+  { value: 'product', label: 'Product' },
+  { value: 'inbox', label: 'Inbox' },
+  { value: 'dealer', label: 'Dealer' },
+  { value: 'services', label: 'Services' },
+  { value: 'home', label: 'Home' },
+  { value: 'custom_url', label: 'Custom URL' },
+] as const;
+
 interface Tenant {
   id: string;
   name: string;
@@ -17,6 +28,9 @@ export default function SuperAdminAnnouncementsPage() {
   const [targetTenantId, setTargetTenantId] = useState('');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [linkType, setLinkType] = useState('');
+  const [linkId, setLinkId] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -52,6 +66,19 @@ export default function SuperAdminAnnouncementsPage() {
     setError(null);
     setSuccess(null);
     try {
+      let resolvedLinkType: string | undefined;
+      let resolvedLinkId: string | undefined;
+      if (linkType === 'custom_url' && linkId.trim()) {
+        resolvedLinkType = 'custom_url';
+        resolvedLinkId = linkId.trim();
+      } else if (linkType === 'product' && linkId.trim()) {
+        resolvedLinkType = 'product';
+        resolvedLinkId = linkId.trim();
+      } else if (linkType && linkType !== 'product' && linkType !== 'custom_url') {
+        resolvedLinkType = linkType;
+        resolvedLinkId = linkType;
+      }
+
       const res = await fetchWithAuth('/api/dashboard/super-admin/announcements/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -60,6 +87,9 @@ export default function SuperAdminAnnouncementsPage() {
           targetTenantId: target === 'tenant_customers' ? targetTenantId : undefined,
           title: t,
           body: b,
+          linkType: resolvedLinkType ?? null,
+          linkId: resolvedLinkId ?? null,
+          imageUrl: imageUrl.trim() || null,
         }),
       });
       const data = await res.json();
@@ -69,6 +99,9 @@ export default function SuperAdminAnnouncementsPage() {
         setSuccess(`Sent to ${sent} devices.${failed > 0 ? ` ${failed} failed.` : ''}`);
         setTitle('');
         setBody('');
+        setLinkType('');
+        setLinkId('');
+        setImageUrl('');
       } else {
         setError(data.error?.message ?? 'Failed to send');
       }
@@ -145,6 +178,59 @@ export default function SuperAdminAnnouncementsPage() {
             placeholder="e.g. Scheduled maintenance tonight 11pm–1am MT."
             className="w-full rounded-lg border border-gray-300 px-3 py-2 min-h-[100px]"
             maxLength={2000}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Deep link (optional)</label>
+          <p className="text-xs text-gray-500 mb-2">
+            Where to open when the user taps the notification.
+          </p>
+          <select
+            value={linkType}
+            onChange={(e) => {
+              setLinkType(e.target.value);
+              setLinkId('');
+            }}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 mb-2"
+          >
+            {LINK_TYPES.map((opt) => (
+              <option key={opt.value || 'none'} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          {linkType === 'product' && (
+            <input
+              type="text"
+              value={linkId}
+              onChange={(e) => setLinkId(e.target.value)}
+              placeholder="Product UUID"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 mt-2"
+            />
+          )}
+          {linkType === 'custom_url' && (
+            <input
+              type="url"
+              value={linkId}
+              onChange={(e) => setLinkId(e.target.value)}
+              placeholder="https://..."
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 mt-2"
+            />
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Image URL (optional)</label>
+          <p className="text-xs text-gray-500 mb-2">
+            Public image URL for rich notification. JPEG, PNG, under 1MB recommended.
+          </p>
+          <input
+            type="url"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            placeholder="https://..."
+            className="w-full rounded-lg border border-gray-300 px-3 py-2"
           />
         </div>
 
