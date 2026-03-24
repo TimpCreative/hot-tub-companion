@@ -36,6 +36,10 @@ router.use('/api/v1/scdb', scdbPublicRoutes);
 // Retailer admin routes (tenant API key + Firebase auth required)
 router.use('/api/v1/admin', adminRoutes);
 
+// Super Admin routes - MUST be before generic /api/v1 to avoid being matched by
+// consumerUhtdSuggestionsRoutes (which runs authMiddleware requiring tenant context)
+router.use('/api/v1/super-admin', superAdminRoutes);
+
 // Customer product routes (tenant API key required; some endpoints require auth)
 router.use('/api/v1', productsRoutes);
 
@@ -47,9 +51,6 @@ router.use('/api/v1', usersRoutes);
 
 // Consumer UHTD review queue (tenant API key + Firebase auth; no SCdb writes)
 router.use('/api/v1', consumerUhtdSuggestionsRoutes);
-
-// Super Admin routes
-router.use('/api/v1/super-admin', superAdminRoutes);
 
 // Super Admin UHTD routes
 router.use('/api/v1/super-admin/scdb', superAdminAuth, scdbAdminRoutes);
