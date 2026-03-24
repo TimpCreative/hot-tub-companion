@@ -62,6 +62,9 @@ export default ({ config: expoConfig }) => ({
     ],
   ],
   extra: {
+    eas: {
+      projectId: '4a7dbfae-165b-4ba0-b354-5e2b88442f52',
+    },
     tenantSlug: config.slug,
     apiUrl: process.env.API_URL || 'https://api.hottubcompanion.com',
     tenantApiKey: process.env.TENANT_API_KEY,
