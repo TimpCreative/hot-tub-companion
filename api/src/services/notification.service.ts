@@ -5,6 +5,7 @@
 
 import { db } from '../config/database';
 import { getFirebaseMessaging } from '../config/firebase';
+import * as notificationSecurityAudit from './notificationSecurityAudit.service';
 
 const PREF_KEYS = ['maintenance', 'orders', 'subscriptions', 'service', 'promotional'] as const;
 type PrefKey = (typeof PREF_KEYS)[number];
@@ -139,9 +140,40 @@ function stringifyData(data: Record<string, string>): Record<string, string> {
   );
 }
 
+function isPermanentTokenFailure(code?: string | null): boolean {
+  return code === 'messaging/invalid-registration-token' || code === 'messaging/registration-token-not-registered';
+}
+
+async function markInvalidTokens(
+  tenantId: string,
+  entries: { userId: string; code?: string | null; message?: string | null }[]
+): Promise<void> {
+  const invalidUserIds = entries.filter((e) => isPermanentTokenFailure(e.code)).map((e) => e.userId);
+  if (invalidUserIds.length === 0) return;
+  await db('users')
+    .where({ tenant_id: tenantId })
+    .whereIn('id', invalidUserIds)
+    .update({
+      fcm_token: null,
+      fcm_token_updated_at: null,
+      fcm_token_status: 'invalid',
+      fcm_token_last_validated_at: db.fn.now(),
+      updated_at: db.fn.now(),
+    });
+}
+
 export interface SendNotificationOptions {
   data?: Record<string, string>;
   imageUrl?: string;
+}
+
+interface DeliveryAuditContext {
+  actorUserId?: string;
+  actorEmail?: string;
+  actorRole?: string;
+  requestId?: string | null;
+  ip?: string | null;
+  userAgent?: string | null;
 }
 
 function normalizeNotificationOptions(
@@ -160,7 +192,8 @@ export async function sendToTenantCustomers(
   body: string,
   opts?: SendNotificationOptions | Record<string, string>,
   prefKey: PrefKey = 'promotional',
-  logParams?: { type: string; createdByType?: string; createdById?: string }
+  logParams?: { type: string; createdByType?: string; createdById?: string },
+  auditContext?: DeliveryAuditContext
 ): Promise<{ sent: number; failed: number }> {
   const users = await getTenantCustomerTokens(tenantId, prefKey);
   if (users.length === 0) return { sent: 0, failed: 0 };
@@ -170,29 +203,6 @@ export async function sendToTenantCustomers(
 
   const messaging = getFirebaseMessaging();
   const tokens = users.map((u) => u.fcm_token);
-  // #region agent log
-  fetch('http://127.0.0.1:7244/ingest/a47da7ba-8944-40d5-a7b1-3ca8dd181a2c', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': '8c62d1',
-    },
-    body: JSON.stringify({
-      sessionId: '8c62d1',
-      runId: 'pre-fix',
-      hypothesisId: 'H3-H4',
-      location: 'api/src/services/notification.service.ts:173',
-      message: 'Preparing multicast send',
-      data: {
-        tenantId,
-        tokenCount: tokens.length,
-        sampleTokenPrefix: tokens[0] ? tokens[0].slice(0, 12) : null,
-        sampleTokenLength: tokens[0]?.length ?? 0,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
 
   const notification: Record<string, string> = { title, body };
   if (imageUrl?.trim()) (notification as any).imageUrl = imageUrl.trim();
@@ -217,30 +227,32 @@ export async function sendToTenantCustomers(
     const res = await messaging.sendEachForMulticast(message);
     sent = res.successCount;
     failed = res.failureCount;
-    // #region agent log
-    fetch('http://127.0.0.1:7244/ingest/a47da7ba-8944-40d5-a7b1-3ca8dd181a2c', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': '8c62d1',
+    await markInvalidTokens(
+      tenantId,
+      res.responses
+        .map((r, i) => ({ response: r, user: users[i] }))
+        .filter((x) => !x.response.success && x.user)
+        .map((x) => ({
+          userId: x.user.id,
+          code: x.response.error?.code ?? null,
+          message: x.response.error?.message ?? null,
+        }))
+    );
+    await notificationSecurityAudit.logNotificationSecurityEvent({
+      tenantId,
+      actorUserId: auditContext?.actorUserId,
+      actorEmail: auditContext?.actorEmail,
+      actorRole: auditContext?.actorRole || 'retailer_admin',
+      eventType: 'notification_send_tenant',
+      outcome: failed > 0 ? 'failure' : 'success',
+      requestId: auditContext?.requestId ?? null,
+      ip: auditContext?.ip ?? null,
+      userAgent: auditContext?.userAgent ?? null,
+      details: {
+        sent,
+        failed,
       },
-      body: JSON.stringify({
-        sessionId: '8c62d1',
-        runId: 'pre-fix',
-        hypothesisId: 'H4-H5',
-        location: 'api/src/services/notification.service.ts:196',
-        message: 'Multicast send result',
-        data: {
-          tenantId,
-          successCount: res.successCount,
-          failureCount: res.failureCount,
-          firstFailureCode: res.responses.find((r) => !r.success)?.error?.code ?? null,
-          firstFailureMessage: res.responses.find((r) => !r.success)?.error?.message ?? null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
+    });
     if (logParams && sent > 0) {
       for (let i = 0; i < res.responses.length; i++) {
         if (res.responses[i].success && users[i]) {
@@ -259,6 +271,20 @@ export async function sendToTenantCustomers(
   } catch (err) {
     console.warn('[notification] sendToTenantCustomers failed:', tenantId, err instanceof Error ? err.message : err);
     failed = users.length;
+    await notificationSecurityAudit.logNotificationSecurityEvent({
+      tenantId,
+      actorUserId: auditContext?.actorUserId,
+      actorEmail: auditContext?.actorEmail,
+      actorRole: auditContext?.actorRole || 'retailer_admin',
+      eventType: 'notification_send_tenant',
+      outcome: 'failure',
+      requestId: auditContext?.requestId ?? null,
+      ip: auditContext?.ip ?? null,
+      userAgent: auditContext?.userAgent ?? null,
+      details: {
+        error: err instanceof Error ? err.message : String(err),
+      },
+    });
   }
 
   return { sent, failed };
@@ -273,6 +299,14 @@ export async function sendToSpecificUsers(
   logParams?: { type: string; createdByType?: string; createdById?: string; scheduledNotificationId?: string }
 ): Promise<{ sent: number; failed: number }> {
   if (userIds.length === 0) return { sent: 0, failed: 0 };
+  const existingUsers = await db('users')
+    .select('id')
+    .where({ tenant_id: tenantId })
+    .whereIn('id', userIds)
+    .whereNull('deleted_at');
+  if (existingUsers.length !== userIds.length) {
+    throw new Error('TENANT_POLICY_VIOLATION: Some target users are outside tenant scope or deleted');
+  }
   const users = await db('users')
     .select('id', 'fcm_token')
     .where({ tenant_id: tenantId })
@@ -307,6 +341,17 @@ export async function sendToSpecificUsers(
     const res = await messaging.sendEachForMulticast(message);
     sent = res.successCount;
     failed = res.failureCount;
+    await markInvalidTokens(
+      tenantId,
+      res.responses
+        .map((r, i) => ({ response: r, user: valid[i] as { id: string } | undefined }))
+        .filter((x) => !x.response.success && x.user)
+        .map((x) => ({
+          userId: x.user!.id,
+          code: x.response.error?.code ?? null,
+          message: x.response.error?.message ?? null,
+        }))
+    );
     if (logParams && sent > 0) {
       for (let i = 0; i < res.responses.length; i++) {
         if (res.responses[i].success && valid[i]) {
@@ -380,6 +425,28 @@ export async function sendToAllCustomers(
     const res = await messaging.sendEachForMulticast(message);
     sent = res.successCount;
     failed = res.failureCount;
+    // Cross-tenant sends may include multiple tenant ids; clear invalid tokens per tenant bucket.
+    const invalidByTenant = new Map<string, string[]>();
+    for (let i = 0; i < res.responses.length; i++) {
+      const r = res.responses[i];
+      const target = valid[i];
+      if (!target || r.success || !isPermanentTokenFailure(r.error?.code ?? null)) continue;
+      const arr = invalidByTenant.get(target.tenant_id) || [];
+      arr.push(target.id);
+      invalidByTenant.set(target.tenant_id, arr);
+    }
+    for (const [rowTenantId, userIds] of invalidByTenant.entries()) {
+      await db('users')
+        .where({ tenant_id: rowTenantId })
+        .whereIn('id', userIds)
+        .update({
+          fcm_token: null,
+          fcm_token_updated_at: null,
+          fcm_token_status: 'invalid',
+          fcm_token_last_validated_at: db.fn.now(),
+          updated_at: db.fn.now(),
+        });
+    }
     if (logParams && sent > 0) {
       for (let i = 0; i < res.responses.length; i++) {
         if (res.responses[i].success && valid[i]) {

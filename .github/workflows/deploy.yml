@@ -5,6 +5,36 @@ on:
     branches: [main]
 
 jobs:
+  mobile-tenant-config:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tenant: [default, takeabreak]
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate tenant manifest
+        run: npm run tenant:verify
+
+      - name: Resolve Expo config for tenant
+        run: TENANT=${{ matrix.tenant }} npx expo config --type public
+        env:
+          TENANT_API_KEY: tenant-key-required-in-ci
+
   api-build:
     runs-on: ubuntu-latest
     defaults:

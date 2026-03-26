@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import { postAgentDebug } from '../debug-react-runtime';
 import { useTenant } from '../contexts/TenantContext';
 import { colors as defaultColors } from './colors';
 import { typography } from './typography';
@@ -18,14 +17,6 @@ const ThemeContext = createContext<ThemeContextType>({
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // #region agent log
-  postAgentDebug({
-    hypothesisId: 'H2',
-    location: 'ThemeProvider.tsx:entry',
-    message: 'ThemeProvider render entry',
-    data: { reactVersion: React.version },
-  });
-  // #endregion
   const { config } = useTenant();
   const themeColors = useMemo(
     () => ({

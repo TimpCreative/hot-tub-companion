@@ -105,10 +105,19 @@ export async function verifyToken(token: string, tenantId?: string) {
   throw new NotFoundError('User not found for this tenant');
 }
 
-export async function updateFcmToken(userId: string, fcmToken: string | null, timezone?: string | null) {
+export async function updateFcmToken(
+  userId: string,
+  fcmToken: string | null,
+  timezone?: string | null,
+  tokenMeta?: { tokenProvider?: string | null; tokenStatus?: string | null; tokenError?: string | null }
+) {
   const update: Record<string, unknown> = {
     fcm_token: fcmToken,
     fcm_token_updated_at: fcmToken ? new Date() : null,
+    fcm_token_provider: tokenMeta?.tokenProvider || null,
+    fcm_token_status: tokenMeta?.tokenStatus || (fcmToken ? 'ready' : 'missing'),
+    fcm_token_error: tokenMeta?.tokenError || null,
+    fcm_token_last_validated_at: new Date(),
   };
   if (timezone !== undefined) {
     const tz = typeof timezone === 'string' && timezone.trim().length > 0 && timezone.length <= 64

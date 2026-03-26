@@ -1,27 +1,22 @@
 require('dotenv').config();
-require('dotenv').config({ path: `./tenants/${process.env.TENANT || 'default'}/config.env` });
-const TENANT = process.env.TENANT || 'default';
+const manifest = require('./tenants/manifest.json');
 
-const tenantConfig = {
-  takeabreak: {
-    name: 'Take A Break Spas',
-    slug: 'takeabreak',
-    bundleId: 'com.hottubcompanion.takeabreak',
-    icon: './tenants/takeabreak/icon.png',
-    splash: './tenants/takeabreak/splash.png',
-    adaptiveIcon: './tenants/takeabreak/adaptive-icon.png',
-  },
-  default: {
-    name: 'Hot Tub Companion',
-    slug: 'hottubcompanion',
-    bundleId: 'com.hottubcompanion.default',
-    icon: './assets/icon.png',
-    splash: './assets/splash-icon.png',
-    adaptiveIcon: './assets/adaptive-icon.png',
-  },
-};
+const TENANT = process.env.TENANT || manifest.defaultTenant || 'default';
+const tenantConfig = manifest.tenants || {};
+const config = tenantConfig[TENANT];
+const isCI = process.env.CI === 'true' || process.env.CI === '1';
+const isEasBuild = !!process.env.EAS_BUILD;
 
-const config = tenantConfig[TENANT] || tenantConfig.default;
+if (!config) {
+  const known = Object.keys(tenantConfig).join(', ');
+  throw new Error(`Unknown TENANT='${TENANT}'. Known tenants: ${known}`);
+}
+
+require('dotenv').config({ path: config.envFile || `./tenants/${TENANT}/config.env` });
+const tenantApiKey = process.env.TENANT_API_KEY;
+if ((isCI || isEasBuild) && !tenantApiKey) {
+  throw new Error(`TENANT_API_KEY is required for tenant '${TENANT}' in CI/EAS builds.`);
+}
 
 export default ({ config: expoConfig }) => ({
   ...expoConfig,
@@ -39,6 +34,7 @@ export default ({ config: expoConfig }) => ({
     supportsTablet: true,
     bundleIdentifier: config.bundleId,
     infoPlist: {
+      CFBundleDisplayName: config.name,
       NSCameraUsageDescription: 'Used to identify your hot tub model',
     },
   },
@@ -49,7 +45,7 @@ export default ({ config: expoConfig }) => ({
     },
     package: config.bundleId,
   },
-  scheme: 'hottubcompanion',
+  scheme: config.slug,
   plugins: [
     'expo-router',
     'expo-secure-store',
@@ -67,7 +63,7 @@ export default ({ config: expoConfig }) => ({
     },
     tenantSlug: config.slug,
     apiUrl: process.env.API_URL || 'https://api.hottubcompanion.com',
-    tenantApiKey: process.env.TENANT_API_KEY,
+    tenantApiKey: tenantApiKey,
     firebaseApiKey: process.env.FIREBASE_API_KEY,
     firebaseAuthDomain: process.env.FIREBASE_AUTH_DOMAIN,
     firebaseProjectId: process.env.FIREBASE_PROJECT_ID,

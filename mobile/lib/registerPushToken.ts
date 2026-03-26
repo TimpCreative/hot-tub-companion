@@ -29,34 +29,26 @@ export async function registerPushToken(): Promise<void> {
     if (!granted) return;
 
     const res = await Notifications.getDevicePushTokenAsync();
-    const token = res?.data && typeof res.data === 'string' ? res.data : null;
+    const rawToken = res?.data && typeof res.data === 'string' ? res.data.trim() : '';
+    const tokenProvider = typeof res?.type === 'string' ? res.type : 'unknown';
+    // FCM-native pipeline expects FCM registration tokens (typically include ':').
+    // APNs tokens on iOS are intentionally not registered into fcm_token.
+    const looksLikeFcm = rawToken.length > 100 && rawToken.includes(':');
+    const token = looksLikeFcm ? rawToken : null;
+    const tokenStatus = looksLikeFcm ? 'ready' : 'unsupported';
+    const tokenError = looksLikeFcm
+      ? null
+      : `Unsupported token format/provider (${tokenProvider}). Expected FCM registration token.`;
     const timezone = getDeviceTimezone();
-    // #region agent log
-    fetch('http://127.0.0.1:7244/ingest/a47da7ba-8944-40d5-a7b1-3ca8dd181a2c', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': '8c62d1',
-      },
-      body: JSON.stringify({
-        sessionId: '8c62d1',
-        runId: 'pre-fix',
-        hypothesisId: 'H1-H2',
-        location: 'mobile/lib/registerPushToken.ts:31',
-        message: 'Device push token acquired',
-        data: {
-          tokenSource: 'getDevicePushTokenAsync',
-          tokenLength: token?.length ?? 0,
-          tokenPrefix: token ? token.slice(0, 12) : null,
-          timezone,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
+    if (!looksLikeFcm) {
+      console.warn('[registerPushToken] Device token is not FCM-compatible; token not registered.');
+    }
 
     await api.put('/users/me/fcm-token', {
       fcmToken: token ?? null,
+      tokenProvider,
+      tokenStatus,
+      tokenError,
       ...(timezone && { timezone }),
     });
   } catch (err) {

@@ -1,4 +1,3 @@
-import '../debug-react-runtime';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { TenantProvider } from '../contexts/TenantContext';

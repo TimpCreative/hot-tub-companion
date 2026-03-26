@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { error, success } from '../utils/response';
 import * as usersService from '../services/users.service';
 import * as authService from '../services/auth.service';
+import * as notificationSecurityAudit from '../services/notificationSecurityAudit.service';
 
 function requireCustomerUser(req: Request, res: Response): string | null {
   if ((req as any).userIsTenantAdminOverride) {
@@ -56,7 +57,13 @@ export async function putFcmToken(req: Request, res: Response): Promise<void> {
   const userId = requireCustomerUser(req, res);
   if (!userId) return;
 
-  const body = (req.body || {}) as { fcmToken?: string | null; timezone?: string | null };
+  const body = (req.body || {}) as {
+    fcmToken?: string | null;
+    timezone?: string | null;
+    tokenProvider?: string | null;
+    tokenStatus?: string | null;
+    tokenError?: string | null;
+  };
   let fcmToken: string | null = null;
   if (body.fcmToken != null) {
     if (typeof body.fcmToken !== 'string') {
@@ -70,34 +77,37 @@ export async function putFcmToken(req: Request, res: Response): Promise<void> {
     }
     fcmToken = trimmed || null;
   }
+  const tokenProvider = typeof body.tokenProvider === 'string' ? body.tokenProvider.trim().slice(0, 30) : null;
+  const tokenStatus = typeof body.tokenStatus === 'string' ? body.tokenStatus.trim().slice(0, 30) : null;
+  const tokenError = typeof body.tokenError === 'string' ? body.tokenError.trim().slice(0, 300) : null;
+
+  if (fcmToken && (!fcmToken.includes(':') || fcmToken.length < 100)) {
+    error(res, 'VALIDATION_ERROR', 'fcmToken is not a valid FCM registration token', 400);
+    return;
+  }
 
   const timezone = body.timezone != null ? (typeof body.timezone === 'string' ? body.timezone : null) : undefined;
 
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7244/ingest/a47da7ba-8944-40d5-a7b1-3ca8dd181a2c', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': '8c62d1',
+    await authService.updateFcmToken(userId, fcmToken, timezone, {
+      tokenProvider,
+      tokenStatus,
+      tokenError,
+    });
+    await notificationSecurityAudit.logNotificationSecurityEvent({
+      tenantId: (req as any).tenant?.id as string,
+      actorUserId: userId,
+      actorEmail: (req as any).user?.email as string | undefined,
+      actorRole: 'customer',
+      eventType: 'token_update',
+      outcome: 'success',
+      ...notificationSecurityAudit.requestAuditContext(req),
+      details: {
+        hasToken: !!fcmToken,
+        tokenProvider,
+        tokenStatus,
       },
-      body: JSON.stringify({
-        sessionId: '8c62d1',
-        runId: 'pre-fix',
-        hypothesisId: 'H2-H3',
-        location: 'api/src/controllers/users.controller.ts:76',
-        message: 'Received token update request',
-        data: {
-          userId,
-          tokenLength: fcmToken?.length ?? 0,
-          tokenPrefix: fcmToken ? fcmToken.slice(0, 12) : null,
-          timezone,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-    await authService.updateFcmToken(userId, fcmToken, timezone);
+    });
     success(res, { updated: true }, 'FCM token updated');
   } catch (err) {
     throw err;

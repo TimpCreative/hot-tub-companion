@@ -8,6 +8,7 @@ import webhooksRoutes from './routes/webhooks.routes';
 import { defaultRateLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
 import { tenantMiddleware } from './middleware/tenant';
+import { requestContextMiddleware } from './middleware/requestContext';
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.use(
 );
 
 app.use(express.json({ limit: '10mb' }));
+app.use(requestContextMiddleware);
 
 // Attach tenant context for tenant-scoped routes
 app.use(tenantMiddleware);

@@ -10,6 +10,12 @@ const extra = Constants.expoConfig?.extra as {
 const baseURL = (extra?.apiUrl || 'https://api.hottubcompanion.com') + '/api/v1';
 const tenantApiKey = extra?.tenantApiKey || '';
 
+if (!tenantApiKey) {
+  // Fail fast in development if tenant context is missing.
+  // This prevents silently calling APIs without tenant scoping.
+  console.warn('[api] Missing tenant API key. Requests may be rejected.');
+}
+
 const api = axios.create({
   baseURL,
   timeout: 15000,

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../config/database';
 import { error, success } from '../utils/response';
 import * as notificationService from '../services/notification.service';
+import * as notificationSecurityAudit from '../services/notificationSecurityAudit.service';
 
 function buildNotificationPayload(
   linkType: string | null,
@@ -20,6 +21,7 @@ function buildNotificationPayload(
 
 interface AdminRole {
   can_send_notifications?: boolean;
+  tenant_id?: string;
 }
 
 function requireNotificationPermission(req: Request, res: Response): boolean {
@@ -31,8 +33,23 @@ function requireNotificationPermission(req: Request, res: Response): boolean {
   return true;
 }
 
+function requireTenantPolicyScope(req: Request, res: Response): boolean {
+  const tenantId = (req as any).tenant?.id as string | undefined;
+  const role = (req as any).adminRole as AdminRole | undefined;
+  if (!tenantId || !role) {
+    error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
+    return false;
+  }
+  if (role.tenant_id && role.tenant_id !== tenantId) {
+    error(res, 'FORBIDDEN', 'Tenant policy violation', 403);
+    return false;
+  }
+  return true;
+}
+
 export async function listNotifications(req: Request, res: Response): Promise<void> {
   if (!requireNotificationPermission(req, res)) return;
+  if (!requireTenantPolicyScope(req, res)) return;
 
   const tenantId = (req as any).tenant?.id as string;
   const status = (req.query.status as string) || 'scheduled';
@@ -53,6 +70,7 @@ export async function listNotifications(req: Request, res: Response): Promise<vo
 
 export async function createNotification(req: Request, res: Response): Promise<void> {
   if (!requireNotificationPermission(req, res)) return;
+  if (!requireTenantPolicyScope(req, res)) return;
 
   const tenantId = (req as any).tenant?.id as string;
   const user = (req as any).user as { id?: string } | undefined;
@@ -79,6 +97,20 @@ export async function createNotification(req: Request, res: Response): Promise<v
   }
 
   const target = body.target === 'segment' ? 'segment' : 'all_customers';
+  if (target !== 'all_customers') {
+    await notificationSecurityAudit.logNotificationSecurityEvent({
+      tenantId,
+      actorUserId: (req as any).user?.id as string | undefined,
+      actorEmail: (req as any).user?.email as string | undefined,
+      actorRole: 'retailer_admin',
+      eventType: 'notification_create',
+      outcome: 'blocked',
+      ...notificationSecurityAudit.requestAuditContext(req),
+      details: { reason: 'target_segment_disabled' },
+    });
+    error(res, 'VALIDATION_ERROR', 'Segment notifications are disabled until tenant policy guards are finalized', 400);
+    return;
+  }
   const linkType = typeof body.linkType === 'string' ? body.linkType.slice(0, 30) : null;
   const linkId = typeof body.linkId === 'string' ? body.linkId.slice(0, 255) : null;
   const imageUrl = typeof body.imageUrl === 'string' && body.imageUrl.trim() ? body.imageUrl.trim() : null;
@@ -142,6 +174,12 @@ export async function createNotification(req: Request, res: Response): Promise<v
         type: 'promotional',
         createdByType: 'retailer_admin',
         createdById: createdBy ?? createdByEmail ?? 'unknown',
+      },
+      {
+        actorUserId: createdBy ?? undefined,
+        actorEmail: createdByEmail ?? (user as { email?: string } | undefined)?.email ?? undefined,
+        actorRole: 'retailer_admin',
+        ...notificationSecurityAudit.requestAuditContext(req),
       }
     );
     await db('scheduled_notifications')
@@ -155,11 +193,26 @@ export async function createNotification(req: Request, res: Response): Promise<v
   }
 
   const updated = await db('scheduled_notifications').where({ id: inserted.id }).first();
+  await notificationSecurityAudit.logNotificationSecurityEvent({
+    tenantId,
+    actorUserId: createdBy ?? undefined,
+    actorEmail: createdByEmail ?? (user as { email?: string } | undefined)?.email ?? undefined,
+    actorRole: 'retailer_admin',
+    eventType: 'notification_create',
+    outcome: 'success',
+    ...notificationSecurityAudit.requestAuditContext(req),
+    details: {
+      notificationId: inserted.id,
+      immediate: sendAt <= new Date(),
+      target,
+    },
+  });
   success(res, updated, 'Notification created');
 }
 
 export async function updateNotification(req: Request, res: Response): Promise<void> {
   if (!requireNotificationPermission(req, res)) return;
+  if (!requireTenantPolicyScope(req, res)) return;
 
   const tenantId = (req as any).tenant?.id as string;
   const id = req.params.id;
@@ -203,6 +256,7 @@ export async function updateNotification(req: Request, res: Response): Promise<v
 
 export async function cancelNotification(req: Request, res: Response): Promise<void> {
   if (!requireNotificationPermission(req, res)) return;
+  if (!requireTenantPolicyScope(req, res)) return;
 
   const tenantId = (req as any).tenant?.id as string;
   const id = req.params.id;
@@ -222,11 +276,22 @@ export async function cancelNotification(req: Request, res: Response): Promise<v
   await db('scheduled_notifications')
     .where({ id, tenant_id: tenantId })
     .update({ status: 'cancelled' });
+  await notificationSecurityAudit.logNotificationSecurityEvent({
+    tenantId,
+    actorUserId: (req as any).user?.id as string | undefined,
+    actorEmail: (req as any).user?.email as string | undefined,
+    actorRole: 'retailer_admin',
+    eventType: 'notification_cancel',
+    outcome: 'success',
+    ...notificationSecurityAudit.requestAuditContext(req),
+    details: { notificationId: id },
+  });
   success(res, { cancelled: true }, 'Notification cancelled');
 }
 
 export async function getNotificationStats(req: Request, res: Response): Promise<void> {
   if (!requireNotificationPermission(req, res)) return;
+  if (!requireTenantPolicyScope(req, res)) return;
 
   const tenantId = (req as any).tenant?.id as string;
   const id = req.params.id;

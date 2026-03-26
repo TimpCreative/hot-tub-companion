@@ -6,7 +6,15 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "tenant:verify": "node scripts/verify-tenant-config.js",
+    "tenant:start": "node scripts/with-tenant.js",
+    "tenant:ios": "node scripts/with-tenant.js",
+    "tenant:android": "node scripts/with-tenant.js",
+    "tenant:ios:takeabreak": "node scripts/with-tenant.js takeabreak npx expo run:ios --device",
+    "tenant:start:takeabreak": "node scripts/with-tenant.js takeabreak npx expo start --dev-client --host lan --clear",
+    "tenant:config:all": "node scripts/verify-tenant-config.js && node scripts/with-tenant.js default npx expo config --type public && node scripts/with-tenant.js takeabreak npx expo config --type public",
+    "tenant:verify:device": "node scripts/verify-installed-tenant.js"
   },
   "dependencies": {
     "@firebase/auth": "1.12.2",
