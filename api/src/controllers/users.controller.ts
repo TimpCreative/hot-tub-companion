@@ -74,6 +74,29 @@ export async function putFcmToken(req: Request, res: Response): Promise<void> {
   const timezone = body.timezone != null ? (typeof body.timezone === 'string' ? body.timezone : null) : undefined;
 
   try {
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/a47da7ba-8944-40d5-a7b1-3ca8dd181a2c', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': '8c62d1',
+      },
+      body: JSON.stringify({
+        sessionId: '8c62d1',
+        runId: 'pre-fix',
+        hypothesisId: 'H2-H3',
+        location: 'api/src/controllers/users.controller.ts:76',
+        message: 'Received token update request',
+        data: {
+          userId,
+          tokenLength: fcmToken?.length ?? 0,
+          tokenPrefix: fcmToken ? fcmToken.slice(0, 12) : null,
+          timezone,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     await authService.updateFcmToken(userId, fcmToken, timezone);
     success(res, { updated: true }, 'FCM token updated');
   } catch (err) {

@@ -170,6 +170,29 @@ export async function sendToTenantCustomers(
 
   const messaging = getFirebaseMessaging();
   const tokens = users.map((u) => u.fcm_token);
+  // #region agent log
+  fetch('http://127.0.0.1:7244/ingest/a47da7ba-8944-40d5-a7b1-3ca8dd181a2c', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': '8c62d1',
+    },
+    body: JSON.stringify({
+      sessionId: '8c62d1',
+      runId: 'pre-fix',
+      hypothesisId: 'H3-H4',
+      location: 'api/src/services/notification.service.ts:173',
+      message: 'Preparing multicast send',
+      data: {
+        tenantId,
+        tokenCount: tokens.length,
+        sampleTokenPrefix: tokens[0] ? tokens[0].slice(0, 12) : null,
+        sampleTokenLength: tokens[0]?.length ?? 0,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
 
   const notification: Record<string, string> = { title, body };
   if (imageUrl?.trim()) (notification as any).imageUrl = imageUrl.trim();
@@ -194,6 +217,30 @@ export async function sendToTenantCustomers(
     const res = await messaging.sendEachForMulticast(message);
     sent = res.successCount;
     failed = res.failureCount;
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/a47da7ba-8944-40d5-a7b1-3ca8dd181a2c', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': '8c62d1',
+      },
+      body: JSON.stringify({
+        sessionId: '8c62d1',
+        runId: 'pre-fix',
+        hypothesisId: 'H4-H5',
+        location: 'api/src/services/notification.service.ts:196',
+        message: 'Multicast send result',
+        data: {
+          tenantId,
+          successCount: res.successCount,
+          failureCount: res.failureCount,
+          firstFailureCode: res.responses.find((r) => !r.success)?.error?.code ?? null,
+          firstFailureMessage: res.responses.find((r) => !r.success)?.error?.message ?? null,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     if (logParams && sent > 0) {
       for (let i = 0; i < res.responses.length; i++) {
         if (res.responses[i].success && users[i]) {
