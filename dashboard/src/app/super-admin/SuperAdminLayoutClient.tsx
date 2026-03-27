@@ -46,6 +46,12 @@ export default function SuperAdminLayoutClient({
   const pathname = usePathname();
   const router = useRouter();
 
+  useEffect(() => {
+    if (authLoading) return;
+    const pageLabel = getPageLabelFromPath(pathname || `${basePath}/dashboard`, basePath, navItems, bottomItems);
+    document.title = `${pageLabel} - Super Admin - Hot Tub Companion Dashboard`;
+  }, [pathname, basePath, navItems, bottomItems, authLoading]);
+
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -58,11 +64,6 @@ export default function SuperAdminLayoutClient({
     router.replace(`/auth/login?redirect=${encodeURIComponent(pathname || basePath + '/dashboard')}&admin=1`);
     return null;
   }
-
-  useEffect(() => {
-    const pageLabel = getPageLabelFromPath(pathname || `${basePath}/dashboard`, basePath, navItems, bottomItems);
-    document.title = `${pageLabel} - Super Admin - Hot Tub Companion Dashboard`;
-  }, [pathname, basePath, navItems, bottomItems]);
 
   return (
     <div className="flex min-h-screen" style={{ backgroundColor: 'var(--main-bg)' }}>

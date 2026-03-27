@@ -54,6 +54,13 @@ export default function AdminLayoutClient({
     });
   }, [navItems, permissions?.can_manage_users]);
 
+  useEffect(() => {
+    if (authLoading) return;
+    const pageLabel = getPageLabelFromPath(pathname || `${basePath}/dashboard`, basePath, navItems);
+    const accountLabel = config?.name || 'Retailer Admin';
+    document.title = `${pageLabel} - ${accountLabel} - Hot Tub Companion Dashboard`;
+  }, [pathname, basePath, navItems, config?.name, authLoading]);
+
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -79,12 +86,6 @@ export default function AdminLayoutClient({
   }
 
   const title = config?.name || (config?.slug ? config.slug.charAt(0).toUpperCase() + config.slug.slice(1) : 'Admin');
-
-  useEffect(() => {
-    const pageLabel = getPageLabelFromPath(pathname || `${basePath}/dashboard`, basePath, navItems);
-    const accountLabel = config?.name || 'Retailer Admin';
-    document.title = `${pageLabel} - ${accountLabel} - Hot Tub Companion Dashboard`;
-  }, [pathname, basePath, navItems, config?.name]);
 
   return (
     <div className="flex min-h-screen" style={{ backgroundColor: 'var(--main-bg)' }}>
