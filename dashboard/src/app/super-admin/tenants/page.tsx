@@ -15,6 +15,7 @@ interface Tenant {
   primaryColor?: string;
   secondaryColor?: string;
   createdAt: string;
+  vercelDomainStatus?: string | null;
 }
 
 export default function SuperAdminTenantsPage() {
@@ -79,6 +80,9 @@ export default function SuperAdminTenantsPage() {
                 Status
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Vercel domain
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Created
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -99,6 +103,9 @@ export default function SuperAdminTenantsPage() {
                   <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                     {tenant.status}
                   </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {tenant.vercelDomainStatus ?? '—'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                   {tenant.createdAt

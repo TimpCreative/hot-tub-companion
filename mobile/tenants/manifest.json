@@ -18,6 +18,15 @@
       "splash": "./tenants/takeabreak/splash.png",
       "adaptiveIcon": "./tenants/takeabreak/adaptive-icon.png",
       "envFile": "./tenants/takeabreak/config.env"
+    },
+    "htctest": {
+      "name": "HTC Test",
+      "slug": "htctest",
+      "bundleId": "com.hottubcompanion.htctest",
+      "icon": "./tenants/htctest/icon.png",
+      "splash": "./tenants/htctest/splash.png",
+      "adaptiveIcon": "./tenants/htctest/adaptive-icon.png",
+      "envFile": "./tenants/htctest/config.env"
     }
   }
 }

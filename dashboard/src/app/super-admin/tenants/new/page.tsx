@@ -1,10 +1,25 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
+
+interface VercelDomainSummary {
+  status: 'attached' | 'failed' | 'skipped';
+  domain: string;
+  reason?: string;
+  error?: string;
+}
+
+interface CreatedTenant {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  apiKey?: string;
+}
 
 export default function NewTenantPage() {
   const fetchWithAuth = useSuperAdminFetch();
@@ -16,6 +31,10 @@ export default function NewTenantPage() {
   const [secondaryColor, setSecondaryColor] = useState('#E8A832');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<{
+    tenant: CreatedTenant;
+    vercelDomain?: VercelDomainSummary;
+  } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,8 +57,13 @@ export default function NewTenantPage() {
         setError(data.error?.message || 'Failed to create tenant');
         return;
       }
-      const tenant = data.data?.tenant;
-      router.push(tenant ? `/super-admin/tenants/${tenant.id}` : '/super-admin/tenants');
+      const tenant = data.data?.tenant as CreatedTenant | undefined;
+      const vercelDomain = data.data?.vercelDomain as VercelDomainSummary | undefined;
+      if (tenant) {
+        setCreated({ tenant, vercelDomain });
+      } else {
+        router.push('/super-admin/tenants');
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to create tenant';
       setError(msg);
@@ -69,6 +93,53 @@ export default function NewTenantPage() {
         <div className="mb-6 rounded-lg bg-red-50 p-4 text-red-700">{error}</div>
       )}
 
+      {created && (
+        <div className="mb-6 max-w-xl space-y-4 rounded-lg border border-green-200 bg-green-50 p-4 text-green-900">
+          <p className="font-medium">Tenant created: {created.tenant.name}</p>
+          <p className="text-sm">
+            API key (copy now; it may not be shown again):{' '}
+            <span className="font-mono break-all">{created.tenant.apiKey}</span>
+          </p>
+          {created.vercelDomain && (
+            <div className="rounded-md bg-white/80 p-3 text-sm text-gray-800">
+              <p className="font-medium text-gray-900">Dashboard domain (Vercel)</p>
+              <p className="mt-1 font-mono text-xs">{created.vercelDomain.domain}</p>
+              {created.vercelDomain.status === 'attached' && (
+                <p className="mt-2 text-green-800">Domain added to the Vercel project. Ensure DNS points this host to Vercel (wildcard or per-subdomain CNAME).</p>
+              )}
+              {created.vercelDomain.status === 'skipped' && (
+                <p className="mt-2 text-amber-800">
+                  Vercel auto-attach skipped ({created.vercelDomain.reason ?? 'not configured'}). Set VERCEL_TOKEN and VERCEL_PROJECT_ID on the API to enable.
+                </p>
+              )}
+              {created.vercelDomain.status === 'failed' && (
+                <p className="mt-2 text-red-700">
+                  Vercel attach failed: {created.vercelDomain.error ?? 'Unknown error'}. Check API logs and Vercel project settings.
+                </p>
+              )}
+            </div>
+          )}
+          <div className="flex flex-wrap gap-3 pt-2">
+            <Link href={`/super-admin/tenants/${created.tenant.id}`}>
+              <Button type="button">View tenant</Button>
+            </Link>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setCreated(null);
+                setName('');
+                setSlug('');
+                setApiKey('');
+              }}
+            >
+              Create another
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!created && (
       <form onSubmit={handleSubmit} className="max-w-xl space-y-4">
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -144,6 +215,7 @@ export default function NewTenantPage() {
           </Link>
         </div>
       </form>
+      )}
     </div>
   );
 }

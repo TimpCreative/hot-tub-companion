@@ -39,6 +39,24 @@ Before starting, ensure you have:
 6. Click **Create**
 7. **Important:** Copy the generated API key immediately — you'll need it for the mobile app config
 
+### Retailer dashboard hostname and Vercel (optional automation)
+
+When a tenant is created, the API can register **`{slug}.{hostname}`** on your Vercel dashboard project (e.g. `hot-tub-companion`) so the retailer admin URL is recognized by Vercel. The hostname comes from **`DASHBOARD_BASE`** on the API (default `https://hottubcompanion.com` → `hottubcompanion.com`).
+
+**Railway / API environment (optional):**
+
+| Variable | Purpose |
+|----------|---------|
+| `VERCEL_TOKEN` | Vercel personal or team token with permission to manage project domains. |
+| `VERCEL_PROJECT_ID` | Vercel project **id** or **name** (e.g. `hot-tub-companion`). |
+| `VERCEL_TEAM_ID` | Required if the project is under a Vercel team. |
+
+If these are unset, tenant creation still succeeds; Vercel attach is recorded as **skipped** and you can add the domain manually in Vercel.
+
+**DNS:** Vercel only registers the hostname on the project. Your DNS (e.g. Namecheap) must still resolve `{slug}.hottubcompanion.com` to Vercel—typically a **wildcard** `*` CNAME to Vercel’s target, or a **per-slug** CNAME for each tenant.
+
+**Reserved slugs:** You cannot use `admin`, `www`, `hottubcompanion`, or `api` as a tenant slug (they conflict with platform routing).
+
 ---
 
 ## Step 2: Set Up Mobile App Assets

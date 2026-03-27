@@ -75,6 +75,8 @@ The API reads env vars from the process (and `dotenv` is enabled), so you can us
 - `SUPER_ADMIN_EMAILS` (comma-separated)
 - `TENANT_ADMIN_EMAILS` (comma-separated)
 - `FIREBASE_STORAGE_BUCKET`
+- `DASHBOARD_BASE` (e.g. `https://hottubcompanion.com`; used for admin invite URLs and tenant subdomain derivation)
+- `VERCEL_TOKEN`, `VERCEL_PROJECT_ID`, `VERCEL_TEAM_ID` (optional; API auto-adds `{slug}` retailer hostname to the Vercel dashboard project on tenant create—see `CREATING-A-NEW-TENANT.md`)
 
 #### Run migrations + seed
 

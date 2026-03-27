@@ -21,10 +21,25 @@
 | **Info cards** | ❌ | Warranty, Filter Reminder, Seasonal Alert, Recent Orders — none on Home |
 | **Shop tab** | ❌ | Placeholder ("Coming in Phase 2"); API exists |
 | **Cart & checkout** | ❌ | Not implemented |
-| **Push notifications** | ❌ | expo-notifications in package; no FCM registration or backend |
+| **Push notifications** | ✅ | FCM registration, cron dispatch, admin UI, deep links, images, user-local scheduling |
 | **Profile & settings** | ✅ | Account, My Spas, notifications, privacy, app info, sign out |
 | **Edit spa flow** | ✅ | Sanitization, usage months, serial, nickname, warranty |
 | **Retailer Admin app-setup** | ✅ | Onboarding config, home dashboard (Quick Links + widgets), dealer contact |
+| **Retailer Admin dashboard UX** | ✅ | Dark/light mode toggle (light default), theme-aware styling, permission system |
+
+---
+
+## Unplanned Changes (Completed)
+
+The following were implemented after the Phase 2 plan and are now complete:
+
+| Change | Status | Notes |
+|--------|--------|-------|
+| **Push notifications** | ✅ | FCM token registration, cron-based dispatch, Admin → Notifications compose UI. Deep links (Shop, Product, Inbox, etc.), image attachments, retailer timezone display. |
+| **User-local notification scheduling** | ✅ | Option to send at retailer time or at each user's local time. Past-timezone handling: send immediately or push to next day. |
+| **Tenant timezone** | ✅ | Retailer timezone in Admin → Settings. Shown next to "Send At" in Notifications. |
+| **Admin permission system** | ✅ | Roles (owner, manager, support, viewer), granular permissions (can_manage_users, can_send_notifications, etc.), Team page with invite/edit/remove, audit log. |
+| **Dashboard dark/light mode** | ✅ | Toggle in header (near Sign Out). Light mode default; no system preference. Cookie persistence. Theme-aware cards, inputs, tables (`.card`, `.bg-card`, `.divide-theme`). |
 
 ---
 
@@ -48,7 +63,7 @@ At the end of this phase, you should have a fully functional customer-facing app
 - ✅ See a personalized "My Tub" dashboard
 - ❌ Browse products filtered to their spa's compatibility
 - ❌ Add products to cart and complete checkout via Shopify Checkout Kit
-- ❌ Receive basic push notifications (order confirmation, welcome)
+- ✅ Receive basic push notifications (order confirmation, welcome — FCM + admin compose UI implemented)
 
 This is the **minimum viable product** for customer-facing functionality.
 
@@ -479,9 +494,9 @@ const REMOVE_FROM_CART = gql`
 
 ---
 
-## Part 5: Push Notifications (Basic) — ❌ Not implemented
+## Part 5: Push Notifications (Basic) — ✅ Implemented
 
-`expo-notifications` is in package.json but not wired up. No FCM registration, backend service, or webhooks.
+FCM registration, cron dispatch, Admin Notifications compose UI, deep links, and image attachments are in place. User-local scheduling option (send at each user's local time) and retailer timezone fallback. See "Unplanned Changes" above.
 
 ### 5.1 FCM Setup
 

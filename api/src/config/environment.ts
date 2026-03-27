@@ -39,4 +39,23 @@ export const env = {
   FIREBASE_STORAGE_BUCKET: process.env.FIREBASE_STORAGE_BUCKET,
   /** Secret for cron dispatch endpoint; min 32 chars. Required when cron is used. */
   CRON_SECRET: process.env.CRON_SECRET,
+  /** Optional: attach `${slug}.${dashboardHost}` to Vercel project when creating tenants. */
+  VERCEL_TOKEN: process.env.VERCEL_TOKEN?.trim() || '',
+  VERCEL_PROJECT_ID: process.env.VERCEL_PROJECT_ID?.trim() || '',
+  VERCEL_TEAM_ID: process.env.VERCEL_TEAM_ID?.trim() || '',
 };
+
+/** Hostname from DASHBOARD_BASE (e.g. hottubcompanion.com) for retailer subdomain URLs. */
+export function getDashboardHostname(): string {
+  const raw = env.DASHBOARD_BASE.trim();
+  try {
+    const withProto = raw.startsWith('http') ? raw : `https://${raw}`;
+    return new URL(withProto).hostname;
+  } catch {
+    return 'hottubcompanion.com';
+  }
+}
+
+export function isVercelDomainAttachConfigured(): boolean {
+  return !!(env.VERCEL_TOKEN && env.VERCEL_PROJECT_ID);
+}

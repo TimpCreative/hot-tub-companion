@@ -24,6 +24,10 @@ interface Tenant {
   posType?: string | null;
   shopifyStoreUrl?: string | null;
   lastProductSyncAt?: string | null;
+  dashboardDomain?: string | null;
+  vercelDomainStatus?: string | null;
+  vercelDomainError?: string | null;
+  vercelDomainUpdatedAt?: string | null;
 }
 
 export default function TenantDetailPage() {
@@ -300,6 +304,30 @@ export default function TenantDetailPage() {
               <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                 {tenant.status}
               </span>
+            </dd>
+          </div>
+          <div className="px-6 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Retailer dashboard domain</dt>
+            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 break-all">
+              {tenant.dashboardDomain ? (
+                <span className="font-mono">{tenant.dashboardDomain}</span>
+              ) : (
+                <span className="text-gray-500">—</span>
+              )}
+            </dd>
+          </div>
+          <div className="px-6 py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Vercel domain status</dt>
+            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+              {tenant.vercelDomainStatus ?? '—'}
+              {tenant.vercelDomainError && (
+                <span className="mt-1 block text-red-600 text-xs">{tenant.vercelDomainError}</span>
+              )}
+              {tenant.vercelDomainUpdatedAt && (
+                <span className="mt-1 block text-xs text-gray-500">
+                  Updated {format(new Date(tenant.vercelDomainUpdatedAt), 'MMM d, yyyy h:mm a')}
+                </span>
+              )}
             </dd>
           </div>
           <div className="px-6 py-4 sm:grid sm:grid-cols-3 sm:gap-4">

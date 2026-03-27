@@ -3,7 +3,8 @@ import { db } from '../config/database';
 import { success, error } from '../utils/response';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
-import { env } from '../config/environment';
+import { env, getDashboardHostname, isVercelDomainAttachConfigured } from '../config/environment';
+import * as vercelProjectDomains from '../services/vercelProjectDomains.service';
 import { getFirebaseAuth, isFirebaseInitialized, getFirebaseInitError, getFirebaseKeyDebugInfo } from '../config/firebase';
 import { toProxyUrl } from '../utils/mediaUrl';
 import sgMail from '@sendgrid/mail';
@@ -159,6 +160,8 @@ export async function registerSuperAdmin(req: Request, res: Response): Promise<v
   }
 }
 
+const RESERVED_TENANT_SLUGS = new Set(['admin', 'www', 'hottubcompanion', 'api']);
+
 export async function listTenants(_req: Request, res: Response): Promise<void> {
   const tenants = await db('tenants').select('*').orderBy('name');
   const formatted = tenants.map((t) => ({
@@ -174,6 +177,10 @@ export async function listTenants(_req: Request, res: Response): Promise<void> {
     logoUrl: toProxyUrl(t.logo_url) ?? t.logo_url,
     iconUrl: toProxyUrl(t.icon_url) ?? t.icon_url,
     createdAt: t.created_at,
+    dashboardDomain: t.dashboard_domain ?? null,
+    vercelDomainStatus: t.vercel_domain_status ?? null,
+    vercelDomainError: t.vercel_domain_error ?? null,
+    vercelDomainUpdatedAt: t.vercel_domain_updated_at ?? null,
   }));
   success(res, { tenants: formatted });
 }
@@ -197,13 +204,19 @@ export async function createTenant(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const slug = body.slug.trim().toLowerCase();
+  if (RESERVED_TENANT_SLUGS.has(slug)) {
+    error(res, 'VALIDATION_ERROR', `Slug "${slug}" is reserved for platform routing`, 400);
+    return;
+  }
+
   const apiKey = body.apiKey || `tenant_${crypto.randomBytes(16).toString('hex')}`;
   const apiKeyHash = bcrypt.hashSync(apiKey, 10);
 
   const [tenant] = await db('tenants')
     .insert({
       name: body.name,
-      slug: body.slug,
+      slug,
       api_key: apiKey,
       api_key_hash: apiKeyHash,
       primary_color: body.primaryColor || '#1B4D7A',
@@ -216,6 +229,58 @@ export async function createTenant(req: Request, res: Response): Promise<void> {
     })
     .returning('*');
 
+  const dashboardHost = getDashboardHostname();
+  const fullDomain = `${slug}.${dashboardHost}`;
+
+  type VercelPayload = {
+    status: 'attached' | 'failed' | 'skipped';
+    domain: string;
+    reason?: string;
+    error?: string;
+  };
+
+  let vercelDomain: VercelPayload = {
+    status: 'skipped',
+    domain: fullDomain,
+    reason: 'not_configured',
+  };
+
+  if (isVercelDomainAttachConfigured()) {
+    const vercelRes = await vercelProjectDomains.addProjectDomain(fullDomain);
+    if (vercelRes.ok) {
+      vercelDomain = { status: 'attached', domain: fullDomain };
+      await db('tenants').where({ id: tenant.id }).update({
+        dashboard_domain: fullDomain,
+        vercel_domain_status: 'attached',
+        vercel_domain_error: null,
+        vercel_domain_updated_at: db.fn.now(),
+        updated_at: db.fn.now(),
+      });
+    } else {
+      vercelDomain = {
+        status: 'failed',
+        domain: fullDomain,
+        error: vercelRes.message,
+      };
+      await db('tenants').where({ id: tenant.id }).update({
+        dashboard_domain: fullDomain,
+        vercel_domain_status: 'failed',
+        vercel_domain_error: vercelRes.message.slice(0, 2000),
+        vercel_domain_updated_at: db.fn.now(),
+        updated_at: db.fn.now(),
+      });
+      console.warn('[createTenant] Vercel domain attach failed:', fullDomain, vercelRes.status, vercelRes.message);
+    }
+  } else {
+    await db('tenants').where({ id: tenant.id }).update({
+      dashboard_domain: fullDomain,
+      vercel_domain_status: 'skipped',
+      vercel_domain_error: null,
+      vercel_domain_updated_at: db.fn.now(),
+      updated_at: db.fn.now(),
+    });
+  }
+
   res.status(201);
   success(res, {
     tenant: {
@@ -225,6 +290,7 @@ export async function createTenant(req: Request, res: Response): Promise<void> {
       status: tenant.status,
       apiKey,
     },
+    vercelDomain,
   });
 }
 
