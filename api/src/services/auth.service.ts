@@ -11,6 +11,10 @@ interface RegisterBody {
   phone?: string;
 }
 
+interface VerifyTokenOptions {
+  autoProvisionTenantUser?: boolean;
+}
+
 export async function register(tenantId: string, body: RegisterBody) {
   const { email, password, firstName, lastName, phone } = body;
   if (!email || !password) {
@@ -59,7 +63,7 @@ export async function register(tenantId: string, body: RegisterBody) {
   };
 }
 
-export async function verifyToken(token: string, tenantId?: string) {
+export async function verifyToken(token: string, tenantId?: string, options?: VerifyTokenOptions) {
   const auth = getFirebaseAuth();
   const decoded = await auth.verifyIdToken(token);
   const tenantIdToUse = tenantId;
@@ -83,6 +87,13 @@ export async function verifyToken(token: string, tenantId?: string) {
     return formatUser({ ...user, email: firebaseEmail || user.email });
   }
 
+  if (options?.autoProvisionTenantUser) {
+    const autoProvisioned = await autoProvisionTenantUser(tenantIdToUse, decoded);
+    if (autoProvisioned) {
+      return formatUser(autoProvisioned);
+    }
+  }
+
   // Whitelist override: same rules as authMiddleware (no users row for this tenant)
   const email = ((decoded.email as string) || '').toLowerCase();
   const canOverride =
@@ -103,6 +114,48 @@ export async function verifyToken(token: string, tenantId?: string) {
   }
 
   throw new NotFoundError('User not found for this tenant');
+}
+
+async function autoProvisionTenantUser(tenantId: string, decoded: Record<string, unknown>) {
+  const firebaseUid = decoded.uid as string | undefined;
+  const emailRaw = decoded.email as string | undefined;
+  const email = emailRaw?.trim().toLowerCase();
+  if (!firebaseUid || !email) return null;
+
+  const fallback = await db('users')
+    .where({ firebase_uid: firebaseUid })
+    .whereNull('deleted_at')
+    .orderBy('created_at', 'asc')
+    .first();
+
+  const name = (decoded.name as string | undefined)?.trim() || '';
+  const [firstFromName, ...rest] = name.split(/\s+/).filter(Boolean);
+
+  const payload = {
+    tenant_id: tenantId,
+    firebase_uid: firebaseUid,
+    email,
+    first_name: fallback?.first_name || firstFromName || null,
+    last_name: fallback?.last_name || (rest.length > 0 ? rest.join(' ') : null),
+    phone: fallback?.phone || null,
+    role: 'customer',
+  };
+
+  try {
+    const [inserted] = await db('users')
+      .insert(payload)
+      .returning('*');
+    return inserted || null;
+  } catch (err: unknown) {
+    const e = err as { code?: string };
+    if (e.code !== '23505') throw err;
+    // Another request may have inserted first.
+    const existing = await db('users')
+      .where({ firebase_uid: firebaseUid, tenant_id: tenantId })
+      .whereNull('deleted_at')
+      .first();
+    return existing || null;
+  }
 }
 
 export async function updateFcmToken(

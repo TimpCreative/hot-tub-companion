@@ -49,7 +49,9 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const user = await authService.verifyToken(token, tenant.id);
+    const user = await authService.verifyToken(token, tenant.id, {
+      autoProvisionTenantUser: true,
+    });
     const fcmToken = (req.body as { fcmToken?: string })?.fcmToken;
     if (fcmToken && user.id) {
       await authService.updateFcmToken(user.id as string, fcmToken);
@@ -85,7 +87,9 @@ export async function verify(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const user = await authService.verifyToken(token, tenant.id);
+    const user = await authService.verifyToken(token, tenant.id, {
+      autoProvisionTenantUser: true,
+    });
     success(res, { user });
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'NOT_FOUND') {
