@@ -2,9 +2,9 @@
 
 This runbook is the required process for shipping app updates safely to multiple tenants.
 
-## 1) Add / verify tenant manifest entry
+## 1) Add / verify tenant config entry
 
-Update `mobile/tenants/manifest.json` with:
+Create or update `mobile/tenants/<tenant-key>/tenant.json` with:
 - `name`
 - `slug`
 - `bundleId`

@@ -7,10 +7,6 @@ on:
 jobs:
   mobile-tenant-config:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        tenant: [default, takeabreak]
     defaults:
       run:
         working-directory: mobile
@@ -30,8 +26,8 @@ jobs:
       - name: Validate tenant manifest
         run: npm run tenant:verify
 
-      - name: Resolve Expo config for tenant
-        run: TENANT=${{ matrix.tenant }} npx expo config --type public
+      - name: Resolve Expo config for all tenants
+        run: npm run tenant:config:all
         env:
           TENANT_API_KEY: tenant-key-required-in-ci
 

@@ -1,0 +1,9 @@
+{
+  "name": "Take A Break Spas",
+  "slug": "takeabreak",
+  "bundleId": "com.hottubcompanion.takeabreak",
+  "icon": "icon.png",
+  "splash": "splash.png",
+  "adaptiveIcon": "adaptive-icon.png",
+  "envFile": "config.env"
+}

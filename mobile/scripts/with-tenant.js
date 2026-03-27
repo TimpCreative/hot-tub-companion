@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 const { spawnSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+const { getTenantConfig } = require('../tenants/load-tenants');
 
 const [, , tenant, ...cmd] = process.argv;
 if (!tenant || cmd.length === 0) {
@@ -9,9 +8,7 @@ if (!tenant || cmd.length === 0) {
   process.exit(1);
 }
 
-const manifestPath = path.resolve(__dirname, '../tenants/manifest.json');
-const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-const cfg = manifest.tenants?.[tenant];
+const cfg = getTenantConfig(tenant);
 if (!cfg) {
   console.error(`Unknown tenant '${tenant}'.`);
   process.exit(1);

@@ -1,0 +1,9 @@
+{
+  "name": "HTC Test",
+  "slug": "htctest",
+  "bundleId": "com.hottubcompanion.htctest",
+  "icon": "icon.png",
+  "splash": "splash.png",
+  "adaptiveIcon": "adaptive-icon.png",
+  "envFile": "config.env"
+}

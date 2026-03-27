@@ -1,8 +1,8 @@
 require('dotenv').config();
-const manifest = require('./tenants/manifest.json');
+const { loadTenantConfigs, getDefaultTenantKey } = require('./tenants/load-tenants');
 
-const TENANT = process.env.TENANT || manifest.defaultTenant || 'default';
-const tenantConfig = manifest.tenants || {};
+const TENANT = process.env.TENANT || getDefaultTenantKey();
+const tenantConfig = loadTenantConfigs();
 const config = tenantConfig[TENANT];
 const isCI = process.env.CI === 'true' || process.env.CI === '1';
 const isEasBuild = !!process.env.EAS_BUILD;

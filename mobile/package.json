@@ -13,7 +13,7 @@
     "tenant:android": "node scripts/with-tenant.js",
     "tenant:ios:takeabreak": "node scripts/with-tenant.js takeabreak npx expo run:ios --device",
     "tenant:start:takeabreak": "node scripts/with-tenant.js takeabreak npx expo start --dev-client --host lan --clear",
-    "tenant:config:all": "node scripts/verify-tenant-config.js && node scripts/with-tenant.js default npx expo config --type public && node scripts/with-tenant.js takeabreak npx expo config --type public",
+    "tenant:config:all": "node scripts/verify-tenant-config.js && node scripts/verify-tenant-public-configs.js",
     "tenant:verify:device": "node scripts/verify-installed-tenant.js"
   },
   "dependencies": {
