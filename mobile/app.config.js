@@ -2,6 +2,9 @@ require('dotenv').config();
 const { execFileSync } = require('child_process');
 const { loadTenantConfigs, getDefaultTenantKey } = require('./tenants/load-tenants');
 
+/** Must match expo.dev project slug for `extra.eas.projectId` (one EAS project, many tenant bundle IDs). */
+const EAS_PROJECT_SLUG = 'hottubcompanion';
+
 /**
  * EAS evaluates app.config synchronously (no async/Promise). Use curl on the builder for tenant key fetch.
  */
@@ -77,7 +80,7 @@ module.exports = ({ config: expoConfig }) => {
     ...expoConfig,
     owner: 'timpcreative',
     name: config.name,
-    slug: config.slug,
+    slug: EAS_PROJECT_SLUG,
     version: '1.0.0',
     orientation: 'portrait',
     icon: config.icon,
@@ -92,6 +95,7 @@ module.exports = ({ config: expoConfig }) => {
       infoPlist: {
         CFBundleDisplayName: config.name,
         NSCameraUsageDescription: 'Used to identify your hot tub model',
+        ITSAppUsesNonExemptEncryption: false,
       },
     },
     android: {
