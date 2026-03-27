@@ -8,6 +8,7 @@ function shouldSkipTenant(path: string): boolean {
     path === '/health' ||
     path.startsWith('/api/v1/auth') ||
     path === '/api/v1/tenant/config' ||
+    path === '/api/v1/internal/eas-tenant-config' ||
     path.startsWith('/api/v1/media/') ||
     path.startsWith('/api/v1/super-admin') ||
     path.startsWith('/api/v1/internal/cron') ||

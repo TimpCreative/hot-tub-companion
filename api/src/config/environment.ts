@@ -39,6 +39,8 @@ export const env = {
   FIREBASE_STORAGE_BUCKET: process.env.FIREBASE_STORAGE_BUCKET,
   /** Secret for cron dispatch endpoint; min 32 chars. Required when cron is used. */
   CRON_SECRET: process.env.CRON_SECRET,
+  /** Secret for EAS/mobile app.config to fetch tenant API key at build time; min 32 chars. Mirror in Expo env. */
+  EAS_BUILD_CONFIG_SECRET: process.env.EAS_BUILD_CONFIG_SECRET?.trim() || '',
   /** Optional: attach `${slug}.${dashboardHost}` to Vercel project when creating tenants. */
   VERCEL_TOKEN: process.env.VERCEL_TOKEN?.trim() || '',
   VERCEL_PROJECT_ID: process.env.VERCEL_PROJECT_ID?.trim() || '',

@@ -77,6 +77,7 @@ The API reads env vars from the process (and `dotenv` is enabled), so you can us
 - `FIREBASE_STORAGE_BUCKET`
 - `DASHBOARD_BASE` (e.g. `https://hottubcompanion.com`; used for admin invite URLs and tenant subdomain derivation)
 - `VERCEL_TOKEN`, `VERCEL_PROJECT_ID`, `VERCEL_TEAM_ID` (optional; API auto-adds `{slug}` retailer hostname to the Vercel dashboard project on tenant create—see `CREATING-A-NEW-TENANT.md`)
+- `EAS_BUILD_CONFIG_SECRET` (min 32 chars; mirror the same value in Expo project env vars — EAS builds call `GET /api/v1/internal/eas-tenant-config` to load `tenantApiKey` by tenant slug)
 
 #### Run migrations + seed
 
@@ -133,9 +134,18 @@ cd mobile
 npm run start
 ```
 
+**EAS cloud builds (per retailer):** set `TENANT` to the folder name under `mobile/tenants/` (must match `tenants.slug` in the DB and `status: active`). Expo env needs `API_URL`, `FIREBASE_*`, and `EAS_BUILD_CONFIG_SECRET` (not per-tenant `TENANT_API_KEY`). On the builder, `app.config.js` loads the key via `curl` to `GET /api/v1/internal/eas-tenant-config` (gitignored `config.env` is absent there). Example:
+
+```bash
+cd mobile
+TENANT=htctest eas build --profile preview --platform android
+```
+
+Set the same `EAS_BUILD_CONFIG_SECRET` on Railway and in Expo. If `TENANT_API_KEY` is already in the environment, it is used instead of fetching (handy for local experiments with `EAS_BUILD=1`).
+
 ## Tenant + auth model (practical notes)
 
-- **Tenant scoping**: most API routes require `x-tenant-key`. The middleware skips `/health`, `/api/v1/auth/*`, `/api/v1/tenant/config`, and all `/api/v1/super-admin/*` routes.
+- **Tenant scoping**: most API routes require `x-tenant-key`. The middleware skips `/health`, `/api/v1/auth/*`, `/api/v1/tenant/config`, `/api/v1/internal/eas-tenant-config`, and all `/api/v1/super-admin/*` routes.
 - **Super admin auth**: `/api/v1/super-admin/*` uses Firebase ID tokens + `SUPER_ADMIN_EMAILS` allowlist.
 
 ## Deployment (current targets)

@@ -37,7 +37,7 @@ Before starting, ensure you have:
    - **Primary Color:** Hex code (e.g., `#1B4D7A`)
    - **Secondary Color:** Hex code (e.g., `#E8A832`)
 6. Click **Create**
-7. **Important:** Copy the generated API key immediately — you'll need it for the mobile app config
+7. **Important:** The API key is stored in the database. For **EAS cloud builds**, you do not paste it into Expo if `EAS_BUILD_CONFIG_SECRET` is configured; use `TENANT=<slug> eas build ...`. For **local** `expo start`, copy the key into `mobile/tenants/<slug>/config.env` (see tenant setup steps below).
 
 ### Retailer dashboard hostname and Vercel (optional automation)
 
@@ -47,6 +47,7 @@ When a tenant is created, the API can register **`{slug}.{hostname}`** on your V
 
 | Variable | Purpose |
 |----------|---------|
+| `EAS_BUILD_CONFIG_SECRET` | Min 32 characters; same value must be set in **Expo** env vars. EAS builds call `GET /api/v1/internal/eas-tenant-config` to load the tenant’s `api_key` by slug (no per-tenant key in Expo). |
 | `VERCEL_TOKEN` | Vercel personal or team token with permission to manage project domains. |
 | `VERCEL_PROJECT_ID` | Vercel project **id** or **name** (e.g. `hot-tub-companion`). |
 | `VERCEL_TEAM_ID` | Required if the project is under a Vercel team. |

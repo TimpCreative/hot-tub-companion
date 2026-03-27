@@ -15,7 +15,9 @@ import mediaRoutes from './media.routes';
 import mediaPublicRoutes from './mediaPublic.routes';
 import { superAdminAuth } from '../middleware/superAdminAuth';
 import { cronAuth } from '../middleware/cronAuth';
+import { easBuildConfigAuth } from '../middleware/easBuildConfigAuth';
 import * as cronController from '../controllers/cron.controller';
+import * as internalEasController from '../controllers/internalEas.controller';
 import adminRoutes from './admin.routes';
 import productsRoutes from './products.routes';
 import spaProfilesRoutes from './spaProfiles.routes';
@@ -34,6 +36,13 @@ router.post(
   '/api/v1/internal/cron/dispatch-notifications',
   cronAuth,
   cronController.dispatchNotifications
+);
+
+// EAS build: fetch tenant API key by slug (EAS_BUILD_CONFIG_SECRET required)
+router.get(
+  '/api/v1/internal/eas-tenant-config',
+  easBuildConfigAuth,
+  internalEasController.getEasTenantConfig
 );
 
 // Public media serve (no auth) - streams from GCS for logos/icons

@@ -14,7 +14,9 @@
     "tenant:ios:takeabreak": "node scripts/with-tenant.js takeabreak npx expo run:ios --device",
     "tenant:start:takeabreak": "node scripts/with-tenant.js takeabreak npx expo start --dev-client --host lan --clear",
     "tenant:config:all": "node scripts/verify-tenant-config.js && node scripts/verify-tenant-public-configs.js",
-    "tenant:verify:device": "node scripts/verify-installed-tenant.js"
+    "tenant:verify:device": "node scripts/verify-installed-tenant.js",
+    "eas:build:android": "eas build --platform android",
+    "eas:build:ios": "eas build --platform ios"
   },
   "dependencies": {
     "@firebase/auth": "1.12.2",
