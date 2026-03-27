@@ -23,8 +23,8 @@ for (const [slug, cfg] of Object.entries(tenants)) {
     errors.push(`${slug}: config must be an object.`);
     continue;
   }
-  if (!cfg.name || !cfg.bundleId || !cfg.slug || !cfg.envFile) {
-    errors.push(`${slug}: missing required keys (name, slug, bundleId, envFile).`);
+  if (!cfg.name || !cfg.bundleId || !cfg.slug) {
+    errors.push(`${slug}: missing required keys (name, slug, bundleId).`);
   }
   if (typeof cfg.slug !== 'string' || cfg.slug.trim().length === 0) {
     errors.push(`${slug}: slug must be a non-empty string.`);
@@ -47,20 +47,20 @@ for (const [slug, cfg] of Object.entries(tenants)) {
     seenBundleIds.add(cfg.bundleId);
   }
 
-  if (typeof cfg.envFile !== 'string' || !cfg.envFile.startsWith('./')) {
-    errors.push(`${slug}: envFile must resolve to a project-relative path.`);
-  }
-  if (!path.basename(cfg.envFile || '').endsWith('.env') && !path.basename(cfg.envFile || '').endsWith('.env.example')) {
-    errors.push(`${slug}: envFile should reference a .env file path.`);
-  }
-  const envPath = path.resolve(MOBILE_ROOT, cfg.envFile || '');
-  const envExamplePath = envPath.endsWith('.env')
-    ? envPath.replace(/\.env$/, '.env.example')
-    : `${envPath}.example`;
-  if (!fs.existsSync(envPath) && !fs.existsSync(envExamplePath)) {
-    errors.push(
-      `${slug}: missing env file '${cfg.envFile}' and missing fallback '${path.relative(MOBILE_ROOT, envExamplePath)}'`
-    );
+  if (cfg.envFile != null) {
+    if (typeof cfg.envFile !== 'string' || !cfg.envFile.startsWith('./')) {
+      errors.push(`${slug}: envFile must be a project-relative path starting with ./`);
+    } else if (
+      !path.basename(cfg.envFile).endsWith('.env') &&
+      !path.basename(cfg.envFile).endsWith('.env.example')
+    ) {
+      errors.push(`${slug}: envFile should reference a .env path.`);
+    } else {
+      const envPath = path.resolve(MOBILE_ROOT, cfg.envFile);
+      if (!fs.existsSync(envPath)) {
+        errors.push(`${slug}: env file '${cfg.envFile}' does not exist.`);
+      }
+    }
   }
 
   for (const key of ['icon', 'splash', 'adaptiveIcon']) {

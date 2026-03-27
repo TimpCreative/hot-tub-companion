@@ -4,6 +4,5 @@
   "bundleId": "com.hottubcompanion.default",
   "icon": "../../assets/icon.png",
   "splash": "../../assets/splash-icon.png",
-  "adaptiveIcon": "../../assets/adaptive-icon.png",
-  "envFile": "config.env"
+  "adaptiveIcon": "../../assets/adaptive-icon.png"
 }

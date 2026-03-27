@@ -10,7 +10,7 @@
    - Find the exposed API key
    - Restrict it: Application restrictions (HTTP referrers for web, package name for Android), API restrictions (only Firebase APIs)
    - Or create a new key and restrict it, then remove the old one
-4. Update `mobile/tenants/*/config.env` (local files, gitignored) with the new key
+4. Update **`mobile/.env`** (or Expo env / optional per-tenant `config.env`) with the new key
 5. Update dashboard `.env.local` with the new key
 6. Update Railway env vars if the API uses it
 
@@ -20,7 +20,7 @@ The `tab_dev_*` key was exposed. Generate a new one:
 
 1. Super Admin dashboard → Tenants → Take A Break → edit or regenerate API key
 2. Or run `railway run knex seed:run` (if seed generates new key) and update config.env
-3. Update `mobile/tenants/takeabreak/config.env` and dashboard `.env.local`
+3. Update `mobile/.env` (and dashboard `.env.local`)
 
 ## 3. Git History (Optional but Recommended)
 

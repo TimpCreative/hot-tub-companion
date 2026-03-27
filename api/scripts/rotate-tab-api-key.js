@@ -29,7 +29,7 @@ async function rotate() {
   }
 
   console.log('\n✅ Take A Break API key rotated.');
-  console.log('\nNew API key (update mobile/tenants/*/config.env and dashboard/.env.local):');
+  console.log('\nNew API key (update mobile/.env or expo.dev env, and dashboard/.env.local):');
   console.log(apiKey);
   console.log('\n');
   await db.destroy();

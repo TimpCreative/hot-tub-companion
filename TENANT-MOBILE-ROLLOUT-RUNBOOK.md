@@ -9,7 +9,8 @@ Create or update `mobile/tenants/<tenant-key>/tenant.json` with:
 - `slug`
 - `bundleId`
 - `icon`, `splash`, `adaptiveIcon`
-- `envFile`
+
+Local secrets live in **`mobile/.env`** (or optional legacy `tenants/<slug>/config.env` if present), not in git.
 
 Validate:
 

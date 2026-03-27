@@ -37,7 +37,7 @@ Before starting, ensure you have:
    - **Primary Color:** Hex code (e.g., `#1B4D7A`)
    - **Secondary Color:** Hex code (e.g., `#E8A832`)
 6. Click **Create**
-7. **Important:** The API key is stored in the database. For **EAS cloud builds**, you do not paste it into Expo if `EAS_BUILD_CONFIG_SECRET` is configured; pick the profile `preview-<slug>` or `production-<slug>` (see Step 5). For **local** `expo start`, copy the key into `mobile/tenants/<slug>/config.env` (see tenant setup steps below).
+7. **Important:** The API key is stored in the database. For **EAS cloud builds**, you do not paste it into Expo if `EAS_BUILD_CONFIG_SECRET` is configured; pick the profile `preview-<slug>` or `production-<slug>` (see Step 5). For **local** `expo start`, put secrets in **`mobile/.env`** (or `eas env:pull`) — see Step 3.
 
 ### Retailer dashboard hostname and Vercel (optional automation)
 
@@ -78,7 +78,6 @@ Create these files in `mobile/tenants/{slug}/`:
 | `icon.png` | 1024x1024px | App icon (no transparency for iOS) |
 | `adaptive-icon.png` | 1024x1024px | Android adaptive icon foreground |
 | `splash.png` | 1284x2778px | Splash screen image |
-| `config.env` | — | Environment configuration |
 
 ### Example Directory Structure
 
@@ -87,21 +86,21 @@ mobile/tenants/takeabreak/
 ├── icon.png
 ├── adaptive-icon.png
 ├── splash.png
-└── config.env
+└── tenant.json
 ```
 
 ---
 
-## Step 3: Create config.env
+## Step 3: Local env for `expo start` (mobile/.env)
 
-Create `mobile/tenants/{slug}/config.env` with the following content:
+Do **not** commit secrets. Use a single **`mobile/.env`** (gitignored) or run `eas env:pull --environment development` from `mobile/` after setting variables on expo.dev.
+
+Minimum variables for local development:
 
 ```env
-# Tenant identification
-TENANT_SLUG=takeabreak
+TENANT=takeabreak
+API_URL=https://api.hottubcompanion.com
 TENANT_API_KEY=tenant_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-# Firebase Web Config (same for all tenants, from Firebase Console)
 FIREBASE_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 FIREBASE_AUTH_DOMAIN=hot-tub-companion.firebaseapp.com
 FIREBASE_PROJECT_ID=hot-tub-companion
@@ -111,11 +110,12 @@ FIREBASE_PROJECT_ID=hot-tub-companion
 
 | Variable | Source |
 |----------|--------|
-| `TENANT_SLUG` | The slug you entered in Step 1 |
+| `TENANT` | Same as folder name / slug from Step 1 |
 | `TENANT_API_KEY` | Copied from Step 1 (or view in tenant details) |
+| `API_URL` | Your deployed API base URL |
 | `FIREBASE_*` | Firebase Console → Project Settings → Your apps → Web app |
 
-> ⚠️ **Security:** `config.env` files are git-ignored. Never commit API keys to the repository.
+> ⚠️ **Security:** Never commit `mobile/.env`. Optional legacy `mobile/tenants/{slug}/config.env` is still supported if the file exists (also gitignored).
 
 ---
 
@@ -352,12 +352,12 @@ Before announcing go-live to the retailer:
 
 - Verify you used the correct EAS profile (`preview-{slug}` or `production-{slug}`) so `env.TENANT` matches the retailer
 - Run `npm run eas:generate` after adding a tenant folder, then commit `eas.json`
-- Check that `config.env` exists in `mobile/tenants/{slug}/` for local dev
+- For local dev, ensure `mobile/.env` (or shell `export`) includes `TENANT` and `TENANT_API_KEY`
 - Rebuild: `eas build --platform all --profile production-{slug}`
 
 ### Firebase auth errors
 
-- Verify Firebase API key is correct in `config.env`
+- Verify Firebase API key is correct in `mobile/.env`
 - Check Firebase Console → Authentication → Settings → Authorized domains includes your domains
 - For mobile, ensure HTTP referer restrictions are disabled or app bundle IDs are whitelisted
 
@@ -402,7 +402,7 @@ npx expo start
 |------|------|
 | Create tenant in dashboard | 5 minutes |
 | Set up mobile assets | 30 minutes (depends on branding package) |
-| Create config.env | 5 minutes |
+| Set `mobile/.env` (or Expo pull) | 5 minutes |
 | Local testing | 15 minutes |
 | Build apps (iOS + Android) | 20-40 minutes (EAS cloud build) |
 | App Store submission | 30 minutes (first time), 10 minutes (subsequent) |

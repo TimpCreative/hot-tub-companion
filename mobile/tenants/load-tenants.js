@@ -20,12 +20,16 @@ function normalizeTenantPath(dirName, rawPath, fallback) {
 }
 
 function normalizeTenantConfig(dirName, cfg) {
+  const hasEnvFile =
+    cfg.envFile != null && typeof cfg.envFile === 'string' && cfg.envFile.trim() !== '';
   return {
     ...cfg,
     icon: normalizeTenantPath(dirName, cfg.icon, `./tenants/${dirName}/icon.png`),
     splash: normalizeTenantPath(dirName, cfg.splash, `./tenants/${dirName}/splash.png`),
     adaptiveIcon: normalizeTenantPath(dirName, cfg.adaptiveIcon, `./tenants/${dirName}/adaptive-icon.png`),
-    envFile: normalizeTenantPath(dirName, cfg.envFile, `./tenants/${dirName}/config.env`),
+    envFile: hasEnvFile
+      ? normalizeTenantPath(dirName, cfg.envFile, `./tenants/${dirName}/config.env`)
+      : null,
   };
 }
 

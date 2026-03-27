@@ -121,16 +121,29 @@ Local tenant context helpers:
 
 ### Mobile
 
-Tenant builds use tenant-specific config files under `mobile/tenants/<tenant>/`.
-
-```bash
-cp mobile/tenants/takeabreak/config.env.example mobile/tenants/takeabreak/config.env
-```
-
-Then run:
+Tenant **branding and bundle IDs** live under `mobile/tenants/<tenant>/` (`tenant.json` + assets). **Secrets for local `expo start`** are not stored next to each tenant: use a single gitignored **`mobile/.env`** or pull from Expo:
 
 ```bash
 cd mobile
+eas env:pull --environment development   # writes .env from expo.dev (if configured)
+```
+
+Or create **`mobile/.env`** manually (never commit) with at least:
+
+| Variable | Purpose |
+|----------|---------|
+| `TENANT` | Folder name under `tenants/` (e.g. `htctest`) when not passing `export TENANT=...` |
+| `API_URL` | Your API base URL |
+| `TENANT_API_KEY` | Tenant mobile key (from Super Admin / DB) |
+| `FIREBASE_API_KEY` | Firebase client config |
+| `FIREBASE_AUTH_DOMAIN` | Firebase client config |
+| `FIREBASE_PROJECT_ID` | Firebase client config |
+
+Optional: a legacy **`mobile/tenants/<tenant>/config.env`** file is still loaded **if present** (also gitignored).
+
+```bash
+cd mobile
+export TENANT=htctest   # optional if TENANT is in .env
 npm run start
 ```
 

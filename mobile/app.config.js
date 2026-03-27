@@ -1,4 +1,6 @@
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 const { execFileSync } = require('child_process');
 const { loadTenantConfigs, getDefaultTenantKey } = require('./tenants/load-tenants');
 
@@ -53,7 +55,12 @@ module.exports = ({ config: expoConfig }) => {
     throw new Error(`Unknown TENANT='${TENANT}'. Known tenants: ${known}`);
   }
 
-  require('dotenv').config({ path: config.envFile || `./tenants/${TENANT}/config.env` });
+  const legacyEnvPath = config.envFile
+    ? path.resolve(__dirname, config.envFile)
+    : path.resolve(__dirname, 'tenants', TENANT, 'config.env');
+  if (fs.existsSync(legacyEnvPath)) {
+    require('dotenv').config({ path: legacyEnvPath });
+  }
 
   let tenantApiKey = process.env.TENANT_API_KEY;
 
