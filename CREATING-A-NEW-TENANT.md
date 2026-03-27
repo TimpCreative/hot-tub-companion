@@ -37,7 +37,7 @@ Before starting, ensure you have:
    - **Primary Color:** Hex code (e.g., `#1B4D7A`)
    - **Secondary Color:** Hex code (e.g., `#E8A832`)
 6. Click **Create**
-7. **Important:** The API key is stored in the database. For **EAS cloud builds**, you do not paste it into Expo if `EAS_BUILD_CONFIG_SECRET` is configured; use `TENANT=<slug> eas build ...`. For **local** `expo start`, copy the key into `mobile/tenants/<slug>/config.env` (see tenant setup steps below).
+7. **Important:** The API key is stored in the database. For **EAS cloud builds**, you do not paste it into Expo if `EAS_BUILD_CONFIG_SECRET` is configured; pick the profile `preview-<slug>` or `production-<slug>` (see Step 5). For **local** `expo start`, copy the key into `mobile/tenants/<slug>/config.env` (see tenant setup steps below).
 
 ### Retailer dashboard hostname and Vercel (optional automation)
 
@@ -143,66 +143,59 @@ Verify:
 
 ## Step 5: Configure EAS Build
 
-### 5.1 Update eas.json (if needed)
-
-The default `eas.json` should work for most cases. If the retailer needs custom build settings, you can add a profile:
-
-```json
-{
-  "build": {
-    "takeabreak-production": {
-      "extends": "production",
-      "env": {
-        "TENANT": "takeabreak"
-      }
-    }
-  }
-}
-```
-
-### 5.2 Register App with EAS
-
-For a new tenant, you may need to configure the app in EAS:
+After `mobile/tenants/{slug}/` exists with `tenant.json` and assets, regenerate EAS profiles:
 
 ```bash
 cd mobile
-TENANT=takeabreak eas build:configure
+npm run eas:generate
 ```
+
+This rewrites `eas.json` with **`preview-{slug}`** (internal / TestFlight-style) and **`production-{slug}`** (store) for every retailer tenant. The template **`default`** folder is excluded from generated profiles (edit `scripts/generate-eas-json.js` if you need it).
+
+Commit the updated `eas.json`. Configure Apple/Google credentials in EAS the first time you build a new bundle ID.
 
 ---
 
 ## Step 6: Build the Mobile App
 
-### iOS Build
+Use the profile that matches the slug (not shell `TENANT=` — cloud builds do not receive it).
+
+### iOS — internal / preview
 
 ```bash
 cd mobile
-TENANT=takeabreak eas build --platform ios --profile production
+eas build --platform ios --profile preview-takeabreak
 ```
 
-This will:
-- Use assets from `mobile/tenants/takeabreak/`
-- Set bundle ID to `com.hottubcompanion.takeabreak`
-- Generate an iOS app archive (.ipa)
-
-### Android Build
+### iOS — store
 
 ```bash
 cd mobile
-TENANT=takeabreak eas build --platform android --profile production
+eas build --platform ios --profile production-takeabreak
 ```
 
-This will:
-- Use assets from `mobile/tenants/takeabreak/`
-- Set package name to `com.hottubcompanion.takeabreak`
-- Generate an Android App Bundle (.aab)
-
-### Build Both Platforms
+### Android — internal / preview
 
 ```bash
 cd mobile
-TENANT=takeabreak eas build --platform all --profile production
+eas build --platform android --profile preview-takeabreak
 ```
+
+### Android — store
+
+```bash
+cd mobile
+eas build --platform android --profile production-takeabreak
+```
+
+### Build both platforms (store)
+
+```bash
+cd mobile
+eas build --platform all --profile production-takeabreak
+```
+
+Each profile sets `env.TENANT` to the slug so the correct icons, bundle ID, and API key fetch apply.
 
 ---
 
@@ -228,7 +221,7 @@ TENANT=takeabreak eas build --platform all --profile production
 #### Submit Build
 
 ```bash
-TENANT=takeabreak eas submit --platform ios
+eas submit --platform ios --profile production-takeabreak
 ```
 
 Or submit manually:
@@ -254,7 +247,7 @@ Or submit manually:
 #### Submit Build
 
 ```bash
-TENANT=takeabreak eas submit --platform android
+eas submit --platform android --profile production-takeabreak
 ```
 
 Or submit manually:
@@ -357,9 +350,10 @@ Before announcing go-live to the retailer:
 
 ### Mobile app shows wrong branding
 
-- Verify `TENANT` environment variable is set correctly during build
-- Check that `config.env` exists in `mobile/tenants/{slug}/`
-- Rebuild the app: `TENANT={slug} eas build --platform all --profile production`
+- Verify you used the correct EAS profile (`preview-{slug}` or `production-{slug}`) so `env.TENANT` matches the retailer
+- Run `npm run eas:generate` after adding a tenant folder, then commit `eas.json`
+- Check that `config.env` exists in `mobile/tenants/{slug}/` for local dev
+- Rebuild: `eas build --platform all --profile production-{slug}`
 
 ### Firebase auth errors
 
@@ -377,23 +371,27 @@ Before announcing go-live to the retailer:
 ## Quick Reference: Commands
 
 ```bash
-# Build iOS app for a tenant
-TENANT={slug} eas build --platform ios --profile production
+# Regenerate eas.json after adding mobile/tenants/{slug}/
+cd mobile && npm run eas:generate
 
-# Build Android app for a tenant
-TENANT={slug} eas build --platform android --profile production
+# Build iOS app for a tenant (store)
+eas build --platform ios --profile production-{slug}
 
-# Build both platforms
-TENANT={slug} eas build --platform all --profile production
+# Build Android app for a tenant (store)
+eas build --platform android --profile production-{slug}
+
+# Internal / TestFlight-style
+eas build --platform ios --profile preview-{slug}
 
 # Submit to iOS App Store
-TENANT={slug} eas submit --platform ios
+eas submit --platform ios --profile production-{slug}
 
 # Submit to Google Play Store
-TENANT={slug} eas submit --platform android
+eas submit --platform android --profile production-{slug}
 
 # Run locally for testing
-TENANT={slug} npx expo start
+export TENANT={slug}
+npx expo start
 ```
 
 ---

@@ -134,14 +134,21 @@ cd mobile
 npm run start
 ```
 
-**EAS cloud builds (per retailer):** the **remote builder does not receive** variables from your shell (`TENANT=foo eas build` does not set `TENANT` on Expo’s servers). Set **`env.TENANT`** in [`mobile/eas.json`](mobile/eas.json) for each profile (or add **`TENANT`** in **expo.dev → Environment variables** for that profile’s environment). The value must match a folder under `mobile/tenants/` and an **active** row in `tenants.slug`. Expo env also needs `API_URL`, `FIREBASE_*`, and `EAS_BUILD_CONFIG_SECRET` (not per-tenant `TENANT_API_KEY`). On the builder, `app.config.js` loads the key via `curl` to `GET /api/v1/internal/eas-tenant-config`. Example:
+**EAS cloud builds (per retailer):** the **remote builder does not receive** arbitrary shell vars. Use a **named profile** so `env.TENANT` is set on the server. [`mobile/eas.json`](mobile/eas.json) is generated with **`preview-<slug>`** and **`production-<slug>`** for each folder under `mobile/tenants/` that has `tenant.json` (the template `default` tenant is skipped). Regenerate after adding a tenant:
 
 ```bash
 cd mobile
-eas build --profile preview --platform ios
+npm run eas:generate
 ```
 
-Duplicate a profile in `eas.json` (e.g. `preview-takeabreak`) to ship another tenant without editing the default. Set the same `EAS_BUILD_CONFIG_SECRET` on Railway and in Expo. If `TENANT_API_KEY` is already in the environment, it is used instead of fetching (handy for local experiments with `EAS_BUILD=1`).
+Examples:
+
+```bash
+eas build --profile preview-htctest --platform ios
+eas build --profile production-takeabreak --platform ios
+```
+
+`submit` entries match **`production-<slug>`** for Android (same `serviceAccountKeyPath` as before). Expo env still needs `API_URL`, `FIREBASE_*`, and `EAS_BUILD_CONFIG_SECRET` per environment (`preview` / `production`). On the builder, `app.config.js` fetches the tenant API key from `GET /api/v1/internal/eas-tenant-config`. Set the same `EAS_BUILD_CONFIG_SECRET` on Railway and in Expo. If `TENANT_API_KEY` is already in the environment, it is used instead of fetching (handy for local experiments with `EAS_BUILD=1`).
 
 ## Tenant + auth model (practical notes)
 

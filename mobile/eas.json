@@ -12,7 +12,7 @@
         "TENANT": "htctest"
       }
     },
-    "preview": {
+    "preview-htctest": {
       "distribution": "internal",
       "environment": "preview",
       "env": {
@@ -20,7 +20,24 @@
         "TENANT": "htctest"
       }
     },
-    "production": {
+    "production-htctest": {
+      "distribution": "store",
+      "environment": "production",
+      "env": {
+        "APP_VARIANT": "production",
+        "TENANT": "htctest"
+      }
+    },
+    "preview-takeabreak": {
+      "distribution": "internal",
+      "environment": "preview",
+      "env": {
+        "APP_VARIANT": "preview",
+        "TENANT": "takeabreak"
+      }
+    },
+    "production-takeabreak": {
+      "distribution": "store",
       "environment": "production",
       "env": {
         "APP_VARIANT": "production",
@@ -29,7 +46,12 @@
     }
   },
   "submit": {
-    "production": {
+    "production-htctest": {
+      "android": {
+        "serviceAccountKeyPath": "./google-play-service-account.json"
+      }
+    },
+    "production-takeabreak": {
       "android": {
         "serviceAccountKeyPath": "./google-play-service-account.json"
       }
