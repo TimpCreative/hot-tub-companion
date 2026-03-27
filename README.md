@@ -134,14 +134,14 @@ cd mobile
 npm run start
 ```
 
-**EAS cloud builds (per retailer):** set `TENANT` to the folder name under `mobile/tenants/` (must match `tenants.slug` in the DB and `status: active`). Expo env needs `API_URL`, `FIREBASE_*`, and `EAS_BUILD_CONFIG_SECRET` (not per-tenant `TENANT_API_KEY`). On the builder, `app.config.js` loads the key via `curl` to `GET /api/v1/internal/eas-tenant-config` (gitignored `config.env` is absent there). Example:
+**EAS cloud builds (per retailer):** the **remote builder does not receive** variables from your shell (`TENANT=foo eas build` does not set `TENANT` on Expo’s servers). Set **`env.TENANT`** in [`mobile/eas.json`](mobile/eas.json) for each profile (or add **`TENANT`** in **expo.dev → Environment variables** for that profile’s environment). The value must match a folder under `mobile/tenants/` and an **active** row in `tenants.slug`. Expo env also needs `API_URL`, `FIREBASE_*`, and `EAS_BUILD_CONFIG_SECRET` (not per-tenant `TENANT_API_KEY`). On the builder, `app.config.js` loads the key via `curl` to `GET /api/v1/internal/eas-tenant-config`. Example:
 
 ```bash
 cd mobile
-TENANT=htctest eas build --profile preview --platform android
+eas build --profile preview --platform ios
 ```
 
-Set the same `EAS_BUILD_CONFIG_SECRET` on Railway and in Expo. If `TENANT_API_KEY` is already in the environment, it is used instead of fetching (handy for local experiments with `EAS_BUILD=1`).
+Duplicate a profile in `eas.json` (e.g. `preview-takeabreak`) to ship another tenant without editing the default. Set the same `EAS_BUILD_CONFIG_SECRET` on Railway and in Expo. If `TENANT_API_KEY` is already in the environment, it is used instead of fetching (handy for local experiments with `EAS_BUILD=1`).
 
 ## Tenant + auth model (practical notes)
 

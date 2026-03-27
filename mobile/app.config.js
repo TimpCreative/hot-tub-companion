@@ -39,7 +39,7 @@ module.exports = ({ config: expoConfig }) => {
   const explicitTenant = process.env.TENANT?.trim();
   if (isEasBuild && !explicitTenant) {
     throw new Error(
-      "TENANT is required for EAS builds. Example: TENANT=htctest eas build --profile preview --platform android"
+      'TENANT is required on EAS builders. Set env.TENANT in eas.json for this profile, or add TENANT in expo.dev Environment variables (shell TENANT=... is not forwarded to cloud builds).'
     );
   }
 
