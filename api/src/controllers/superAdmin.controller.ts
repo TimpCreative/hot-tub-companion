@@ -221,7 +221,8 @@ export async function createTenant(req: Request, res: Response): Promise<void> {
       api_key_hash: apiKeyHash,
       primary_color: body.primaryColor || '#1B4D7A',
       secondary_color: body.secondaryColor || '#E8A832',
-      status: body.status || 'onboarding',
+      // Super Admin-created tenants should be immediately reachable on retailer subdomains.
+      status: body.status || 'active',
       pos_type: body.posType || null,
       shopify_store_url: body.shopifyStoreUrl || null,
       shopify_storefront_token: body.shopifyStorefrontToken || null,
