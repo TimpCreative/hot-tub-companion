@@ -54,8 +54,13 @@ for (const [slug, cfg] of Object.entries(tenants)) {
     errors.push(`${slug}: envFile should reference a .env file path.`);
   }
   const envPath = path.resolve(MOBILE_ROOT, cfg.envFile || '');
-  if (!fs.existsSync(envPath)) {
-    errors.push(`${slug}: missing env file '${cfg.envFile}'`);
+  const envExamplePath = envPath.endsWith('.env')
+    ? envPath.replace(/\.env$/, '.env.example')
+    : `${envPath}.example`;
+  if (!fs.existsSync(envPath) && !fs.existsSync(envExamplePath)) {
+    errors.push(
+      `${slug}: missing env file '${cfg.envFile}' and missing fallback '${path.relative(MOBILE_ROOT, envExamplePath)}'`
+    );
   }
 
   for (const key of ['icon', 'splash', 'adaptiveIcon']) {
