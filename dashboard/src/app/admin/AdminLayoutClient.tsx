@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenant } from '@/contexts/TenantContext';
@@ -19,6 +19,21 @@ interface AdminLayoutClientProps {
   children: React.ReactNode;
   navItems: NavItem[];
   basePath: string;
+}
+
+function getPageLabelFromPath(pathname: string, basePath: string, navItems: NavItem[]): string {
+  const relative = pathname.startsWith(basePath)
+    ? pathname.slice(basePath.length)
+    : pathname;
+  const segments = relative.split('/').filter(Boolean);
+  if (segments.length === 0) return 'Dashboard';
+  const first = `/${segments[0]}`;
+  const matched = navItems.find((item) => item.href === first);
+  if (matched?.label) return matched.label;
+  return segments[0]
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }
 
 export default function AdminLayoutClient({
@@ -64,6 +79,12 @@ export default function AdminLayoutClient({
   }
 
   const title = config?.name || (config?.slug ? config.slug.charAt(0).toUpperCase() + config.slug.slice(1) : 'Admin');
+
+  useEffect(() => {
+    const pageLabel = getPageLabelFromPath(pathname || `${basePath}/dashboard`, basePath, navItems);
+    const accountLabel = config?.name || 'Retailer Admin';
+    document.title = `${pageLabel} - ${accountLabel} - Hot Tub Companion Dashboard`;
+  }, [pathname, basePath, navItems, config?.name]);
 
   return (
     <div className="flex min-h-screen" style={{ backgroundColor: 'var(--main-bg)' }}>

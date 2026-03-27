@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/ui/Sidebar';
@@ -18,6 +18,22 @@ interface SuperAdminLayoutClientProps {
   navItems: NavItem[];
   bottomItems?: NavItem[];
   basePath: string;
+}
+
+function getPageLabelFromPath(pathname: string, basePath: string, navItems: NavItem[], bottomItems?: NavItem[]): string {
+  const allNav = [...navItems, ...(bottomItems || [])];
+  const relative = pathname.startsWith(basePath)
+    ? pathname.slice(basePath.length)
+    : pathname;
+  const segments = relative.split('/').filter(Boolean);
+  if (segments.length === 0) return 'Dashboard';
+  const first = `/${segments[0]}`;
+  const matched = allNav.find((item) => item.href === first);
+  if (matched?.label) return matched.label;
+  return segments[0]
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }
 
 export default function SuperAdminLayoutClient({
@@ -42,6 +58,11 @@ export default function SuperAdminLayoutClient({
     router.replace(`/auth/login?redirect=${encodeURIComponent(pathname || basePath + '/dashboard')}&admin=1`);
     return null;
   }
+
+  useEffect(() => {
+    const pageLabel = getPageLabelFromPath(pathname || `${basePath}/dashboard`, basePath, navItems, bottomItems);
+    document.title = `${pageLabel} - Super Admin - Hot Tub Companion Dashboard`;
+  }, [pathname, basePath, navItems, bottomItems]);
 
   return (
     <div className="flex min-h-screen" style={{ backgroundColor: 'var(--main-bg)' }}>
