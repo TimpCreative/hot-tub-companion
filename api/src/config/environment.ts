@@ -41,6 +41,8 @@ export const env = {
   CRON_SECRET: process.env.CRON_SECRET,
   /** Secret for EAS/mobile app.config to fetch tenant API key at build time; min 32 chars. Mirror in Expo env. */
   EAS_BUILD_CONFIG_SECRET: process.env.EAS_BUILD_CONFIG_SECRET?.trim() || '',
+  /** Optional Expo access token for higher push throughput (expo.dev → Access tokens). */
+  EXPO_ACCESS_TOKEN: process.env.EXPO_ACCESS_TOKEN?.trim() || '',
   /** Optional: attach `${slug}.${dashboardHost}` to Vercel project when creating tenants. */
   VERCEL_TOKEN: process.env.VERCEL_TOKEN?.trim() || '',
   VERCEL_PROJECT_ID: process.env.VERCEL_PROJECT_ID?.trim() || '',

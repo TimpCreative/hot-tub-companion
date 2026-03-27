@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import Expo from 'expo-server-sdk';
 import { error, success } from '../utils/response';
 import * as usersService from '../services/users.service';
 import * as authService from '../services/auth.service';
@@ -81,9 +82,12 @@ export async function putFcmToken(req: Request, res: Response): Promise<void> {
   const tokenStatus = typeof body.tokenStatus === 'string' ? body.tokenStatus.trim().slice(0, 30) : null;
   const tokenError = typeof body.tokenError === 'string' ? body.tokenError.trim().slice(0, 300) : null;
 
-  if (fcmToken && (!fcmToken.includes(':') || fcmToken.length < 100)) {
-    error(res, 'VALIDATION_ERROR', 'fcmToken is not a valid FCM registration token', 400);
-    return;
+  if (fcmToken) {
+    const looksLikeFcm = fcmToken.includes(':') && fcmToken.length >= 100;
+    if (!Expo.isExpoPushToken(fcmToken) && !looksLikeFcm) {
+      error(res, 'VALIDATION_ERROR', 'fcmToken must be an Expo push token or FCM registration token', 400);
+      return;
+    }
   }
 
   const timezone = body.timezone != null ? (typeof body.timezone === 'string' ? body.timezone : null) : undefined;

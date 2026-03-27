@@ -1,9 +1,10 @@
 /**
- * Registers the device's FCM/push token with the API.
+ * Registers the device's push token with the API (Expo Push Token on all platforms).
  * Also sends device timezone for user-local notification scheduling.
  * Call when user is authenticated (customer account, not staff override).
  */
 
+import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import api from '../services/api';
 
@@ -23,36 +24,44 @@ async function requestPermissions(): Promise<boolean> {
   return status === 'granted';
 }
 
+function resolveEasProjectId(): string | null {
+  const extra = Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined;
+  const fromExtra = extra?.eas?.projectId;
+  if (typeof fromExtra === 'string' && fromExtra.length > 0) return fromExtra;
+  const fromEas = Constants.easConfig?.projectId;
+  if (typeof fromEas === 'string' && fromEas.length > 0) return fromEas;
+  return null;
+}
+
 export async function registerPushToken(): Promise<void> {
   try {
     const granted = await requestPermissions();
     if (!granted) return;
 
-    const res = await Notifications.getDevicePushTokenAsync();
-    const rawToken = res?.data && typeof res.data === 'string' ? res.data.trim() : '';
-    const tokenProvider = typeof res?.type === 'string' ? res.type : 'unknown';
-    // FCM-native pipeline expects FCM registration tokens (typically include ':').
-    // APNs tokens on iOS are intentionally not registered into fcm_token.
-    const looksLikeFcm = rawToken.length > 100 && rawToken.includes(':');
-    const token = looksLikeFcm ? rawToken : null;
-    const tokenStatus = looksLikeFcm ? 'ready' : 'unsupported';
-    const tokenError = looksLikeFcm
-      ? null
-      : `Unsupported token format/provider (${tokenProvider}). Expected FCM registration token.`;
-    const timezone = getDeviceTimezone();
-    if (!looksLikeFcm) {
-      console.warn('[registerPushToken] Device token is not FCM-compatible; token not registered.');
+    const projectId = resolveEasProjectId();
+    if (!projectId) {
+      console.warn('[registerPushToken] Missing EAS projectId; cannot obtain Expo push token.');
+      return;
     }
 
+    const tokenRes = await Notifications.getExpoPushTokenAsync({ projectId });
+    const expoToken =
+      tokenRes?.data && typeof tokenRes.data === 'string' ? tokenRes.data.trim() : '';
+    if (!expoToken) {
+      console.warn('[registerPushToken] Empty Expo push token.');
+      return;
+    }
+
+    const timezone = getDeviceTimezone();
+
     await api.put('/users/me/fcm-token', {
-      fcmToken: token ?? null,
-      tokenProvider,
-      tokenStatus,
-      tokenError,
+      fcmToken: expoToken,
+      tokenProvider: 'expo',
+      tokenStatus: 'ready',
+      tokenError: null,
       ...(timezone && { timezone }),
     });
   } catch (err) {
     console.warn('[registerPushToken] Failed:', err instanceof Error ? err.message : err);
   }
 }
-

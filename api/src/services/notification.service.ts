@@ -6,6 +6,7 @@
 import { db } from '../config/database';
 import { getFirebaseMessaging } from '../config/firebase';
 import * as notificationSecurityAudit from './notificationSecurityAudit.service';
+import * as expoPushSend from './expoPushSend.service';
 
 const PREF_KEYS = ['maintenance', 'orders', 'subscriptions', 'service', 'promotional'] as const;
 type PrefKey = (typeof PREF_KEYS)[number];
@@ -105,11 +106,41 @@ export async function sendToUser(
   const user = await getUserWithToken(userId, tenantId, prefKey);
   if (!user?.fcm_token) return false;
 
+  const strData = data ? stringifyData(data) : undefined;
+
+  if (expoPushSend.isExpoPushToken(user.fcm_token)) {
+    try {
+      const r = await expoPushSend.sendExpoPushToUsers(
+        [{ id: userId, token: user.fcm_token }],
+        title,
+        body,
+        strData,
+        null
+      );
+      if (r.invalidUserIds.length > 0) await clearTokensForUsers(tenantId, r.invalidUserIds);
+      if (r.sent > 0 && logParams) {
+        await logNotification({
+          tenantId,
+          recipientUserId: userId,
+          title,
+          body,
+          type: logParams.type,
+          createdByType: logParams.createdByType,
+          createdById: logParams.createdById,
+        });
+      }
+      return r.sent > 0;
+    } catch (err) {
+      console.warn('[notification] sendToUser expo failed:', userId, err instanceof Error ? err.message : err);
+      return false;
+    }
+  }
+
   const messaging = getFirebaseMessaging();
   const payload: import('firebase-admin/messaging').Message = {
     token: user.fcm_token,
     notification: { title, body },
-    data: data ? stringifyData(data) : undefined,
+    data: strData,
     android: { priority: 'high' as const },
     apns: { payload: { aps: { sound: 'default' } } },
   };
@@ -162,6 +193,20 @@ async function markInvalidTokens(
     });
 }
 
+async function clearTokensForUsers(tenantId: string, userIds: string[]): Promise<void> {
+  if (userIds.length === 0) return;
+  await db('users')
+    .where({ tenant_id: tenantId })
+    .whereIn('id', userIds)
+    .update({
+      fcm_token: null,
+      fcm_token_updated_at: null,
+      fcm_token_status: 'invalid',
+      fcm_token_last_validated_at: db.fn.now(),
+      updated_at: db.fn.now(),
+    });
+}
+
 export interface SendNotificationOptions {
   data?: Record<string, string>;
   imageUrl?: string;
@@ -201,64 +246,81 @@ export async function sendToTenantCustomers(
   const { data: finalData, imageUrl } = normalizeNotificationOptions(opts);
   const strData = finalData ? stringifyData(finalData) : undefined;
 
-  const messaging = getFirebaseMessaging();
-  const tokens = users.map((u) => u.fcm_token);
-
-  const notification: Record<string, string> = { title, body };
-  if (imageUrl?.trim()) (notification as any).imageUrl = imageUrl.trim();
-
-  const apnsConfig: import('firebase-admin/messaging').ApnsConfig = {
-    payload: { aps: { sound: 'default', ...(imageUrl ? { 'mutable-content': 1 } : {}) } },
-  };
-  if (imageUrl?.trim()) (apnsConfig as any).fcmOptions = { imageUrl: imageUrl.trim() };
-
-  const message: import('firebase-admin/messaging').MulticastMessage = {
-    tokens,
-    notification,
-    data: strData,
-    android: { priority: 'high' as const },
-    apns: apnsConfig,
-  };
+  const expoUsers = users.filter((u) => expoPushSend.isExpoPushToken(u.fcm_token));
+  const fcmUsers = users.filter((u) => !expoPushSend.isExpoPushToken(u.fcm_token));
 
   let sent = 0;
   let failed = 0;
 
-  try {
-    const res = await messaging.sendEachForMulticast(message);
-    sent = res.successCount;
-    failed = res.failureCount;
-    await markInvalidTokens(
-      tenantId,
-      res.responses
-        .map((r, i) => ({ response: r, user: users[i] }))
-        .filter((x) => !x.response.success && x.user)
-        .map((x) => ({
-          userId: x.user.id,
-          code: x.response.error?.code ?? null,
-          message: x.response.error?.message ?? null,
-        }))
-    );
-    await notificationSecurityAudit.logNotificationSecurityEvent({
-      tenantId,
-      actorUserId: auditContext?.actorUserId,
-      actorEmail: auditContext?.actorEmail,
-      actorRole: auditContext?.actorRole || 'retailer_admin',
-      eventType: 'notification_send_tenant',
-      outcome: failed > 0 ? 'failure' : 'success',
-      requestId: auditContext?.requestId ?? null,
-      ip: auditContext?.ip ?? null,
-      userAgent: auditContext?.userAgent ?? null,
-      details: {
-        sent,
-        failed,
-      },
-    });
-    if (logParams && sent > 0) {
-      for (let i = 0; i < res.responses.length; i++) {
-        if (res.responses[i].success && users[i]) {
+  if (fcmUsers.length > 0) {
+    const messaging = getFirebaseMessaging();
+    const tokens = fcmUsers.map((u) => u.fcm_token);
+    const notification: Record<string, string> = { title, body };
+    if (imageUrl?.trim()) (notification as any).imageUrl = imageUrl.trim();
+    const apnsConfig: import('firebase-admin/messaging').ApnsConfig = {
+      payload: { aps: { sound: 'default', ...(imageUrl ? { 'mutable-content': 1 } : {}) } },
+    };
+    if (imageUrl?.trim()) (apnsConfig as any).fcmOptions = { imageUrl: imageUrl.trim() };
+    const message: import('firebase-admin/messaging').MulticastMessage = {
+      tokens,
+      notification,
+      data: strData,
+      android: { priority: 'high' as const },
+      apns: apnsConfig,
+    };
+    try {
+      const res = await messaging.sendEachForMulticast(message);
+      sent += res.successCount;
+      failed += res.failureCount;
+      await markInvalidTokens(
+        tenantId,
+        res.responses
+          .map((r, i) => ({ response: r, user: fcmUsers[i] }))
+          .filter((x) => !x.response.success && x.user)
+          .map((x) => ({
+            userId: x.user!.id,
+            code: x.response.error?.code ?? null,
+            message: x.response.error?.message ?? null,
+          }))
+      );
+      if (logParams && res.successCount > 0) {
+        for (let i = 0; i < res.responses.length; i++) {
+          if (res.responses[i].success && fcmUsers[i]) {
+            await logNotification({
+              tenantId,
+              recipientUserId: fcmUsers[i].id,
+              title,
+              body,
+              type: logParams.type,
+              createdByType: logParams.createdByType,
+              createdById: logParams.createdById,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[notification] sendToTenantCustomers FCM failed:', tenantId, err instanceof Error ? err.message : err);
+      failed += fcmUsers.length;
+    }
+  }
+
+  if (expoUsers.length > 0) {
+    try {
+      const ex = await expoPushSend.sendExpoPushToUsers(
+        expoUsers.map((u) => ({ id: u.id, token: u.fcm_token })),
+        title,
+        body,
+        strData,
+        imageUrl ?? null
+      );
+      sent += ex.sent;
+      failed += ex.failed;
+      if (ex.invalidUserIds.length > 0) await clearTokensForUsers(tenantId, ex.invalidUserIds);
+      if (logParams && ex.successUserIds.length > 0) {
+        for (const uid of ex.successUserIds) {
           await logNotification({
             tenantId,
-            recipientUserId: users[i].id,
+            recipientUserId: uid,
             title,
             body,
             type: logParams.type,
@@ -267,25 +329,29 @@ export async function sendToTenantCustomers(
           });
         }
       }
+    } catch (err) {
+      console.warn('[notification] sendToTenantCustomers Expo failed:', tenantId, err instanceof Error ? err.message : err);
+      failed += expoUsers.length;
     }
-  } catch (err) {
-    console.warn('[notification] sendToTenantCustomers failed:', tenantId, err instanceof Error ? err.message : err);
-    failed = users.length;
-    await notificationSecurityAudit.logNotificationSecurityEvent({
-      tenantId,
-      actorUserId: auditContext?.actorUserId,
-      actorEmail: auditContext?.actorEmail,
-      actorRole: auditContext?.actorRole || 'retailer_admin',
-      eventType: 'notification_send_tenant',
-      outcome: 'failure',
-      requestId: auditContext?.requestId ?? null,
-      ip: auditContext?.ip ?? null,
-      userAgent: auditContext?.userAgent ?? null,
-      details: {
-        error: err instanceof Error ? err.message : String(err),
-      },
-    });
   }
+
+  await notificationSecurityAudit.logNotificationSecurityEvent({
+    tenantId,
+    actorUserId: auditContext?.actorUserId,
+    actorEmail: auditContext?.actorEmail,
+    actorRole: auditContext?.actorRole || 'retailer_admin',
+    eventType: 'notification_send_tenant',
+    outcome: failed > 0 ? 'failure' : 'success',
+    requestId: auditContext?.requestId ?? null,
+    ip: auditContext?.ip ?? null,
+    userAgent: auditContext?.userAgent ?? null,
+    details: {
+      sent,
+      failed,
+      expoRecipients: expoUsers.length,
+      fcmRecipients: fcmUsers.length,
+    },
+  });
 
   return { sent, failed };
 }
@@ -316,48 +382,84 @@ export async function sendToSpecificUsers(
   const valid = users.filter((u: { fcm_token: string | null }) => u.fcm_token && typeof u.fcm_token === 'string');
   if (valid.length === 0) return { sent: 0, failed: 0 };
 
+  const expoUsers = valid.filter((u: { fcm_token: string }) => expoPushSend.isExpoPushToken(u.fcm_token));
+  const fcmUsers = valid.filter((u: { fcm_token: string }) => !expoPushSend.isExpoPushToken(u.fcm_token));
+
   const { data: finalData, imageUrl } = normalizeNotificationOptions(opts);
   const strData = finalData ? stringifyData(finalData) : undefined;
-  const notification: Record<string, string> = { title, body };
-  if (imageUrl?.trim()) (notification as any).imageUrl = imageUrl.trim();
-  const apnsConfig: import('firebase-admin/messaging').ApnsConfig = {
-    payload: { aps: { sound: 'default', ...(imageUrl ? { 'mutable-content': 1 } : {}) } },
-  };
-  if (imageUrl?.trim()) (apnsConfig as any).fcmOptions = { imageUrl: imageUrl.trim() };
-
-  const messaging = getFirebaseMessaging();
-  const tokens = valid.map((u: { fcm_token: string }) => u.fcm_token);
-  const message: import('firebase-admin/messaging').MulticastMessage = {
-    tokens,
-    notification,
-    data: strData,
-    android: { priority: 'high' as const },
-    apns: apnsConfig,
-  };
 
   let sent = 0;
   let failed = 0;
-  try {
-    const res = await messaging.sendEachForMulticast(message);
-    sent = res.successCount;
-    failed = res.failureCount;
-    await markInvalidTokens(
-      tenantId,
-      res.responses
-        .map((r, i) => ({ response: r, user: valid[i] as { id: string } | undefined }))
-        .filter((x) => !x.response.success && x.user)
-        .map((x) => ({
-          userId: x.user!.id,
-          code: x.response.error?.code ?? null,
-          message: x.response.error?.message ?? null,
-        }))
-    );
-    if (logParams && sent > 0) {
-      for (let i = 0; i < res.responses.length; i++) {
-        if (res.responses[i].success && valid[i]) {
+
+  if (fcmUsers.length > 0) {
+    const notification: Record<string, string> = { title, body };
+    if (imageUrl?.trim()) (notification as any).imageUrl = imageUrl.trim();
+    const apnsConfig: import('firebase-admin/messaging').ApnsConfig = {
+      payload: { aps: { sound: 'default', ...(imageUrl ? { 'mutable-content': 1 } : {}) } },
+    };
+    if (imageUrl?.trim()) (apnsConfig as any).fcmOptions = { imageUrl: imageUrl.trim() };
+    const messaging = getFirebaseMessaging();
+    const message: import('firebase-admin/messaging').MulticastMessage = {
+      tokens: fcmUsers.map((u: { fcm_token: string }) => u.fcm_token),
+      notification,
+      data: strData,
+      android: { priority: 'high' as const },
+      apns: apnsConfig,
+    };
+    try {
+      const res = await messaging.sendEachForMulticast(message);
+      sent += res.successCount;
+      failed += res.failureCount;
+      await markInvalidTokens(
+        tenantId,
+        res.responses
+          .map((r, i) => ({ response: r, user: fcmUsers[i] as { id: string } | undefined }))
+          .filter((x) => !x.response.success && x.user)
+          .map((x) => ({
+            userId: x.user!.id,
+            code: x.response.error?.code ?? null,
+            message: x.response.error?.message ?? null,
+          }))
+      );
+      if (logParams && res.successCount > 0) {
+        for (let i = 0; i < res.responses.length; i++) {
+          if (res.responses[i].success && fcmUsers[i]) {
+            await logNotification({
+              tenantId,
+              recipientUserId: (fcmUsers[i] as { id: string }).id,
+              title,
+              body,
+              type: logParams.type,
+              createdByType: logParams.createdByType,
+              createdById: logParams.createdById,
+              scheduledNotificationId: logParams.scheduledNotificationId,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[notification] sendToSpecificUsers FCM failed:', tenantId, err instanceof Error ? err.message : err);
+      failed += fcmUsers.length;
+    }
+  }
+
+  if (expoUsers.length > 0) {
+    try {
+      const ex = await expoPushSend.sendExpoPushToUsers(
+        expoUsers.map((u: { id: string; fcm_token: string }) => ({ id: u.id, token: u.fcm_token })),
+        title,
+        body,
+        strData,
+        imageUrl ?? null
+      );
+      sent += ex.sent;
+      failed += ex.failed;
+      if (ex.invalidUserIds.length > 0) await clearTokensForUsers(tenantId, ex.invalidUserIds);
+      if (logParams && ex.successUserIds.length > 0) {
+        for (const uid of ex.successUserIds) {
           await logNotification({
             tenantId,
-            recipientUserId: (valid[i] as { id: string }).id,
+            recipientUserId: uid,
             title,
             body,
             type: logParams.type,
@@ -367,11 +469,12 @@ export async function sendToSpecificUsers(
           });
         }
       }
+    } catch (err) {
+      console.warn('[notification] sendToSpecificUsers Expo failed:', tenantId, err instanceof Error ? err.message : err);
+      failed += expoUsers.length;
     }
-  } catch (err) {
-    console.warn('[notification] sendToSpecificUsers failed:', tenantId, err instanceof Error ? err.message : err);
-    failed = valid.length;
   }
+
   return { sent, failed };
 }
 
@@ -397,62 +500,97 @@ export async function sendToAllCustomers(
   const valid = rows.filter((r) => r.fcm_token && typeof r.fcm_token === 'string');
   if (valid.length === 0) return { sent: 0, failed: 0 };
 
+  const expoRows = valid.filter((r) => expoPushSend.isExpoPushToken(r.fcm_token));
+  const fcmRows = valid.filter((r) => !expoPushSend.isExpoPushToken(r.fcm_token));
+
   const { data: finalData, imageUrl } = normalizeNotificationOptions(opts);
   const strData = finalData ? stringifyData(finalData) : undefined;
-
-  const messaging = getFirebaseMessaging();
-  const tokens = valid.map((r) => r.fcm_token);
-  const notification: Record<string, string> = { title, body };
-  if (imageUrl?.trim()) (notification as Record<string, unknown>).imageUrl = imageUrl.trim();
-
-  const apnsConfig: import('firebase-admin/messaging').ApnsConfig = {
-    payload: { aps: { sound: 'default', ...(imageUrl ? { 'mutable-content': 1 } : {}) } },
-  };
-  if (imageUrl?.trim()) (apnsConfig as Record<string, unknown>).fcmOptions = { imageUrl: imageUrl.trim() };
-
-  const message: import('firebase-admin/messaging').MulticastMessage = {
-    tokens,
-    notification,
-    data: strData,
-    android: { priority: 'high' as const },
-    apns: apnsConfig,
-  };
 
   let sent = 0;
   let failed = 0;
 
-  try {
-    const res = await messaging.sendEachForMulticast(message);
-    sent = res.successCount;
-    failed = res.failureCount;
-    // Cross-tenant sends may include multiple tenant ids; clear invalid tokens per tenant bucket.
-    const invalidByTenant = new Map<string, string[]>();
-    for (let i = 0; i < res.responses.length; i++) {
-      const r = res.responses[i];
-      const target = valid[i];
-      if (!target || r.success || !isPermanentTokenFailure(r.error?.code ?? null)) continue;
-      const arr = invalidByTenant.get(target.tenant_id) || [];
-      arr.push(target.id);
-      invalidByTenant.set(target.tenant_id, arr);
-    }
-    for (const [rowTenantId, userIds] of invalidByTenant.entries()) {
-      await db('users')
-        .where({ tenant_id: rowTenantId })
-        .whereIn('id', userIds)
-        .update({
-          fcm_token: null,
-          fcm_token_updated_at: null,
-          fcm_token_status: 'invalid',
-          fcm_token_last_validated_at: db.fn.now(),
-          updated_at: db.fn.now(),
-        });
-    }
-    if (logParams && sent > 0) {
+  if (fcmRows.length > 0) {
+    const messaging = getFirebaseMessaging();
+    const notification: Record<string, string> = { title, body };
+    if (imageUrl?.trim()) (notification as Record<string, unknown>).imageUrl = imageUrl.trim();
+    const apnsConfig: import('firebase-admin/messaging').ApnsConfig = {
+      payload: { aps: { sound: 'default', ...(imageUrl ? { 'mutable-content': 1 } : {}) } },
+    };
+    if (imageUrl?.trim()) (apnsConfig as Record<string, unknown>).fcmOptions = { imageUrl: imageUrl.trim() };
+    const message: import('firebase-admin/messaging').MulticastMessage = {
+      tokens: fcmRows.map((r) => r.fcm_token),
+      notification,
+      data: strData,
+      android: { priority: 'high' as const },
+      apns: apnsConfig,
+    };
+    try {
+      const res = await messaging.sendEachForMulticast(message);
+      sent += res.successCount;
+      failed += res.failureCount;
+      const invalidByTenant = new Map<string, string[]>();
       for (let i = 0; i < res.responses.length; i++) {
-        if (res.responses[i].success && valid[i]) {
+        const r = res.responses[i];
+        const target = fcmRows[i];
+        if (!target || r.success || !isPermanentTokenFailure(r.error?.code ?? null)) continue;
+        const arr = invalidByTenant.get(target.tenant_id) || [];
+        arr.push(target.id);
+        invalidByTenant.set(target.tenant_id, arr);
+      }
+      for (const [rowTenantId, userIds] of invalidByTenant.entries()) {
+        await clearTokensForUsers(rowTenantId, userIds);
+      }
+      if (logParams && res.successCount > 0) {
+        for (let i = 0; i < res.responses.length; i++) {
+          if (res.responses[i].success && fcmRows[i]) {
+            await logNotification({
+              tenantId: fcmRows[i].tenant_id,
+              recipientUserId: fcmRows[i].id,
+              title,
+              body,
+              type: logParams.type,
+              createdByType: logParams.createdByType,
+              createdById: logParams.createdById,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[notification] sendToAllCustomers FCM failed:', err instanceof Error ? err.message : err);
+      failed += fcmRows.length;
+    }
+  }
+
+  if (expoRows.length > 0) {
+    try {
+      const ex = await expoPushSend.sendExpoPushToUsers(
+        expoRows.map((r) => ({ id: r.id, token: r.fcm_token })),
+        title,
+        body,
+        strData,
+        imageUrl ?? null
+      );
+      sent += ex.sent;
+      failed += ex.failed;
+      const invalidSet = new Set(ex.invalidUserIds);
+      const invalidByTenant = new Map<string, string[]>();
+      for (const r of expoRows) {
+        if (!invalidSet.has(r.id)) continue;
+        const arr = invalidByTenant.get(r.tenant_id) || [];
+        arr.push(r.id);
+        invalidByTenant.set(r.tenant_id, arr);
+      }
+      for (const [tid, ids] of invalidByTenant.entries()) {
+        await clearTokensForUsers(tid, ids);
+      }
+      if (logParams && ex.successUserIds.length > 0) {
+        const idToTenant = new Map(expoRows.map((r) => [r.id, r.tenant_id]));
+        for (const uid of ex.successUserIds) {
+          const tid = idToTenant.get(uid);
+          if (!tid) continue;
           await logNotification({
-            tenantId: valid[i].tenant_id,
-            recipientUserId: valid[i].id,
+            tenantId: tid,
+            recipientUserId: uid,
             title,
             body,
             type: logParams.type,
@@ -461,10 +599,10 @@ export async function sendToAllCustomers(
           });
         }
       }
+    } catch (err) {
+      console.warn('[notification] sendToAllCustomers Expo failed:', err instanceof Error ? err.message : err);
+      failed += expoRows.length;
     }
-  } catch (err) {
-    console.warn('[notification] sendToAllCustomers failed:', err instanceof Error ? err.message : err);
-    failed = valid.length;
   }
 
   return { sent, failed };

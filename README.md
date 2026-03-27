@@ -78,6 +78,7 @@ The API reads env vars from the process (and `dotenv` is enabled), so you can us
 - `DASHBOARD_BASE` (e.g. `https://hottubcompanion.com`; used for admin invite URLs and tenant subdomain derivation)
 - `VERCEL_TOKEN`, `VERCEL_PROJECT_ID`, `VERCEL_TEAM_ID` (optional; API auto-adds `{slug}` retailer hostname to the Vercel dashboard project on tenant create—see `CREATING-A-NEW-TENANT.md`)
 - `EAS_BUILD_CONFIG_SECRET` (min 32 chars; mirror the same value in Expo project env vars — EAS builds call `GET /api/v1/internal/eas-tenant-config` to load `tenantApiKey` by tenant slug)
+- `EXPO_ACCESS_TOKEN` (optional; Expo push notifications work without it for moderate volume—create at [expo.dev](https://expo.dev) → Access tokens if you need higher throughput)
 
 #### Run migrations + seed
 
