@@ -21,11 +21,23 @@
 | **Info cards** | ❌ | Warranty, Filter Reminder, Seasonal Alert, Recent Orders — none on Home |
 | **Shop tab** | ❌ | Placeholder ("Coming in Phase 2"); API exists |
 | **Cart & checkout** | ❌ | Not implemented |
-| **Push notifications** | ✅ | FCM registration, cron dispatch, admin UI, deep links, images, user-local scheduling |
+| **Push notifications** | ✅ **Done** | Expo Push Token + API registration (all platforms); backend sends via **Expo Push API** or **FCM** by token type; cron dispatch; Admin compose UI; deep links; images; user-local scheduling. *(Retail “all customers” requires a **customer** session — admin/whitelist logins do not register device tokens.)* |
 | **Profile & settings** | ✅ | Account, My Spas, notifications, privacy, app info, sign out |
 | **Edit spa flow** | ✅ | Sanitization, usage months, serial, nickname, warranty |
 | **Retailer Admin app-setup** | ✅ | Onboarding config, home dashboard (Quick Links + widgets), dealer contact |
 | **Retailer Admin dashboard UX** | ✅ | Dark/light mode toggle (light default), theme-aware styling, permission system |
+
+### Phase 2 — Still outstanding (not push)
+
+Push notifications are **closed out** for Phase 2. Remaining Phase 2 scope from this doc:
+
+- **Shop + cart + checkout:** Shop tab UI, compatible/browse modes, product detail, Shopify cart + Checkout Kit (Part 4).
+- **Home:** Info cards (warranty, filter reminder, seasonal alert, recent orders) — Part 3.1.
+- **Spa selector:** Multi-spa switching on Home/Shop (see Part 2.2).
+- **Order flow:** Shopify `orders/create` webhook → push (and dashboard order card) — §5.4; verification checklist.
+- **Manual / QA:** TAB branding package, Checkout Kit store setup, test accounts, UHTD product coverage (see “Manual Steps Required”).
+- **Deferred Phase 1 verification** (end of doc): SCdb/PCdb/comps/POS/admin mapping checklists — tracked here until you exit Phase 2.
+- **Cross-platform:** “App works on both iOS and Android” — verification checklist.
 
 ---
 
@@ -35,7 +47,7 @@ The following were implemented after the Phase 2 plan and are now complete:
 
 | Change | Status | Notes |
 |--------|--------|-------|
-| **Push notifications** | ✅ | FCM token registration, cron-based dispatch, Admin → Notifications compose UI. Deep links (Shop, Product, Inbox, etc.), image attachments, retailer timezone display. |
+| **Push notifications** | ✅ **Done** | `ExponentPushToken[…]` registration to API; server delivery via **expo-server-sdk** + **Firebase Admin** for legacy FCM tokens; cron + Admin compose UI; deep links; images; retailer timezone; user-local send windows. |
 | **User-local notification scheduling** | ✅ | Option to send at retailer time or at each user's local time. Past-timezone handling: send immediately or push to next day. |
 | **Tenant timezone** | ✅ | Retailer timezone in Admin → Settings. Shown next to "Send At" in Notifications. |
 | **Admin permission system** | ✅ | Roles (owner, manager, support, viewer), granular permissions (can_manage_users, can_send_notifications, etc.), Team page with invite/edit/remove, audit log. |
@@ -63,7 +75,7 @@ At the end of this phase, you should have a fully functional customer-facing app
 - ✅ See a personalized "My Tub" dashboard
 - ❌ Browse products filtered to their spa's compatibility
 - ❌ Add products to cart and complete checkout via Shopify Checkout Kit
-- ✅ Receive basic push notifications (order confirmation, welcome — FCM + admin compose UI implemented)
+- ✅ Receive basic push notifications (welcome + retailer compose; **Expo Push + FCM** on API; order-confirmation push depends on Shopify webhook path — see checklist)
 
 This is the **minimum viable product** for customer-facing functionality.
 
@@ -494,13 +506,13 @@ const REMOVE_FROM_CART = gql`
 
 ---
 
-## Part 5: Push Notifications (Basic) — ✅ Implemented
+## Part 5: Push Notifications (Basic) — ✅ Done (Phase 2)
 
-FCM registration, cron dispatch, Admin Notifications compose UI, deep links, and image attachments are in place. User-local scheduling option (send at each user's local time) and retailer timezone fallback. See "Unplanned Changes" above.
+**Implemented:** After auth (customer accounts), the app requests permission and registers an **Expo push token** (`getExpoPushTokenAsync` with EAS `projectId`). The API stores it in `users.fcm_token` (name is historical) and sends retail pushes via **Expo Push API** or **Firebase Cloud Messaging** depending on token shape. Cron dispatch, Admin Notifications compose UI, deep links, image attachments, and user-local scheduling (vs retailer time) are in place. See `mobile/lib/registerPushToken.ts` and `api/src/services/notification.service.ts` + `expoPushSend.service.ts`.
 
-### 5.1 FCM Setup
+### 5.1 Client token registration
 
-On app launch (after auth), request notification permissions and register the FCM token:
+On app launch (after auth), request notification permissions and register the push token with the API:
 
 ```typescript
 import * as Notifications from 'expo-notifications';
@@ -509,11 +521,8 @@ async function registerForPushNotifications() {
   const { status } = await Notifications.requestPermissionsAsync();
   if (status !== 'granted') return;
 
-  const token = (await Notifications.getExpoPushTokenAsync()).data;
-  // Or use FCM directly:
-  // const token = (await Notifications.getDevicePushTokenAsync()).data;
+  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
 
-  // Send token to backend
   await api.put('/users/me/fcm-token', { fcmToken: token });
 }
 ```
@@ -621,7 +630,7 @@ Before moving to Phase 3, verify:
 - [ ] Cart screen shows items, allows quantity changes and removal
 - [ ] Checkout via Shopify Checkout Kit works end-to-end (test purchase)
 - [ ] Order webhook fires and creates a notification
-- [ ] Push notifications are received on device
+- [x] Push notifications are received on device (retailer compose + registered customer token)
 - [ ] User with multiple spas can switch between them
 - [x] Profile settings are editable and persist
 - [x] Spa profile can be edited (sanitization, usage months, serial number)
