@@ -61,6 +61,9 @@ export async function registerPushToken(): Promise<void> {
       tokenError: null,
       ...(timezone && { timezone }),
     });
+    if (__DEV__) {
+      console.log('[registerPushToken] Expo token registered with API');
+    }
   } catch (err) {
     console.warn('[registerPushToken] Failed:', err instanceof Error ? err.message : err);
   }

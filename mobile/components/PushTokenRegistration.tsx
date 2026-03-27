@@ -66,9 +66,16 @@ export function PushTokenRegistration() {
   const shouldRegister = user && !isStaffTenantAppLogin(user);
 
   useEffect(() => {
+    if (__DEV__ && user && isStaffTenantAppLogin(user)) {
+      console.warn(
+        '[PushTokenRegistration] Push tokens are only registered for customer accounts. ' +
+          'Tenant-admin / whitelist logins use a synthetic id and cannot register a device token. ' +
+          'Sign in with a normal customer account on this tenant to test retailer pushes.'
+      );
+    }
     if (!shouldRegister) return;
     void registerPushToken();
-  }, [shouldRegister]);
+  }, [shouldRegister, user]);
 
   useEffect(() => {
     if (!shouldRegister) return;
