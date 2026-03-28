@@ -8,6 +8,13 @@ import * as vercelProjectDomains from '../services/vercelProjectDomains.service'
 import { getFirebaseAuth, isFirebaseInitialized, getFirebaseInitError, getFirebaseKeyDebugInfo } from '../config/firebase';
 import { toProxyUrl } from '../utils/mediaUrl';
 import sgMail from '@sendgrid/mail';
+import {
+  getPreset,
+  isSaasPlanPreset,
+  SAAS_PLAN_PRESETS,
+  type SaasPlanPreset,
+  type TenantFeatureRow,
+} from '../services/saasPlanPresets.service';
 
 // Initialize SendGrid if API key is available
 if (env.SENDGRID_API_KEY) {
@@ -181,6 +188,7 @@ export async function listTenants(_req: Request, res: Response): Promise<void> {
     vercelDomainStatus: t.vercel_domain_status ?? null,
     vercelDomainError: t.vercel_domain_error ?? null,
     vercelDomainUpdatedAt: t.vercel_domain_updated_at ?? null,
+    saasPlan: (t as { saas_plan?: string }).saas_plan ?? 'base',
   }));
   success(res, { tenants: formatted });
 }
@@ -691,4 +699,107 @@ export async function sendInviteEmail(req: Request, res: Response): Promise<void
     console.error('Error sending invite email:', err);
     error(res, 'EMAIL_ERROR', `Failed to send email: ${err.message}`, 500);
   }
+}
+
+function tenantFeatureColumns(row: Record<string, unknown>): TenantFeatureRow {
+  return {
+    feature_subscriptions: Boolean(row.feature_subscriptions),
+    feature_loyalty: Boolean(row.feature_loyalty),
+    feature_referrals: Boolean(row.feature_referrals),
+    feature_water_care: Boolean(row.feature_water_care),
+    feature_service_scheduling: Boolean(row.feature_service_scheduling),
+    feature_seasonal_timeline: Boolean(row.feature_seasonal_timeline),
+    feature_tab_inbox: row.feature_tab_inbox !== false,
+    feature_tab_dealer: row.feature_tab_dealer !== false,
+  };
+}
+
+/**
+ * GET plan label + effective feature flags + preset snapshots for Super Admin UI.
+ */
+export async function getTenantEntitlements(req: Request, res: Response): Promise<void> {
+  const { id } = req.params;
+  const tenant = await db('tenants').where({ id }).first();
+  if (!tenant) {
+    error(res, 'NOT_FOUND', 'Tenant not found', 404);
+    return;
+  }
+
+  const saasPlan = String((tenant as { saas_plan?: string }).saas_plan ?? 'base');
+  success(res, {
+    tenantId: tenant.id,
+    saasPlan,
+    features: tenantFeatureColumns(tenant),
+    presets: SAAS_PLAN_PRESETS,
+  });
+}
+
+/**
+ * Apply a preset and/or patch individual feature_* columns.
+ * Body: { applyPreset?: 'base'|'core'|'advanced', saasPlan?: 'base'|'core'|'advanced'|'custom', features?: Partial<TenantFeatureRow> }
+ */
+export async function updateTenantEntitlements(req: Request, res: Response): Promise<void> {
+  const { id } = req.params;
+  const body = req.body as {
+    applyPreset?: SaasPlanPreset;
+    saasPlan?: string;
+    features?: Partial<TenantFeatureRow>;
+  };
+
+  const tenant = await db('tenants').where({ id }).first();
+  if (!tenant) {
+    error(res, 'NOT_FOUND', 'Tenant not found', 404);
+    return;
+  }
+
+  const update: Record<string, unknown> = { updated_at: db.fn.now() };
+
+  if (body.applyPreset != null) {
+    if (!isSaasPlanPreset(body.applyPreset)) {
+      error(res, 'VALIDATION_ERROR', 'applyPreset must be base, core, or advanced', 400);
+      return;
+    }
+    const preset = getPreset(body.applyPreset);
+    Object.assign(update, preset);
+    update.saas_plan = body.applyPreset;
+  }
+
+  if (body.saasPlan !== undefined) {
+    const p = body.saasPlan.trim().toLowerCase();
+    if (!['base', 'core', 'advanced', 'custom'].includes(p)) {
+      error(res, 'VALIDATION_ERROR', 'saasPlan must be base, core, advanced, or custom', 400);
+      return;
+    }
+    update.saas_plan = p;
+  }
+
+  if (body.features && typeof body.features === 'object') {
+    const allowed: (keyof TenantFeatureRow)[] = [
+      'feature_subscriptions',
+      'feature_loyalty',
+      'feature_referrals',
+      'feature_water_care',
+      'feature_service_scheduling',
+      'feature_seasonal_timeline',
+      'feature_tab_inbox',
+      'feature_tab_dealer',
+    ];
+    for (const key of allowed) {
+      if (key in body.features && typeof (body.features as Record<string, boolean>)[key] === 'boolean') {
+        update[key] = (body.features as Record<string, boolean>)[key];
+      }
+    }
+  }
+
+  if (Object.keys(update).length <= 1) {
+    success(res, { message: 'No changes applied', tenantId: id });
+    return;
+  }
+
+  const [updated] = await db('tenants').where({ id }).update(update).returning('*');
+  success(res, {
+    tenantId: updated.id,
+    saasPlan: String((updated as { saas_plan?: string }).saas_plan ?? 'base'),
+    features: tenantFeatureColumns(updated as Record<string, unknown>),
+  });
 }

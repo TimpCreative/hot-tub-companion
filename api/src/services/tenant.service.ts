@@ -17,6 +17,7 @@ export async function getConfig(tenantId: string) {
     tenantId: tenant.id,
     name: tenant.name,
     slug: tenant.slug,
+    saasPlan: (tenant as { saas_plan?: string }).saas_plan ?? 'base',
     branding: {
       primaryColor: tenant.primary_color,
       secondaryColor: tenant.secondary_color,

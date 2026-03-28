@@ -4,24 +4,23 @@
 **Unlocks:** Phase 6 (scale and polish)
 **Estimated effort:** 2–3 weeks
 
+**Plans:** Loyalty / points / redemption are **Core and Advanced** only (not Base). Referrals are built in **[Phase 3](./PHASE-3-ENGAGEMENT.md#part-6-referral-program)** (all tiers). See [SAAS-PLANS-AND-FEATURES.md](./SAAS-PLANS-AND-FEATURES.md).
+
 ---
 
 ## Manual Steps Required (Do These First)
 
 1. **Design loyalty program rules with TAB.** Determine: points per dollar spent (e.g., 1 point per $1), redemption rate (e.g., 100 points = $5 credit), any bonus point events (double points on chemicals), expiration policy (points expire after 12 months of inactivity?).
 
-2. **Design referral program terms.** Determine: what reward does the referrer get when their friend buys a hot tub? (e.g., $100 store credit). Does the referred customer get anything? What counts as a qualifying purchase? How is attribution tracked?
-
-3. **Define the key metrics TAB wants to see.** Walk through the analytics dashboard with them and confirm which metrics matter most, what date ranges they want, and any specific reports.
+2. **Define the key metrics TAB wants to see.** Walk through the analytics dashboard with them and confirm which metrics matter most, what date ranges they want, and any specific reports.
 
 ---
 
 ## What Phase 5 Builds
 
-- Loyalty/rewards program
-- Referral program
+- Loyalty/rewards program (Core+; gated by `feature_loyalty`)
 - Analytics dashboards (retailer + TimpCreative super admin)
-- Recommended bundles system
+- Recommended bundles system (shopping UX; bundle templates may originate in Phase 3)
 - Subscription discount configuration
 
 ---
@@ -139,94 +138,9 @@ POST   /api/v1/admin/loyalty/adjust
 
 ---
 
-## Part 2: Referral Program
+## Part 2: Analytics Dashboards
 
-### 2.1 Database Tables
-
-```sql
-CREATE TABLE referral_codes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  code VARCHAR(20) NOT NULL UNIQUE,  -- e.g., "JOHN-TAB-2024"
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX idx_referral_code ON referral_codes(code);
-
-CREATE TABLE referrals (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  referrer_user_id UUID NOT NULL REFERENCES users(id),
-  referral_code_id UUID NOT NULL REFERENCES referral_codes(id),
-  referred_name VARCHAR(255),
-  referred_email VARCHAR(255),
-  referred_phone VARCHAR(20),
-  status VARCHAR(30) DEFAULT 'pending',  -- 'pending' | 'contacted' | 'purchased' | 'rewarded' | 'expired'
-  purchase_date DATE,
-  reward_type VARCHAR(20),  -- 'store_credit' | 'loyalty_points' | 'custom'
-  reward_amount INTEGER,  -- cents for store credit, points for loyalty
-  reward_issued_at TIMESTAMPTZ,
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE referral_config (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE UNIQUE,
-  referrer_reward_type VARCHAR(20) DEFAULT 'store_credit',
-  referrer_reward_amount INTEGER DEFAULT 10000,  -- $100.00 in cents
-  referred_reward_type VARCHAR(20),  -- null = no reward for referred
-  referred_reward_amount INTEGER,
-  qualifying_purchase_description TEXT DEFAULT 'Purchase of a new hot tub',
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-### 2.2 Referral Flow
-
-**Customer side:**
-1. Referral code auto-generated on account creation: `[FIRSTNAME]-[TENANT_SLUG]-[RANDOM4]` (e.g., "JOHN-TAB-A3K9")
-2. Referral screen in app (accessible from Profile):
-   - "Refer a Friend" heading
-   - Explanation: "Know someone who'd love a hot tub? Refer them to [Retailer Name] and earn $[X] in store credit when they purchase!"
-   - Referral code displayed large with "Copy" and "Share" buttons
-   - Share opens native share sheet with pre-filled message: "I love my [Brand] hot tub from [Retailer Name]! Use my referral code [CODE] when you buy yours. [App download link]"
-   - List of past referrals with status
-
-**Manual referral submission (alternative):**
-- "Submit a referral" form: referred person's name, email, phone
-- This creates a referral record that the retailer can track
-
-**Retailer side:**
-- When a referred customer buys a hot tub, the retailer marks the referral as "purchased" in the admin dashboard
-- System auto-generates reward (store credit via Shopify discount code or loyalty points)
-- Notifies referrer: "Your referral [Name] made a purchase! You've earned $[X] in store credit! 🎉"
-
-### 2.3 API Endpoints
-
-```
-# Customer
-GET    /api/v1/referrals/my-code
-GET    /api/v1/referrals
-POST   /api/v1/referrals
-  Body: { referredName, referredEmail, referredPhone }
-
-# Admin
-GET    /api/v1/admin/referrals?status=X
-PUT    /api/v1/admin/referrals/:id/status
-  Body: { status, purchaseDate? }  → If status='purchased', triggers reward
-GET    /api/v1/admin/referral-config
-PUT    /api/v1/admin/referral-config
-```
-
----
-
-## Part 3: Analytics Dashboards
-
-### 3.1 Retailer Analytics (`/admin/analytics`)
+### 2.1 Retailer Analytics (`/admin/analytics`)
 
 **Overview cards (top of page):**
 - Total Revenue Through App (last 30 days / all time)
@@ -250,7 +164,7 @@ PUT    /api/v1/admin/referral-config
 
 **Data sources:** All metrics computed from our database tables. Revenue comes from order references (stored when Shopify webhooks fire). We do NOT query Shopify for analytics — we use our own tracked data.
 
-### 3.2 Super Admin Analytics (`/super-admin/analytics`)
+### 2.2 Super Admin Analytics (`/super-admin/analytics`)
 
 **Platform-wide overview:**
 - Total Active Retailers
@@ -268,7 +182,7 @@ PUT    /api/v1/admin/referral-config
 - Models with 0 compatible parts
 - Total mapped products vs unmapped across all retailers
 
-### 3.3 Analytics API Endpoints
+### 2.3 Analytics API Endpoints
 
 ```
 # Admin
@@ -285,7 +199,7 @@ GET /api/v1/super-admin/analytics/retailers
 GET /api/v1/super-admin/analytics/uhtd-coverage
 ```
 
-### 3.4 Analytics Data Tracking
+### 2.4 Analytics Data Tracking
 
 To power analytics without querying external APIs:
 
@@ -315,9 +229,9 @@ Populated by Shopify order webhooks. This gives us enough data for analytics wit
 
 ---
 
-## Part 4: Recommended Bundles
+## Part 3: Recommended Bundles
 
-### 4.1 Bundle Display in App
+### 3.1 Bundle Display in App
 
 Bundles were defined in Phase 3 (subscription_bundles table). Now we build the full shopping experience:
 
@@ -341,9 +255,9 @@ Bundles were defined in Phase 3 (subscription_bundles table). Now we build the f
 
 ---
 
-## Part 5: Subscription Discount Configuration
+## Part 4: Subscription Discount Configuration
 
-### 5.1 Admin Discount Settings
+### 4.1 Admin Discount Settings
 
 In `/admin/settings/subscriptions`:
 
@@ -354,7 +268,7 @@ In `/admin/settings/subscriptions`:
 
 The `subscriptions.discount_percentage` field (from Phase 3) is populated based on these settings when a subscription is created.
 
-### 5.2 API Endpoints
+### 4.2 API Endpoints
 
 ```
 GET    /api/v1/admin/subscription-config
@@ -366,7 +280,7 @@ PUT    /api/v1/admin/subscription-config
 
 ## Verification Checklist
 
-Before moving to Phase 6, verify:
+Before moving to Phase 6, verify (referral flows: [Phase 3 verification](./PHASE-3-ENGAGEMENT.md#verification-checklist)):
 
 - [ ] Loyalty accounts are auto-created on registration (with signup bonus if configured)
 - [ ] Points are earned on order completion via Shopify webhook
@@ -374,10 +288,6 @@ Before moving to Phase 6, verify:
 - [ ] Redemption generates a working Shopify discount code
 - [ ] Points expiration works (if configured)
 - [ ] Admin can view loyalty leaderboard and manually adjust points
-- [ ] Referral codes are auto-generated per user
-- [ ] Referral share functionality works (copy, native share sheet)
-- [ ] Referral submissions appear in admin dashboard
-- [ ] Marking a referral as "purchased" triggers reward issuance and notification
 - [ ] Retailer analytics dashboard shows all metrics with correct data
 - [ ] Charts render correctly with date range filtering
 - [ ] Super admin analytics shows platform-wide and per-retailer metrics

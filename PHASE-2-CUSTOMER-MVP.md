@@ -1,8 +1,10 @@
-# Phase 2 — Customer App MVP
+# Phase 2 — Customer App MVP (shipped slice)
 
 **Depends on:** Phase 0 (app shell, auth), Phase 1 (products synced, UHTD populated)
-**Unlocks:** Phase 3 (engagement features layer on top of this)
-**Estimated effort:** 3–4 weeks
+**Unlocks:** [Phase 3 — Engagement](./PHASE-3-ENGAGEMENT.md) for **commerce, home completion, referrals, water care, content, and subscriptions** (see that doc’s *What Phase 3 builds*).
+**Estimated effort:** 3–4 weeks *(historical; core slice below is largely complete)*
+
+Commercial entitlements (Base / Core / Advanced presets, manual upgrades, TAB on **Advanced**): [SAAS-PLANS-AND-FEATURES.md](./SAAS-PLANS-AND-FEATURES.md)
 
 ---
 
@@ -27,17 +29,11 @@
 | **Retailer Admin app-setup** | ✅ | Onboarding config, home dashboard (Quick Links + widgets), dealer contact |
 | **Retailer Admin dashboard UX** | ✅ | Dark/light mode toggle (light default), theme-aware styling, permission system |
 
-### Phase 2 — Still outstanding (not push)
+### Next work (Phase 3)
 
-Push notifications are **closed out** for Phase 2. Remaining Phase 2 scope from this doc:
+All **remaining** customer-app backlog from this file (shop, cart, checkout, home info cards, multi-spa selector, order webhook, Android QA, manual storefront steps) lives under **[Phase 3 — Engagement](./PHASE-3-ENGAGEMENT.md)** — *What Phase 3 builds* and verification checklist there.
 
-- **Shop + cart + checkout:** Shop tab UI, compatible/browse modes, product detail, Shopify cart + Checkout Kit (Part 4).
-- **Home:** Info cards (warranty, filter reminder, seasonal alert, recent orders) — Part 3.1.
-- **Spa selector:** Multi-spa switching on Home/Shop (see Part 2.2).
-- **Order flow:** Shopify `orders/create` webhook → push (and dashboard order card) — §5.4; verification checklist.
-- **Manual / QA:** TAB branding package, Checkout Kit store setup, test accounts, UHTD product coverage (see “Manual Steps Required”).
-- **Deferred Phase 1 verification** (end of doc): SCdb/PCdb/comps/POS/admin mapping checklists — tracked here until you exit Phase 2.
-- **Cross-platform:** “App works on both iOS and Android” — verification checklist.
+**Deferred Phase 1 / production ops** (data volume, production POS sync, correction flows, etc.): [Phase 6 — Deferred Phase 1 and operations verification](./PHASE-6-SCALE-POLISH.md#deferred-phase-1-and-operations-verification-moved-from-phase-2).
 
 ---
 
@@ -55,29 +51,25 @@ The following were implemented after the Phase 2 plan and are now complete:
 
 ---
 
-## Manual Steps Required (Do These First)
+## Manual steps (Phase 2)
 
-1. **Obtain TAB's branding package.** Collect from Take A Break: primary logo (SVG/PNG, light and dark background versions), brand colors (hex codes), preferred font (or approve a suggestion), app icon artwork, splash screen artwork. Place these in `/mobile/tenants/takeabreak/`.
-
-2. **Set up Shopify Checkout Kit.** In TAB's Shopify admin, ensure Checkout is configured and the Storefront API scopes include `unauthenticated_read_checkouts` and `unauthenticated_write_checkouts`. The Checkout Kit requires the Storefront API access token (already obtained in Phase 1).
-
-3. **Create test customer accounts.** Register 3–5 test accounts with different spa models and sanitization systems to fully test the personalized experience.
-
-4. **Confirm at least 10 products are mapped in UHTD** for the test spa models so the compatibility-filtered product feed has real data to display.
+Phase 2 manual / QA tasks that remain relevant to **shipping the current slice** (branding assets, device testing) are folded into **[Phase 3 — Manual Steps Required](./PHASE-3-ENGAGEMENT.md#manual-steps-required-do-these-first)** alongside checkout and catalog prep.
 
 ---
 
-## What Phase 2 Builds
+## What Phase 2 delivered (shipped slice)
 
-At the end of this phase, you should have a fully functional customer-facing app where a user can:
-- ✅ Register and log in
-- ✅ Register their spa (brand, model line, model, year, sanitization system, serial number)
-- ✅ See a personalized "My Tub" dashboard
-- ❌ Browse products filtered to their spa's compatibility
-- ❌ Add products to cart and complete checkout via Shopify Checkout Kit
-- ✅ Receive basic push notifications (welcome + retailer compose; **Expo Push + FCM** on API; order-confirmation push depends on Shopify webhook path — see checklist)
+Phase 2 is treated as **complete** for the following **customer and retailer-admin** capabilities:
 
-This is the **minimum viable product** for customer-facing functionality.
+- Register and log in (Firebase + tenant context)
+- Spa onboarding (SCdb search, Not listed? → consumer suggestions queue, skippable setup)
+- Welcome screen and tab shell (Home, Shop placeholder, Water Care, Inbox, Dealer; Profile in header)
+- **My Tub** home: hero + spa summary, **Quick Links**, tenant-configurable widgets (`dealer_card`, `tips_list`, `product_strip`), Retailer Admin home editor
+- **Push notifications** end-to-end (token registration, Expo/FCM send, cron, Admin compose, deep links, scheduling)
+- Profile: account, My Spas, notifications, privacy, app info, sign out; **edit spa** (sanitization, usage months, serial, nickname, warranty)
+- Retailer Admin: app setup (onboarding config), home dashboard, dealer contact, team/permissions, dark/light mode, notifications UX
+
+**Not in Phase 2:** in-app shop beyond placeholder, cart/checkout, home **info cards** (warranty / filter / seasonal / orders), **multi-spa** switching on Home/Shop, **orders/create** webhook → customer notification — all **Phase 3**.
 
 ---
 
@@ -334,175 +326,9 @@ The home screen shows a personalized overview for the active spa. Hero + spa sum
 
 ---
 
-## Part 4: Product Browsing (Shop Tab) — ❌ Not implemented
+## Part 4: Product Browsing (moved to Phase 3)
 
-Shop tab currently shows "Coming in Phase 2" placeholder. API exists: `GET /products`, `GET /products/compatible/:spaProfileId`.
-
-### 4.1 Shop Screen Layout
-
-**Top section:**
-- Search bar (searches product titles and descriptions locally on the fetched data)
-- Category filter pills (horizontal scroll): "All", "Filters", "Chemicals", "Covers", "Accessories", etc. — derived from UHTD part categories that have mapped products
-
-**Product grid:**
-- 2-column grid of product cards
-- Each card shows: product image, product title (truncated), price, "Add to Cart" button
-- If inventory_quantity = 0, show "Out of Stock" overlay and disable Add to Cart
-- Infinite scroll pagination (20 products per page)
-
-**Two viewing modes:**
-
-1. **"For Your [Model]" (default)** — shows only products compatible with the active spa via UHTD mapping. Uses `GET /api/v1/products/compatible/:spaProfileId`
-
-2. **"Browse All"** — shows all non-hidden products from the retailer. Toggle between modes with a switch/segmented control at top.
-
-### 4.2 Product Detail Screen
-
-When tapping a product card, navigate to a full product detail screen:
-
-- Product image carousel (swipeable, supports multiple images)
-- Product title
-- Price (formatted: "$29.99")
-- Compare-at price with strikethrough if applicable
-- Inventory status: "In Stock" (green) or "X left" (orange) or "Out of Stock" (red)
-- Product description (rendered from HTML/markdown if applicable)
-- Variant selector (if product has variants — e.g., size options for chemicals)
-- Quantity selector (default 1, increment/decrement)
-- "Add to Cart" button (full width, retailer primary color)
-- Compatibility badge: "✓ Compatible with your [Model]" or "ℹ️ General product — check compatibility"
-- Related products section at bottom (other compatible products in same category)
-
-### 4.3 Cart
-
-**Cart icon** in the header with badge count showing number of items.
-
-**Cart screen (modal or dedicated screen):**
-- List of cart items: image, title, variant, quantity, price, line total
-- Quantity adjustable per item (increment/decrement)
-- Remove item (swipe-to-delete or X button)
-- Subtotal displayed at bottom
-- "Proceed to Checkout" button
-
-**Cart state management:**
-- Use React Context (`CartContext`)
-- Cart is backed by Shopify Storefront API cart objects
-- On "Add to Cart": call Shopify Storefront API `cartCreate` mutation (if no cart exists) or `cartLinesAdd` mutation
-- Cart ID stored in SecureStore so it persists across sessions
-- Cart is tied to the retailer's Shopify store
-
-### 4.4 Checkout via Shopify Checkout Kit
-
-When the user taps "Proceed to Checkout":
-
-1. Retrieve the `checkoutUrl` from the Shopify cart object
-2. Call `shopifyCheckout.present(checkoutUrl)` from `@shopify/checkout-sheet-kit`
-3. Shopify Checkout Kit presents a native checkout sheet over the app
-4. The checkout sheet is fully branded per the retailer's Shopify checkout customization
-5. Customer enters shipping info, selects shipping method, enters payment, and completes purchase — all within Shopify's UI
-6. Listen for checkout completion events:
-   - `completed`: Order placed successfully → show success screen, clear cart, log order reference
-   - `cancelled`: User dismissed checkout → return to cart
-   - `failed`: Payment failed → show error, return to cart
-
-**Implementation:**
-
-```typescript
-import { useShopifyCheckoutSheet } from '@shopify/checkout-sheet-kit';
-
-function CheckoutButton({ checkoutUrl }) {
-  const shopifyCheckout = useShopifyCheckoutSheet();
-
-  // Preload for faster presentation
-  useEffect(() => {
-    if (checkoutUrl) {
-      shopifyCheckout.preload(checkoutUrl);
-    }
-  }, [checkoutUrl]);
-
-  const handleCheckout = () => {
-    shopifyCheckout.present(checkoutUrl);
-  };
-
-  // Listen for events
-  useEffect(() => {
-    const unsubscribeComplete = shopifyCheckout.addEventListener('completed', (event) => {
-      // Order completed — clear cart, navigate to confirmation
-      clearCart();
-      navigation.navigate('OrderConfirmation', { orderId: event.orderDetails?.id });
-    });
-
-    const unsubscribeCancel = shopifyCheckout.addEventListener('cancelled', () => {
-      // User cancelled — stay on cart
-    });
-
-    return () => {
-      unsubscribeComplete();
-      unsubscribeCancel();
-    };
-  }, []);
-
-  return <Button onPress={handleCheckout} title="Proceed to Checkout" />;
-}
-```
-
-**For Lightspeed retailers (no Shopify):**
-This is an edge case we need to address. If a retailer uses Lightspeed but not Shopify, we have two options:
-- Option A: Require the retailer to also set up a minimal Shopify store just for checkout. We sync products from Lightspeed but checkout through Shopify.
-- Option B: Use a WebView to load the retailer's existing e-commerce website checkout. Less native feel but avoids requiring Shopify.
-- **Decision for now:** Start with Option A for TAB (they may already have Shopify, or we set one up). Revisit for future retailers.
-
-### 4.5 Shopify Storefront API Integration
-
-```typescript
-// services/shopify-storefront.ts
-import { ApolloClient, InMemoryCache, gql } from '@apollo/client';
-import Constants from 'expo-constants';
-
-const client = new ApolloClient({
-  uri: `https://${SHOPIFY_STORE_URL}/api/2025-01/graphql.json`,
-  cache: new InMemoryCache(),
-  headers: {
-    'X-Shopify-Storefront-Access-Token': STOREFRONT_TOKEN,
-  },
-});
-
-// Cart mutations
-const CREATE_CART = gql`
-  mutation CreateCart($lines: [CartLineInput!]!) {
-    cartCreate(input: { lines: $lines }) {
-      cart { id checkoutUrl lines(first: 100) { edges { node { id quantity merchandise { ... on ProductVariant { id title price { amount currencyCode } product { title images(first: 1) { edges { node { url } } } } } } } } } }
-    }
-  }
-`;
-
-const ADD_TO_CART = gql`
-  mutation AddToCart($cartId: ID!, $lines: [CartLineInput!]!) {
-    cartLinesAdd(cartId: $cartId, lines: $lines) {
-      cart { id checkoutUrl lines(first: 100) { edges { node { id quantity merchandise { ... on ProductVariant { id title price { amount currencyCode } } } } } } }
-    }
-  }
-`;
-
-const UPDATE_CART = gql`
-  mutation UpdateCart($cartId: ID!, $lines: [CartLineUpdateInput!]!) {
-    cartLinesUpdate(cartId: $cartId, lines: $lines) {
-      cart { id checkoutUrl lines(first: 100) { edges { node { id quantity } } } }
-    }
-  }
-`;
-
-const REMOVE_FROM_CART = gql`
-  mutation RemoveFromCart($cartId: ID!, $lineIds: [ID!]!) {
-    cartLinesRemove(cartId: $cartId, lineIds: $lineIds) {
-      cart { id checkoutUrl lines(first: 100) { edges { node { id quantity } } } }
-    }
-  }
-`;
-```
-
-**Important:** The `merchandiseId` used in cart mutations is the Shopify **Storefront** variant ID (a GID like `gid://shopify/ProductVariant/12345`). You need to store the mapping between your `pos_products.pos_variant_id` (Admin API ID) and the Storefront variant GID. You can either:
-- Convert Admin IDs to Storefront GIDs using the formula: `gid://shopify/ProductVariant/{numericId}`
-- Or fetch products via Storefront API to get the correct GIDs
+Full specification for Shop, PDP, cart, Checkout Kit, and Storefront API lives in **[Phase 3 — Part 5: Commerce](./PHASE-3-ENGAGEMENT.md#part-5-commerce--product-browsing-shop-tab-cart--checkout)**.
 
 ---
 
@@ -612,101 +438,23 @@ Tapping a spa in the profile opens an edit screen where the user can change:
 
 ---
 
-## Verification Checklist
+## Verification Checklist (Phase 2 — shipped slice)
 
-Before moving to Phase 3, verify:
+Use this list to confirm the **Phase 2** surface is done. Commerce, home info cards, multi-spa switching, order webhook, and full Android pass are verified in **[Phase 3 verification checklist](./PHASE-3-ENGAGEMENT.md#verification-checklist)**.
+
+_Tenant branding below means **colors + icon URL** from tenant config (`ThemeProvider`, welcome/onboarding); per-tenant typography is not separately configurable in app today._
 
 - [x] New user can register, complete spa onboarding, and land on My Tub dashboard
-- [x] Spa registration correctly links to UHTD model
-- [ ] My Tub dashboard shows correct spa info, warranty status, filter reminder
-- [ ] Seasonal alerts appear at appropriate times
-- [ ] Shop tab shows products filtered to the user's spa model
-- [ ] Shop tab filters further by sanitization system for chemicals
-- [ ] "Browse All" mode shows all non-hidden products
-- [ ] Category filter pills work correctly
-- [ ] Product search works
-- [ ] Product detail screen shows full info with images, variants, pricing
-- [ ] Add to Cart creates/updates a Shopify cart
-- [ ] Cart screen shows items, allows quantity changes and removal
-- [ ] Checkout via Shopify Checkout Kit works end-to-end (test purchase)
-- [ ] Order webhook fires and creates a notification
+- [x] Spa registration correctly links to UHTD model (or pending-review path via consumer suggestions)
+- [x] My Tub dashboard shows hero + spa summary + Quick Links + configured widgets
 - [x] Push notifications are received on device (retailer compose + registered customer token)
-- [ ] User with multiple spas can switch between them
 - [x] Profile settings are editable and persist
-- [x] Spa profile can be edited (sanitization, usage months, serial number)
-- [x] App displays correctly with TAB's branding (colors, logo, fonts)
-- [ ] App works on both iOS and Android
+- [x] Spa profile can be edited (sanitization, usage months, serial number, nickname, warranty in edit flow)
+- [x] App applies tenant branding (primary/secondary colors, logo/`iconUrl`)
+- [x] Retailer Admin can configure onboarding and home dashboard (Quick Links + widgets)
 
 ---
 
-## Deferred: Phase 1 Verification Checklist (Moved to End of Phase 2)
+### Phase 1 schema & API verification (reference)
 
-This checklist was originally part of Phase 1, but we are intentionally validating it after Phase 2 flows exist end-to-end.
-
-Before moving to Phase 3, also verify:
-
-### SCdb (Spas)
-- [ ] `scdb_brands`, `scdb_model_lines`, `scdb_spa_models` tables exist with correct columns
-- [ ] Individual year strategy implemented (each year = own row)
-- [ ] Soft delete (`deleted_at`) and `data_source` columns present
-- [ ] At least one brand's full model lineup is populated (Jacuzzi recommended)
-- [ ] SCdb API endpoints return correct cascading data
-- [ ] Consumer flow works: Brand → Year → Model selection
-- [ ] `tenant_brand_visibility` table exists
-
-### PCdb (Parts)
-- [ ] `pcdb_categories`, `pcdb_parts`, `pcdb_interchange_groups` tables exist
-- [ ] Part categories are seeded
-- [ ] Parts have `upc`, `ean`, `sku_aliases`, `display_importance` columns
-- [ ] `is_discontinued` and `discontinued_at` columns present
-- [ ] Interchange groups can be created and parts assigned
-- [ ] Trigram indexes created for typo-tolerant search
-
-### Source of Truth
-- [ ] `part_spa_compatibility` has `status`, `fit_notes`, `quantity_required`, `position` columns
-- [ ] Pending/confirmed workflow works
-- [ ] Review queue shows pending records
-
-### Comps
-- [ ] `compatibility_groups` and `comp_spas` tables exist
-- [ ] Comp IDs are human-readable VARCHAR(50)
-- [ ] Comps can be manually created
-- [ ] Comps auto-generate when conditions met (2+ parts, same category, 2+ spas)
-- [ ] Comp quickview shows spas and computed parts
-- [ ] Selecting a Comp selects all its spas
-- [ ] Near-match suggestions work with percentage overlap
-- [ ] Bulk import with Comp IDs creates `pending` records
-
-### Qdb (Qualifiers)
-- [ ] Qualifiers table seeded with sanitization_system, voltage, etc.
-- [ ] Spas can have qualifiers assigned
-- [ ] Parts can have qualifier requirements with `is_required` flag
-
-### Audit & Provenance
-- [ ] `audit_log` table exists with appropriate indexes
-- [ ] UHTD changes are logged
-- [ ] `correction_requests` table exists
-- [ ] Tenants can submit correction requests
-
-### POS Integration
-- [ ] TAB's POS is connected
-- [ ] Product sync runs successfully
-- [ ] Each variant becomes its own `pos_products` row
-- [ ] `barcode` column populated for UPC matching
-- [ ] Auto-mapping algorithm runs with confidence scores
-- [ ] Sync handles rate limits gracefully
-
-### Retailer Admin
-- [ ] Admin can view synced products with mapping status
-- [ ] Admin can see auto-suggested mappings
-- [ ] Admin can confirm or manually map products
-- [ ] Admin can hide/show products
-- [ ] Admin can trigger manual sync
-- [ ] Admin can submit correction requests
-
-### Customer Queries
-- [ ] Product API returns filtered results based on spa profile
-- [ ] `status='confirmed'` filter applied
-- [ ] Sanitization system filtering works
-- [ ] Universal parts bypass compatibility check
-- [ ] Results ordered by category, display_importance, title
+The former “Deferred Phase 1” checklist (SCdb/PCdb/comps/Qdb/audit/customer-query APIs, etc.) was validated against **migrations and source**. Anything still open is **data, tenant POS, or product behavior** — see **[Phase 6 — Deferred Phase 1 and operations verification](./PHASE-6-SCALE-POLISH.md#deferred-phase-1-and-operations-verification-moved-from-phase-2)**.

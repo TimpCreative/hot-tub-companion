@@ -1,5 +1,7 @@
 # Phase 0 — Foundation
 
+**SaaS plans & feature presets:** [SAAS-PLANS-AND-FEATURES.md](./SAAS-PLANS-AND-FEATURES.md)
+
 **Status:** ✅ COMPLETE (February 2026)
 **Depends on:** Nothing. This is the starting point.
 **Unlocks:** All subsequent phases.

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hot Tub Companion — Plans vs phases (internal)</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --border: #2d3a4d;
+      --yes: #3d9a6a;
+      --partial: #c9a227;
+      --no: #c44c4c;
+      --phase: #5b8fd8;
+      --section: #a8b8d0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+      padding: 1.5rem clamp(0.75rem, 2vw, 2rem) 3rem;
+    }
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin: 0 0 0.35rem;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 0.9rem;
+      max-width: 52rem;
+      margin-bottom: 1rem;
+    }
+    .sub a { color: var(--phase); }
+    .callout {
+      background: rgba(201, 162, 39, 0.12);
+      border: 1px solid rgba(201, 162, 39, 0.35);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+      margin: 1.25rem 0;
+      font-size: 0.85rem;
+      max-width: 52rem;
+    }
+    .callout strong { color: #e8d4a8; }
+    .callout ul { margin: 0.5rem 0 0; padding-left: 1.2rem; }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .dot {
+      width: 0.65rem;
+      height: 0.65rem;
+      border-radius: 50%;
+    }
+    .dot.shipped { background: var(--yes); }
+    .dot.partial { background: var(--partial); }
+    .dot.not { background: var(--no); }
+    .dot.ops { background: #6b7a90; }
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--section);
+      margin: 2rem 0 0.65rem;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-title:first-of-type { margin-top: 0.5rem; }
+    .wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--card);
+      margin-bottom: 0.25rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      min-width: 880px;
+    }
+    thead th {
+      background: #243044;
+      text-align: left;
+      padding: 0.6rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    tbody td {
+      padding: 0.5rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tbody tr:hover td { background: rgba(255,255,255,0.03); }
+    .feat { font-weight: 500; max-width: 280px; }
+    .tier { text-align: center; color: var(--muted); }
+    .tier.yes { color: #7dcea0; }
+    .tier.no { color: #666; }
+    .phase { color: var(--phase); white-space: nowrap; }
+    .status {
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .status.shipped { color: var(--yes); }
+    .status.partial { color: var(--partial); }
+    .status.not { color: #e08080; }
+    .status.ops { color: #9aa8bc; }
+    .note { color: var(--muted); font-size: 0.78rem; max-width: 320px; }
+    h2.meta {
+      font-size: 0.95rem;
+      margin: 2rem 0 0.65rem;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Plans page → internal phases (reference)</h1>
+  <p class="sub">
+    Sections mirror <a href="https://hottubcompanion.com/plans/" target="_blank" rel="noopener">hottubcompanion.com/plans</a>
+    (Base / Core / Advanced groupings). Same matrix lives in Super Admin at
+    <code style="background:#243044;padding:0.15rem 0.35rem;border-radius:4px;font-size:0.8rem">/super-admin/roadmap</code>
+    on your deployed dashboard (e.g. admin host).
+  </p>
+
+  <div class="callout">
+    <strong>Blind spots</strong> — line items not strongly spelled out in phase docs:
+    <ul>
+      <li><strong>Scale pricing (future)</strong> — per-user add-on after 500 users (site footnote).</li>
+      <li><strong>Hosting / annual discount / 12-mo minimum</strong> — commercial &amp; ops, not product phases.</li>
+      <li><strong>Customer service history view</strong> (Core marketing) — implied by Phase 4 requests; ensure customer app “my services” copy matches sales.</li>
+    </ul>
+  </div>
+
+  <div class="legend">
+    <span><span class="dot shipped"></span> Shipped</span>
+    <span><span class="dot partial"></span> Partial</span>
+    <span><span class="dot not"></span> Not yet</span>
+    <span><span class="dot ops"></span> Ops</span>
+  </div>
+
+  <!-- Tables: keep in sync with dashboard/src/data/plansRoadmap.ts -->
+
+  <h3 class="section-title">Branded mobile app</h3>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Feature</th><th class="tier">Base</th><th class="tier">Core</th><th class="tier">Adv.</th><th>Phase</th><th>Build</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="feat">Custom iOS &amp; Android app</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">2 / 3</td><td class="status partial">Partial</td><td class="note">Android QA Phase 3.</td></tr>
+        <tr><td class="feat">White-label branding</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">2</td><td class="status shipped">Shipped</td><td class="note"></td></tr>
+        <tr><td class="feat">Modular &quot;My Tub&quot; home</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">2</td><td class="status shipped">Shipped</td><td class="note"></td></tr>
+        <tr><td class="feat">Configurable widget order</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">2</td><td class="status shipped">Shipped</td><td class="note"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="section-title">Customer experience</h3>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Feature</th><th class="tier">Base</th><th class="tier">Core</th><th class="tier">Adv.</th><th>Phase</th><th>Build</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="feat">Spa registration</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">2</td><td class="status shipped">Shipped</td><td class="note"></td></tr>
+        <tr><td class="feat">UHTD compatibility engine</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">1 / 2 / 3</td><td class="status partial">Partial</td><td class="note">Shop UI Phase 3.</td></tr>
+        <tr><td class="feat">Water test logging &amp; history</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">3</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Water care assistant</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">3</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Seasonal maintenance timeline</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">3</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Multi-spa (basic)</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">3</td><td class="status partial">Partial</td><td class="note">Selector Phase 3.</td></tr>
+        <tr><td class="feat">Multi-spa (refined UX)</td><td class="tier no">—</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="phase">6</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">New owner onboarding / spa transfer</td><td class="tier no">—</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="phase">6</td><td class="status not">Not yet</td><td class="note"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="section-title">Commerce</h3>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Feature</th><th class="tier">Base</th><th class="tier">Core</th><th class="tier">Adv.</th><th>Phase</th><th>Build</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="feat">Product catalog (POS sync)</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">1 / 2</td><td class="status partial">Partial</td><td class="note"></td></tr>
+        <tr><td class="feat">In-app Shopify checkout</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">3</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Product filtering by compatibility</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">3</td><td class="status partial">Partial</td><td class="note"></td></tr>
+        <tr><td class="feat">Subscriptions &amp; auto-delivery</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">3</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Subscription discount engine</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">5</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Recommended product bundles</td><td class="tier no">—</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="phase">5</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">White-label fulfillment</td><td class="tier">8%</td><td class="tier">12%</td><td class="tier">15%</td><td class="phase">6</td><td class="status not">Not yet</td><td class="note"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="section-title">Service management</h3>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Feature</th><th class="tier">Base</th><th class="tier">Core</th><th class="tier">Adv.</th><th>Phase</th><th>Build</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="feat">Service request system</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">4</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Custom service types</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">4</td><td class="status not">Not yet</td><td class="note">≈ retailer-defined categories.</td></tr>
+        <tr><td class="feat">Service status tracking</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">4</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Customer service history view</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">4</td><td class="status not">Not yet</td><td class="note">Align Phase 4 customer UX w/ sales.</td></tr>
+        <tr><td class="feat">Service request analytics</td><td class="tier no">—</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="phase">5 / 6</td><td class="status not">Not yet</td><td class="note"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="section-title">Communication &amp; notifications</h3>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Feature</th><th class="tier">Base</th><th class="tier">Core</th><th class="tier">Adv.</th><th>Phase</th><th>Build</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="feat">Basic push (manual)</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">2</td><td class="status shipped">Shipped</td><td class="note"></td></tr>
+        <tr><td class="feat">Scheduled push campaigns</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">4</td><td class="status partial">Partial</td><td class="note"></td></tr>
+        <tr><td class="feat">Urgent banner system</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">4</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">TimpCreative ↔ Retailer inbox</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">4</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Automated push (trigger-based)</td><td class="tier no">—</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="phase">6</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Segmentation &amp; targeted push</td><td class="tier no">—</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="phase">6</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">In-app live chat / messaging</td><td class="tier no">—</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="phase">6</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">White-label email notifications</td><td class="tier no">—</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="phase">6</td><td class="status not">Not yet</td><td class="note"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="section-title">Content</h3>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Feature</th><th class="tier">Base</th><th class="tier">Core</th><th class="tier">Adv.</th><th>Phase</th><th>Build</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="feat">Universal content library</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">3</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Content filtered by spa &amp; system</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">3</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Retailer-authored content</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">3</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Content priority</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">3</td><td class="status not">Not yet</td><td class="note"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="section-title">Growth &amp; loyalty</h3>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Feature</th><th class="tier">Base</th><th class="tier">Core</th><th class="tier">Adv.</th><th>Phase</th><th>Build</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="feat">Referral program</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">3</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Loyalty / rewards</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">5</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Points redemption at checkout</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">5</td><td class="status not">Not yet</td><td class="note"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="section-title">Retailer dashboard</h3>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Feature</th><th class="tier">Base</th><th class="tier">Core</th><th class="tier">Adv.</th><th>Phase</th><th>Build</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="feat">Admin dashboard (subdomain)</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">0 / 2</td><td class="status partial">Partial</td><td class="note"></td></tr>
+        <tr><td class="feat">Customer list &amp; spa profiles</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">2+</td><td class="status partial">Partial</td><td class="note"></td></tr>
+        <tr><td class="feat">Product visibility</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">1 / 2</td><td class="status partial">Partial</td><td class="note"></td></tr>
+        <tr><td class="feat">UHTD mapping tool</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">1 / 2</td><td class="status partial">Partial</td><td class="note"></td></tr>
+        <tr><td class="feat">Service request management</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">4</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Push scheduling</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">4</td><td class="status partial">Partial</td><td class="note"></td></tr>
+        <tr><td class="feat">Content management</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">3</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Basic analytics</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">5</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Advanced analytics</td><td class="tier no">—</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="phase">5 / 6</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Data export / import</td><td class="tier no">—</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="phase">6</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Branded customer reports</td><td class="tier no">—</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="phase">6</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Retailer API access</td><td class="tier no">—</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="phase">6</td><td class="status not">Not yet</td><td class="note"></td></tr>
+        <tr><td class="feat">Multi-location</td><td class="tier no">—</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="phase">6</td><td class="status not">Not yet</td><td class="note"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="section-title">Support</h3>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Feature</th><th class="tier">Base</th><th class="tier">Core</th><th class="tier">Adv.</th><th>Phase</th><th>Build</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="feat">Email support</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">—</td><td class="status ops">Ops</td><td class="note"></td></tr>
+        <tr><td class="feat">Priority support</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="tier yes">✓</td><td class="phase">—</td><td class="status ops">Ops</td><td class="note"></td></tr>
+        <tr><td class="feat">Dedicated onboarding manager</td><td class="tier no">—</td><td class="tier no">—</td><td class="tier yes">✓</td><td class="phase">—</td><td class="status ops">Ops</td><td class="note"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="meta">Standard build-out</h2>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Line item</th><th>Phase</th><th>Build</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="feat">Branded app build</td><td class="phase">2 / 3</td><td class="status partial">Partial</td><td class="note"></td></tr>
+        <tr><td class="feat">App store submission</td><td class="phase">0 / 2</td><td class="status partial">Partial</td><td class="note"></td></tr>
+        <tr><td class="feat">POS / Shopify connection</td><td class="phase">1 / 2</td><td class="status partial">Partial</td><td class="note"></td></tr>
+        <tr><td class="feat">Catalog sync</td><td class="phase">1 / 2</td><td class="status partial">Partial</td><td class="note"></td></tr>
+        <tr><td class="feat">UHTD mapping</td><td class="phase">1 / 2</td><td class="status partial">Partial</td><td class="note"></td></tr>
+        <tr><td class="feat">Branding config</td><td class="phase">2</td><td class="status shipped">Shipped</td><td class="note"></td></tr>
+        <tr><td class="feat">Admin provisioning</td><td class="phase">0 / 2</td><td class="status partial">Partial</td><td class="note"></td></tr>
+        <tr><td class="feat">QA &amp; soft launch</td><td class="phase">2 / 3</td><td class="status partial">Ongoing</td><td class="note"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="meta">Platform / entitlements</h2>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Item</th><th>Phase</th><th>Build</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="feat">saas_plan + entitlements API</td><td class="phase">Infra</td><td class="status shipped">Shipped</td><td class="note">Super Admin PUT/GET …/entitlements</td></tr>
+        <tr><td class="feat">Lightspeed POS (all plans)</td><td class="phase">1 / 2</td><td class="status partial">Partial</td><td class="note"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="sub" style="margin-top:2rem;">
+    Keep in sync with <code style="background:#243044;padding:0.15rem 0.35rem;border-radius:4px">dashboard/src/data/plansRoadmap.ts</code>.
+  </p>
+</body>
+</html>

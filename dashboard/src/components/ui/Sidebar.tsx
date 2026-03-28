@@ -19,17 +19,28 @@ interface SidebarProps {
   title: string;
 }
 
+/** Nav items use paths relative to basePath (e.g. `/dashboard`); full paths already under basePath are left as-is. */
+function resolveSidebarHref(itemHref: string, basePath: string): string {
+  if (itemHref === basePath || itemHref.startsWith(`${basePath}/`)) {
+    return itemHref;
+  }
+  if (itemHref.startsWith('/')) {
+    return `${basePath}${itemHref}`;
+  }
+  return `${basePath}/${itemHref}`;
+}
+
 export function Sidebar({ navItems, bottomItems, basePath, title }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { confirmNavigate } = useUnsavedChanges();
 
   const renderNavItem = (item: NavItem) => {
-    const href = item.href.startsWith('/') ? item.href : `${basePath}${item.href}`;
+    const href = resolveSidebarHref(item.href, basePath);
     const isActive = pathname === href || pathname.startsWith(href + '/');
     return (
       <Link
-        key={item.href}
+        key={href}
         href={href}
         onClick={(e) => {
           if (isActive) {

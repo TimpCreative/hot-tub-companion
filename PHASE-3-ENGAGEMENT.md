@@ -1,29 +1,68 @@
 # Phase 3 — Engagement & Retention Features
 
-**Depends on:** Phase 2 (working customer app with shopping)
+**Depends on:** [Phase 2](./PHASE-2-CUSTOMER-MVP.md) (auth, onboarding, My Tub shell, push, retailer admin basics). **Shopping is delivered in this phase**, not a prerequisite.
 **Unlocks:** Phase 4 (service & communication features)
-**Estimated effort:** 3–4 weeks
+**Estimated effort:** 6–8 weeks *(commerce + engagement + referrals — revise as you track velocity)*
+
+**Plans / entitlements:** [SAAS-PLANS-AND-FEATURES.md](./SAAS-PLANS-AND-FEATURES.md) (TAB on **Advanced** preset for guinea-pig coverage; referrals on **all** tiers.)
 
 ---
 
 ## Manual Steps Required (Do These First)
 
-1. **Write universal water care content.** Create at least 10 guides: first-time fill & startup, weekly water testing basics, bromine maintenance, chlorine maintenance, Frog @Ease maintenance, winterizing your hot tub, spring startup, filter cleaning & replacement, water chemistry troubleshooting, draining & refilling. Written in markdown.
+**Commerce / pilot (from former Phase 2 manual checklist)**
 
-2. **Gather chemical dosage data.** Dosage tables for pH increaser/decreaser, alkalinity increaser, bromine, chlorine, calcium hardness increaser — how much per gallon to adjust by 1 unit. Source from manufacturer labels.
+1. **Obtain TAB's branding package.** Primary logo (SVG/PNG, light and dark), brand colors (hex), preferred font or approved fallback, app icon, splash. Place under `/mobile/tenants/<slug>/` as needed.
 
-3. **Confirm TAB's subscription preferences.** Does TAB want Shopify Subscriptions (requires an app like Recharge/Bold) or our internal subscription engine?
+2. **Set up Shopify Checkout Kit.** In TAB's Shopify admin: checkout configured; Storefront API scopes include `unauthenticated_read_checkouts` and `unauthenticated_write_checkouts`; Storefront access token available to the app (see Phase 1).
 
-4. **Design preset bundles with TAB.** Create 3–5 presets: New Owner Starter Kit, Monthly Bromine Pack, Monthly Chlorine Pack, Winterization Kit, Spring Startup Kit.
+3. **Create test customer accounts.** 3–5 accounts with different spa models and sanitization systems.
+
+4. **Confirm sufficient UHTD / POS mapping** (e.g. at least ~10 mapped products per test model) so compatible and browse flows have real data.
+
+**Engagement**
+
+5. **Write universal water care content.** At least 10 guides: first-time fill & startup, weekly water testing basics, bromine/chlorine/Frog @Ease maintenance, winterizing, spring startup, filter cleaning & replacement, chemistry troubleshooting, draining & refilling — markdown.
+
+6. **Gather chemical dosage data.** Dosage tables for pH, alkalinity, sanitizer, calcium — per gallon per unit; source from manufacturer labels.
+
+7. **Confirm TAB's subscription preferences.** Shopify Subscriptions (Recharge/Bold, etc.) vs internal subscription engine.
+
+8. **Design preset bundles with TAB.** 3–5 presets: New Owner Starter Kit, Monthly Bromine/Chlorine packs, Winterization, Spring Startup, etc.
+
+**Referrals (all tiers)**
+
+9. **Define referral program terms with TAB.** Referrer reward, optional referred reward, qualifying purchase definition, attribution — see [Part 6: Referral Program](#part-6-referral-program).
 
 ---
 
 ## What Phase 3 Builds
 
-- Water Care Assistant (test logging, chemical recommendations, one-tap purchase)
-- Seasonal Maintenance Timeline with push notification triggers
-- Content system (universal + retailer-specific, contextual filtering)
-- Subscription management (Chewy-style)
+Work is grouped **below** for clarity; later parts of this document retain detailed specs.
+
+1. **Commerce (former Phase 2 scope)**  
+   Shop tab: compatible + browse-all modes, category pills, search, PDP, cart (Shopify Storefront), **Shopify Checkout Kit**, sanitization-aware product filtering as specified.  
+   **Multi-spa selector** on Home and Shop with persistent active spa (extends [Phase 2 Part 2](./PHASE-2-CUSTOMER-MVP.md#part-2-main-app-navigation)).  
+   **Home info cards:** warranty, filter reminder, seasonal alert, recent orders — [Phase 2 Part 3](./PHASE-2-CUSTOMER-MVP.md#part-3-my-tub-dashboard-home-tab---partial).  
+   **Orders:** Shopify `orders/create` webhook → validated handler, push notification, `order_references` (or equivalent) — [Phase 2 Part 5 §5.4](./PHASE-2-CUSTOMER-MVP.md#54-shopify-webhooks).
+
+2. **Referral program (all SaaS tiers)**  
+   Unique codes, share sheet, optional manual referral submission, admin workflow to mark purchased and issue rewards — after purchasable checkout exists. Spec: [Part 6](#part-6-referral-program).
+
+3. **Water Care Assistant**  
+   Test logging, recommendations, purchasable product links.
+
+4. **Seasonal Maintenance Timeline**  
+   Push triggers, recurring tasks.
+
+5. **Content system**  
+   Universal + retailer content, filtering by spa / sanitization.
+
+6. **Subscription management (Chewy-style)**  
+   Internal engine, bundles, deliveries — as specified in Part 4 of this doc.
+
+7. **Cross-platform QA**  
+   Android verification alongside iOS for new surfaces.
 
 ---
 
@@ -525,9 +564,291 @@ PUT    /api/v1/admin/subscriptions/:id/discount
 
 ---
 
+## Part 5: Commerce — Product Browsing (Shop Tab), Cart & Checkout
+
+Shop tab currently shows a placeholder until this part is implemented. API exists: `GET /products`, `GET /products/compatible/:spaProfileId`.
+
+### 5.0 Multi-spa, home cards, and order webhook
+
+Deliver alongside or before the Shop UI as needed for pilot QA:
+
+- **Multi-spa selector** on Home and Shop; persist active `spa_profile_id` (see [Phase 2 — Part 2](./PHASE-2-CUSTOMER-MVP.md#part-2-main-app-navigation)).
+- **Home info cards:** warranty, filter reminder, seasonal alert, recent orders — [Phase 2 — Part 3](./PHASE-2-CUSTOMER-MVP.md#part-3-my-tub-dashboard-home-tab---partial).
+- **Shopify `orders/create` webhook** → HMAC-validated handler, tenant match, user match optional, push + `order_references` — [Phase 2 — Part 5 §5.4](./PHASE-2-CUSTOMER-MVP.md#54-shopify-webhooks).
+
+### 5.1 Shop Screen Layout
+
+**Top section:**
+- Search bar (searches product titles and descriptions locally on the fetched data)
+- Category filter pills (horizontal scroll): "All", "Filters", "Chemicals", "Covers", "Accessories", etc. — derived from UHTD part categories that have mapped products
+
+**Product grid:**
+- 2-column grid of product cards
+- Each card shows: product image, product title (truncated), price, "Add to Cart" button
+- If inventory_quantity = 0, show "Out of Stock" overlay and disable Add to Cart
+- Infinite scroll pagination (20 products per page)
+
+**Two viewing modes:**
+
+1. **"For Your [Model]" (default)** — shows only products compatible with the active spa via UHTD mapping. Uses `GET /api/v1/products/compatible/:spaProfileId`
+
+2. **"Browse All"** — shows all non-hidden products from the retailer. Toggle between modes with a switch/segmented control at top.
+
+### 5.2 Product Detail Screen
+
+When tapping a product card, navigate to a full product detail screen:
+
+- Product image carousel (swipeable, supports multiple images)
+- Product title
+- Price (formatted: "$29.99")
+- Compare-at price with strikethrough if applicable
+- Inventory status: "In Stock" (green) or "X left" (orange) or "Out of Stock" (red)
+- Product description (rendered from HTML/markdown if applicable)
+- Variant selector (if product has variants — e.g., size options for chemicals)
+- Quantity selector (default 1, increment/decrement)
+- "Add to Cart" button (full width, retailer primary color)
+- Compatibility badge: "✓ Compatible with your [Model]" or "ℹ️ General product — check compatibility"
+- Related products section at bottom (other compatible products in same category)
+
+### 5.3 Cart
+
+**Cart icon** in the header with badge count showing number of items.
+
+**Cart screen (modal or dedicated screen):**
+- List of cart items: image, title, variant, quantity, price, line total
+- Quantity adjustable per item (increment/decrement)
+- Remove item (swipe-to-delete or X button)
+- Subtotal displayed at bottom
+- "Proceed to Checkout" button
+
+**Cart state management:**
+- Use React Context (`CartContext`)
+- Cart is backed by Shopify Storefront API cart objects
+- On "Add to Cart": call Shopify Storefront API `cartCreate` mutation (if no cart exists) or `cartLinesAdd` mutation
+- Cart ID stored in SecureStore so it persists across sessions
+- Cart is tied to the retailer's Shopify store
+
+### 5.4 Checkout via Shopify Checkout Kit
+
+When the user taps "Proceed to Checkout":
+
+1. Retrieve the `checkoutUrl` from the Shopify cart object
+2. Call `shopifyCheckout.present(checkoutUrl)` from `@shopify/checkout-sheet-kit`
+3. Shopify Checkout Kit presents a native checkout sheet over the app
+4. The checkout sheet is fully branded per the retailer's Shopify checkout customization
+5. Customer enters shipping info, selects shipping method, enters payment, and completes purchase — all within Shopify's UI
+6. Listen for checkout completion events:
+   - `completed`: Order placed successfully → show success screen, clear cart, log order reference
+   - `cancelled`: User dismissed checkout → return to cart
+   - `failed`: Payment failed → show error, return to cart
+
+**Implementation:**
+
+```typescript
+import { useShopifyCheckoutSheet } from '@shopify/checkout-sheet-kit';
+
+function CheckoutButton({ checkoutUrl }) {
+  const shopifyCheckout = useShopifyCheckoutSheet();
+
+  useEffect(() => {
+    if (checkoutUrl) {
+      shopifyCheckout.preload(checkoutUrl);
+    }
+  }, [checkoutUrl]);
+
+  const handleCheckout = () => {
+    shopifyCheckout.present(checkoutUrl);
+  };
+
+  useEffect(() => {
+    const unsubscribeComplete = shopifyCheckout.addEventListener('completed', (event) => {
+      clearCart();
+      navigation.navigate('OrderConfirmation', { orderId: event.orderDetails?.id });
+    });
+
+    const unsubscribeCancel = shopifyCheckout.addEventListener('cancelled', () => {});
+
+    return () => {
+      unsubscribeComplete();
+      unsubscribeCancel();
+    };
+  }, []);
+
+  return <Button onPress={handleCheckout} title="Proceed to Checkout" />;
+}
+```
+
+**For Lightspeed retailers (no Shopify):**
+- Option A: Minimal Shopify store for checkout; sync products from Lightspeed.
+- Option B: WebView to retailer checkout (less native).
+- **TAB:** Prefer Option A where applicable.
+
+### 5.5 Shopify Storefront API Integration
+
+```typescript
+// services/shopify-storefront.ts
+import { ApolloClient, InMemoryCache, gql } from '@apollo/client';
+
+const client = new ApolloClient({
+  uri: `https://${SHOPIFY_STORE_URL}/api/2025-01/graphql.json`,
+  cache: new InMemoryCache(),
+  headers: {
+    'X-Shopify-Storefront-Access-Token': STOREFRONT_TOKEN,
+  },
+});
+
+const CREATE_CART = gql`
+  mutation CreateCart($lines: [CartLineInput!]!) {
+    cartCreate(input: { lines: $lines }) {
+      cart { id checkoutUrl lines(first: 100) { edges { node { id quantity merchandise { ... on ProductVariant { id title price { amount currencyCode } product { title images(first: 1) { edges { node { url } } } } } } } } } }
+    }
+  }
+`;
+
+const ADD_TO_CART = gql`
+  mutation AddToCart($cartId: ID!, $lines: [CartLineInput!]!) {
+    cartLinesAdd(cartId: $cartId, lines: $lines) {
+      cart { id checkoutUrl lines(first: 100) { edges { node { id quantity merchandise { ... on ProductVariant { id title price { amount currencyCode } } } } } } } }
+    }
+  }
+`;
+
+const UPDATE_CART = gql`
+  mutation UpdateCart($cartId: ID!, $lines: [CartLineUpdateInput!]!) {
+    cartLinesUpdate(cartId: $cartId, lines: $lines) {
+      cart { id checkoutUrl lines(first: 100) { edges { node { id quantity } } } }
+    }
+  }
+`;
+
+const REMOVE_FROM_CART = gql`
+  mutation RemoveFromCart($cartId: ID!, $lineIds: [ID!]!) {
+    cartLinesRemove(cartId: $cartId, lineIds: $lineIds) {
+      cart { id checkoutUrl lines(first: 100) { edges { node { id quantity } } } }
+    }
+  }
+`;
+```
+
+**Important:** `merchandiseId` in cart mutations is the Shopify **Storefront** variant GID (`gid://shopify/ProductVariant/...`). Map `pos_products.pos_variant_id` to Storefront GIDs accordingly.
+
+---
+
+## Part 6: Referral Program
+
+**Tiers:** Available on **Base, Core, and Advanced** per [SAAS-PLANS-AND-FEATURES.md](./SAAS-PLANS-AND-FEATURES.md). Implement **after** checkout and order flow exist so attribution and rewards can tie to real purchases.
+
+### 6.1 Database Tables
+
+```sql
+CREATE TABLE referral_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  code VARCHAR(20) NOT NULL UNIQUE,  -- e.g., "JOHN-TAB-2024"
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_referral_code ON referral_codes(code);
+
+CREATE TABLE referrals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  referrer_user_id UUID NOT NULL REFERENCES users(id),
+  referral_code_id UUID NOT NULL REFERENCES referral_codes(id),
+  referred_name VARCHAR(255),
+  referred_email VARCHAR(255),
+  referred_phone VARCHAR(20),
+  status VARCHAR(30) DEFAULT 'pending',  -- 'pending' | 'contacted' | 'purchased' | 'rewarded' | 'expired'
+  purchase_date DATE,
+  reward_type VARCHAR(20),  -- 'store_credit' | 'loyalty_points' | 'custom'
+  reward_amount INTEGER,  -- cents for store credit, points for loyalty
+  reward_issued_at TIMESTAMPTZ,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE referral_config (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE UNIQUE,
+  referrer_reward_type VARCHAR(20) DEFAULT 'store_credit',
+  referrer_reward_amount INTEGER DEFAULT 10000,  -- $100.00 in cents
+  referred_reward_type VARCHAR(20),  -- null = no reward for referred
+  referred_reward_amount INTEGER,
+  qualifying_purchase_description TEXT DEFAULT 'Purchase of a new hot tub',
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### 6.2 Referral Flow
+
+**Customer side:**
+1. Referral code auto-generated on account creation: `[FIRSTNAME]-[TENANT_SLUG]-[RANDOM4]` (e.g., "JOHN-TAB-A3K9")
+2. Referral screen in app (accessible from Profile):
+   - "Refer a Friend" heading
+   - Explanation: "Know someone who'd love a hot tub? Refer them to [Retailer Name] and earn $[X] in store credit when they purchase!"
+   - Referral code displayed large with "Copy" and "Share" buttons
+   - Share opens native share sheet with pre-filled message: "I love my [Brand] hot tub from [Retailer Name]! Use my referral code [CODE] when you buy yours. [App download link]"
+   - List of past referrals with status
+
+**Manual referral submission (alternative):**
+- "Submit a referral" form: referred person's name, email, phone
+- Creates a referral record the retailer can track
+
+**Retailer side:**
+- When a referred customer buys a hot tub, the retailer marks the referral as "purchased" in the admin dashboard
+- System auto-generates reward (store credit via Shopify discount code or loyalty points)
+- Notifies referrer: "Your referral [Name] made a purchase! You've earned $[X] in store credit!"
+
+### 6.3 API Endpoints
+
+```
+# Customer
+GET    /api/v1/referrals/my-code
+GET    /api/v1/referrals
+POST   /api/v1/referrals
+  Body: { referredName, referredEmail, referredPhone }
+
+# Admin
+GET    /api/v1/admin/referrals?status=X
+PUT    /api/v1/admin/referrals/:id/status
+  Body: { status, purchaseDate? }  → If status='purchased', triggers reward
+GET    /api/v1/admin/referral-config
+PUT    /api/v1/admin/referral-config
+```
+
+---
+
 ## Verification Checklist
 
 Before moving to Phase 4, verify:
+
+### Commerce, home, and platform
+
+- [ ] Multi-spa: user with multiple spas can switch active spa on Home and Shop
+- [ ] My Tub dashboard shows warranty, filter reminder, seasonal alert, and recent orders as specified
+- [ ] Shop tab shows products filtered to the user's spa model (compatible mode)
+- [ ] Shop tab filters further by sanitization system for chemicals (as specified)
+- [ ] "Browse All" mode shows all non-hidden products
+- [ ] Category filter pills work correctly
+- [ ] Product search works
+- [ ] Product detail screen shows full info with images, variants, pricing
+- [ ] Add to Cart creates/updates a Shopify cart
+- [ ] Cart screen shows items, allows quantity changes and removal
+- [ ] Checkout via Shopify Checkout Kit works end-to-end (test purchase)
+- [ ] Order webhook fires and creates a notification (and order reference if applicable)
+- [ ] App works on both iOS and Android (full pass on new surfaces)
+
+### Referrals (all tiers)
+
+- [ ] Referral codes are auto-generated per user
+- [ ] Referral share functionality works (copy, native share sheet)
+- [ ] Referral submissions appear in admin dashboard
+- [ ] Marking a referral as "purchased" triggers reward issuance and notification
+
+### Engagement (existing Phase 3 scope)
 
 - [ ] Customer can log a water test with all parameters
 - [ ] Recommendations engine correctly calculates chemical doses based on spa volume and sanitization system

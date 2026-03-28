@@ -53,6 +53,8 @@ interface TenantConfig {
   tenantId: string;
   name: string;
   slug: string;
+  /** base | core | advanced | custom — informational; use features for gating */
+  saasPlan?: string;
   branding: {
     primaryColor: string;
     secondaryColor: string;
