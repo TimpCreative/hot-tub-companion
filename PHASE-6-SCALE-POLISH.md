@@ -4,6 +4,17 @@
 **Unlocks:** Onboarding additional retailers, marketing the platform
 **Estimated effort:** 2–3 weeks
 
+### Release timing (what “launch” means here)
+
+These phase docs do **not** commit to a calendar release date. In order of ambition:
+
+| Milestone | Where it’s defined | Practical meaning |
+| --------- | ------------------ | ----------------- |
+| **First retailer customer app (e.g. TAB)** | Phase 2 | Ship when Phase 2 verification is done: shop, checkout, home/dashboard scope you care about, and tenant QA — not blocked on Phase 5–6 polish. |
+| **Platform launch-ready** | Phase 6 (checklist below) | White-label maturity, second retailer validation, performance/security/legal gates. Part 6 of this doc notes an **internal bar**: second retailer app live **within ~30 days of contract** once the onboarding process is working. |
+
+Use Phase 6 for “we’re ready to market the platform”; use Phase 2’s checklist for “this retailer’s app is safe to put in customers’ hands.”
+
 ---
 
 ## Manual Steps Required (Do These First)
@@ -26,9 +37,30 @@
 - New tub owner guided onboarding experience (first-week flow)
 - Multi-spa management refinements
 - White-label onboarding automation (templatize the process)
+- **White-label fulfillment** — order routing to partner retailer Shopify, royalty settlement aligned to plan tier (8% / 12% / 15% per public pricing); **after TAB pilot** when a second fulfillment story is required — not blocking Phase 3 launch on TAB’s own store.
 - Performance optimization and hardening
 - Second retailer onboarding (validation)
 - AWS migration planning (if needed)
+- **Optional scale pricing** — per-active-user add-on after a threshold (~500 users, per [hottubcompanion.com/plans](https://hottubcompanion.com/plans/)); metering, billing, and admin UX — when the first tenant approaches scale
+
+---
+
+## Advanced platform capabilities (from public comparison table)
+
+_Stubs for marketing/engineering alignment; full specs TBD. These map to **Advanced** on [hottubcompanion.com/plans](https://hottubcompanion.com/plans/) unless noted._
+
+| Capability | Notes |
+|------------|--------|
+| Automated / trigger-based push campaigns | Reorder, filter replacement, win-back; segmentation rules. Beyond Phase 4 scheduled campaigns. |
+| Customer segmentation & targeted push | Behavioral segments for push/email surfaces. |
+| In-app live chat / messaging with customer | Distinct from TimpCreative ↔ Retailer inbox (Phase 4). |
+| White-label **customer** email | Branded transactional/marketing email; not the same as internal retailer notification email. |
+| Multi-location support | Tenant org structure / locations in admin. |
+| Retailer API access | Documented external API for partners. |
+| Branded automated customer reports | e.g. monthly spa health summary emails to customers. |
+| Optional per-active-user pricing above ~500 users | Public plans footnote; aligns cost with value at scale — design with billing (Stripe) and Super Admin reporting. |
+
+Feature flags / `saas_plan` gating for these should follow [SAAS-PLANS-AND-FEATURES.md](./SAAS-PLANS-AND-FEATURES.md) as columns are added to `tenants`.
 
 ---
 
@@ -414,3 +446,32 @@ Migrate to AWS when any of these occur:
 - [ ] Legal review of ToS and Privacy Policy complete
 - [ ] UHTD coverage is sufficient for both retailers' product lines
 - [ ] AWS migration plan documented (if needed)
+
+---
+
+## Deferred Phase 1 and operations verification (moved from Phase 2)
+
+_These items were deferred from Phase 1 and previously lived at the end of **Phase 2 — Customer App MVP**. They are **not** schema trivia (those are already verified in-repo). They are **production data**, **tenant-specific integrations**, **remaining product behavior**, or **stress/QA** — appropriate to close before calling the **platform** launch-ready, or alongside TAB’s hard launch if you require them earlier._
+
+### SCdb (data)
+
+- [ ] At least one brand's full model lineup is populated in SCdb (Jacuzzi recommended)
+
+### Comps (automation)
+
+- [ ] Comps **auto-generate** when conditions are met (2+ parts, same category, 2+ spas) — wire batch/cron or trigger from super-admin workflow _(detection helper may already exist in API; automation not verified)_
+
+### Audit & correction workflow
+
+- [ ] **Tenants** can submit correction requests (customer-facing or Retailer Admin flow — whatever the product spec calls for)
+- [ ] **Retailer Admin** can submit or track correction requests end-to-end _(if required separately from tenant submission)_
+
+### POS integration (tenant + reliability)
+
+- [ ] **TAB’s** (or pilot tenant’s) POS is connected in **production**
+- [ ] Product **sync runs successfully** on a real cadence (initial full sync + incremental) with no silent data loss
+- [ ] Sync **handles Shopify (or POS) rate limits** gracefully (backoff, resumes, observability)
+
+### Optional cross-reference
+
+For the full Phase 2 **customer app** verification (shop, cart, checkout, dashboard cards, Android, etc.), see **Phase 2 — Verification Checklist** in `PHASE-2-CUSTOMER-MVP.md`.

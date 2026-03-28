@@ -1,8 +1,10 @@
 # Phase 4 — Services & Communication
 
-**Depends on:** Phase 3 (engagement features live)
+**Depends on:** [Phase 3](./PHASE-3-ENGAGEMENT.md) (commerce, referrals, water care, content, subscriptions, and related verification complete — as scoped for pilot)
 **Unlocks:** Phase 5 (growth features)
 **Estimated effort:** 2–3 weeks
+
+**Plans:** Service and comms features align with **Core / Advanced** on [SAAS-PLANS-AND-FEATURES.md](./SAAS-PLANS-AND-FEATURES.md).
 
 ---
 
@@ -18,7 +20,8 @@
 
 ## What Phase 4 Builds
 
-- Service request system (Water Valet vs Technician categories, retailer-configurable types)
+- Service request system (Water Valet vs Technician **categories**, **retailer-defined** service types — matches public copy *Retailer-defined service categories*)
+- **Customer service history** — in-app list and detail for active and past requests (status timeline, ratings); aligns with Core plan *Customer service history view* on [hottubcompanion.com/plans](https://hottubcompanion.com/plans/)
 - Retailer scheduling tool integration or built-in request flow
 - Two-way retailer ↔ TimpCreative inbox
 - Urgent banner system (admin dashboards + customer app)
@@ -122,7 +125,7 @@ CREATE TABLE service_request_updates (
    - Summary of request details
    - "We'll notify you when your appointment is confirmed."
 
-4. **My Service Requests screen:**
+4. **My Service Requests screen** (public plans: *Customer service history view*):
    - List of all service requests sorted by date
    - Status badges: 🟡 Pending, 🟢 Confirmed, 🔵 In Progress, ✅ Completed, ❌ Cancelled
    - Tap to view details:
@@ -148,11 +151,12 @@ CREATE TABLE service_request_updates (
   - **Cancel button:** Add reason → sends push notification with reason
   - **Internal notes** field (not visible to customer)
 
-**Service type configuration:**
+**Service type configuration** (public plans: *Retailer-defined service categories*):
 - `/admin/settings/services` — manage service types
 - Add/edit/deactivate service types
 - Reorder with drag-and-drop
 - Set category, description, estimated duration, price range display
+- **Terminology:** "Categories" in marketing = the two lanes (**Water Valet** vs **Technician**) plus each **retailer-defined** service type the tenant creates. No separate feature beyond `service_types` + `category`.
 
 ### 1.4 External Scheduling Integration (Optional)
 
@@ -404,6 +408,19 @@ GET    /api/v1/admin/notifications/:id/stats
 
 ---
 
+## Public plans page — alignment
+
+Cross-check with [hottubcompanion.com/plans](https://hottubcompanion.com/plans/) so Core service bullets have a clear home in this phase.
+
+| Plans page line | Where it lives |
+| ---------------- | -------------- |
+| **Customer service history view** | §1.2 — *My Service Requests* (list, detail, status timeline, cancel/rate). |
+| **Retailer-defined service categories** | §1.1 / §1.3 — `service_types` grouped under Water Valet vs Technician; tenant defines types. |
+| **Scale pricing** (optional per active user after ~500 users) | Commercial/product TBD when needed; planning and implementation tracked in [Phase 6](./PHASE-6-SCALE-POLISH.md). |
+| **Hosting included**, **annual discount**, **12-month minimum** | Contract and billing operations — not application build scope; reflect in MSA/order form. |
+
+---
+
 ## Verification Checklist
 
 Before moving to Phase 5, verify:
@@ -414,6 +431,8 @@ Before moving to Phase 5, verify:
 - [ ] Admin can confirm, update status, and complete service requests
 - [ ] Status changes trigger push notifications to customer
 - [ ] Customer can rate completed services
+- [ ] Customer **service history** (requests list + detail + timeline) matches Core marketing copy on the public plans page
+- [ ] **Retailer-defined** types/categories behave as documented (Water Valet / Technician + tenant-defined types)
 - [ ] Retailer ↔ TimpCreative inbox works both directions
 - [ ] Email notifications fire when new messages arrive
 - [ ] Urgent banners display in admin dashboards (all severity levels)
