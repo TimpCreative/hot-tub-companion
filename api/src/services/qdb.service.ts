@@ -46,7 +46,7 @@ interface PartQualifierRow {
   is_required: boolean;
 }
 
-function mapQualifierFromDb(row: QualifierRow): QdbQualifier {
+function mapQualifierFromDb(row: QualifierRow, brandIds?: string[] | null): QdbQualifier {
   const allowedValues = row.allowed_values == null
     ? null
     : typeof row.allowed_values === 'string'
@@ -62,9 +62,40 @@ function mapQualifierFromDb(row: QualifierRow): QdbQualifier {
     description: row.description,
     sectionId: row.section_id ?? null,
     isUniversal: row.is_universal ?? false,
+    brandIds: row.is_universal ? null : (brandIds ?? []),
     isRequired: row.is_required ?? false,
     createdAt: row.created_at,
   };
+}
+
+async function getQualifierBrandIdsMap(qualifierIds: string[]): Promise<Map<string, string[]>> {
+  if (qualifierIds.length === 0) return new Map();
+
+  const rows = await db('brand_qualifiers')
+    .whereIn('qualifier_id', qualifierIds)
+    .select('qualifier_id', 'brand_id');
+
+  const map = new Map<string, string[]>();
+  for (const row of rows as Array<{ qualifier_id: string; brand_id: string }>) {
+    const existing = map.get(row.qualifier_id) ?? [];
+    existing.push(row.brand_id);
+    map.set(row.qualifier_id, existing);
+  }
+  return map;
+}
+
+async function syncQualifierBrandAssignments(
+  qualifierId: string,
+  isUniversal: boolean,
+  brandIds: string[] | null | undefined
+): Promise<void> {
+  await db('brand_qualifiers').where({ qualifier_id: qualifierId }).del();
+
+  if (isUniversal || !brandIds || brandIds.length === 0) return;
+
+  await db('brand_qualifiers').insert(
+    brandIds.map((brandId) => ({ brand_id: brandId, qualifier_id: qualifierId }))
+  );
 }
 
 function mapSectionFromDb(row: SectionRow): QdbSection {
@@ -96,12 +127,15 @@ function mapPartQualifierFromDb(row: PartQualifierRow): QdbPartQualifier {
 // Qualifier CRUD
 export async function getAllQualifiers(): Promise<QdbQualifier[]> {
   const rows = await db('qdb_qualifiers').orderBy('display_name');
-  return rows.map(mapQualifierFromDb);
+  const brandMap = await getQualifierBrandIdsMap(rows.map((row: QualifierRow) => row.id));
+  return rows.map((row: QualifierRow) => mapQualifierFromDb(row, brandMap.get(row.id) ?? []));
 }
 
 export async function getQualifierById(id: string): Promise<QdbQualifier | null> {
   const row = await db('qdb_qualifiers').where({ id }).first();
-  return row ? mapQualifierFromDb(row) : null;
+  if (!row) return null;
+  const brandMap = await getQualifierBrandIdsMap([id]);
+  return mapQualifierFromDb(row, brandMap.get(id) ?? []);
 }
 
 export async function createQualifier(
@@ -125,6 +159,8 @@ export async function createQualifier(
     })
     .returning('*');
 
+  await syncQualifierBrandAssignments(row.id, data.isUniversal ?? false, data.brandIds);
+
   await logAudit(
     'qdb_qualifiers',
     row.id,
@@ -134,7 +170,7 @@ export async function createQualifier(
     userId
   );
 
-  return mapQualifierFromDb(row);
+  return mapQualifierFromDb(row, data.isUniversal ? null : (data.brandIds ?? []));
 }
 
 export async function updateQualifier(
@@ -162,6 +198,12 @@ export async function updateQualifier(
     .update(updateData)
     .returning('*');
 
+  await syncQualifierBrandAssignments(
+    id,
+    row.is_universal ?? false,
+    data.brandIds !== undefined ? data.brandIds : undefined
+  );
+
   await logAudit(
     'qdb_qualifiers',
     id,
@@ -171,7 +213,8 @@ export async function updateQualifier(
     userId
   );
 
-  return mapQualifierFromDb(row);
+  const brandMap = await getQualifierBrandIdsMap([id]);
+  return mapQualifierFromDb(row, brandMap.get(id) ?? []);
 }
 
 export async function deleteQualifier(id: string, userId?: string): Promise<boolean> {

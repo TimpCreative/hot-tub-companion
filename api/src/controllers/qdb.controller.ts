@@ -135,14 +135,14 @@ export async function getQualifier(req: Request, res: Response) {
 export async function createQualifier(req: Request, res: Response) {
   try {
     const userId = (req as any).superAdminEmail;
-    const { name, displayName, description, dataType, allowedValues, appliesTo, sectionId, isUniversal, isRequired } = req.body;
+    const { name, displayName, description, dataType, allowedValues, appliesTo, sectionId, isUniversal, brandIds, isRequired } = req.body;
 
     if (!name || !displayName || !dataType || !appliesTo) {
       return error(res, 'VALIDATION_ERROR', 'Name, displayName, dataType, and appliesTo are required', 400);
     }
 
     const qualifier = await qdbService.createQualifier(
-      { name, displayName, description, dataType, allowedValues, appliesTo, sectionId, isUniversal, isRequired },
+      { name, displayName, description, dataType, allowedValues, appliesTo, sectionId, isUniversal, brandIds, isRequired },
       userId
     );
 
@@ -160,11 +160,11 @@ export async function updateQualifier(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const userId = (req as any).superAdminEmail;
-    const { displayName, description, dataType, allowedValues, appliesTo, sectionId, isUniversal, isRequired } = req.body;
+    const { displayName, description, dataType, allowedValues, appliesTo, sectionId, isUniversal, brandIds, isRequired } = req.body;
 
     const qualifier = await qdbService.updateQualifier(
       id,
-      { displayName, description, dataType, allowedValues, appliesTo, sectionId, isUniversal, isRequired },
+      { displayName, description, dataType, allowedValues, appliesTo, sectionId, isUniversal, brandIds, isRequired },
       userId
     );
 

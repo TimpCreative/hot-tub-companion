@@ -35,6 +35,7 @@ interface Qualifier {
   appliesTo: 'spa' | 'part' | 'both';
   sectionId: string | null;
   isUniversal: boolean;
+  brandIds?: string[] | null;
   isRequired: boolean;
   createdAt: string;
 }
@@ -80,6 +81,7 @@ export default function QualifiersPage() {
     appliesTo: 'both' as 'spa' | 'part' | 'both',
     sectionId: null as string | null,
     isUniversal: true,
+    brandIds: [] as string[],
     isRequired: false,
   });
 
@@ -131,6 +133,7 @@ export default function QualifiersPage() {
       appliesTo: 'both',
       sectionId: null,
       isUniversal: true,
+      brandIds: [],
       isRequired: false,
     });
     setIsModalOpen(true);
@@ -149,6 +152,7 @@ export default function QualifiersPage() {
       appliesTo: qualifier.appliesTo,
       sectionId: qualifier.sectionId ?? null,
       isUniversal: qualifier.isUniversal ?? true,
+      brandIds: qualifier.brandIds ?? [],
       isRequired: qualifier.isRequired ?? false,
     });
     setIsModalOpen(true);
@@ -271,6 +275,12 @@ export default function QualifiersPage() {
         }
       }
 
+      if (!formData.isUniversal && formData.brandIds.length === 0) {
+        setError('Select at least one brand when Universal is turned off');
+        setSaving(false);
+        return;
+      }
+
       const payload = {
         name: formData.name,
         displayName: formData.displayName,
@@ -280,6 +290,7 @@ export default function QualifiersPage() {
         appliesTo: formData.appliesTo,
         sectionId: formData.sectionId || null,
         isUniversal: formData.isUniversal,
+        brandIds: formData.isUniversal ? null : formData.brandIds,
         isRequired: formData.isRequired,
       };
 
@@ -331,6 +342,15 @@ export default function QualifiersPage() {
     return av.map((a) => `${a.displayName}${a.brandIds?.length ? ' (brand)' : ''}`).join(', ');
   };
 
+  const formatQualifierBrands = (q: Qualifier) => {
+    if (q.isUniversal) return 'All brands';
+    if (!q.brandIds || q.brandIds.length === 0) return 'No brands selected';
+    const names = q.brandIds
+      .map((brandId) => brands.find((brand) => brand.id === brandId)?.name ?? brandId)
+      .sort((a, b) => a.localeCompare(b));
+    return names.join(', ');
+  };
+
   const columns = [
     {
       key: 'displayName',
@@ -364,6 +384,11 @@ export default function QualifiersPage() {
       key: 'required',
       header: 'Required',
       render: (q: Qualifier) => (q.isRequired ? 'Yes' : 'No'),
+    },
+    {
+      key: 'brands',
+      header: 'Brands',
+      render: (q: Qualifier) => <span className="text-sm text-gray-600">{formatQualifierBrands(q)}</span>,
     },
     {
       key: 'appliesTo',
@@ -550,11 +575,43 @@ export default function QualifiersPage() {
               type="checkbox"
               id="isUniversal"
               checked={formData.isUniversal}
-              onChange={(e) => setFormData({ ...formData, isUniversal: e.target.checked })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  isUniversal: e.target.checked,
+                  brandIds: e.target.checked ? [] : formData.brandIds,
+                })
+              }
               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
             <label htmlFor="isUniversal" className="text-sm text-gray-700">Universal (shows for all brands)</label>
           </div>
+
+          {!formData.isUniversal && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Active Brands</label>
+              <p className="text-xs text-gray-500 mb-2">
+                Select the brands that should see this qualifier. Cmd/Ctrl+click to deselect.
+              </p>
+              <select
+                multiple
+                value={formData.brandIds}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    brandIds: Array.from(e.target.selectedOptions, (option) => option.value),
+                  })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[8rem]"
+              >
+                {brands.map((brand) => (
+                  <option key={brand.id} value={brand.id}>
+                    {brand.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
             <input

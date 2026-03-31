@@ -379,6 +379,7 @@ export interface QdbQualifier {
   description: string | null;
   sectionId: string | null;
   isUniversal: boolean;
+  brandIds?: string[] | null;
   isRequired: boolean;
   createdAt: Date;
 }
@@ -392,6 +393,7 @@ export interface CreateQualifierInput {
   description?: string;
   sectionId?: string | null;
   isUniversal?: boolean;
+  brandIds?: string[] | null;
   isRequired?: boolean;
 }
 
