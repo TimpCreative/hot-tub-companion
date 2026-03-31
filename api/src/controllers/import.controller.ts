@@ -24,7 +24,7 @@ interface SpaModelImportRow {
   brandName: string;
   modelLineName: string;
   name: string;
-  year: number;
+  year: number | string;
   manufacturerSku?: string;
   seatingCapacity?: number;
   jetCount?: number;
@@ -249,7 +249,7 @@ const SPA_BASE_HEADERS = [
 ];
 
 const SPA_BASE_EXAMPLE = [
-  'Example Brand', 'Premium Line', 'Model X', '2024', 'SKU-123',
+  'Example Brand', 'Premium Line', 'Model X', '2020-2024', 'SKU-123',
   '6', '40', '350',
   '84', '84', '36',
   '500', '3500', 'https://...', 'https://...',
@@ -515,6 +515,14 @@ export async function importSpas(req: Request, res: Response) {
           continue;
         }
 
+        const yearInput = String(row.year).trim();
+        const years = parseYearRange(yearInput);
+        if (years.length === 0) {
+          errors.push(`Row ${rowNum}: year "${yearInput}" is invalid. Use a single year, range (2020-2024), or comma-separated list.`);
+          skipped++;
+          continue;
+        }
+
         let brand = await db('scdb_brands').where('name', 'ilike', row.brandName).first();
         if (!brand) {
           if (autoCreate) {
@@ -578,49 +586,6 @@ export async function importSpas(req: Request, res: Response) {
           }
         }
 
-        const existing = await db('scdb_spa_models')
-          .where('model_line_id', modelLine.id)
-          .where('name', 'ilike', row.name)
-          .where('year', row.year)
-          .first();
-
-        if (existing) {
-          skipped++;
-          continue;
-        }
-
-        const [inserted] = await db('scdb_spa_models')
-          .insert({
-            brand_id: brand.id,
-            model_line_id: modelLine.id,
-            name: row.name,
-            year: row.year,
-            manufacturer_sku: row.manufacturerSku || null,
-            seating_capacity: row.seatingCapacity || null,
-            jet_count: row.jetCount || null,
-            water_capacity_gallons: row.waterCapacityGallons || null,
-            dimensions_length_inches: row.dimensionsLengthInches || null,
-            dimensions_width_inches: row.dimensionsWidthInches || null,
-            dimensions_height_inches: row.dimensionsHeightInches || null,
-            weight_dry_lbs: row.weightDryLbs || null,
-            weight_filled_lbs: row.weightFilledLbs || null,
-            image_url: row.imageUrl || null,
-            spec_sheet_url: row.specSheetUrl || null,
-            notes: row.notes || null,
-            is_discontinued: row.isDiscontinued ?? false,
-            data_source: row.dataSource || 'csv_import',
-          })
-          .returning('*');
-
-        await logAudit(
-          'scdb_spa_models',
-          inserted.id,
-          'INSERT' as AuditAction,
-          null,
-          inserted,
-          userId
-        );
-
         let qualifierValues = parseQualifierValuesFromRow(row as Record<string, unknown>, qualifierNameToId);
         if (Object.keys(qualifierValues).length > 0) {
           const brandQualifierIds = new Set(await qdbService.getBrandQualifiers(brand.id));
@@ -630,12 +595,59 @@ export async function importSpas(req: Request, res: Response) {
             qualifierIdToQualifier,
             brandQualifierIds
           );
+        }
+
+        for (const year of years) {
+          const existing = await db('scdb_spa_models')
+            .where('model_line_id', modelLine.id)
+            .where('name', 'ilike', row.name)
+            .where('year', year)
+            .whereNull('deleted_at')
+            .first();
+
+          if (existing) {
+            skipped++;
+            continue;
+          }
+
+          const [inserted] = await db('scdb_spa_models')
+            .insert({
+              brand_id: brand.id,
+              model_line_id: modelLine.id,
+              name: row.name,
+              year,
+              manufacturer_sku: row.manufacturerSku || null,
+              seating_capacity: row.seatingCapacity || null,
+              jet_count: row.jetCount || null,
+              water_capacity_gallons: row.waterCapacityGallons || null,
+              dimensions_length_inches: row.dimensionsLengthInches || null,
+              dimensions_width_inches: row.dimensionsWidthInches || null,
+              dimensions_height_inches: row.dimensionsHeightInches || null,
+              weight_dry_lbs: row.weightDryLbs || null,
+              weight_filled_lbs: row.weightFilledLbs || null,
+              image_url: row.imageUrl || null,
+              spec_sheet_url: row.specSheetUrl || null,
+              notes: row.notes || null,
+              is_discontinued: row.isDiscontinued ?? false,
+              data_source: row.dataSource || 'csv_import',
+            })
+            .returning('*');
+
+          await logAudit(
+            'scdb_spa_models',
+            inserted.id,
+            'INSERT' as AuditAction,
+            null,
+            inserted,
+            userId
+          );
+
           if (Object.keys(qualifierValues).length > 0) {
             await qdbService.setSpaQualifiersBatch(inserted.id, qualifierValues, userId);
           }
-        }
 
-        created++;
+          created++;
+        }
       } catch (err: any) {
         errors.push(`Row ${rowNum} "${row.name}": ${err.message}`);
       }

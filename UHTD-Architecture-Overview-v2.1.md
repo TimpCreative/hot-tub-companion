@@ -1092,16 +1092,20 @@ Required fields include UPC/part_number (at least one), category, name, and data
 
 ## 12.3 Key Workflow: Bulk Import
 
-CSV import supports Comp IDs for efficient bulk data entry:
+CSV import supports individual-year storage with importer-side expansion for spa year ranges:
 
 ```csv
-part_number,name,category,manufacturer,upc,is_oem,comp_ids,data_source
-6000-383A,ProClear 6000-383A,filter,Jacuzzi,012345678901,true,COMP-JAC-FILT-001,manufacturer_spec_sheet
-6CH-961,Pleatco 6CH-961,filter,Pleatco,012345678902,false,COMP-JAC-FILT-001,manual
-PUMP-2HP,Waterway Executive 2HP,pump,Waterway,,false,"COMP-JAC-PUMP-001,COMP-SUND-PUMP-002",manual
+brandName,modelLineName,name,year,qualifier_stereo_package,dataSource
+Jacuzzi,J-300 Collection,J-335,2016-2018,false,manufacturer_spec_sheet
+Jacuzzi,J-300 Collection,J-335,2019-2026,true,manufacturer_spec_sheet
 ```
 
-Import behavior: look up Comp IDs, get all spas, add to part_spa_compatibility with status='pending', then check for new Comp auto-generation.
+Import behavior:
+
+- The CSV `year` field may be a single year, range, or comma-separated list.
+- The importer expands that input into individual years before inserting.
+- Each generated year becomes its own `scdb_spa_models` record, preserving the system's one-row-per-year model.
+- Any `qualifier_<name>` columns on the source row are copied to every generated spa-model-year row.
 
 ---
 
@@ -1167,7 +1171,7 @@ Import behavior: look up Comp IDs, get all spas, add to part_spa_compatibility w
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/dashboard/super-admin/import/templates/:type` | Download CSV template for bulk import. `:type` is one of: `brands`, `model-lines`, `spas`, `parts`, `comps`. Templates include qualifier columns (`qualifier_<name>`) for spas and parts based on current Qdb definitions. |
+| GET | `/api/dashboard/super-admin/import/templates/:type` | Download CSV template for bulk import. `:type` is `spas` or `parts`. Templates include qualifier columns (`qualifier_<name>`) for spas and parts based on current Qdb definitions. |
 
 ## 13.7 Super Admin Utility Endpoints
 

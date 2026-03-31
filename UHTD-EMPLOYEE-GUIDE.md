@@ -394,7 +394,7 @@ For enum or array qualifiers with fixed options, use the Allowed Values builder:
 - `brandName` (required) - Must exist in database
 - `modelLineName` (required) - Must exist under the brand
 - `name` (required) - The spa model name (e.g., "J-335")
-- `year` (required) - The model year
+- `year` (required) - Single year, year range, or comma-separated list (e.g., `2024`, `2020-2024`, `2020, 2022, 2024`). Import expands these into individual model-year rows.
 - `manufacturerSku` - Manufacturer's part/model number
 - `seatingCapacity`, `jetCount`, `waterCapacityGallons` - Numbers only
 - `electricalConfig1`, `electricalConfig2` - Structured electrical options (e.g., "240V/50A", "120V/15A"). Supports formats: `240V/50A`, `240V/60Hz/50A`, `120V 15A`. Leave empty or use one column for single-config spas.
@@ -405,6 +405,17 @@ For enum or array qualifiers with fixed options, use the Allowed Values builder:
 - `notes` - Internal notes
 - `isDiscontinued` - Boolean (`true`/`false`)
 - `dataSource` - Where the data came from
+
+**Spa year format:**
+
+| Format | Example |
+|--------|---------|
+| Single year | `2024` |
+| Range | `2020-2024` or `2020 - 2024` |
+| Comma-separated | `2020, 2022, 2024` |
+| Mix | `2002-2007, 2009, 2011-2015` |
+
+The import layer expands each year into its own `scdb_spa_models` record. A row like `J-335 / 2020-2024` creates five spa-model-year rows, and any `qualifier_<name>` columns are applied to all generated years from that source row.
 
 **Parts CSV (20 columns with smart compatibility):**
 

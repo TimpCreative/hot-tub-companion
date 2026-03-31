@@ -151,9 +151,9 @@ export default function ImportPage() {
     },
     spas: {
       headers: spaTemplate?.headers ?? ['brandName', 'modelLineName', 'name', 'year', 'manufacturerSku', 'seatingCapacity', 'jetCount', 'waterCapacityGallons', 'dimensionsLengthInches', 'dimensionsWidthInches', 'dimensionsHeightInches', 'weightDryLbs', 'weightFilledLbs', 'imageUrl', 'specSheetUrl', 'notes', 'isDiscontinued', 'dataSource'],
-      example: spaTemplate?.example ?? ['Jacuzzi', 'J-300 Collection', 'J-335', '2024', 'JAC-J335-24', '5', '35', '350', '85', '85', '36', '725', '4200', '', '', '', 'false', 'manual_entry'],
+      example: spaTemplate?.example ?? ['Jacuzzi', 'J-300 Collection', 'J-335', '2020-2024', 'JAC-J335-24', '5', '35', '350', '85', '85', '36', '725', '4200', '', '', '', 'false', 'manual_entry'],
       label: 'Spas',
-      description: 'Spa model-years',
+      description: 'Spa model-years (year supports ranges)',
     },
     parts: {
       headers: partsTemplate?.headers ?? [
@@ -404,9 +404,25 @@ export default function ImportPage() {
               <li>• Download the template to see required columns</li>
               <li>• First row must be column headers</li>
               <li>• Duplicates are automatically skipped</li>
+              <li>• Spa <code className="bg-blue-100 px-1 rounded">year</code> accepts single years, ranges, or comma-separated lists</li>
               <li>• Compatibility imports create "pending" records</li>
             </ul>
           </div>
+
+          {importType === 'spas' && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+              <h3 className="font-medium text-indigo-900 mb-2">Spa Year Format</h3>
+              <p className="text-sm text-indigo-800 mb-2">
+                The <code className="bg-indigo-100 px-1 rounded">year</code> column can be a single year, a range, or a comma-separated list.
+                Each imported year is still stored as its own spa-model record in the database.
+              </p>
+              <div className="text-sm text-indigo-800 space-y-2">
+                <div><strong>Single year:</strong> <code className="bg-indigo-100 px-1 rounded">2024</code></div>
+                <div><strong>Range:</strong> <code className="bg-indigo-100 px-1 rounded">2020-2024</code></div>
+                <div><strong>List:</strong> <code className="bg-indigo-100 px-1 rounded">2020, 2022, 2024</code></div>
+              </div>
+            </div>
+          )}
 
           {importType === 'parts' && (
             <div className="space-y-4">
