@@ -3,6 +3,7 @@ import * as superAdminController from '../controllers/superAdmin.controller';
 import * as superAdminBrandingController from '../controllers/superAdminBranding.controller';
 import * as superAdminConsumerUhtdController from '../controllers/superAdminConsumerUhtd.controller';
 import * as superAdminAnnouncementsController from '../controllers/superAdminAnnouncements.controller';
+import * as superAdminJournalController from '../controllers/superAdminJournal.controller';
 import * as platformUsersController from '../controllers/platformUsers.controller';
 import { superAdminAuth } from '../middleware/superAdminAuth';
 import { authRateLimiter, superAdminAnnouncementRateLimiter } from '../middleware/rateLimiter';
@@ -37,6 +38,12 @@ router.post(
   superAdminAnnouncementRateLimiter,
   superAdminAnnouncementsController.sendAnnouncement
 );
+
+router.get('/journal', superAdminJournalController.listJournalEntries);
+router.post('/journal', superAdminJournalController.createJournalEntry);
+router.put('/journal/:id', superAdminJournalController.updateJournalEntry);
+router.delete('/journal/:id', superAdminJournalController.deleteJournalEntry);
+router.post('/journal/:id/reorder', superAdminJournalController.reorderJournalEntry);
 
 // Platform users (super/tenant admins in DB)
 router.get('/platform-users', platformUsersController.listPlatformUsers);

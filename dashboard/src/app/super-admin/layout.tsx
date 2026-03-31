@@ -2,6 +2,7 @@ import SuperAdminLayoutClient from './SuperAdminLayoutClient';
 
 const SUPER_ADMIN_NAV = [
   { label: 'Dashboard', href: '/dashboard' },
+  { label: 'Journal', href: '/journal' },
   { label: 'Roadmap', href: '/roadmap' },
   { label: 'Tenants', href: '/tenants' },
   { label: 'Platform Users', href: '/platform-users' },
