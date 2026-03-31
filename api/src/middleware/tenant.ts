@@ -1,18 +1,31 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../config/database';
-import { UnauthorizedError } from '../utils/errors';
 import { error } from '../utils/response';
 
+function matchesPath(path: string, target: string): boolean {
+  return path === target || path.startsWith(`${target}/`);
+}
+
 function shouldSkipTenant(path: string): boolean {
+  const normalized = path.startsWith('/api/v1/') ? path.slice('/api/v1'.length) : path;
+
   return (
     path === '/health' ||
-    path.startsWith('/api/v1/auth') ||
+    normalized === '/health' ||
+    matchesPath(path, '/api/v1/auth') ||
+    matchesPath(normalized, '/auth') ||
     path === '/api/v1/tenant/config' ||
+    normalized === '/tenant/config' ||
     path === '/api/v1/internal/eas-tenant-config' ||
-    path.startsWith('/api/v1/media/') ||
-    path.startsWith('/api/v1/super-admin') ||
-    path.startsWith('/api/v1/internal/cron') ||
-    path.startsWith('/api/v1/webhooks/')
+    normalized === '/internal/eas-tenant-config' ||
+    matchesPath(path, '/api/v1/media') ||
+    matchesPath(normalized, '/media') ||
+    matchesPath(path, '/api/v1/super-admin') ||
+    matchesPath(normalized, '/super-admin') ||
+    matchesPath(path, '/api/v1/internal/cron') ||
+    matchesPath(normalized, '/internal/cron') ||
+    matchesPath(path, '/api/v1/webhooks') ||
+    matchesPath(normalized, '/webhooks')
   );
 }
 
