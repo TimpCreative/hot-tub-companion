@@ -102,7 +102,7 @@ TENANT=takeabreak
 API_URL=https://api.hottubcompanion.com
 TENANT_API_KEY=tenant_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 FIREBASE_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-FIREBASE_AUTH_DOMAIN=hot-tub-companion.firebaseapp.com
+FIREBASE_AUTH_DOMAIN=auth.hottubcompanion.com
 FIREBASE_PROJECT_ID=hot-tub-companion
 ```
 

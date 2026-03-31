@@ -31,6 +31,25 @@ function StatusBadge({ status }: { status: BuildStatus }) {
 }
 
 export default function SuperAdminRoadmapPage() {
+  const roadmapItems = [
+    ...PLANS_ROADMAP_SECTIONS.flatMap((section) => section.rows),
+    ...BUILD_OUT_ITEMS,
+    ...ENTITLEMENTS_EXTRA,
+  ];
+
+  const progressCounts = roadmapItems.reduce(
+    (acc, item) => {
+      acc[item.status] += 1;
+      return acc;
+    },
+    { shipped: 0, partial: 0, not_yet: 0, ops: 0 } satisfies Record<BuildStatus, number>
+  );
+
+  const productTotal = progressCounts.shipped + progressCounts.partial + progressCounts.not_yet;
+  const shippedPct = productTotal ? Math.round((progressCounts.shipped / productTotal) * 100) : 0;
+  const partialPct = productTotal ? Math.round((progressCounts.partial / productTotal) * 100) : 0;
+  const notYetPct = productTotal ? Math.round((progressCounts.not_yet / productTotal) * 100) : 0;
+
   return (
     <div className="max-w-[1100px]">
       <div className="mb-6">
@@ -48,10 +67,65 @@ export default function SuperAdminRoadmapPage() {
           page. <strong>Phase</strong> = where we document or plan work (<code className="text-xs bg-gray-100 px-1 rounded">PHASE-*.md</code>
           ). <strong>Build</strong> is a rough engineering snapshot, not formal QA sign-off.
         </p>
-        <p className="mt-2 text-xs text-gray-500">
-          This route: <code className="bg-gray-100 px-1 rounded">/super-admin/roadmap</code> (e.g. on your deployed admin host).
-        </p>
       </div>
+
+      <section className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Overall build progress</h3>
+            <p className="mt-1 text-sm text-gray-600">
+              {progressCounts.shipped} shipped, {progressCounts.partial} partial, {progressCounts.not_yet} not yet
+              {' '}across {productTotal} product roadmap items.
+            </p>
+            {progressCounts.ops > 0 && (
+              <p className="mt-1 text-xs text-gray-500">
+                {progressCounts.ops} additional ops/commercial items tracked separately.
+              </p>
+            )}
+          </div>
+          <div className="text-sm font-medium text-gray-700">
+            {shippedPct}% shipped
+          </div>
+        </div>
+
+        <div className="mt-4 h-4 overflow-hidden rounded-full bg-gray-100">
+          <div className="flex h-full w-full">
+            <div
+              className="bg-emerald-500"
+              style={{ width: `${shippedPct}%` }}
+              aria-label={`Shipped ${shippedPct}%`}
+            />
+            <div
+              className="bg-amber-500"
+              style={{ width: `${partialPct}%` }}
+              aria-label={`Partial ${partialPct}%`}
+            />
+            <div
+              className="bg-red-400"
+              style={{ width: `${notYetPct}%` }}
+              aria-label={`Not yet ${notYetPct}%`}
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-lg bg-emerald-50 px-3 py-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Shipped</div>
+            <div className="mt-1 text-lg font-semibold text-emerald-950">{progressCounts.shipped}</div>
+            <div className="text-xs text-emerald-800">{shippedPct}% of product scope</div>
+          </div>
+          <div className="rounded-lg bg-amber-50 px-3 py-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">Partial</div>
+            <div className="mt-1 text-lg font-semibold text-amber-950">{progressCounts.partial}</div>
+            <div className="text-xs text-amber-800">{partialPct}% of product scope</div>
+          </div>
+          <div className="rounded-lg bg-red-50 px-3 py-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-red-700">Not yet</div>
+            <div className="mt-1 text-lg font-semibold text-red-950">{progressCounts.not_yet}</div>
+            <div className="text-xs text-red-800">{notYetPct}% of product scope</div>
+          </div>
+        </div>
+      </section>
 
       <div className="flex flex-wrap gap-4 mb-6 text-xs text-gray-600">
         <span>

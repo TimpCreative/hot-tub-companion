@@ -296,6 +296,11 @@ CREATE TABLE content (
   video_url TEXT,
   thumbnail_url TEXT,
   author VARCHAR(100),
+  format VARCHAR(20),  -- for videos: 'masterclass' | 'clip'; null for articles
+  transcript TEXT,  -- video transcript used for search and accessibility
+  hidden_search_tags TEXT[],     -- backend-only keywords, not shown to customers
+  hidden_search_aliases TEXT[],  -- backend-only natural-language phrases / synonyms
+  parent_content_id UUID REFERENCES content(id) ON DELETE SET NULL,  -- clip -> masterclass
   target_brands TEXT[],               -- null = all
   target_models TEXT[],               -- null = all
   target_sanitization_systems TEXT[], -- null = all
@@ -343,6 +348,74 @@ async function getContentForUser(tenantId: string, spaProfile: SpaProfile, filte
 }
 ```
 
+### 3.2A Video Content Library & Search Strategy
+
+Video content should support both:
+
+- **15-20 minute masterclass videos** that teach a full topic end-to-end
+- **1-3 minute quick-reference clips** cut from those masterclasses for in-the-moment help
+
+**Hosting model:**
+
+- YouTube is the primary **video host and playback source** for Phase 3 video content.
+- The Hot Tub Companion database is the **source of truth** for all app-facing metadata and search behavior.
+- Do **not** rely on YouTube metadata at runtime for title, description, targeting, transcript, or search keywords.
+- `video_url` should store the YouTube URL (or canonical provider URL), while metadata such as `title`, `summary`, `transcript`, `hidden_search_tags`, `hidden_search_aliases`, `format`, and targeting fields are authored and maintained in our own admin tools.
+
+The search and recommendation system should assume the customer may **not** know the exact video title. Discovery should therefore rely on a weighted relevance model rather than title match only.
+
+**Backend metadata per video:**
+
+- `title` and `summary` for customer-facing display
+- `hidden_search_tags` for backend-only concepts and keywords
+- `hidden_search_aliases` for common customer phrasing, synonyms, and misspellings
+- `transcript` so spoken phrases are searchable
+- `format` so the app can distinguish long-form learning vs quick-help content
+- `parent_content_id` so clips can be linked back to a full masterclass
+
+**Examples of hidden metadata:**
+
+- Masterclass: "Water Testing and Logging"
+  - Tags: `water testing`, `water balance`, `test strips`, `log water test`, `spa chemistry`
+  - Aliases: `how do I test my hot tub water`, `how to record water results`, `how to log strip readings`
+- Masterclass: "How a Bromine System Works"
+  - Tags: `bromine`, `bromine bank`, `sanitizer`, `oxidizer`, `tablet floater`
+  - Aliases: `why is my bromine low`, `how does bromine work`, `how to manage bromine spa`
+- Quick clip: "How to Log a Water Test in the App"
+  - Linked to its parent masterclass via `parent_content_id`
+
+**Search behavior:**
+
+1. Normalize the query (case-insensitive, punctuation stripped, typo-tolerant where practical).
+2. Match across `title`, `summary`, `hidden_search_tags`, `hidden_search_aliases`, and `transcript`.
+3. Weight matches by importance:
+   - highest: hidden tags / aliases
+   - high: title
+   - medium: summary
+   - lower: transcript
+4. Apply contextual boosts:
+   - match the user's sanitization system
+   - match the active spa profile or relevant category
+   - boost quick-reference clips when the user is in a help flow or troubleshooting screen
+   - boost masterclasses when the user is browsing educational content intentionally
+5. Return a curated result set:
+   - best match first
+   - then 2-4 related items
+   - optionally show the parent masterclass when a clip is returned
+
+**Authoring guidance:**
+
+- Every video should have a clear title, customer-facing summary, transcript, and backend-only search metadata.
+- Each video should typically include 10-25 hidden tags and 5-15 aliases.
+- Transcript should be required for universal videos whenever practical because it materially improves search quality.
+- Tags should cover:
+  - topic (`water_testing`, `bromine`, `filter_cleaning`)
+  - problem (`low_sanitizer`, `cloudy_water`, `high_ph`)
+  - task (`log_test`, `shock_spa`, `adjust_alkalinity`)
+  - audience / intent (`beginner`, `quick_help`, `troubleshooting`)
+- Tags and aliases are **not** shown in the UI; they exist only to improve search quality and recommendations.
+- A clip should normally belong to **zero or one** parent masterclass via `parent_content_id`.
+
 ### 3.3 Content Screen in App
 
 Add a "Guides" section accessible from My Tub dashboard and as a section within relevant screens:
@@ -351,26 +424,77 @@ Add a "Guides" section accessible from My Tub dashboard and as a section within 
 - **Category tabs:** "Getting Started", "Water Care", "Maintenance", "Troubleshooting", "Seasonal"
 - **Article detail:** Render markdown body with styled components. Support headings, bold, lists, images, links.
 - **Video detail:** Embedded YouTube player (use `react-native-youtube-iframe`)
-- **Search:** Search content by title and body text
-- **Contextual content:** On Water Care screen, show related water care articles. On Maintenance screen, show related maintenance guides.
+- **Search:** Search content by weighted relevance using title, summary, hidden tags, aliases, and transcript text. Do not expose raw keyword lists to customers.
+- **Contextual content:** On Water Care screen, show related water care articles and videos. On Maintenance screen, show related maintenance guides. On help and troubleshooting flows, prioritize short clips first and show the related masterclass as a secondary "Learn more" option.
 
-### 3.4 Admin Content Management (Dashboard)
+### 3.4 Super Admin Content Library
+
+Add a dedicated **Content Library** section in Super Admin for managing the universal content library used across tenants.
+
+**Purpose:**
+
+- Serve as the source of truth for universal articles, masterclass videos, and quick-reference clips
+- Manage all search metadata, transcript content, and parent/child relationships for universal content
+- Publish universal content once and make it available to retailer tenants unless explicitly suppressed
+
+**Super Admin Content Library list view:**
+
+- Filters for type (`article` / `video`), format (`masterclass` / `clip`), category, sanitization system, publish status, and universal vs retailer-authored scope
+- Search by title, slug, summary, and hidden metadata for admin operations
+- Columns/cards for title, type, format, publish status, category, last updated, and usage targeting
+- Quick indicator for whether a clip is linked to a parent masterclass
+
+**Super Admin create/edit form:**
+
+- Title
+- Slug
+- Type selector (`article` / `video`)
+- Summary
+- Author
+- Publish status (`draft` / `published` / `archived`)
+- Published date
+- Priority
+- Targeting: brand multi-select, model multi-select, sanitization system multi-select, category multi-select
+- Body markdown editor (articles)
+- Video URL (YouTube URL for videos)
+- Thumbnail URL or upload override
+- Video format (`masterclass` / `clip`)
+- Parent masterclass selector (for clips)
+- Transcript editor / upload / paste area
+- Hidden search tags
+- Hidden search aliases
+
+**Behavior rules:**
+
+- Universal video metadata is authored in our database, not pulled live from YouTube at runtime.
+- Retailers do not edit universal content directly.
+- Universal content can be suppressed per tenant from retailer admin.
+- Super Admin may optionally prefill title/thumbnail from a YouTube URL during creation, but the saved DB values remain authoritative after review.
+
+### 3.5 Retailer Admin Content Management
+
+Retailer dashboard `/admin/content` should manage retailer-authored content and how universal content appears for that tenant.
 
 `/admin/content` page:
 
-- **List view:** All retailer content + toggle to view universal content
+- **List view:** Retailer-authored content + toggle to view universal content available to that tenant
 - **Create/Edit form:**
   - Title, type selector (article/video)
   - Body: Markdown editor (use a library like `react-md-editor` or `@uiw/react-md-editor`)
-  - Video URL (if type=video)
-  - Thumbnail upload (to Firebase Storage)
+  - Video URL (if type=video; typically YouTube)
+  - Thumbnail upload / URL override
   - Summary
+  - Video format: masterclass or clip
+  - Parent video selector (for clips derived from a masterclass)
+  - Transcript editor / upload
+  - Hidden search tags and hidden search aliases (backend-only, not customer-visible)
   - Targeting: brand multi-select, sanitization system multi-select, category multi-select
   - Publish toggle
 - **Delete** (retailer's own content only)
-- **Hide universal content:** Toggle to suppress specific universal articles for this retailer's customers
+- **Hide universal content:** Toggle to suppress specific universal articles or videos for this retailer's customers
+- **Optional future enhancement:** Feature/pin selected universal items higher in the tenant experience without modifying the underlying universal record
 
-### 3.5 API Endpoints
+### 3.6 API Endpoints
 
 ```
 # Customer
@@ -385,6 +509,7 @@ DELETE /api/v1/admin/content/:id
 PUT    /api/v1/admin/content/:id/suppress  (hide universal content for this tenant)
 
 # Super Admin
+GET    /api/v1/super-admin/content?type=video&format=masterclass&status=published
 POST   /api/v1/super-admin/content  (create universal)
 GET    /api/v1/super-admin/content
 PUT    /api/v1/super-admin/content/:id
