@@ -58,6 +58,18 @@ router.use('/api/v1/admin', adminRoutes);
 // consumerUhtdSuggestionsRoutes (which runs authMiddleware requiring tenant context)
 router.use('/api/v1/super-admin', superAdminRoutes);
 
+// Super Admin UHTD routes must also be before generic /api/v1 routers because
+// several tenant/customer routers register auth middleware at their root.
+router.use('/api/v1/super-admin/scdb', superAdminAuth, scdbAdminRoutes);
+router.use('/api/v1/super-admin/pcdb', superAdminAuth, pcdbRoutes);
+router.use('/api/v1/super-admin/comps', superAdminAuth, compRoutes);
+router.use('/api/v1/super-admin/qdb', superAdminAuth, qdbRoutes);
+router.use('/api/v1/super-admin/audit', superAdminAuth, auditRoutes);
+router.use('/api/v1/super-admin/import', superAdminAuth, importRoutes);
+router.use('/api/v1/super-admin/merge', superAdminAuth, mergeRoutes);
+router.use('/api/v1/super-admin/stats', superAdminAuth, statsRoutes);
+router.use('/api/v1/super-admin/media', superAdminAuth, mediaRoutes);
+
 // Customer product routes (tenant API key required; some endpoints require auth)
 router.use('/api/v1', productsRoutes);
 
@@ -69,16 +81,5 @@ router.use('/api/v1', usersRoutes);
 
 // Consumer UHTD review queue (tenant API key + Firebase auth; no SCdb writes)
 router.use('/api/v1', consumerUhtdSuggestionsRoutes);
-
-// Super Admin UHTD routes
-router.use('/api/v1/super-admin/scdb', superAdminAuth, scdbAdminRoutes);
-router.use('/api/v1/super-admin/pcdb', superAdminAuth, pcdbRoutes);
-router.use('/api/v1/super-admin/comps', superAdminAuth, compRoutes);
-router.use('/api/v1/super-admin/qdb', superAdminAuth, qdbRoutes);
-router.use('/api/v1/super-admin/audit', superAdminAuth, auditRoutes);
-router.use('/api/v1/super-admin/import', superAdminAuth, importRoutes);
-router.use('/api/v1/super-admin/merge', superAdminAuth, mergeRoutes);
-router.use('/api/v1/super-admin/stats', superAdminAuth, statsRoutes);
-router.use('/api/v1/super-admin/media', superAdminAuth, mediaRoutes);
 
 export default router;
