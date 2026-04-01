@@ -83,3 +83,21 @@ export async function listCategories(_req: Request, res: Response) {
     error(res, 'INTERNAL_ERROR', 'Failed to list categories', 500);
   }
 }
+
+export async function createCategory(req: Request, res: Response) {
+  try {
+    const category = await contentService.createCategory({
+      key: String(req.body?.key ?? ''),
+      label: String(req.body?.label ?? ''),
+    });
+    res.status(201);
+    success(res, category, 'Category created');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to create category';
+    if (/required|exists/i.test(message)) {
+      return error(res, 'VALIDATION_ERROR', message, 400);
+    }
+    console.error('Error creating content category:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to create category', 500);
+  }
+}

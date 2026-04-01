@@ -21,6 +21,11 @@ export interface ContentCategory {
   isActive: boolean;
 }
 
+export interface CreateContentCategoryInput {
+  key: string;
+  label: string;
+}
+
 export interface ContentTarget {
   id?: string;
   targetType: ContentTargetType;
@@ -531,6 +536,28 @@ function buildWriteRow(
 
 export async function listCategories(): Promise<ContentCategory[]> {
   return (await listCategoriesRaw()).map(mapCategory);
+}
+
+export async function createCategory(input: CreateContentCategoryInput): Promise<ContentCategory> {
+  const key = input.key.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const label = input.label.trim();
+  if (!key) throw new Error('Category key is required');
+  if (!label) throw new Error('Category label is required');
+
+  const existing = await db('content_categories').where({ key }).first();
+  if (existing) throw new Error('Category key already exists');
+
+  const [{ max }] = (await db('content_categories').max('sort_order as max')) as Array<{ max: number | string | null }>;
+  const [created] = await db('content_categories')
+    .insert({
+      key,
+      label,
+      sort_order: Number(max ?? 0) + 1,
+      is_active: true,
+    })
+    .returning('*');
+
+  return mapCategory(created as ContentCategoryRow);
 }
 
 export async function listCustomerContent(params: {

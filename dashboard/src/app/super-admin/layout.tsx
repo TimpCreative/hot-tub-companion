@@ -7,7 +7,7 @@ const SUPER_ADMIN_NAV = [
   { label: 'Tenants', href: '/tenants' },
   { label: 'Platform Users', href: '/platform-users' },
   { label: 'UHTD', href: '/uhtd' },
-  { label: 'Content', href: '/content' },
+  { label: 'Content Library', href: '/content' },
   { label: 'Messages', href: '/messages', comingPhase: 3 },
   { label: 'Banners', href: '/banners', comingPhase: 3 },
   { label: 'Announcements', href: '/announcements' },

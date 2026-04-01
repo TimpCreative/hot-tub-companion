@@ -14,7 +14,7 @@ import {
 } from '@/components/content/ContentEditorModal';
 
 interface ContentTarget {
-  targetType: 'brand' | 'model_line' | 'spa_model' | 'sanitation_system';
+  targetType: 'brand' | 'model_line' | 'spa_model' | 'sanitation_system' | 'part_category';
   targetEntityId?: string | null;
   targetValue?: string | null;
   isExclusion?: boolean;
@@ -65,6 +65,7 @@ export default function SuperAdminContentPage() {
   const [brands, setBrands] = useState<LookupOption[]>([]);
   const [modelLines, setModelLines] = useState<LookupOption[]>([]);
   const [spas, setSpas] = useState<LookupOption[]>([]);
+  const [partCategories, setPartCategories] = useState<LookupOption[]>([]);
   const [sanitationSystems, setSanitationSystems] = useState<Array<{ value: string; displayName: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -76,12 +77,14 @@ export default function SuperAdminContentPage() {
   const [status, setStatus] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ContentItem | null>(null);
+  const [newCategoryLabel, setNewCategoryLabel] = useState('');
+  const [creatingCategory, setCreatingCategory] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [itemsRes, categoriesRes, brandsRes, modelLinesRes, spasRes, qualifiersRes] = await Promise.all([
+      const [itemsRes, categoriesRes, brandsRes, modelLinesRes, spasRes, partCategoriesRes, qualifiersRes] = await Promise.all([
         api.get('/content', {
           params: {
             search: search || undefined,
@@ -96,6 +99,7 @@ export default function SuperAdminContentPage() {
         api.get('/scdb/brands?page=1&pageSize=500'),
         api.get('/scdb/model-lines'),
         api.get('/scdb/spa-models?page=1&pageSize=500'),
+        api.get('/pcdb/categories'),
         api.get('/qdb/qualifiers'),
       ]);
 
@@ -107,6 +111,12 @@ export default function SuperAdminContentPage() {
         (spasRes.data ?? []).map((row: OptionResponseRow) => ({
           id: row.id,
           name: `${row.brandName ?? ''} ${row.modelLineName ?? ''} ${row.name ?? ''} ${row.year ?? ''}`.replace(/\s+/g, ' ').trim(),
+        }))
+      );
+      setPartCategories(
+        (partCategoriesRes.data ?? []).map((row: OptionResponseRow) => ({
+          id: row.id,
+          name: row.name ?? row.id,
         }))
       );
       const qualifier = (qualifiersRes.data ?? []).find(
@@ -204,6 +214,26 @@ export default function SuperAdminContentPage() {
     }
   }
 
+  async function createCategory() {
+    const label = newCategoryLabel.trim();
+    if (!label) return;
+    setCreatingCategory(true);
+    setError(null);
+    try {
+      await api.post('/content/categories', { label, key: label });
+      setNewCategoryLabel('');
+      await load();
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'error' in err
+          ? (err as { error?: { message?: string } }).error?.message
+          : 'Failed to create category';
+      setError(message ?? 'Failed to create category');
+    } finally {
+      setCreatingCategory(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -242,6 +272,23 @@ export default function SuperAdminContentPage() {
           <option value="published">Published</option>
           <option value="archived">Archived</option>
         </select>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Add Category</label>
+            <input
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+              value={newCategoryLabel}
+              onChange={(e) => setNewCategoryLabel(e.target.value)}
+              placeholder="Water Balance"
+            />
+          </div>
+          <Button onClick={() => void createCategory()} loading={creatingCategory} disabled={!newCategoryLabel.trim()}>
+            Add Category
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-xl border border-gray-200 overflow-hidden">
@@ -332,6 +379,7 @@ export default function SuperAdminContentPage() {
             brands,
             modelLines,
             spas,
+            partCategories,
             sanitationSystems,
           }}
         />

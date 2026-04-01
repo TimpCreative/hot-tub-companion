@@ -162,7 +162,7 @@ export default function AdminContentPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">Content</h2>
+          <h2 className="text-2xl font-semibold text-gray-900">Content Library</h2>
           <p className="text-sm text-gray-500 mt-1">Manage your tenant’s guides and videos, and hide universal items you do not want customers to see.</p>
         </div>
         <Button onClick={() => { setEditing(null); setModalOpen(true); }}>+ New Content</Button>

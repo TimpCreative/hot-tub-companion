@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 export type ContentType = 'article' | 'video';
 export type ContentStatus = 'draft' | 'published' | 'archived';
 export type VideoFormat = 'masterclass' | 'clip';
-export type TargetType = 'brand' | 'model_line' | 'spa_model' | 'sanitation_system';
+export type TargetType = 'brand' | 'model_line' | 'spa_model' | 'sanitation_system' | 'part_category';
 
 export interface ContentCategoryOption {
   id: string;
@@ -58,6 +58,7 @@ interface Props {
     brands?: LookupOption[];
     modelLines?: LookupOption[];
     spas?: LookupOption[];
+    partCategories?: LookupOption[];
     sanitationSystems?: Array<{ value: string; displayName: string }>;
     allowedTargetTypes?: TargetType[];
   };
@@ -67,7 +68,7 @@ const EMPTY_DRAFT: ContentItemDraft = {
   title: '',
   slug: '',
   summary: '',
-  contentType: 'article',
+  contentType: 'video',
   bodyMarkdown: '',
   videoUrl: '',
   thumbnailUrl: '',
@@ -99,6 +100,16 @@ function slugify(value: string) {
     .replace(/^-+|-+$/g, '');
 }
 
+type EditorField = 'summary' | 'bodyMarkdown';
+
+function applyMarkdownFormat(value: string, format: 'bold' | 'italic' | 'underline' | 'bullet' | 'numbered'): string {
+  if (format === 'bold') return `${value}**bold text**`;
+  if (format === 'italic') return `${value}*italic text*`;
+  if (format === 'underline') return `${value}<u>underlined text</u>`;
+  if (format === 'bullet') return `${value}${value.endsWith('\n') || value.length === 0 ? '' : '\n'}- Bullet point`;
+  return `${value}${value.endsWith('\n') || value.length === 0 ? '' : '\n'}1. Numbered item`;
+}
+
 export function ContentEditorModal({
   isOpen,
   onClose,
@@ -113,12 +124,19 @@ export function ContentEditorModal({
   const [error, setError] = useState<string | null>(null);
 
   const allowedTargetTypes = useMemo<TargetType[]>(
-    () => targetOptions?.allowedTargetTypes ?? ['brand', 'model_line', 'spa_model', 'sanitation_system'],
+    () => targetOptions?.allowedTargetTypes ?? ['brand', 'model_line', 'spa_model', 'sanitation_system', 'part_category'],
     [targetOptions?.allowedTargetTypes]
   );
 
   function update<K extends keyof ContentItemDraft>(key: K, value: ContentItemDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  function applyFormat(field: EditorField, format: 'bold' | 'italic' | 'underline' | 'bullet' | 'numbered') {
+    setDraft((current) => ({
+      ...current,
+      [field]: applyMarkdownFormat(current[field], format),
+    }));
   }
 
   function toggleCategory(categoryKey: string) {
@@ -179,6 +197,8 @@ export function ContentEditorModal({
     setError(null);
     await onSave(draft);
   }
+
+  const selectedCategories = categories.filter((category) => draft.categoryKeys.includes(category.key));
 
   return (
     <Modal
@@ -283,6 +303,12 @@ export function ContentEditorModal({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Summary</label>
+          <div className="mb-2 flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('summary', 'bold')}>Bold</Button>
+            <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('summary', 'italic')}>Italic</Button>
+            <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('summary', 'underline')}>Underline</Button>
+            <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('summary', 'bullet')}>Bullet</Button>
+          </div>
           <textarea
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm min-h-[90px]"
             value={draft.summary}
@@ -293,11 +319,21 @@ export function ContentEditorModal({
         {draft.contentType === 'article' ? (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Body Markdown</label>
+            <div className="mb-2 flex flex-wrap gap-2">
+              <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('bodyMarkdown', 'bold')}>Bold</Button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('bodyMarkdown', 'italic')}>Italic</Button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('bodyMarkdown', 'underline')}>Underline</Button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('bodyMarkdown', 'bullet')}>Bullet</Button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('bodyMarkdown', 'numbered')}>Numbered</Button>
+            </div>
             <textarea
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm min-h-[220px] font-mono"
               value={draft.bodyMarkdown}
               onChange={(e) => update('bodyMarkdown', e.target.value)}
             />
+            <p className="mt-2 text-xs text-gray-500">
+              Supports Markdown plus inline HTML like `{`<u>underlined text</u>`}` when needed.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4">
@@ -350,7 +386,15 @@ export function ContentEditorModal({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Hidden Search Aliases</label>
+            <div className="mb-1 flex items-center gap-2">
+              <label className="block text-sm font-medium text-gray-700">Hidden Search Aliases</label>
+              <span
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-gray-300 text-xs text-gray-500 cursor-help"
+                title="Alternative phrases customers might search for, like 'shock', 'oxidizer', or common misspellings. One per line."
+              >
+                i
+              </span>
+            </div>
             <textarea
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm min-h-[80px]"
               value={draft.hiddenSearchAliases}
@@ -362,24 +406,37 @@ export function ContentEditorModal({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Categories</label>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => {
-              const selected = draft.categoryKeys.includes(category.key);
-              return (
+          <select
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            value=""
+            onChange={(e) => {
+              if (e.target.value) toggleCategory(e.target.value);
+            }}
+          >
+            <option value="">Add category...</option>
+            {categories
+              .filter((category) => !draft.categoryKeys.includes(category.key))
+              .map((category) => (
+                <option key={category.id} value={category.key}>
+                  {category.label}
+                </option>
+              ))}
+          </select>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {selectedCategories.length === 0 ? (
+              <span className="text-sm text-gray-500">No categories selected yet.</span>
+            ) : (
+              selectedCategories.map((category) => (
                 <button
                   key={category.id}
                   type="button"
                   onClick={() => toggleCategory(category.key)}
-                  className={`rounded-full border px-3 py-1 text-sm ${
-                    selected
-                      ? 'border-blue-600 bg-blue-50 text-blue-700'
-                      : 'border-gray-300 bg-white text-gray-700'
-                  }`}
+                  className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm text-blue-700"
                 >
-                  {category.label}
+                  {category.label} x
                 </button>
-              );
-            })}
+              ))
+            )}
           </div>
         </div>
 
@@ -450,7 +507,9 @@ export function ContentEditorModal({
                             ? targetOptions?.brands
                             : target.targetType === 'model_line'
                               ? targetOptions?.modelLines
-                              : targetOptions?.spas) ?? []
+                              : target.targetType === 'part_category'
+                                ? targetOptions?.partCategories
+                                : targetOptions?.spas) ?? []
                           ).map((option) => (
                             <option key={option.id} value={option.id}>
                               {option.name}

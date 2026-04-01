@@ -4,6 +4,7 @@ import * as superAdminContentController from '../controllers/superAdminContent.c
 const router = Router();
 
 router.get('/categories', superAdminContentController.listCategories);
+router.post('/categories', superAdminContentController.createCategory);
 router.get('/', superAdminContentController.listContent);
 router.post('/', superAdminContentController.createContent);
 router.put('/:id', superAdminContentController.updateContent);
