@@ -22,8 +22,8 @@
     "eas:generate": "node scripts/generate-eas-json.js"
   },
   "dependencies": {
-    "@firebase/auth": "1.12.2",
     "@expo/vector-icons": "^15.1.1",
+    "@firebase/auth": "1.12.2",
     "@react-native-async-storage/async-storage": "^3.0.1",
     "axios": "^1.13.5",
     "dotenv": "^17.3.1",
@@ -41,6 +41,7 @@
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-dotenv": "^3.4.11",
+    "react-native-render-html": "^6.3.4",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0"
   },

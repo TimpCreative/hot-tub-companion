@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { RichTextEditor, stripHtml } from './RichTextEditor';
 
 export type ContentType = 'article' | 'video';
 export type ContentStatus = 'draft' | 'published' | 'archived';
@@ -54,6 +55,8 @@ interface Props {
   title: string;
   categories: ContentCategoryOption[];
   initialValue?: Partial<ContentItemDraft> | null;
+  existingSlugs?: string[];
+  onManageCategories?: () => void;
   targetOptions?: {
     brands?: LookupOption[];
     modelLines?: LookupOption[];
@@ -100,14 +103,23 @@ function slugify(value: string) {
     .replace(/^-+|-+$/g, '');
 }
 
-type EditorField = 'summary' | 'bodyMarkdown';
+function buildUniqueSlug(baseSlug: string, existingSlugs: string[], currentSlug?: string) {
+  const normalizedBase = slugify(baseSlug);
+  if (!normalizedBase) return '';
 
-function applyMarkdownFormat(value: string, format: 'bold' | 'italic' | 'underline' | 'bullet' | 'numbered'): string {
-  if (format === 'bold') return `${value}**bold text**`;
-  if (format === 'italic') return `${value}*italic text*`;
-  if (format === 'underline') return `${value}<u>underlined text</u>`;
-  if (format === 'bullet') return `${value}${value.endsWith('\n') || value.length === 0 ? '' : '\n'}- Bullet point`;
-  return `${value}${value.endsWith('\n') || value.length === 0 ? '' : '\n'}1. Numbered item`;
+  const reserved = new Set(
+    existingSlugs
+      .map((slug) => slug.trim().toLowerCase())
+      .filter((slug) => slug && slug !== (currentSlug ?? '').trim().toLowerCase())
+  );
+
+  if (!reserved.has(normalizedBase)) return normalizedBase;
+
+  let suffix = 2;
+  while (reserved.has(`${normalizedBase}-${suffix}`)) {
+    suffix += 1;
+  }
+  return `${normalizedBase}-${suffix}`;
 }
 
 export function ContentEditorModal({
@@ -118,6 +130,8 @@ export function ContentEditorModal({
   title,
   categories,
   initialValue,
+  existingSlugs = [],
+  onManageCategories,
   targetOptions,
 }: Props) {
   const [draft, setDraft] = useState<ContentItemDraft>(() => buildInitialDraft(initialValue));
@@ -130,13 +144,6 @@ export function ContentEditorModal({
 
   function update<K extends keyof ContentItemDraft>(key: K, value: ContentItemDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
-  }
-
-  function applyFormat(field: EditorField, format: 'bold' | 'italic' | 'underline' | 'bullet' | 'numbered') {
-    setDraft((current) => ({
-      ...current,
-      [field]: applyMarkdownFormat(current[field], format),
-    }));
   }
 
   function toggleCategory(categoryKey: string) {
@@ -181,11 +188,17 @@ export function ContentEditorModal({
       setError('Slug is required');
       return;
     }
+    const normalizedSlug = draft.slug.trim().toLowerCase();
+    const currentSlug = initialValue?.slug?.trim().toLowerCase();
+    if (existingSlugs.some((slug) => slug.trim().toLowerCase() === normalizedSlug && normalizedSlug !== currentSlug)) {
+      setError('Slug already exists');
+      return;
+    }
     if (draft.categoryKeys.length === 0) {
       setError('Choose at least one category');
       return;
     }
-    if (draft.contentType === 'article' && !draft.bodyMarkdown.trim()) {
+    if (draft.contentType === 'article' && !stripHtml(draft.bodyMarkdown)) {
       setError('Article body is required');
       return;
     }
@@ -237,7 +250,7 @@ export function ContentEditorModal({
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => update('slug', slugify(draft.title))}
+                onClick={() => update('slug', buildUniqueSlug(draft.title, existingSlugs, initialValue?.slug))}
               >
                 Generate
               </Button>
@@ -302,38 +315,25 @@ export function ContentEditorModal({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Summary</label>
-          <div className="mb-2 flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('summary', 'bold')}>Bold</Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('summary', 'italic')}>Italic</Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('summary', 'underline')}>Underline</Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('summary', 'bullet')}>Bullet</Button>
-          </div>
-          <textarea
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm min-h-[90px]"
+          <RichTextEditor
+            label="Summary"
             value={draft.summary}
-            onChange={(e) => update('summary', e.target.value)}
+            onChange={(value) => update('summary', value)}
+            minHeight={140}
+            placeholder="Short rich-text summary for previews and detail pages"
           />
         </div>
 
         {draft.contentType === 'article' ? (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Body Markdown</label>
-            <div className="mb-2 flex flex-wrap gap-2">
-              <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('bodyMarkdown', 'bold')}>Bold</Button>
-              <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('bodyMarkdown', 'italic')}>Italic</Button>
-              <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('bodyMarkdown', 'underline')}>Underline</Button>
-              <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('bodyMarkdown', 'bullet')}>Bullet</Button>
-              <Button type="button" variant="secondary" size="sm" onClick={() => applyFormat('bodyMarkdown', 'numbered')}>Numbered</Button>
-            </div>
-            <textarea
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm min-h-[220px] font-mono"
+            <RichTextEditor
+              label="Body Text"
               value={draft.bodyMarkdown}
-              onChange={(e) => update('bodyMarkdown', e.target.value)}
+              onChange={(value) => update('bodyMarkdown', value)}
+              minHeight={280}
+              placeholder="Full article body"
+              helperText="Uses rich HTML formatting so content can carry real styling into supported detail views."
             />
-            <p className="mt-2 text-xs text-gray-500">
-              Supports Markdown plus inline HTML like `{`<u>underlined text</u>`}` when needed.
-            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4">
@@ -405,7 +405,14 @@ export function ContentEditorModal({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Categories</label>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <label className="block text-sm font-medium text-gray-700">Categories</label>
+            {onManageCategories ? (
+              <Button type="button" variant="secondary" size="sm" onClick={onManageCategories}>
+                Manage Categories
+              </Button>
+            ) : null}
+          </div>
           <select
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             value=""

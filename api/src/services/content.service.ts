@@ -26,6 +26,11 @@ export interface CreateContentCategoryInput {
   label: string;
 }
 
+export interface UpdateContentCategoryInput {
+  key?: string;
+  label?: string;
+}
+
 export interface ContentTarget {
   id?: string;
   targetType: ContentTargetType;
@@ -171,6 +176,33 @@ function normalizeNullableString(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function isPgUniqueViolation(err: unknown, constraintNamePart: string) {
+  if (!err || typeof err !== 'object') return false;
+  const code = 'code' in err ? String((err as { code?: unknown }).code ?? '') : '';
+  const constraint = 'constraint' in err ? String((err as { constraint?: unknown }).constraint ?? '') : '';
+  return code === '23505' && constraint.includes(constraintNamePart);
+}
+
+async function assertSlugAvailable(tenantId: string | null, slug: string, excludeId?: string) {
+  const normalizedSlug = slug.trim();
+  let query = db('content_items').where({ slug: normalizedSlug });
+
+  if (tenantId) {
+    query = query.where({ tenant_id: tenantId });
+  } else {
+    query = query.whereNull('tenant_id');
+  }
+
+  if (excludeId) {
+    query = query.whereNot({ id: excludeId });
+  }
+
+  const existing = await query.first();
+  if (existing) {
+    throw new Error('Slug already exists');
+  }
 }
 
 function mapCategory(row: ContentCategoryRow): ContentCategory {
@@ -560,6 +592,43 @@ export async function createCategory(input: CreateContentCategoryInput): Promise
   return mapCategory(created as ContentCategoryRow);
 }
 
+export async function updateCategory(id: string, input: UpdateContentCategoryInput): Promise<ContentCategory | null> {
+  const existing = (await db('content_categories').where({ id }).first()) as ContentCategoryRow | undefined;
+  if (!existing) return null;
+
+  const key =
+    input.key == null
+      ? existing.key
+      : input.key.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const label = input.label == null ? existing.label : input.label.trim();
+
+  if (!key) throw new Error('Category key is required');
+  if (!label) throw new Error('Category label is required');
+
+  const duplicate = await db('content_categories').where({ key }).whereNot({ id }).first();
+  if (duplicate) throw new Error('Category key already exists');
+
+  const [updated] = await db('content_categories')
+    .where({ id })
+    .update({
+      key,
+      label,
+    })
+    .returning('*');
+
+  return mapCategory(updated as ContentCategoryRow);
+}
+
+export async function deleteCategory(id: string): Promise<boolean> {
+  const linked = await db('content_item_categories').where({ category_id: id }).first();
+  if (linked) {
+    throw new Error('Cannot delete a category that is still assigned to content');
+  }
+
+  const deleted = await db('content_categories').where({ id }).del();
+  return deleted > 0;
+}
+
 export async function listCustomerContent(params: {
   tenantId: string;
   userId: string;
@@ -638,30 +707,46 @@ export async function listSuperAdminContent(filters: {
 
 export async function createSuperAdminContent(input: ContentWriteInput): Promise<ContentItem> {
   validateInput(input);
-  const [row] = await db.transaction(async (trx) => {
-    const [inserted] = await trx('content_items')
-      .insert({
-        ...buildWriteRow(null, 'universal', input),
-        created_at: trx.fn.now(),
-      })
-      .returning('*');
-    await syncCategories(trx, inserted.id, input.categoryKeys);
-    await syncTargets(trx, inserted.id, input.targets ?? []);
-    return [inserted];
-  });
-  const items = await listSuperAdminContent({});
-  return items.find((item) => item.id === row.id)!;
+  try {
+    await assertSlugAvailable(null, input.slug);
+    const [row] = await db.transaction(async (trx) => {
+      const [inserted] = await trx('content_items')
+        .insert({
+          ...buildWriteRow(null, 'universal', input),
+          created_at: trx.fn.now(),
+        })
+        .returning('*');
+      await syncCategories(trx, inserted.id, input.categoryKeys);
+      await syncTargets(trx, inserted.id, input.targets ?? []);
+      return [inserted];
+    });
+    const items = await listSuperAdminContent({});
+    return items.find((item) => item.id === row.id)!;
+  } catch (err) {
+    if (isPgUniqueViolation(err, 'slug')) {
+      throw new Error('Slug already exists');
+    }
+    throw err;
+  }
 }
 
 export async function updateSuperAdminContent(id: string, input: ContentWriteInput): Promise<ContentItem | null> {
   validateInput(input);
   const existing = await db('content_items').where({ id }).first();
   if (!existing) return null;
-  await db.transaction(async (trx) => {
-    await trx('content_items').where({ id }).update(buildWriteRow(null, 'universal', input));
-    await syncCategories(trx, id, input.categoryKeys);
-    await syncTargets(trx, id, input.targets ?? []);
-  });
+  try {
+    await assertSlugAvailable(null, input.slug, id);
+    await db.transaction(async (trx) => {
+      await trx('content_items').where({ id }).update(buildWriteRow(null, 'universal', input));
+      await syncCategories(trx, id, input.categoryKeys);
+      await syncTargets(trx, id, input.targets ?? []);
+    });
+  } catch (err) {
+    if (isPgUniqueViolation(err, 'slug')) {
+      throw new Error('Slug already exists');
+    }
+    throw err;
+  }
   const items = await listSuperAdminContent({});
   return items.find((item) => item.id === id) ?? null;
 }
@@ -694,19 +779,27 @@ export async function listRetailerContent(params: {
 
 export async function createRetailerContent(tenantId: string, input: ContentWriteInput): Promise<ContentItem> {
   validateInput(input);
-  const [row] = await db.transaction(async (trx) => {
-    const [inserted] = await trx('content_items')
-      .insert({
-        ...buildWriteRow(tenantId, 'retailer', input),
-        created_at: trx.fn.now(),
-      })
-      .returning('*');
-    await syncCategories(trx, inserted.id, input.categoryKeys);
-    await syncTargets(trx, inserted.id, input.targets ?? []);
-    return [inserted];
-  });
-  const items = await listRetailerContent({ tenantId, includeUniversal: false });
-  return items.find((item) => item.id === row.id)!;
+  try {
+    await assertSlugAvailable(tenantId, input.slug);
+    const [row] = await db.transaction(async (trx) => {
+      const [inserted] = await trx('content_items')
+        .insert({
+          ...buildWriteRow(tenantId, 'retailer', input),
+          created_at: trx.fn.now(),
+        })
+        .returning('*');
+      await syncCategories(trx, inserted.id, input.categoryKeys);
+      await syncTargets(trx, inserted.id, input.targets ?? []);
+      return [inserted];
+    });
+    const items = await listRetailerContent({ tenantId, includeUniversal: false });
+    return items.find((item) => item.id === row.id)!;
+  } catch (err) {
+    if (isPgUniqueViolation(err, 'slug')) {
+      throw new Error('Slug already exists');
+    }
+    throw err;
+  }
 }
 
 export async function updateRetailerContent(
@@ -717,11 +810,19 @@ export async function updateRetailerContent(
   validateInput(input);
   const existing = await db('content_items').where({ id, tenant_id: tenantId, scope: 'retailer' }).first();
   if (!existing) return null;
-  await db.transaction(async (trx) => {
-    await trx('content_items').where({ id }).update(buildWriteRow(tenantId, 'retailer', input));
-    await syncCategories(trx, id, input.categoryKeys);
-    await syncTargets(trx, id, input.targets ?? []);
-  });
+  try {
+    await assertSlugAvailable(tenantId, input.slug, id);
+    await db.transaction(async (trx) => {
+      await trx('content_items').where({ id }).update(buildWriteRow(tenantId, 'retailer', input));
+      await syncCategories(trx, id, input.categoryKeys);
+      await syncTargets(trx, id, input.targets ?? []);
+    });
+  } catch (err) {
+    if (isPgUniqueViolation(err, 'slug')) {
+      throw new Error('Slug already exists');
+    }
+    throw err;
+  }
   const items = await listRetailerContent({ tenantId, includeUniversal: false });
   return items.find((item) => item.id === id) ?? null;
 }

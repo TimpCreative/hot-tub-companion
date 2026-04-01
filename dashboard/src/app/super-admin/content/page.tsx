@@ -6,6 +6,8 @@ import { createSuperAdminApiClient } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { SearchInput } from '@/components/ui/SearchInput';
+import { Modal } from '@/components/ui/Modal';
+import { stripHtml } from '@/components/content/RichTextEditor';
 import {
   ContentEditorModal,
   type ContentCategoryOption,
@@ -77,8 +79,12 @@ export default function SuperAdminContentPage() {
   const [status, setStatus] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ContentItem | null>(null);
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [newCategoryLabel, setNewCategoryLabel] = useState('');
+  const [editingCategory, setEditingCategory] = useState<{ id: string; label: string; key: string } | null>(null);
   const [creatingCategory, setCreatingCategory] = useState(false);
+  const [updatingCategory, setUpdatingCategory] = useState(false);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -234,6 +240,47 @@ export default function SuperAdminContentPage() {
     }
   }
 
+  async function saveCategoryEdit() {
+    if (!editingCategory) return;
+    const label = editingCategory.label.trim();
+    const key = editingCategory.key.trim();
+    if (!label || !key) return;
+    setUpdatingCategory(true);
+    setError(null);
+    try {
+      await api.put(`/content/categories/${editingCategory.id}`, { label, key });
+      setEditingCategory(null);
+      await load();
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'error' in err
+          ? (err as { error?: { message?: string } }).error?.message
+          : 'Failed to update category';
+      setError(message ?? 'Failed to update category');
+    } finally {
+      setUpdatingCategory(false);
+    }
+  }
+
+  async function deleteCategory(categoryId: string) {
+    if (!confirm('Delete this category?')) return;
+    setDeletingCategoryId(categoryId);
+    setError(null);
+    try {
+      await api.delete(`/content/categories/${categoryId}`);
+      if (editingCategory?.id === categoryId) setEditingCategory(null);
+      await load();
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'error' in err
+          ? (err as { error?: { message?: string } }).error?.message
+          : 'Failed to delete category';
+      setError(message ?? 'Failed to delete category');
+    } finally {
+      setDeletingCategoryId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -274,23 +321,6 @@ export default function SuperAdminContentPage() {
         </select>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-        <div className="flex items-end gap-3">
-          <div className="flex-1">
-            <label className="mb-1 block text-sm font-medium text-gray-700">Add Category</label>
-            <input
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-              value={newCategoryLabel}
-              onChange={(e) => setNewCategoryLabel(e.target.value)}
-              placeholder="Water Balance"
-            />
-          </div>
-          <Button onClick={() => void createCategory()} loading={creatingCategory} disabled={!newCategoryLabel.trim()}>
-            Add Category
-          </Button>
-        </div>
-      </div>
-
       <div className="rounded-xl border border-gray-200 overflow-hidden">
         <div className="grid grid-cols-[2fr_1fr_1fr_1fr_160px] gap-4 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
           <div>Content</div>
@@ -313,7 +343,7 @@ export default function SuperAdminContentPage() {
                   {item.videoFormat ? <Badge variant="default" size="sm">{item.videoFormat}</Badge> : null}
                   <Badge variant={item.scope === 'universal' ? 'success' : 'warning'} size="sm">{item.scope}</Badge>
                 </div>
-                {item.summary ? <p className="mt-2 text-gray-600 line-clamp-2">{item.summary}</p> : null}
+                {item.summary ? <p className="mt-2 text-gray-600 line-clamp-2">{stripHtml(item.summary)}</p> : null}
               </div>
               <div className="flex flex-wrap gap-2 content-start">
                 {item.categories.map((entry) => (
@@ -353,6 +383,7 @@ export default function SuperAdminContentPage() {
           saving={saving}
           title={editing ? 'Edit Content' : 'New Content'}
           categories={categories}
+          existingSlugs={items.filter((item) => item.scope === 'universal').map((item) => item.slug)}
           initialValue={
             editing
               ? {
@@ -382,8 +413,112 @@ export default function SuperAdminContentPage() {
             partCategories,
             sanitationSystems,
           }}
+          onManageCategories={() => setCategoryModalOpen(true)}
         />
       ) : null}
+
+      <Modal
+        isOpen={categoryModalOpen}
+        onClose={() => {
+          setCategoryModalOpen(false);
+          setEditingCategory(null);
+        }}
+        title="Manage Categories"
+        size="xl"
+        footer={
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={() => {
+              setCategoryModalOpen(false);
+              setEditingCategory(null);
+            }}>
+              Done
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-5">
+          <div className="rounded-lg border border-gray-200 p-4">
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700">New Category</label>
+                <input
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+                  value={newCategoryLabel}
+                  onChange={(e) => setNewCategoryLabel(e.target.value)}
+                  placeholder="Water Balance"
+                />
+              </div>
+              <Button onClick={() => void createCategory()} loading={creatingCategory} disabled={!newCategoryLabel.trim()}>
+                Add Category
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {categories.map((entry) => {
+              const isEditing = editingCategory?.id === entry.id;
+              return (
+                <div key={entry.id} className="rounded-lg border border-gray-200 p-4">
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-gray-700">Label</label>
+                          <input
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                            value={editingCategory.label}
+                            onChange={(e) =>
+                              setEditingCategory((current) => (current ? { ...current, label: e.target.value } : current))
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-gray-700">Key</label>
+                          <input
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                            value={editingCategory.key}
+                            onChange={(e) =>
+                              setEditingCategory((current) => (current ? { ...current, key: e.target.value } : current))
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button onClick={() => void saveCategoryEdit()} loading={updatingCategory}>Save</Button>
+                        <Button variant="secondary" onClick={() => setEditingCategory(null)}>Cancel</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <div className="font-medium text-gray-900">{entry.label}</div>
+                        <div className="text-sm text-gray-500">{entry.key}</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setEditingCategory({ id: entry.id, label: entry.label, key: entry.key })}
+                        >
+                          Rename
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => void deleteCategory(entry.id)}
+                          loading={deletingCategoryId === entry.id}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

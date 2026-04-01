@@ -18,6 +18,20 @@ type ContentItem = {
   categories: Array<{ id: string; key: string; label: string }>;
 };
 
+function stripHtml(value: string | null | undefined): string {
+  if (!value) return '';
+  return value
+    .replace(/<\/(p|div|li|blockquote|h1|h2|h3|h4|h5|h6)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function getPrimarySpa(spaProfiles: SpaProfile[]): SpaProfile | null {
   return spaProfiles.find((spa) => spa.isPrimary) ?? spaProfiles[0] ?? null;
 }
@@ -118,7 +132,7 @@ export default function WaterGuidesScreen() {
                 <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
                 {item.summary ? (
                   <Text style={[styles.copy, { color: colors.textSecondary }]} numberOfLines={3}>
-                    {item.summary}
+                    {stripHtml(item.summary)}
                   </Text>
                 ) : null}
               </View>

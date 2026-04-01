@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import RenderHtml from 'react-native-render-html';
 import api from '../../../services/api';
 import { useTheme } from '../../../theme/ThemeProvider';
 
@@ -17,25 +18,23 @@ type ContentItem = {
   categories: Array<{ id: string; key: string; label: string }>;
 };
 
-function renderMarkdownLines(markdown: string) {
-  return markdown.split('\n').map((line, index) => {
-    const trimmed = line.trim();
-    if (!trimmed) return <View key={`spacer-${index}`} style={{ height: 12 }} />;
-    if (trimmed.startsWith('## ')) {
-      return <Text key={index} style={styles.h2}>{trimmed.slice(3)}</Text>;
-    }
-    if (trimmed.startsWith('# ')) {
-      return <Text key={index} style={styles.h1}>{trimmed.slice(2)}</Text>;
-    }
-    if (trimmed.startsWith('- ')) {
-      return <Text key={index} style={styles.bullet}>{`\u2022 ${trimmed.slice(2)}`}</Text>;
-    }
-    return <Text key={index} style={styles.body}>{trimmed}</Text>;
-  });
+function stripHtml(value: string | null | undefined): string {
+  if (!value) return '';
+  return value
+    .replace(/<\/(p|div|li|blockquote|h1|h2|h3|h4|h5|h6)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 export default function ContentDetailScreen() {
   const { colors } = useTheme();
+  const { width } = useWindowDimensions();
   const params = useLocalSearchParams<{ id: string; spaProfileId?: string }>();
   const [loading, setLoading] = useState(true);
   const [item, setItem] = useState<ContentItem | null>(null);
@@ -91,7 +90,14 @@ export default function ContentDetailScreen() {
         </View>
       </View>
       <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
-      {item.summary ? <Text style={[styles.summary, { color: colors.textSecondary }]}>{item.summary}</Text> : null}
+      {item.summary ? (
+        <RenderHtml
+          contentWidth={width - 40}
+          source={{ html: item.summary }}
+          baseStyle={{ color: colors.textSecondary, fontSize: 16, lineHeight: 24 }}
+          tagsStyles={htmlStyles(colors).tagsStyles}
+        />
+      ) : null}
       {item.author ? <Text style={[styles.author, { color: colors.textMuted }]}>By {item.author}</Text> : null}
 
       {item.contentType === 'video' && item.videoUrl ? (
@@ -102,18 +108,49 @@ export default function ContentDetailScreen() {
 
       {item.bodyMarkdown ? (
         <View style={[styles.section, { backgroundColor: colors.contentBackground, borderColor: colors.border }]}>
-          {renderMarkdownLines(item.bodyMarkdown)}
+          <RenderHtml
+            contentWidth={width - 76}
+            source={{ html: item.bodyMarkdown }}
+            baseStyle={{ color: colors.text, fontSize: 15, lineHeight: 24 }}
+            tagsStyles={htmlStyles(colors).tagsStyles}
+          />
         </View>
       ) : null}
 
       {item.transcript ? (
         <View style={[styles.section, { backgroundColor: colors.contentBackground, borderColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Transcript</Text>
-          <Text style={[styles.body, { color: colors.textSecondary }]}>{item.transcript}</Text>
+          <Text style={[styles.body, { color: colors.textSecondary }]}>{stripHtml(item.transcript)}</Text>
         </View>
       ) : null}
     </ScrollView>
   );
+}
+
+function htmlStyles(colors: { text: string; textSecondary: string }) {
+  return {
+    tagsStyles: {
+      p: { marginTop: 0, marginBottom: 12, color: colors.textSecondary, lineHeight: 24 },
+      strong: { fontWeight: '700' as const, color: colors.text },
+      b: { fontWeight: '700' as const, color: colors.text },
+      em: { fontStyle: 'italic' as const, color: colors.textSecondary },
+      i: { fontStyle: 'italic' as const, color: colors.textSecondary },
+      u: { textDecorationLine: 'underline' as const, color: colors.textSecondary },
+      h1: { fontSize: 24, fontWeight: '800' as const, marginBottom: 10, color: colors.text },
+      h2: { fontSize: 20, fontWeight: '700' as const, marginBottom: 8, color: colors.text },
+      blockquote: {
+        borderLeftWidth: 3,
+        borderLeftColor: '#cbd5e1',
+        paddingLeft: 12,
+        marginLeft: 0,
+        color: colors.textSecondary,
+      },
+      ul: { marginVertical: 8 },
+      ol: { marginVertical: 8 },
+      li: { marginBottom: 6, color: colors.textSecondary },
+      a: { color: '#2563eb', textDecorationLine: 'underline' as const },
+    },
+  };
 }
 
 const styles = StyleSheet.create({
@@ -135,10 +172,7 @@ const styles = StyleSheet.create({
   openButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   section: { borderWidth: 1, borderRadius: 18, padding: 18, gap: 10 },
   sectionTitle: { fontSize: 16, fontWeight: '700' },
-  h1: { fontSize: 24, fontWeight: '800', marginBottom: 6 },
-  h2: { fontSize: 20, fontWeight: '700', marginBottom: 4 },
   body: { fontSize: 15, lineHeight: 24 },
-  bullet: { fontSize: 15, lineHeight: 24, paddingLeft: 4 },
   emptyTitle: { fontSize: 20, fontWeight: '700', marginBottom: 6 },
   emptyBody: { fontSize: 15, lineHeight: 22, textAlign: 'center' },
 });

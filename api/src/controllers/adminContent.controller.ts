@@ -60,7 +60,7 @@ export async function createContent(req: Request, res: Response) {
     success(res, item, 'Content created');
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to create content';
-    if (/required|Unknown category/.test(message)) {
+    if (/required|Unknown category|already exists/i.test(message)) {
       return error(res, 'VALIDATION_ERROR', message, 400);
     }
     console.error('Error creating retailer content:', err);
@@ -78,7 +78,7 @@ export async function updateContent(req: Request, res: Response) {
     success(res, item, 'Content updated');
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to update content';
-    if (/required|Unknown category/.test(message)) {
+    if (/required|Unknown category|already exists/i.test(message)) {
       return error(res, 'VALIDATION_ERROR', message, 400);
     }
     console.error('Error updating retailer content:', err);

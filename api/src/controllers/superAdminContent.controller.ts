@@ -41,7 +41,7 @@ export async function createContent(req: Request, res: Response) {
     success(res, item, 'Content created');
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to create content';
-    if (/required|Unknown category/.test(message)) {
+    if (/required|Unknown category|already exists/i.test(message)) {
       return error(res, 'VALIDATION_ERROR', message, 400);
     }
     console.error('Error creating super admin content:', err);
@@ -56,7 +56,7 @@ export async function updateContent(req: Request, res: Response) {
     success(res, item, 'Content updated');
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to update content';
-    if (/required|Unknown category/.test(message)) {
+    if (/required|Unknown category|already exists/i.test(message)) {
       return error(res, 'VALIDATION_ERROR', message, 400);
     }
     console.error('Error updating super admin content:', err);
@@ -99,5 +99,38 @@ export async function createCategory(req: Request, res: Response) {
     }
     console.error('Error creating content category:', err);
     error(res, 'INTERNAL_ERROR', 'Failed to create category', 500);
+  }
+}
+
+export async function updateCategory(req: Request, res: Response) {
+  try {
+    const category = await contentService.updateCategory(req.params.id, {
+      key: req.body?.key,
+      label: req.body?.label,
+    });
+    if (!category) return error(res, 'NOT_FOUND', 'Category not found', 404);
+    success(res, category, 'Category updated');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to update category';
+    if (/required|exists/i.test(message)) {
+      return error(res, 'VALIDATION_ERROR', message, 400);
+    }
+    console.error('Error updating content category:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to update category', 500);
+  }
+}
+
+export async function deleteCategory(req: Request, res: Response) {
+  try {
+    const deleted = await contentService.deleteCategory(req.params.id);
+    if (!deleted) return error(res, 'NOT_FOUND', 'Category not found', 404);
+    success(res, { id: req.params.id }, 'Category deleted');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to delete category';
+    if (/still assigned/i.test(message)) {
+      return error(res, 'VALIDATION_ERROR', message, 400);
+    }
+    console.error('Error deleting content category:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to delete category', 500);
   }
 }

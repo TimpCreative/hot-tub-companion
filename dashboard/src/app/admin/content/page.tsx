@@ -12,6 +12,7 @@ import {
   type ContentCategoryOption,
   type ContentItemDraft,
 } from '@/components/content/ContentEditorModal';
+import { stripHtml } from '@/components/content/RichTextEditor';
 
 interface ContentTarget {
   targetType: 'brand' | 'model_line' | 'spa_model' | 'sanitation_system';
@@ -193,7 +194,7 @@ export default function AdminContentPage() {
                   <Badge variant="info" size="sm">{item.contentType}</Badge>
                   {item.videoFormat ? <Badge variant="default" size="sm">{item.videoFormat}</Badge> : null}
                 </div>
-                {item.summary ? <p className="mt-2 text-gray-600 line-clamp-2">{item.summary}</p> : null}
+                {item.summary ? <p className="mt-2 text-gray-600 line-clamp-2">{stripHtml(item.summary)}</p> : null}
               </div>
               <div className="flex flex-wrap gap-2 content-start">
                 {item.categories.map((entry) => (
@@ -240,6 +241,7 @@ export default function AdminContentPage() {
           saving={saving}
           title={editing ? 'Edit Retailer Content' : 'New Retailer Content'}
           categories={categories}
+          existingSlugs={items.filter((item) => item.scope === 'retailer').map((item) => item.slug)}
           initialValue={
             editing
               ? {
