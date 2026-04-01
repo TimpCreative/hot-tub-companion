@@ -1,3 +1,4 @@
+import sanitizeHtml from 'sanitize-html';
 import { db } from '../config/database';
 
 export type ContentType = 'article' | 'video';
@@ -176,6 +177,44 @@ function normalizeNullableString(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+const ALLOWED_CONTENT_TAGS = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'h1', 'h2', 'blockquote', 'ul', 'ol', 'li', 'a'];
+const ALLOWED_CONTENT_ATTRIBUTES: sanitizeHtml.IOptions['allowedAttributes'] = {
+  a: ['href'],
+};
+const ALLOWED_LINK_SCHEMES = ['http', 'https', 'mailto', 'tel'];
+
+function sanitizeRichHtml(value: unknown): string | null {
+  const normalized = normalizeNullableString(value);
+  if (!normalized) return null;
+
+  const sanitized = sanitizeHtml(normalized, {
+    allowedTags: ALLOWED_CONTENT_TAGS,
+    allowedAttributes: ALLOWED_CONTENT_ATTRIBUTES,
+    allowedSchemes: ALLOWED_LINK_SCHEMES,
+    allowedSchemesByTag: {
+      a: ALLOWED_LINK_SCHEMES,
+    },
+  }).trim();
+
+  return sanitized || null;
+}
+
+function hasVisibleText(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const withoutTags = value
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|blockquote|h1|h2|h3|h4|h5|h6)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return withoutTags.length > 0;
 }
 
 function isPgUniqueViolation(err: unknown, constraintNamePart: string) {
@@ -519,7 +558,7 @@ function validateInput(input: ContentWriteInput) {
   if (!Array.isArray(input.categoryKeys) || input.categoryKeys.length === 0) {
     throw new Error('At least one category is required');
   }
-  if (input.contentType === 'article' && !normalizeNullableString(input.bodyMarkdown)) {
+  if (input.contentType === 'article' && !hasVisibleText(sanitizeRichHtml(input.bodyMarkdown))) {
     throw new Error('Article body is required');
   }
   if (input.contentType === 'video' && !normalizeNullableString(input.videoUrl)) {
@@ -532,6 +571,8 @@ function buildWriteRow(
   scope: ContentScope,
   input: ContentWriteInput
 ) {
+  const sanitizedSummary = sanitizeRichHtml(input.summary);
+  const sanitizedBody = input.contentType === 'article' ? sanitizeRichHtml(input.bodyMarkdown) : null;
   const publishedAt =
     input.publishedAt != null
       ? new Date(input.publishedAt)
@@ -545,8 +586,8 @@ function buildWriteRow(
     title: input.title.trim(),
     slug: input.slug.trim(),
     content_type: input.contentType,
-    summary: normalizeNullableString(input.summary),
-    body_markdown: input.contentType === 'article' ? normalizeNullableString(input.bodyMarkdown) : null,
+    summary: sanitizedSummary,
+    body_markdown: sanitizedBody,
     video_provider: input.contentType === 'video' ? normalizeNullableString(input.videoProvider) ?? 'youtube' : null,
     video_url: input.contentType === 'video' ? normalizeNullableString(input.videoUrl) : null,
     thumbnail_url: normalizeNullableString(input.thumbnailUrl),
