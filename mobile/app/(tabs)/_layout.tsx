@@ -127,6 +127,25 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="content/[id]"
+        options={{
+          title: 'Guide',
+          href: null,
+          headerShown: true,
+          headerStyle: { backgroundColor: primary },
+          headerTintColor: '#fff',
+          headerLeft: () => (
+            <TouchableOpacity
+              onPress={() => router.replace('/(tabs)/water-guides')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+            >
+              <Ionicons name="chevron-back" size={20} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>Back</Text>
+            </TouchableOpacity>
+          ),
+        }}
+      />
     </Tabs>
   );
 }

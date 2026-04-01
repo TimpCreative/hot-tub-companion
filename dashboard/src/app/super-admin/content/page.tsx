@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTenant } from '@/contexts/TenantContext';
-import { createTenantApiClient } from '@/services/api';
+import { createSuperAdminApiClient } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { SearchInput } from '@/components/ui/SearchInput';
@@ -11,6 +10,7 @@ import {
   ContentEditorModal,
   type ContentCategoryOption,
   type ContentItemDraft,
+  type LookupOption,
 } from '@/components/content/ContentEditorModal';
 
 interface ContentTarget {
@@ -23,23 +23,31 @@ interface ContentTarget {
 interface ContentItem {
   id: string;
   title: string;
+  slug: string;
   scope: 'universal' | 'retailer';
   contentType: 'article' | 'video';
+  videoFormat: 'masterclass' | 'clip' | null;
   summary: string | null;
   bodyMarkdown: string | null;
   videoUrl: string | null;
   thumbnailUrl: string | null;
   author: string | null;
   transcript: string | null;
-  videoFormat: 'masterclass' | 'clip' | null;
   hiddenSearchTags: string[];
   hiddenSearchAliases: string[];
   status: 'draft' | 'published' | 'archived';
   priority: number;
-  slug: string;
   categories: ContentCategoryOption[];
   targets: ContentTarget[];
-  isSuppressed?: boolean;
+  updatedAt: string;
+}
+
+interface OptionResponseRow {
+  id: string;
+  name?: string;
+  brandName?: string;
+  modelLineName?: string;
+  year?: number;
 }
 
 function lineTextToArray(value: string) {
@@ -49,16 +57,23 @@ function lineTextToArray(value: string) {
     .filter(Boolean);
 }
 
-export default function AdminContentPage() {
+export default function SuperAdminContentPage() {
   const { getIdToken } = useAuth();
-  const { config } = useTenant();
-  const api = useMemo(() => createTenantApiClient(async () => await getIdToken()), [getIdToken]);
+  const api = useMemo(() => createSuperAdminApiClient(async () => await getIdToken()), [getIdToken]);
   const [items, setItems] = useState<ContentItem[]>([]);
   const [categories, setCategories] = useState<ContentCategoryOption[]>([]);
+  const [brands, setBrands] = useState<LookupOption[]>([]);
+  const [modelLines, setModelLines] = useState<LookupOption[]>([]);
+  const [spas, setSpas] = useState<LookupOption[]>([]);
+  const [sanitationSystems, setSanitationSystems] = useState<Array<{ value: string; displayName: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [type, setType] = useState('');
+  const [format, setFormat] = useState('');
+  const [status, setStatus] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ContentItem | null>(null);
 
@@ -66,26 +81,69 @@ export default function AdminContentPage() {
     setLoading(true);
     setError(null);
     try {
-      const [itemsRes, categoriesRes] = await Promise.all([
-        api.get('/admin/content', { params: { includeUniversal: true, search: search || undefined } }),
+      const [itemsRes, categoriesRes, brandsRes, modelLinesRes, spasRes, qualifiersRes] = await Promise.all([
+        api.get('/content', {
+          params: {
+            search: search || undefined,
+            category: category || undefined,
+            type: type || undefined,
+            format: format || undefined,
+            status: status || undefined,
+            scope: 'all',
+          },
+        }),
         api.get('/content/categories'),
+        api.get('/scdb/brands?page=1&pageSize=500'),
+        api.get('/scdb/model-lines'),
+        api.get('/scdb/spa-models?page=1&pageSize=500'),
+        api.get('/qdb/qualifiers'),
       ]);
+
       setItems(itemsRes.data ?? []);
       setCategories(categoriesRes.data ?? []);
+      setBrands((brandsRes.data ?? []).map((row: OptionResponseRow) => ({ id: row.id, name: row.name ?? row.id })));
+      setModelLines((modelLinesRes.data ?? []).map((row: OptionResponseRow) => ({ id: row.id, name: row.name ?? row.id })));
+      setSpas(
+        (spasRes.data ?? []).map((row: OptionResponseRow) => ({
+          id: row.id,
+          name: `${row.brandName ?? ''} ${row.modelLineName ?? ''} ${row.name ?? ''} ${row.year ?? ''}`.replace(/\s+/g, ' ').trim(),
+        }))
+      );
+      const qualifier = (qualifiersRes.data ?? []).find(
+        (entry: { name?: string }) => entry.name === 'sanitation_system' || entry.name === 'sanitization_system'
+      );
+      setSanitationSystems(
+        Array.isArray(qualifier?.allowedValues)
+          ? qualifier.allowedValues.map((option: { value: string; displayName?: string }) => ({
+              value: option.value,
+              displayName: option.displayName || option.value,
+            }))
+          : []
+      );
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'error' in err
           ? (err as { error?: { message?: string } }).error?.message
-          : 'Failed to load content';
-      setError(message ?? 'Failed to load content');
+          : 'Failed to load content library';
+      setError(message ?? 'Failed to load content library');
     } finally {
       setLoading(false);
     }
-  }, [api, search]);
+  }, [api, category, format, search, status, type]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  function openCreate() {
+    setEditing(null);
+    setModalOpen(true);
+  }
+
+  function openEdit(item: ContentItem) {
+    setEditing(item);
+    setModalOpen(true);
+  }
 
   async function save(draft: ContentItemDraft) {
     setSaving(true);
@@ -113,10 +171,11 @@ export default function AdminContentPage() {
       };
 
       if (editing) {
-        await api.put(`/admin/content/${editing.id}`, payload);
+        await api.put(`/content/${editing.id}`, payload);
       } else {
-        await api.post('/admin/content', payload);
+        await api.post('/content', payload);
       }
+
       setModalOpen(false);
       setEditing(null);
       await load();
@@ -134,7 +193,7 @@ export default function AdminContentPage() {
   async function remove(item: ContentItem) {
     if (!confirm(`Delete "${item.title}"?`)) return;
     try {
-      await api.delete(`/admin/content/${item.id}`);
+      await api.delete(`/content/${item.id}`);
       await load();
     } catch (err: unknown) {
       const message =
@@ -145,37 +204,51 @@ export default function AdminContentPage() {
     }
   }
 
-  async function toggleSuppression(item: ContentItem) {
-    try {
-      await api.put(`/admin/content/${item.id}/suppress`, { suppressed: !item.isSuppressed });
-      await load();
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'error' in err
-          ? (err as { error?: { message?: string } }).error?.message
-          : 'Failed to update suppression';
-      setError(message ?? 'Failed to update suppression');
-    }
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">Content</h2>
-          <p className="text-sm text-gray-500 mt-1">Manage your tenant’s guides and videos, and hide universal items you do not want customers to see.</p>
+          <h1 className="text-2xl font-semibold text-gray-900">Content Library</h1>
+          <p className="text-sm text-gray-500 mt-1">Universal guides and videos for Water Care and future app surfaces.</p>
         </div>
-        <Button onClick={() => { setEditing(null); setModalOpen(true); }}>+ New Content</Button>
+        <Button onClick={openCreate}>+ New Content</Button>
       </div>
 
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {error ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+      ) : null}
 
-      <SearchInput value={search} onChange={setSearch} placeholder="Search content..." className="max-w-xl" />
+      <div className="grid grid-cols-5 gap-3">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search title, summary, transcript..." />
+        <select className="rounded-lg border border-gray-300 px-3 py-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)}>
+          <option value="">All categories</option>
+          {categories.map((entry) => (
+            <option key={entry.id} value={entry.key}>{entry.label}</option>
+          ))}
+        </select>
+        <select className="rounded-lg border border-gray-300 px-3 py-2 text-sm" value={type} onChange={(e) => setType(e.target.value)}>
+          <option value="">All types</option>
+          <option value="article">Article</option>
+          <option value="video">Video</option>
+        </select>
+        <select className="rounded-lg border border-gray-300 px-3 py-2 text-sm" value={format} onChange={(e) => setFormat(e.target.value)}>
+          <option value="">All formats</option>
+          <option value="masterclass">Masterclass</option>
+          <option value="clip">Clip</option>
+        </select>
+        <select className="rounded-lg border border-gray-300 px-3 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">All statuses</option>
+          <option value="draft">Draft</option>
+          <option value="published">Published</option>
+          <option value="archived">Archived</option>
+        </select>
+      </div>
 
       <div className="rounded-xl border border-gray-200 overflow-hidden">
-        <div className="grid grid-cols-[2fr_1fr_1fr_180px] gap-4 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_160px] gap-4 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
           <div>Content</div>
           <div>Categories</div>
+          <div>Targets</div>
           <div>Status</div>
           <div>Actions</div>
         </div>
@@ -185,13 +258,13 @@ export default function AdminContentPage() {
           <div className="px-4 py-10 text-sm text-gray-500">No content found.</div>
         ) : (
           items.map((item) => (
-            <div key={item.id} className="grid grid-cols-[2fr_1fr_1fr_180px] gap-4 border-t border-gray-100 px-4 py-4 text-sm">
+            <div key={item.id} className="grid grid-cols-[2fr_1fr_1fr_1fr_160px] gap-4 border-t border-gray-100 px-4 py-4 text-sm">
               <div>
                 <div className="font-medium text-gray-900">{item.title}</div>
                 <div className="mt-1 flex flex-wrap gap-2">
-                  <Badge variant={item.scope === 'retailer' ? 'warning' : 'success'} size="sm">{item.scope}</Badge>
                   <Badge variant="info" size="sm">{item.contentType}</Badge>
                   {item.videoFormat ? <Badge variant="default" size="sm">{item.videoFormat}</Badge> : null}
+                  <Badge variant={item.scope === 'universal' ? 'success' : 'warning'} size="sm">{item.scope}</Badge>
                 </div>
                 {item.summary ? <p className="mt-2 text-gray-600 line-clamp-2">{item.summary}</p> : null}
               </div>
@@ -200,6 +273,9 @@ export default function AdminContentPage() {
                   <Badge key={entry.id} variant="default" size="sm">{entry.label}</Badge>
                 ))}
               </div>
+              <div className="text-gray-600">
+                {item.targets.length === 0 ? 'All audiences' : `${item.targets.length} rule${item.targets.length === 1 ? '' : 's'}`}
+              </div>
               <div className="space-y-1">
                 <Badge
                   variant={item.status === 'published' ? 'success' : item.status === 'archived' ? 'warning' : 'pending'}
@@ -207,21 +283,11 @@ export default function AdminContentPage() {
                 >
                   {item.status}
                 </Badge>
-                {item.scope === 'universal' && item.isSuppressed ? (
-                  <div className="text-xs text-red-600">Hidden for this tenant</div>
-                ) : null}
+                <div className="text-xs text-gray-500">Priority {item.priority}</div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {item.scope === 'retailer' ? (
-                  <>
-                    <Button variant="secondary" size="sm" onClick={() => { setEditing(item); setModalOpen(true); }}>Edit</Button>
-                    <Button variant="danger" size="sm" onClick={() => void remove(item)}>Delete</Button>
-                  </>
-                ) : (
-                  <Button variant="secondary" size="sm" onClick={() => void toggleSuppression(item)}>
-                    {item.isSuppressed ? 'Show' : 'Hide'}
-                  </Button>
-                )}
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" onClick={() => openEdit(item)}>Edit</Button>
+                <Button variant="danger" size="sm" onClick={() => void remove(item)}>Delete</Button>
               </div>
             </div>
           ))
@@ -238,7 +304,7 @@ export default function AdminContentPage() {
           }}
           onSave={save}
           saving={saving}
-          title={editing ? 'Edit Retailer Content' : 'New Retailer Content'}
+          title={editing ? 'Edit Content' : 'New Content'}
           categories={categories}
           initialValue={
             editing
@@ -263,11 +329,10 @@ export default function AdminContentPage() {
               : undefined
           }
           targetOptions={{
-            sanitationSystems:
-              config?.sanitationSystemOptions?.length
-                ? config.sanitationSystemOptions
-                : (config?.sanitizationSystems ?? []).map((value) => ({ value, displayName: value })),
-            allowedTargetTypes: ['sanitation_system'],
+            brands,
+            modelLines,
+            spas,
+            sanitationSystems,
           }}
         />
       ) : null}

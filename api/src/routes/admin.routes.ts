@@ -9,6 +9,7 @@ import * as adminBrandingMediaController from '../controllers/adminBrandingMedia
 import * as adminAppSetupController from '../controllers/adminAppSetup.controller';
 import * as adminNotificationsController from '../controllers/adminNotifications.controller';
 import * as adminTeamController from '../controllers/adminTeam.controller';
+import adminContentRoutes from './adminContent.routes';
 
 const router = Router();
 
@@ -46,6 +47,9 @@ router.put('/settings/branding', adminBrandingController.updateBranding);
 // App setup (onboarding config, etc.)
 router.get('/settings/app-setup', adminAppSetupController.getAppSetup);
 router.put('/settings/app-setup', adminAppSetupController.updateAppSetup);
+
+// Content library
+router.use('/', adminContentRoutes);
 
 // Notifications (requires can_send_notifications)
 router.get(

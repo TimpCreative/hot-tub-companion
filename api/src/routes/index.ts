@@ -14,6 +14,8 @@ import statsRoutes from './stats.routes';
 import mediaRoutes from './media.routes';
 import mediaPublicRoutes from './mediaPublic.routes';
 import waterCareCustomerRoutes, { adminRoutes as waterCareAdminRoutes } from './waterCare.routes';
+import contentRoutes from './content.routes';
+import superAdminContentRoutes from './superAdminContent.routes';
 import { superAdminAuth } from '../middleware/superAdminAuth';
 import { cronAuth } from '../middleware/cronAuth';
 import { easBuildConfigAuth } from '../middleware/easBuildConfigAuth';
@@ -71,9 +73,11 @@ router.use('/api/v1/super-admin/merge', superAdminAuth, mergeRoutes);
 router.use('/api/v1/super-admin/stats', superAdminAuth, statsRoutes);
 router.use('/api/v1/super-admin/media', superAdminAuth, mediaRoutes);
 router.use('/api/v1/super-admin/water-care', superAdminAuth, waterCareAdminRoutes);
+router.use('/api/v1/super-admin/content', superAdminAuth, superAdminContentRoutes);
 
 // Customer product routes (tenant API key required; some endpoints require auth)
 router.use('/api/v1', waterCareCustomerRoutes);
+router.use('/api/v1', contentRoutes);
 
 // Customer product routes (tenant API key required; some endpoints require auth)
 router.use('/api/v1', productsRoutes);

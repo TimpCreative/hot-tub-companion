@@ -17,6 +17,7 @@ interface TenantConfig {
   features: Record<string, boolean>;
   serviceTypes: string[];
   sanitizationSystems: string[];
+  sanitationSystemOptions?: Array<{ value: string; displayName: string }>;
   timezone?: string;
 }
 
