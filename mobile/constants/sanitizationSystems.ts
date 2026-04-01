@@ -11,3 +11,11 @@ export const SANITIZATION_LABELS: Record<string, string> = {
 export function labelForSanitizer(key: string): string {
   return SANITIZATION_LABELS[key] ?? key.replace(/_/g, ' ');
 }
+
+export function labelForSanitationOption(
+  key: string,
+  options?: Array<{ value: string; displayName: string }>
+): string {
+  const match = options?.find((option) => option.value === key);
+  return match?.displayName ?? labelForSanitizer(key);
+}

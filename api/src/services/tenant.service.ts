@@ -2,8 +2,8 @@ import { db } from '../config/database';
 import { normalizeOnboardingConfig } from './onboardingConfig.service';
 import { mapDealerContact, normalizeHomeDashboardConfig } from './homeDashboardConfig.service';
 import { toProxyUrl } from '../utils/mediaUrl';
-
-const SANITIZATION_SYSTEMS = ['bromine', 'chlorine', 'frog_ease', 'copper', 'silver_mineral'];
+import { getSanitationSystemOptions } from './sanitationSystem.service';
+import { normalizeWaterCareConfig } from './waterCareConfig.service';
 
 export async function getByApiKey(apiKey: string) {
   return db('tenants').where({ api_key: apiKey }).first();
@@ -12,6 +12,7 @@ export async function getByApiKey(apiKey: string) {
 export async function getConfig(tenantId: string) {
   const tenant = await db('tenants').where({ id: tenantId }).first();
   if (!tenant) return null;
+  const sanitationSystemOptions = await getSanitationSystemOptions();
 
   return {
     tenantId: tenant.id,
@@ -39,11 +40,13 @@ export async function getConfig(tenantId: string) {
       tabDealer: tenant.feature_tab_dealer !== false,
     },
     serviceTypes: [],
-    sanitizationSystems: SANITIZATION_SYSTEMS,
+    sanitizationSystems: sanitationSystemOptions.map((option) => option.value),
+    sanitationSystemOptions,
     fulfillmentMode: tenant.fulfillment_mode,
     shopifyStoreUrl: tenant.shopify_store_url,
     onboarding: normalizeOnboardingConfig(tenant.onboarding_config),
     homeDashboard: normalizeHomeDashboardConfig(tenant.home_dashboard_config),
+    waterCare: normalizeWaterCareConfig((tenant as { water_care_config?: unknown }).water_care_config),
     dealerContact: mapDealerContact(tenant),
     termsUrl: (tenant as any).terms_url?.trim() || null,
     privacyUrl: (tenant as any).privacy_url?.trim() || null,

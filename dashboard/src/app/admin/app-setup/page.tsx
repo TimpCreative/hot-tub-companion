@@ -51,6 +51,11 @@ interface HomeDashboardConfig {
   widgets: HomeWidget[];
 }
 
+interface WaterCareConfig {
+  testingTipsTitle: string;
+  testingTips: { text: string }[];
+}
+
 interface DealerContact {
   phone: string | null;
   address: string | null;
@@ -64,7 +69,7 @@ interface Legal {
 const STEP_LABELS: Record<StepId, string> = {
   brand: 'Hot tub make (brand)',
   modelPick: 'Model selection (UHTD)',
-  sanitizer: 'Sanitizer system',
+  sanitizer: 'Sanitation system',
 };
 
 const ROUTE_OPTIONS = ['/shop', '/water-care', '/inbox', '/dealer', '/services', '/onboarding'] as const;
@@ -104,9 +109,10 @@ export default function AdminAppSetupPage() {
 
   const markDirty = useCallback(() => setUnsavedChanges(true), [setUnsavedChanges]);
 
-  const [tab, setTab] = useState<'onboarding' | 'home' | 'legal'>('onboarding');
+  const [tab, setTab] = useState<'onboarding' | 'home' | 'waterCare' | 'legal'>('onboarding');
   const [onboarding, setOnboarding] = useState<OnboardingConfig | null>(null);
   const [homeDashboard, setHomeDashboard] = useState<HomeDashboardConfig | null>(null);
+  const [waterCare, setWaterCare] = useState<WaterCareConfig | null>(null);
   const [dealerPhone, setDealerPhone] = useState('');
   const [dealerAddress, setDealerAddress] = useState('');
   const [termsUrl, setTermsUrl] = useState('');
@@ -125,6 +131,7 @@ export default function AdminAppSetupPage() {
         data?: {
           onboarding?: OnboardingConfig;
           homeDashboard?: HomeDashboardConfig;
+          waterCare?: WaterCareConfig;
           dealerContact?: DealerContact;
           legal?: Legal;
         };
@@ -139,6 +146,7 @@ export default function AdminAppSetupPage() {
           quickLinksLayout: hd.quickLinksLayout === 'double' ? 'double' : 'single',
         });
       }
+      if (body?.data?.waterCare) setWaterCare(body.data.waterCare);
       const dc = body?.data?.dealerContact;
       if (dc) {
         setDealerPhone(dc.phone ?? '');
@@ -298,6 +306,31 @@ export default function AdminAppSetupPage() {
     }
   }
 
+  async function saveWaterCare() {
+    if (!waterCare) return;
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const body = (await api.put('/admin/settings/app-setup', { waterCare })) as {
+        success?: boolean;
+        data?: { waterCare?: WaterCareConfig };
+        message?: string;
+      };
+      if (body?.data?.waterCare) setWaterCare(body.data.waterCare);
+      setSuccess(body.message ?? 'Saved');
+      setUnsavedChanges(false);
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === 'object' && 'error' in e
+          ? (e as { error?: { message?: string } }).error?.message
+          : 'Failed to save';
+      setError(msg ?? 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveLegal() {
     setSaving(true);
     setError(null);
@@ -335,7 +368,7 @@ export default function AdminAppSetupPage() {
     return <div className="flex items-center justify-center py-12">Loading...</div>;
   }
 
-  if (!onboarding || !homeDashboard) {
+    if (!onboarding || !homeDashboard || !waterCare) {
     return <div className="rounded-lg bg-red-50 p-4 text-red-700">{error || 'Could not load app setup.'}</div>;
   }
 
@@ -371,6 +404,15 @@ export default function AdminAppSetupPage() {
           }`}
         >
           Legal
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('waterCare')}
+          className={`pb-3 px-1 text-sm font-medium border-b-2 ${
+            tab === 'waterCare' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'
+          }`}
+        >
+          Water Care
         </button>
       </div>
 
@@ -861,6 +903,84 @@ export default function AdminAppSetupPage() {
             dealerAddress={dealerAddress}
             primaryColor={primaryColor}
           />
+        </div>
+      )}
+
+      {tab === 'waterCare' && (
+        <div className="card rounded-lg p-6 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Water Testing Tips</h3>
+            <p className="text-xs text-gray-500 mt-1">
+              These tips appear in the customer Water Care tab beneath the chemistry ranges.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Card title</label>
+            <input
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+              value={waterCare.testingTipsTitle}
+              onChange={(e) => {
+                markDirty();
+                setWaterCare((prev) => (prev ? { ...prev, testingTipsTitle: e.target.value } : prev));
+              }}
+              placeholder="Water Testing Tips"
+            />
+          </div>
+          <div className="space-y-3">
+            {waterCare.testingTips.map((tip, index) => (
+              <div key={index} className="flex gap-2">
+                <input
+                  className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
+                  value={tip.text}
+                  onChange={(e) => {
+                    markDirty();
+                    setWaterCare((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            testingTips: prev.testingTips.map((row, rowIndex) =>
+                              rowIndex === index ? { text: e.target.value } : row
+                            ),
+                          }
+                        : prev
+                    );
+                  }}
+                  placeholder="Tip text"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    markDirty();
+                    setWaterCare((prev) =>
+                      prev
+                        ? { ...prev, testingTips: prev.testingTips.filter((_, rowIndex) => rowIndex !== index) }
+                        : prev
+                    );
+                  }}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                markDirty();
+                setWaterCare((prev) =>
+                  prev ? { ...prev, testingTips: [...prev.testingTips, { text: '' }] } : prev
+                );
+              }}
+            >
+              + Add Tip
+            </Button>
+            <Button type="button" loading={saving} onClick={() => void saveWaterCare()}>
+              Save water care
+            </Button>
+          </div>
         </div>
       )}
 

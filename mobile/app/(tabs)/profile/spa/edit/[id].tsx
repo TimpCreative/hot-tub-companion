@@ -15,9 +15,7 @@ import { Button } from '../../../../../components/ui/Button';
 import api from '../../../../../services/api';
 import { useTenant } from '../../../../../contexts/TenantContext';
 import { useTheme } from '../../../../../theme/ThemeProvider';
-import { labelForSanitizer } from '../../../../../constants/sanitizationSystems';
-
-const SANITIZATION_KEYS = ['bromine', 'chlorine', 'frog_ease', 'copper', 'silver_mineral'] as const;
+import { labelForSanitationOption } from '../../../../../constants/sanitizationSystems';
 
 type SpaProfile = {
   id: string;
@@ -49,7 +47,16 @@ export default function EditSpaScreen() {
   const [usageMonths, setUsageMonths] = useState<number[]>([]);
   const [warrantyDate, setWarrantyDate] = useState('');
 
-  const sanitizerOptions = config?.sanitizationSystems ?? SANITIZATION_KEYS;
+  const sanitizerOptions =
+    config?.sanitationSystemOptions && config.sanitationSystemOptions.length > 0
+      ? config.sanitationSystemOptions
+      : [
+          { value: 'bromine', displayName: 'Bromine' },
+          { value: 'chlorine', displayName: 'Chlorine' },
+          { value: 'frog_ease', displayName: 'Frog @Ease' },
+          { value: 'copper', displayName: 'Copper' },
+          { value: 'silver_mineral', displayName: 'Silver / Mineral stick' },
+        ];
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -153,21 +160,23 @@ export default function EditSpaScreen() {
       </View>
 
       <View style={[styles.section, { backgroundColor: colors.contentBackground }]}>
-        <Text style={[styles.label, { color: colors.textMuted }]}>Sanitization system</Text>
+        <Text style={[styles.label, { color: colors.textMuted }]}>Sanitation system</Text>
         <Text style={[styles.warning, { color: colors.textMuted }]}>
-          Changing your sanitization system will update your product recommendations.
+          Changing your sanitation system will update your product recommendations.
         </Text>
-        {sanitizerOptions.map((key) => (
+        {sanitizerOptions.map((option) => (
           <TouchableOpacity
-            key={key}
+            key={option.value}
             style={[
               styles.option,
               { borderColor: colors.border },
-              sanitizationSystem === key && { borderColor: colors.primary, backgroundColor: `${colors.primary}20` },
+              sanitizationSystem === option.value && { borderColor: colors.primary, backgroundColor: `${colors.primary}20` },
             ]}
-            onPress={() => setSanitizationSystem(key)}
+            onPress={() => setSanitizationSystem(option.value)}
           >
-            <Text style={[styles.optionText, { color: colors.text }]}>{labelForSanitizer(key)}</Text>
+            <Text style={[styles.optionText, { color: colors.text }]}>
+              {labelForSanitationOption(option.value, sanitizerOptions)}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>

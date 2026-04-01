@@ -15,6 +15,7 @@ const UHTD_NAV = [
   { label: 'Comps', href: '/super-admin/uhtd/comps' },
   { label: 'Categories', href: '/super-admin/uhtd/categories' },
   { label: 'Qualifiers', href: '/super-admin/uhtd/qualifiers' },
+  { label: 'Water Care', href: '/super-admin/uhtd/water-care' },
   { label: 'Import', href: '/super-admin/uhtd/import' },
   { label: 'Review Queue', href: '/super-admin/uhtd/review-queue' },
 ];

@@ -117,6 +117,7 @@ export default function UhtdOverviewPage() {
     { label: 'Add Spa', href: '/super-admin/uhtd/spas/new', color: 'teal' },
     { label: 'Add Part', href: '/super-admin/uhtd/parts/new', color: 'green' },
     { label: 'Create Comp', href: '/super-admin/uhtd/comps/new', color: 'purple' },
+    { label: 'Water Care', href: '/super-admin/uhtd/water-care', color: 'blue' },
     { label: 'Import CSV', href: '/super-admin/uhtd/import', color: 'orange' },
   ];
 

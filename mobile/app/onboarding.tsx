@@ -22,7 +22,7 @@ import { Button } from '../components/ui/Button';
 import api from '../services/api';
 import { clearSetupSkippedFlag, setSetupSkippedFlag } from '../lib/setupSkippedStorage';
 import { getWelcomeSeenFlag } from '../lib/welcomeSeenStorage';
-import { labelForSanitizer } from '../constants/sanitizationSystems';
+import { labelForSanitationOption } from '../constants/sanitizationSystems';
 
 type ScdbBrand = { id: string; name: string };
 type SpaModelHit = {
@@ -84,9 +84,17 @@ export default function OnboardingScreen() {
   const [shareWaterTestsWithRetailer, setShareWaterTestsWithRetailer] = useState(true);
 
   const sanitizerOptions = useMemo(() => {
-    const list = config?.sanitizationSystems ?? [];
-    return list.length > 0 ? list : ['bromine', 'chlorine', 'frog_ease', 'copper', 'silver_mineral'];
-  }, [config?.sanitizationSystems]);
+    const list = config?.sanitationSystemOptions ?? [];
+    return list.length > 0
+      ? list
+      : [
+          { value: 'bromine', displayName: 'Bromine' },
+          { value: 'chlorine', displayName: 'Chlorine' },
+          { value: 'frog_ease', displayName: 'Frog @Ease' },
+          { value: 'copper', displayName: 'Copper' },
+          { value: 'silver_mineral', displayName: 'Silver / Mineral stick' },
+        ];
+  }, [config?.sanitationSystemOptions]);
 
   useEffect(() => {
     if (!showBrand) return;
@@ -142,7 +150,7 @@ export default function OnboardingScreen() {
 
   useEffect(() => {
     if (!showSanitizer && sanitizerOptions.length > 0 && !useCustomSanitizer) {
-      setSanitizer(sanitizerOptions[0]);
+      setSanitizer(sanitizerOptions[0].value);
     }
   }, [showSanitizer, sanitizerOptions, useCustomSanitizer]);
 
@@ -176,7 +184,7 @@ export default function OnboardingScreen() {
   async function handleSubmit() {
     setError(null);
     if (!modelOk || !sanitizerOk || !brandOk) {
-      setError('Fill in make, model, and sanitizer to continue.');
+      setError('Fill in make, model, and sanitation system to continue.');
       return;
     }
     setSubmitting(true);
@@ -445,12 +453,12 @@ export default function OnboardingScreen() {
 
           {showSanitizer ? (
             <View style={styles.field}>
-              <Text style={styles.label}>Sanitizer System</Text>
+              <Text style={styles.label}>Sanitation System</Text>
               {useCustomSanitizer ? (
                 <>
                   <TextInput
                     style={[styles.textInput, { backgroundColor: inputWell, borderColor: inputWell, minHeight: 80 }]}
-                    placeholder="Describe your sanitizer system"
+                    placeholder="Describe your sanitation system"
                     placeholderTextColor="#888"
                     value={customSanitizerNote}
                     onChangeText={setCustomSanitizerNote}
@@ -476,7 +484,7 @@ export default function OnboardingScreen() {
                     accessibilityRole="button"
                   >
                     <Text style={sanitizer ? styles.inputText : styles.placeholder}>
-                      {sanitizer ? labelForSanitizer(sanitizer) : 'Select sanitizer'}
+                      {sanitizer ? labelForSanitationOption(sanitizer, sanitizerOptions) : 'Select sanitation system'}
                     </Text>
                     <Text style={styles.chevron}>v</Text>
                   </TouchableOpacity>
@@ -658,21 +666,21 @@ export default function OnboardingScreen() {
       <Modal visible={sanitizerModal} animationType="slide" transparent>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Sanitizer system</Text>
+            <Text style={styles.modalTitle}>Sanitation system</Text>
             <FlatList
               data={sanitizerOptions}
-              keyExtractor={(item) => item}
+              keyExtractor={(item) => item.value}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.modalRow}
                   onPress={() => {
                     setUseCustomSanitizer(false);
                     setCustomSanitizerNote('');
-                    setSanitizer(item);
+                    setSanitizer(item.value);
                     setSanitizerModal(false);
                   }}
                 >
-                  <Text style={styles.modalRowText}>{labelForSanitizer(item)}</Text>
+                  <Text style={styles.modalRowText}>{item.displayName}</Text>
                 </TouchableOpacity>
               )}
               ListFooterComponent={

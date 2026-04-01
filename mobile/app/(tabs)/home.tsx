@@ -11,6 +11,7 @@ import { QuickLinksGrid } from '../../components/home/QuickLinksGrid';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTenant } from '../../contexts/TenantContext';
 import { useFinishSetupNudge } from '../../hooks/useFinishSetupNudge';
+import { labelForSanitationOption } from '../../constants/sanitizationSystems';
 import { shiftHueSaturateHex } from '../../lib/colorUtils';
 import { DEFAULT_HOME_DASHBOARD } from '../../lib/homeDashboardDefaults';
 import api from '../../services/api';
@@ -117,7 +118,9 @@ export default function Home() {
             <Text style={styles.spaTitle}>{spaSummaryLine(spa)}</Text>
             {spa.nickname ? <Text style={styles.spaNick}>{spa.nickname}</Text> : null}
             {spa.sanitizationSystem ? (
-              <Text style={styles.spaMeta}>Sanitizer: {spa.sanitizationSystem.replace(/_/g, ' ')}</Text>
+              <Text style={styles.spaMeta}>
+                Sanitation: {labelForSanitationOption(spa.sanitizationSystem, config?.sanitationSystemOptions)}
+              </Text>
             ) : null}
           </View>
         ) : user ? (

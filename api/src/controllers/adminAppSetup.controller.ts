@@ -11,6 +11,10 @@ import {
   type HomeDashboardConfigDTO,
   mapDealerContact,
 } from '../services/homeDashboardConfig.service';
+import {
+  normalizeWaterCareConfig,
+  type WaterCareConfigDTO,
+} from '../services/waterCareConfig.service';
 
 function requireManageSettings(req: Request, res: Response): boolean {
   const role = (req as any).adminRole as Record<string, unknown> | undefined;
@@ -39,6 +43,7 @@ export async function getAppSetup(req: Request, res: Response): Promise<void> {
   success(res, {
     onboarding: normalizeOnboardingConfig(tenant.onboarding_config),
     homeDashboard: normalizeHomeDashboardConfig(tenant.home_dashboard_config),
+    waterCare: normalizeWaterCareConfig((tenant as { water_care_config?: unknown }).water_care_config),
     dealerContact: mapDealerContact(tenant),
     legal: {
       termsUrl: (tenant as any).terms_url?.trim() || null,
@@ -64,6 +69,7 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
   const body = req.body as {
     onboarding?: OnboardingConfigDTO;
     homeDashboard?: HomeDashboardConfigDTO;
+    waterCare?: WaterCareConfigDTO;
     dealerContact?: { phone?: string | null; address?: string | null };
     legal?: { termsUrl?: string | null; privacyUrl?: string | null };
   };
@@ -79,8 +85,10 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
     typeof body.legal === 'object' &&
     (body.legal.termsUrl !== undefined || body.legal.privacyUrl !== undefined);
 
-  if (!hasOnboarding && !hasHome && !hasDealer && !hasLegal) {
-    error(res, 'VALIDATION_ERROR', 'Provide onboarding, homeDashboard, dealerContact, and/or legal', 400);
+  const hasWaterCare = body.waterCare && typeof body.waterCare === 'object';
+
+  if (!hasOnboarding && !hasHome && !hasDealer && !hasLegal && !hasWaterCare) {
+    error(res, 'VALIDATION_ERROR', 'Provide onboarding, homeDashboard, waterCare, dealerContact, and/or legal', 400);
     return;
   }
 
@@ -92,6 +100,9 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
   if (hasHome) {
     const currentHd = normalizeHomeDashboardConfig(tenant.home_dashboard_config);
     update.home_dashboard_config = mergePartialHomeDashboard(currentHd, body.homeDashboard);
+  }
+  if (hasWaterCare) {
+    update.water_care_config = normalizeWaterCareConfig(body.waterCare);
   }
   if (hasDealer) {
     const dc = body.dealerContact!;
@@ -123,6 +134,7 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
     {
       onboarding: normalizeOnboardingConfig(next!.onboarding_config),
       homeDashboard: normalizeHomeDashboardConfig(next!.home_dashboard_config),
+      waterCare: normalizeWaterCareConfig((next as { water_care_config?: unknown }).water_care_config),
       dealerContact: mapDealerContact(next!),
       legal: {
         termsUrl: (next as any).terms_url?.trim() || null,

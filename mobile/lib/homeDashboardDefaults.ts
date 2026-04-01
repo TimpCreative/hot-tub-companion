@@ -29,7 +29,7 @@ export const DEFAULT_HOME_DASHBOARD: HomeDashboardConfig = {
         title: 'Tips from Our Experts',
         subtitle: 'Recommendations for your spa',
         items: [
-          { title: 'Test water weekly', body: 'For your sanitizer system, test pH and sanitizer levels weekly.' },
+          { title: 'Test water weekly', body: 'For your sanitation system, test pH and sanitizer levels weekly.' },
           { title: 'Clean filters monthly', body: 'Rinse your filters with a hose every month — we can help!' },
           { title: 'Schedule annual service', body: 'Let certified techs keep your spa running smoothly.' },
         ],

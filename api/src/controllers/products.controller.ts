@@ -154,7 +154,8 @@ export async function listCompatibleProducts(req: Request, res: Response): Promi
 
   // Resolve sanitization_system qualifier id
   const sanitizationQualifier = await db('qdb_qualifiers')
-    .where({ name: 'sanitization_system' })
+    .whereIn('name', ['sanitation_system', 'sanitization_system'])
+    .orderByRaw(`CASE WHEN name = 'sanitation_system' THEN 0 ELSE 1 END`)
     .select('id')
     .first();
 

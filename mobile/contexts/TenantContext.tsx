@@ -49,6 +49,20 @@ export interface DealerContact {
   address: string | null;
 }
 
+export interface SanitationSystemOption {
+  value: string;
+  displayName: string;
+}
+
+export interface WaterCareTip {
+  text: string;
+}
+
+export interface WaterCareConfig {
+  testingTipsTitle: string;
+  testingTips: WaterCareTip[];
+}
+
 interface TenantConfig {
   tenantId: string;
   name: string;
@@ -66,8 +80,10 @@ interface TenantConfig {
   features: Record<string, boolean>;
   serviceTypes: unknown[];
   sanitizationSystems: string[];
+  sanitationSystemOptions?: SanitationSystemOption[];
   onboarding?: TenantOnboardingConfig;
   homeDashboard?: HomeDashboardConfig;
+  waterCare?: WaterCareConfig;
   dealerContact?: DealerContact;
   termsUrl?: string | null;
   privacyUrl?: string | null;

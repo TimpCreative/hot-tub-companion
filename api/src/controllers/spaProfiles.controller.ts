@@ -3,8 +3,7 @@ import { db } from '../config/database';
 import { success, error } from '../utils/response';
 import * as scdbService from '../services/scdb.service';
 import * as notificationService from '../services/notification.service';
-
-const SANITIZATION_SYSTEMS = ['bromine', 'chlorine', 'frog_ease', 'copper', 'silver_mineral'] as const;
+import { getSanitationSystemValues, isValidSanitationSystem } from '../services/sanitationSystem.service';
 
 function mapProfile(row: Record<string, unknown>) {
   return {
@@ -84,8 +83,9 @@ export async function createSpaProfile(req: Request, res: Response): Promise<voi
     error(res, 'VALIDATION_ERROR', 'sanitizationSystem is required', 400);
     return;
   }
-  if (!SANITIZATION_SYSTEMS.includes(body.sanitizationSystem as (typeof SANITIZATION_SYSTEMS)[number])) {
-    error(res, 'VALIDATION_ERROR', `Invalid sanitizationSystem. Allowed: ${SANITIZATION_SYSTEMS.join(', ')}`, 400);
+  if (!(await isValidSanitationSystem(body.sanitizationSystem))) {
+    const allowed = await getSanitationSystemValues();
+    error(res, 'VALIDATION_ERROR', `Invalid sanitizationSystem. Allowed: ${allowed.join(', ')}`, 400);
     return;
   }
 
@@ -177,8 +177,9 @@ export async function updateSpaProfile(req: Request, res: Response): Promise<voi
   const update: Record<string, unknown> = { updated_at: db.fn.now() };
 
   if (body.sanitizationSystem !== undefined) {
-    if (typeof body.sanitizationSystem !== 'string' || !SANITIZATION_SYSTEMS.includes(body.sanitizationSystem as (typeof SANITIZATION_SYSTEMS)[number])) {
-      error(res, 'VALIDATION_ERROR', `Invalid sanitizationSystem. Allowed: ${SANITIZATION_SYSTEMS.join(', ')}`, 400);
+    if (typeof body.sanitizationSystem !== 'string' || !(await isValidSanitationSystem(body.sanitizationSystem))) {
+      const allowed = await getSanitationSystemValues();
+      error(res, 'VALIDATION_ERROR', `Invalid sanitizationSystem. Allowed: ${allowed.join(', ')}`, 400);
       return;
     }
     update.sanitization_system = body.sanitizationSystem;
