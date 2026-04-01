@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import api from '../services/api';
-import { Button } from '../components/ui/Button';
-import { useTheme } from '../theme/ThemeProvider';
+import api from '../../services/api';
+import { Button } from '../../components/ui/Button';
+import { useTheme } from '../../theme/ThemeProvider';
 
 type SpaProfile = {
   id: string;

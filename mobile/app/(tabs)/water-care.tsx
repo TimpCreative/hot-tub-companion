@@ -359,11 +359,12 @@ const styles = StyleSheet.create({
   actionCard: {
     borderWidth: 1,
     borderRadius: 18,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
-    minHeight: 118,
+    minHeight: 100,
   },
   actionIconWrap: {
     width: 64,
