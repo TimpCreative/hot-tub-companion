@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppPageHeader } from '../../components/AppPageHeader';
+import { AppHeroHeader } from '../../components/AppHeroHeader';
 import { useTenant } from '../../contexts/TenantContext';
 import type { DealerActionButton, DealerLatestItem, DealerServiceItem } from '../../contexts/TenantContext';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -73,6 +73,7 @@ export default function DealerScreen() {
   const address = dealerContact?.address ?? null;
   const email = dealerContact?.email ?? null;
   const hours = dealerContact?.hours ?? null;
+  const logoUrl = config?.branding?.logoUrl ?? config?.branding?.iconUrl ?? null;
 
   async function handleAction(action: {
     actionType: string;
@@ -114,10 +115,16 @@ export default function DealerScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
-        <AppPageHeader title={name} subtitle="Your trusted hot tub care partner" />
+        <AppHeroHeader title={name} subtitle="Your trusted hot tub care partner" />
 
         <View style={[styles.card, { backgroundColor: colors.contentBackground, borderColor: colors.border }]}>
-          {dealerPage.dealerInfo.showName ? <Text style={[styles.dealerName, { color: colors.text }]}>{name}</Text> : null}
+          {logoUrl ? (
+            <View style={styles.logoWrap}>
+              <Image source={{ uri: logoUrl }} style={styles.logo} resizeMode="contain" />
+            </View>
+          ) : dealerPage.dealerInfo.showName ? (
+            <Text style={[styles.dealerName, { color: colors.text }]}>{name}</Text>
+          ) : null}
           <View style={styles.infoList}>
             {dealerPage.dealerInfo.showAddress && address ? (
               <View style={styles.infoRow}>
@@ -259,10 +266,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 18,
   },
+  logoWrap: {
+    marginBottom: 16,
+    width: 184,
+    height: 58,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  logo: {
+    width: 220,
+    height: 58,
+    marginLeft: -18,
+  },
   dealerName: {
-    fontSize: 28,
+    fontSize: 18,
     fontWeight: '700',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   infoList: {
     gap: 14,

@@ -8,6 +8,26 @@
 
 ---
 
+## Phase 3 Status Review (current)
+
+| Area | Status | Notes |
+|------|--------|-------|
+| **Commerce (Shop / cart / checkout)** | ❌ | Still planned in this phase |
+| **Referral program** | ❌ | Still planned in this phase |
+| **Water Care Assistant** | ❌ | Still planned in this phase |
+| **Seasonal maintenance timeline** | ❌ | Still planned in this phase |
+| **Content system** | ✅ Partial | Core universal + retailer content platform is shipped; contextual recommendation/search refinements remain |
+| **Subscription management** | ❌ | Still planned in this phase |
+| **Cross-platform QA** | ⏳ | Ongoing as features ship |
+
+### Content shipped from this phase
+
+- Super Admin **Content Library** and retailer **Content** management screens are live
+- Universal + retailer-authored content supports targeting, categories, suppression, and publish workflows
+- Mobile app renders content detail and list surfaces from tenant-aware content APIs
+
+---
+
 ## Manual Steps Required (Do These First)
 
 **Commerce / pilot (from former Phase 2 manual checklist)**
@@ -56,7 +76,7 @@ Work is grouped **below** for clarity; later parts of this document retain detai
    Push triggers, recurring tasks.
 
 5. **Content system**  
-   Universal + retailer content, filtering by spa / sanitization.
+   Core content management is already live (universal + retailer content, targeting, categories, suppression, mobile rendering). Remaining work in this phase is search/recommendation depth and contextual placement refinement.
 
 6. **Subscription management (Chewy-style)**  
    Internal engine, bundles, deliveries — as specified in Part 4 of this doc.
@@ -281,6 +301,8 @@ DELETE /api/v1/maintenance/:id  (only custom events)
 ---
 
 ## Part 3: Content System
+
+> **Current status:** The core content platform in this section is already implemented in shipped form: Super Admin Content Library, retailer content management, universal/tenant targeting, category management, suppression, and mobile content rendering are live. Remaining work here should focus on recommendation quality, contextual surfacing, and any follow-on search/ranking improvements.
 
 ### 3.1 Database Table
 

@@ -26,7 +26,7 @@ Commercial entitlements (Base / Core / Advanced presets, manual upgrades, TAB on
 | **Push notifications** | ✅ **Done** | Expo Push Token + API registration (all platforms); backend sends via **Expo Push API** or **FCM** by token type; cron dispatch; Admin compose UI; deep links; images; user-local scheduling. *(Retail “all customers” requires a **customer** session — admin/whitelist logins do not register device tokens.)* |
 | **Profile & settings** | ✅ | Account, My Spas, notifications, privacy, app info, sign out |
 | **Edit spa flow** | ✅ | Sanitization, usage months, serial, nickname, warranty |
-| **Retailer Admin app-setup** | ✅ | Onboarding config, home dashboard (Quick Links + widgets), dealer contact |
+| **Retailer Admin app-setup** | ✅ | Onboarding config, home dashboard editor, dealer page editor, live mobile previews |
 | **Retailer Admin dashboard UX** | ✅ | Dark/light mode toggle (light default), theme-aware styling, permission system |
 
 ### Next work (Phase 3)
@@ -67,7 +67,7 @@ Phase 2 is treated as **complete** for the following **customer and retailer-adm
 - **My Tub** home: hero + spa summary, **Quick Links**, tenant-configurable widgets (`dealer_card`, `tips_list`, `product_strip`), Retailer Admin home editor
 - **Push notifications** end-to-end (token registration, Expo/FCM send, cron, Admin compose, deep links, scheduling)
 - Profile: account, My Spas, notifications, privacy, app info, sign out; **edit spa** (sanitization, usage months, serial, nickname, warranty)
-- Retailer Admin: app setup (onboarding config), home dashboard, dealer contact, team/permissions, dark/light mode, notifications UX
+- Retailer Admin: app setup (onboarding config, home dashboard, dealer page), Settings-managed dealer contact, team/permissions, dark/light mode, notifications UX
 
 **Not in Phase 2:** in-app shop beyond placeholder, cart/checkout, home **info cards** (warranty / filter / seasonal / orders), **multi-spa** switching on Home/Shop, **orders/create** webhook → customer notification — all **Phase 3**.
 
@@ -83,8 +83,8 @@ Phase 2 is treated as **complete** for the following **customer and retailer-adm
 - **Skip:** `AsyncStorage` key `setup_skipped_v1`. While skipped and still no profiles, **Home** and **Shop** show a **Finish setup** banner with **Continue setup** → `/onboarding`. Completing setup removes the skip flag.
 - **Customer API:** `GET /api/v1/spa-profiles`, `POST /api/v1/spa-profiles` (Firebase Bearer + `x-tenant-key`). Body includes `uhtdSpaModelId`, `sanitizationSystem`; server fills `brand` / `model_line` / `model` / `year` from SCdb. **`POST /api/v1/consumer-uhtd-suggestions`** — queue-only submission + pending `spa_profile` (see above). Admin override users cannot use these endpoints (403).
 - **SCdb:** `GET /api/v1/scdb/brands`, `GET /api/v1/scdb/search?q=&brandId=` (optional `brandId` after make is chosen).
-- **Retailer Admin — App setup:** `GET/PUT /api/v1/admin/settings/app-setup` with `can_manage_settings`. Persists `tenants.onboarding_config` (jsonb): `{ version, allowSkip, steps[] }` with step ids `brand`, `modelPick`, `sanitizer`. **`modelPick` is always treated as enabled** in the API normalizer (spa profile requires a UHTD model).
-- **Tenant config:** `GET /api/v1/tenant/config` includes `onboarding`, **`homeDashboard`** (normalized from `tenants.home_dashboard_config`), **`dealerContact`** (`public_contact_phone` / `public_contact_address`), and **`features.tabInbox` / `features.tabDealer`** (optional tab visibility; default show). Mobile home renders widgets from `homeDashboard.widgets` with server-side validation and route whitelist.
+- **Retailer Admin — App setup:** `GET/PUT /api/v1/admin/settings/app-setup` with `can_manage_settings`. Persists `tenants.onboarding_config` plus normalized **`homeDashboard`** and **`dealerPage`** config for mobile rendering and admin preview. **`modelPick` is always treated as enabled** in the API normalizer (spa profile requires a UHTD model).
+- **Tenant config:** `GET /api/v1/tenant/config` includes `onboarding`, **`homeDashboard`**, **`dealerContact`** (public phone / address / email / hours), **`dealerPage`**, and **`features.tabInbox` / `features.tabDealer`** (optional tab visibility; default show). Mobile home renders widgets from `homeDashboard.widgets`, and Dealer renders from `dealerPage`, both with server-side normalization.
 
 ---
 
@@ -241,7 +241,7 @@ After onboarding, the app uses a **bottom tab bar with 5 tabs** (IA-aligned):
 | 2 | Shop | Product browsing (MVP placeholder until catalog UI ships) |
 | 3 | Water Care | Water care hub (placeholder → Phase 3) |
 | 4 | Inbox | Messages (placeholder) — hidden if `features.tabInbox === false` |
-| 5 | Dealer | Dealership info (uses `dealerContact` from tenant) — hidden if `features.tabDealer === false` |
+| 5 | Dealer | Configurable dealership screen using `dealerContact` + `dealerPage` tenant config — hidden if `features.tabDealer === false` |
 
 **Profile** is **not** a tab: a **header right** control on tab roots (and the Services stack screen) opens **`/profile`**.
 
@@ -249,7 +249,7 @@ After onboarding, the app uses a **bottom tab bar with 5 tabs** (IA-aligned):
 
 The tab bar uses the retailer's primary color for the active tab indicator.
 
-**Retailer Admin — App setup:** besides onboarding, the **Home dashboard** tab edits `homeDashboard` and dealer public phone/address (`GET/PUT /api/v1/admin/settings/app-setup`).
+**Retailer Admin — configuration split:** App Setup edits **onboarding**, **home dashboard**, and **dealer page**. Shared public dealer contact fields (phone, address, email, hours) live under **Settings**, not App Setup.
 
 ### 2.2 Spa Selector (Global) — ❌ Not implemented
 
@@ -451,7 +451,7 @@ _Tenant branding below means **colors + icon URL** from tenant config (`ThemePro
 - [x] Profile settings are editable and persist
 - [x] Spa profile can be edited (sanitization, usage months, serial number, nickname, warranty in edit flow)
 - [x] App applies tenant branding (primary/secondary colors, logo/`iconUrl`)
-- [x] Retailer Admin can configure onboarding and home dashboard (Quick Links + widgets)
+- [x] Retailer Admin can configure onboarding, home dashboard, and dealer page; shared dealer contact fields are managed in Settings
 
 ---
 

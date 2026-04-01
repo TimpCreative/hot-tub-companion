@@ -7,6 +7,7 @@ import { useUnsavedChanges } from '@/contexts/UnsavedChangesContext';
 import { createTenantApiClient } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { HomeDashboardMockup } from '@/components/HomeDashboardMockup';
+import { MobilePreviewShell } from '@/components/MobilePreviewShell';
 
 type StepId = 'brand' | 'modelPick' | 'sanitizer';
 
@@ -1598,8 +1599,7 @@ export default function AdminAppSetupPage() {
             </Button>
           </div>
 
-          <div className="w-full max-w-sm shrink-0 rounded-3xl border border-gray-200 bg-gray-50 p-5 shadow-sm">
-            <div className="overflow-hidden rounded-[28px] border border-gray-300 bg-white">
+          <MobilePreviewShell>
               <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-6 text-white">
                 <div className="text-2xl font-semibold">{config?.name ?? 'Your retailer'}</div>
                 <div className="mt-2 text-sm text-white/90">Your trusted hot tub care partner</div>
@@ -1644,8 +1644,7 @@ export default function AdminAppSetupPage() {
                   </div>
                 ) : null}
               </div>
-            </div>
-          </div>
+          </MobilePreviewShell>
         </div>
       )}
 

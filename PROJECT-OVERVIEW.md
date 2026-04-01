@@ -66,7 +66,7 @@ TimpCreative manages a single multi-tenant backend that powers all retailer apps
 These are the core entities. Each phase file contains detailed schemas for the tables it introduces.
 
 ### Tenant (Retailer)
-- `id`, `name`, `slug` (for subdomain), branding config (colors, logos, fonts), feature flags, POS connection credentials, Shopify store URL, fulfillment preference, contract details.
+- `id`, `name`, `slug` (for subdomain), branding config (colors, logos, fonts), feature flags, POS connection credentials, Shopify store URL, fulfillment preference, contract details, onboarding config, home dashboard config, dealer page config, and shared public dealer contact details.
 
 ### User (Customer)
 - `id`, `tenant_id`, `email`, `name`, `phone`, `address`, Firebase UID, notification preferences, loyalty points, referral code.
@@ -96,7 +96,10 @@ These are the core entities. Each phase file contains detailed schemas for the t
 - `id`, `user_id`, `tenant_id`, `spa_profile_id`, managed_by (shopify | internal), `shopify_subscription_id` (nullable), `items` (JSON array of product + quantity), `frequency`, `next_delivery_date`, `status` (active, paused, cancelled), `pause_reason`, `discount_percentage`.
 
 ### Content
-- `id`, `tenant_id` (nullable for universal content), `title`, `type` (article | video), `body` (for articles), `video_url` (YouTube link for videos), `target_brands` (array), `target_sanitization_systems` (array), `target_models` (array), `is_universal`, `priority` (retailer content > universal), `published_at`.
+- `content_items`: universal or retailer-authored articles/videos with title, summary, body/transcript, media metadata, targeting, publish state, and priority.
+- `content_categories` + `content_item_categories`: reusable taxonomy for organizing content across admin tools and the app.
+- `content_targets`: normalized brand / model line / spa model / sanitization / part-category targeting for personalized delivery.
+- `tenant_content_suppressions`: retailer-level suppression of universal content without editing the source record.
 
 ### Notification
 - `id`, `tenant_id`, `target` (all_users | specific_user | segment), `title`, `body`, `type` (maintenance | order | subscription | service | promotional), `scheduled_for`, `sent_at`, `created_by`.
@@ -159,7 +162,27 @@ TENANT_API_KEY=tab_live_xxxxxxxxxxxx
     "loyalty_program": true,
     "referral_program": false,
     "water_care_assistant": true,
-    "service_scheduling": true
+    "service_scheduling": true,
+    "tabInbox": true,
+    "tabDealer": true
+  },
+  "onboarding": {
+    "allowSkip": true,
+    "steps": ["brand", "modelPick", "sanitizer"]
+  },
+  "homeDashboard": {
+    "quickLinksLayout": "single",
+    "quickLinks": [],
+    "widgets": []
+  },
+  "dealerContact": {
+    "phone": "(801) 555-0123",
+    "address": "123 Main St, Springville, UT",
+    "email": "service@example.com",
+    "hours": "Mon-Fri 9am-6pm"
+  },
+  "dealerPage": {
+    "layout": { "actionButtonsLayout": "grid_2x2" }
   },
   "service_types": [
     { "id": "water_valet", "name": "Water Valet", "category": "water_valet", "description": "Chemical maintenance and filter changes" },
@@ -342,6 +365,10 @@ GET    /api/v1/admin/service-requests
 PUT    /api/v1/admin/service-requests/:id
 POST   /api/v1/admin/notifications/send
 GET    /api/v1/admin/analytics
+GET    /api/v1/admin/settings/app-setup
+PUT    /api/v1/admin/settings/app-setup
+GET    /api/v1/admin/settings/branding
+PUT    /api/v1/admin/settings/branding
 GET    /api/v1/admin/content
 POST   /api/v1/admin/content
 PUT    /api/v1/admin/content/:id

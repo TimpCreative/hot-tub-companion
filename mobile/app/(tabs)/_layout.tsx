@@ -55,6 +55,7 @@ export default function TabLayout() {
         name="dealer"
         options={{
           title: 'Dealer',
+          headerShown: false,
           href: hideDealer ? null : undefined,
           tabBarIcon: ({ color, size }) => <Ionicons name="storefront-outline" size={size} color={color} />,
         }}
