@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import api from '../../services/api';
+import { AppPageHeader } from '../../components/AppPageHeader';
 import { Button } from '../../components/ui/Button';
 import { useTheme } from '../../theme/ThemeProvider';
 
@@ -117,12 +118,14 @@ export default function WaterTestScreen() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={styles.content}>
-      <Text style={[styles.title, { color: colors.text }]}>Log a water test</Text>
-      {spa ? (
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {spa.nickname?.trim() || [spa.brand, spa.modelLine || spa.model, spa.year].filter(Boolean).join(' · ')}
-        </Text>
-      ) : null}
+      <AppPageHeader
+        title="Log a Water Test"
+        subtitle={
+          spa
+            ? spa.nickname?.trim() || [spa.brand, spa.modelLine || spa.model, spa.year].filter(Boolean).join(' · ')
+            : 'Add a spa first to log a water test.'
+        }
+      />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -180,8 +183,6 @@ export default function WaterTestScreen() {
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 20, gap: 16 },
-  title: { fontSize: 24, fontWeight: '700' },
-  subtitle: { fontSize: 14 },
   copy: { fontSize: 15, lineHeight: 22 },
   form: { gap: 14 },
   card: { borderRadius: 16, padding: 16, gap: 8 },

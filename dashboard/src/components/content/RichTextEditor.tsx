@@ -112,7 +112,7 @@ export function RichTextEditor({
     if (!editor) return;
     const currentHtml = normalizeHtml(editor.getHTML());
     if (currentHtml !== normalizedValue) {
-      editor.commands.setContent(normalizedValue, false);
+      editor.commands.setContent(normalizedValue, { emitUpdate: false });
     }
   }, [editor, normalizedValue]);
 

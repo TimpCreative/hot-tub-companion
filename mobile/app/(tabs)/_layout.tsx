@@ -1,13 +1,12 @@
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, TouchableOpacity } from 'react-native';
 import { useTenant } from '../../contexts/TenantContext';
+import { buildAppStackHeaderOptions, buildReplacementBackButton } from '../../lib/appHeader';
 
 const ACTIVE = '#1B4D7A';
 const INACTIVE = '#8E8E93';
 
 export default function TabLayout() {
-  const router = useRouter();
   const { config } = useTenant();
   const hideInbox = config?.features?.tabInbox === false;
   const hideDealer = config?.features?.tabDealer === false;
@@ -18,9 +17,7 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: primary,
         tabBarInactiveTintColor: INACTIVE,
-        headerShown: true,
-        headerStyle: { backgroundColor: primary },
-        headerTintColor: '#fff',
+        ...buildAppStackHeaderOptions(primary),
       }}
     >
       <Tabs.Screen
@@ -75,18 +72,7 @@ export default function TabLayout() {
         options={{
           title: 'Water Test',
           href: null,
-          headerShown: true,
-          headerStyle: { backgroundColor: primary },
-          headerTintColor: '#fff',
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => router.replace('/(tabs)/water-care')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-            >
-              <Ionicons name="chevron-back" size={20} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>Back</Text>
-            </TouchableOpacity>
-          ),
+          headerLeft: buildReplacementBackButton('/(tabs)/water-care'),
         }}
       />
       <Tabs.Screen
@@ -94,18 +80,7 @@ export default function TabLayout() {
         options={{
           title: 'Maintenance Log',
           href: null,
-          headerShown: true,
-          headerStyle: { backgroundColor: primary },
-          headerTintColor: '#fff',
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => router.replace('/(tabs)/water-care')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-            >
-              <Ionicons name="chevron-back" size={20} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>Back</Text>
-            </TouchableOpacity>
-          ),
+          headerLeft: buildReplacementBackButton('/(tabs)/water-care'),
         }}
       />
       <Tabs.Screen
@@ -113,18 +88,7 @@ export default function TabLayout() {
         options={{
           title: 'Guides & Videos',
           href: null,
-          headerShown: true,
-          headerStyle: { backgroundColor: primary },
-          headerTintColor: '#fff',
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => router.replace('/(tabs)/water-care')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-            >
-              <Ionicons name="chevron-back" size={20} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>Back</Text>
-            </TouchableOpacity>
-          ),
+          headerLeft: buildReplacementBackButton('/(tabs)/water-care'),
         }}
       />
       <Tabs.Screen
@@ -132,18 +96,7 @@ export default function TabLayout() {
         options={{
           title: 'Guide',
           href: null,
-          headerShown: true,
-          headerStyle: { backgroundColor: primary },
-          headerTintColor: '#fff',
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => router.replace('/(tabs)/water-guides')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-            >
-              <Ionicons name="chevron-back" size={20} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>Back</Text>
-            </TouchableOpacity>
-          ),
+          headerLeft: buildReplacementBackButton('/(tabs)/water-guides'),
         }}
       />
     </Tabs>

@@ -11,12 +11,11 @@ import {
   Alert,
   Animated,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
-import { shiftHueSaturateHex } from '../../../lib/colorUtils';
+import { AppHeroHeader } from '../../../components/AppHeroHeader';
 import { Button } from '../../../components/ui/Button';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useTenant } from '../../../contexts/TenantContext';
@@ -58,10 +57,7 @@ export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const { config } = useTenant();
   const { colors } = useTheme();
-
   const primaryHex = colors.primary ?? '#1B4D7A';
-  const gradientStart = shiftHueSaturateHex(primaryHex, 16, 1.25);
-  const gradientColors = [gradientStart, primaryHex] as const;
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [spaProfiles, setSpaProfiles] = useState<SpaProfile[]>([]);
@@ -147,18 +143,11 @@ export default function ProfileScreen() {
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
           scrollEventThrottle={16}
         >
-        <LinearGradient
-          colors={gradientColors}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.hero, { paddingTop: insets.top + 20, marginHorizontal: -24, marginTop: -24 }]}
-        >
-          <View style={styles.heroTitleRow}>
-            <Ionicons name="person-outline" size={28} color="#fff" />
-            <Text style={styles.heroTitle}>Profile</Text>
-          </View>
-          <Text style={styles.heroSubtitle}>Manage your hot tub information</Text>
-        </LinearGradient>
+        <AppHeroHeader
+          icon="person-outline"
+          title="Profile"
+          subtitle="Manage your hot tub information"
+        />
         {staffAppLogin ? (
           <View style={[styles.section, { backgroundColor: colors.contentBackground }]}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Staff login</Text>
@@ -273,14 +262,6 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  hero: {
-    paddingHorizontal: 24,
-    paddingBottom: 28,
-    marginBottom: 20,
-  },
-  heroTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  heroTitle: { fontSize: 28, fontWeight: '700', color: '#fff' },
-  heroSubtitle: { fontSize: 15, color: 'rgba(255,255,255,0.9)', marginTop: 4 },
   scroll: { flex: 1 },
   scrollContent: { padding: 24 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },

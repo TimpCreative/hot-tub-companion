@@ -47,6 +47,73 @@ export interface HomeDashboardConfig {
 export interface DealerContact {
   phone: string | null;
   address: string | null;
+  email: string | null;
+  hours: string | null;
+}
+
+export type DealerActionType = 'call' | 'directions' | 'message' | 'book_service' | 'chat' | 'external_url';
+
+export interface DealerActionButton {
+  id: string;
+  enabled: boolean;
+  label: string;
+  iconKey: string;
+  actionType: DealerActionType;
+  actionValue?: string | null;
+  order: number;
+}
+
+export interface DealerServiceItem {
+  id: string;
+  enabled: boolean;
+  title: string;
+  body: string;
+  iconKey: string;
+  order: number;
+}
+
+export interface DealerLatestItem {
+  id: string;
+  enabled: boolean;
+  title: string;
+  body: string;
+  accentColor?: string;
+  order: number;
+}
+
+export interface DealerPageConfig {
+  version: number;
+  layout: {
+    actionButtonsLayout: 'grid_2x2' | 'single';
+  };
+  dealerInfo: {
+    showName: boolean;
+    showAddress: boolean;
+    showPhone: boolean;
+    showEmail: boolean;
+    showHours: boolean;
+  };
+  actionButtons: DealerActionButton[];
+  servicesBlock: {
+    enabled: boolean;
+    title: string;
+    subtitle?: string;
+    items: DealerServiceItem[];
+  };
+  assistanceBlock: {
+    enabled: boolean;
+    title: string;
+    body: string;
+    buttonLabel: string;
+    actionType: 'chat' | 'call' | 'external_url';
+    actionValue?: string | null;
+  };
+  latestBlock: {
+    enabled: boolean;
+    title: string;
+    subtitle?: string;
+    items: DealerLatestItem[];
+  };
 }
 
 export interface SanitationSystemOption {
@@ -85,6 +152,7 @@ interface TenantConfig {
   homeDashboard?: HomeDashboardConfig;
   waterCare?: WaterCareConfig;
   dealerContact?: DealerContact;
+  dealerPage?: DealerPageConfig;
   termsUrl?: string | null;
   privacyUrl?: string | null;
 }

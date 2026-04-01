@@ -8,9 +8,11 @@ export interface DealerCardProps {
   tenantName: string;
   phone: string | null;
   address: string | null;
+  title?: string;
+  subtitle?: string;
 }
 
-export function DealerCardWidget({ tenantName, phone, address }: DealerCardProps) {
+export function DealerCardWidget({ tenantName, phone, address, title = 'Your dealership', subtitle = 'We are here to help' }: DealerCardProps) {
   const router = useRouter();
   const { colors, typography, spacing } = useTheme();
 
@@ -37,9 +39,10 @@ export function DealerCardWidget({ tenantName, phone, address }: DealerCardProps
     >
       <View style={styles.titleRow}>
         <Ionicons name="business-outline" size={20} color={primaryHex} style={{ marginRight: 8 }} />
-        <Text style={[typography.h3, { color: colors.text, fontSize: 17 }]}>Your dealership</Text>
+        <Text style={[typography.h3, { color: colors.text, fontSize: 17 }]}>{title}</Text>
       </View>
-      <Text style={[typography.body, { color: colors.textSecondary }]}>{tenantName}</Text>
+      <Text style={[typography.body, { color: colors.textSecondary }]}>{subtitle}</Text>
+      <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>{tenantName}</Text>
       {phone ? (
         <Text style={[typography.body, { color: colors.primary, marginTop: 8 }]}>{phone}</Text>
       ) : null}

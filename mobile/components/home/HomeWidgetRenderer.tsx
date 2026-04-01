@@ -42,6 +42,8 @@ export function HomeWidgetRenderer({
           tenantName={tenantName}
           phone={dealerContact?.phone ?? null}
           address={dealerContact?.address ?? null}
+          title={str(props.title) || 'Your Dealership'}
+          subtitle={str(props.subtitle) || 'We are here to help'}
         />
       );
     case 'tips_list': {

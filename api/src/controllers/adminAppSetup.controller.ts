@@ -15,6 +15,10 @@ import {
   normalizeWaterCareConfig,
   type WaterCareConfigDTO,
 } from '../services/waterCareConfig.service';
+import {
+  normalizeDealerPageConfig,
+  type DealerPageConfigDTO,
+} from '../services/dealerPageConfig.service';
 
 function requireManageSettings(req: Request, res: Response): boolean {
   const role = (req as any).adminRole as Record<string, unknown> | undefined;
@@ -45,6 +49,7 @@ export async function getAppSetup(req: Request, res: Response): Promise<void> {
     homeDashboard: normalizeHomeDashboardConfig(tenant.home_dashboard_config),
     waterCare: normalizeWaterCareConfig((tenant as { water_care_config?: unknown }).water_care_config),
     dealerContact: mapDealerContact(tenant),
+    dealerPage: normalizeDealerPageConfig((tenant as { dealer_page_config?: unknown }).dealer_page_config),
     legal: {
       termsUrl: (tenant as any).terms_url?.trim() || null,
       privacyUrl: (tenant as any).privacy_url?.trim() || null,
@@ -70,7 +75,8 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
     onboarding?: OnboardingConfigDTO;
     homeDashboard?: HomeDashboardConfigDTO;
     waterCare?: WaterCareConfigDTO;
-    dealerContact?: { phone?: string | null; address?: string | null };
+    dealerContact?: { phone?: string | null; address?: string | null; email?: string | null; hours?: string | null };
+    dealerPage?: DealerPageConfigDTO;
     legal?: { termsUrl?: string | null; privacyUrl?: string | null };
   };
 
@@ -79,16 +85,22 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
   const hasDealer =
     body.dealerContact &&
     typeof body.dealerContact === 'object' &&
-    (body.dealerContact.phone !== undefined || body.dealerContact.address !== undefined);
+    (
+      body.dealerContact.phone !== undefined ||
+      body.dealerContact.address !== undefined ||
+      body.dealerContact.email !== undefined ||
+      body.dealerContact.hours !== undefined
+    );
   const hasLegal =
     body.legal &&
     typeof body.legal === 'object' &&
     (body.legal.termsUrl !== undefined || body.legal.privacyUrl !== undefined);
 
   const hasWaterCare = body.waterCare && typeof body.waterCare === 'object';
+  const hasDealerPage = body.dealerPage && typeof body.dealerPage === 'object';
 
-  if (!hasOnboarding && !hasHome && !hasDealer && !hasLegal && !hasWaterCare) {
-    error(res, 'VALIDATION_ERROR', 'Provide onboarding, homeDashboard, waterCare, dealerContact, and/or legal', 400);
+  if (!hasOnboarding && !hasHome && !hasDealer && !hasLegal && !hasWaterCare && !hasDealerPage) {
+    error(res, 'VALIDATION_ERROR', 'Provide onboarding, homeDashboard, waterCare, dealerContact, dealerPage, and/or legal', 400);
     return;
   }
 
@@ -115,6 +127,17 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
         dc.address === null || dc.address === '' ? null : String(dc.address).trim().slice(0, 2000);
       update.public_contact_address = a;
     }
+    if (dc.email !== undefined) {
+      const e = dc.email === null || dc.email === '' ? null : String(dc.email).trim().slice(0, 320);
+      update.public_contact_email = e;
+    }
+    if (dc.hours !== undefined) {
+      const h = dc.hours === null || dc.hours === '' ? null : String(dc.hours).trim().slice(0, 2000);
+      update.public_contact_hours = h;
+    }
+  }
+  if (hasDealerPage) {
+    update.dealer_page_config = normalizeDealerPageConfig(body.dealerPage);
   }
   if (hasLegal) {
     const legal = body.legal!;
@@ -136,6 +159,7 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
       homeDashboard: normalizeHomeDashboardConfig(next!.home_dashboard_config),
       waterCare: normalizeWaterCareConfig((next as { water_care_config?: unknown }).water_care_config),
       dealerContact: mapDealerContact(next!),
+      dealerPage: normalizeDealerPageConfig((next as { dealer_page_config?: unknown }).dealer_page_config),
       legal: {
         termsUrl: (next as any).terms_url?.trim() || null,
         privacyUrl: (next as any).privacy_url?.trim() || null,

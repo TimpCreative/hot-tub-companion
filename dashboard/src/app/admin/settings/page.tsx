@@ -2,15 +2,52 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTenant } from '@/contexts/TenantContext';
 import { useUnsavedChanges } from '@/contexts/UnsavedChangesContext';
 import { createTenantApiClient } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { TenantMediaInput } from '@/components/ui/TenantMediaInput';
 
+interface DealerContactResponse {
+  phone?: string | null;
+  address?: string | null;
+  email?: string | null;
+  hours?: string | null;
+}
+
+interface BrandingResponse {
+  primaryColor?: string;
+  secondaryColor?: string;
+  logoUrl?: string;
+  iconUrl?: string;
+  timezone?: string;
+}
+
+interface SettingsResponse {
+  success?: boolean;
+  message?: string;
+  error?: { message?: string };
+  data?: {
+    branding?: BrandingResponse;
+    dealerContact?: DealerContactResponse;
+  };
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error && typeof error === 'object') {
+    if ('error' in error) {
+      const nested = (error as { error?: { message?: string } }).error?.message;
+      if (nested) return nested;
+    }
+    if ('message' in error) {
+      const message = (error as { message?: string }).message;
+      if (message) return message;
+    }
+  }
+  return fallback;
+}
+
 export default function AdminSettingsPage() {
   const { getIdToken } = useAuth();
-  const { config, loading } = useTenant();
   const { setUnsavedChanges } = useUnsavedChanges();
 
   const api = useMemo(() => createTenantApiClient(async () => await getIdToken()), [getIdToken]);
@@ -20,20 +57,42 @@ export default function AdminSettingsPage() {
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [iconUrl, setIconUrl] = useState<string>('');
   const [timezone, setTimezone] = useState<string>('America/Denver');
+  const [dealerPhone, setDealerPhone] = useState<string>('');
+  const [dealerAddress, setDealerAddress] = useState<string>('');
+  const [dealerEmail, setDealerEmail] = useState<string>('');
+  const [dealerHours, setDealerHours] = useState<string>('');
 
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!config) return;
-    setPrimaryColor(config.branding.primaryColor || '#1B4D7A');
-    setSecondaryColor(config.branding.secondaryColor || '#E8A832');
-    setLogoUrl(config.branding.logoUrl || '');
-    setIconUrl(config.branding.iconUrl || '');
-    setTimezone(config.branding?.timezone ?? config.timezone ?? 'America/Denver');
-    setUnsavedChanges(false);
-  }, [config, setUnsavedChanges]);
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await api.get('/admin/settings/branding') as SettingsResponse;
+        const branding = res?.data?.branding;
+        const dealerContact = res?.data?.dealerContact;
+        setPrimaryColor(branding?.primaryColor || '#1B4D7A');
+        setSecondaryColor(branding?.secondaryColor || '#E8A832');
+        setLogoUrl(branding?.logoUrl || '');
+        setIconUrl(branding?.iconUrl || '');
+        setTimezone(branding?.timezone ?? 'America/Denver');
+        setDealerPhone(dealerContact?.phone ?? '');
+        setDealerAddress(dealerContact?.address ?? '');
+        setDealerEmail(dealerContact?.email ?? '');
+        setDealerHours(dealerContact?.hours ?? '');
+        setUnsavedChanges(false);
+      } catch (e: unknown) {
+        setError(getErrorMessage(e, 'Failed to load settings'));
+      } finally {
+        setLoading(false);
+      }
+    }
+    void load();
+  }, [api, setUnsavedChanges]);
 
   async function handleSave() {
     setSaving(true);
@@ -46,16 +105,22 @@ export default function AdminSettingsPage() {
         logoUrl: logoUrl.trim().length > 0 ? logoUrl.trim() : null,
         iconUrl: iconUrl.trim().length > 0 ? iconUrl.trim() : null,
         timezone: timezone.trim() || 'America/Denver',
-      }) as any;
+        dealerContact: {
+          phone: dealerPhone.trim() || null,
+          address: dealerAddress.trim() || null,
+          email: dealerEmail.trim() || null,
+          hours: dealerHours.trim() || null,
+        },
+      }) as SettingsResponse;
 
       if (res?.success) {
-        setSuccess(res.message ?? 'Branding saved');
+        setSuccess(res.message ?? 'Settings saved');
         setUnsavedChanges(false);
       } else {
-        setError(res?.error?.message ?? 'Failed to save branding');
+        setError(res?.error?.message ?? 'Failed to save settings');
       }
-    } catch (e: any) {
-      setError(e?.error?.message ?? e?.message ?? 'Failed to save branding');
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, 'Failed to save settings'));
     } finally {
       setSaving(false);
     }
@@ -81,7 +146,7 @@ export default function AdminSettingsPage() {
   return (
     <div className="max-w-2xl">
       <h2 className="text-2xl font-semibold text-gray-900 mb-4">Settings</h2>
-      <p className="text-gray-600 mb-6">Branding for this retailer (used by the mobile app).</p>
+      <p className="text-gray-600 mb-6">Branding and public business information used across the mobile app.</p>
 
       {error && <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700">{error}</div>}
       {success && <div className="mb-4 rounded-lg bg-green-50 p-4 text-green-800">{success}</div>}
@@ -178,12 +243,72 @@ export default function AdminSettingsPage() {
           />
         </div>
 
+        <div className="border-t border-gray-100 pt-4 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Public dealer contact</h3>
+            <p className="text-xs text-gray-500 mt-1">
+              Used anywhere the app needs retailer contact details, including Home and Dealer surfaces.
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Public phone</label>
+            <input
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              value={dealerPhone}
+              onChange={(e) => {
+                setUnsavedChanges(true);
+                setDealerPhone(e.target.value);
+              }}
+              placeholder="(555) 123-4567"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Public address</label>
+            <textarea
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              rows={3}
+              value={dealerAddress}
+              onChange={(e) => {
+                setUnsavedChanges(true);
+                setDealerAddress(e.target.value);
+              }}
+              placeholder="123 Main St, City, ST 12345"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Public email</label>
+            <input
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              type="email"
+              value={dealerEmail}
+              onChange={(e) => {
+                setUnsavedChanges(true);
+                setDealerEmail(e.target.value);
+              }}
+              placeholder="service@example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Public hours</label>
+            <textarea
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              rows={3}
+              value={dealerHours}
+              onChange={(e) => {
+                setUnsavedChanges(true);
+                setDealerHours(e.target.value);
+              }}
+              placeholder="Mon-Fri: 9AM-6PM&#10;Sat: 9AM-4PM"
+            />
+          </div>
+        </div>
+
         <div className="flex items-center gap-3 pt-2">
           <Button type="button" loading={saving} onClick={handleSave}>
-            Save Branding
+            Save Settings
           </Button>
           <p className="text-xs text-gray-500">
-            After upload, click Save Branding. Images only. Min 1KB, max 10MB.
+            After upload, click Save Settings. Images only. Min 1KB, max 10MB.
           </p>
         </div>
       </div>

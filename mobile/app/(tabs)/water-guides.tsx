@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { AppPageHeader } from '../../components/AppPageHeader';
 import api from '../../services/api';
 import { useTheme } from '../../theme/ThemeProvider';
 
@@ -78,14 +79,13 @@ export default function WaterGuidesScreen() {
     return 'No water care guides have been published for this spa yet.';
   }, [search, spaProfileId]);
 
+  const headerSubtitle = spaProfileId
+    ? 'Contextual water care content for your active spa.'
+    : 'Finish spa setup to unlock personalized water care guides.';
+
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Guides & Videos</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Contextual water care content for your active spa.
-        </Text>
-      </View>
+      <AppPageHeader title="Guides & Videos" subtitle={headerSubtitle} />
 
       <TextInput
         value={search}
@@ -146,9 +146,6 @@ export default function WaterGuidesScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: 20, gap: 16 },
-  header: { gap: 6 },
-  title: { fontSize: 24, fontWeight: '700' },
-  subtitle: { fontSize: 15, lineHeight: 22 },
   searchInput: {
     borderWidth: 1,
     borderRadius: 14,

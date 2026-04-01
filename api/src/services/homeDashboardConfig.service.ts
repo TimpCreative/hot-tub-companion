@@ -298,14 +298,20 @@ export function mergePartialHomeDashboard(
 export interface DealerContactDTO {
   phone: string | null;
   address: string | null;
+  email: string | null;
+  hours: string | null;
 }
 
 export function mapDealerContact(row: {
   public_contact_phone?: string | null;
   public_contact_address?: string | null;
+  public_contact_email?: string | null;
+  public_contact_hours?: string | null;
 }): DealerContactDTO {
   return {
     phone: row.public_contact_phone?.trim() || null,
     address: row.public_contact_address?.trim() || null,
+    email: row.public_contact_email?.trim() || null,
+    hours: row.public_contact_hours?.trim() || null,
   };
 }

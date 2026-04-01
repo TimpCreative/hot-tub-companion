@@ -59,6 +59,73 @@ interface WaterCareConfig {
 interface DealerContact {
   phone: string | null;
   address: string | null;
+  email: string | null;
+  hours: string | null;
+}
+
+type DealerActionType = 'call' | 'directions' | 'message' | 'book_service' | 'chat' | 'external_url';
+
+interface DealerActionButton {
+  id: string;
+  enabled: boolean;
+  label: string;
+  iconKey: string;
+  actionType: DealerActionType;
+  actionValue?: string | null;
+  order: number;
+}
+
+interface DealerServiceItem {
+  id: string;
+  enabled: boolean;
+  title: string;
+  body: string;
+  iconKey: string;
+  order: number;
+}
+
+interface DealerLatestItem {
+  id: string;
+  enabled: boolean;
+  title: string;
+  body: string;
+  accentColor?: string;
+  order: number;
+}
+
+interface DealerPageConfig {
+  version: number;
+  layout: {
+    actionButtonsLayout: 'grid_2x2' | 'single';
+  };
+  dealerInfo: {
+    showName: boolean;
+    showAddress: boolean;
+    showPhone: boolean;
+    showEmail: boolean;
+    showHours: boolean;
+  };
+  actionButtons: DealerActionButton[];
+  servicesBlock: {
+    enabled: boolean;
+    title: string;
+    subtitle?: string;
+    items: DealerServiceItem[];
+  };
+  assistanceBlock: {
+    enabled: boolean;
+    title: string;
+    body: string;
+    buttonLabel: string;
+    actionType: 'chat' | 'call' | 'external_url';
+    actionValue?: string | null;
+  };
+  latestBlock: {
+    enabled: boolean;
+    title: string;
+    subtitle?: string;
+    items: DealerLatestItem[];
+  };
 }
 
 interface Legal {
@@ -74,6 +141,24 @@ const STEP_LABELS: Record<StepId, string> = {
 
 const ROUTE_OPTIONS = ['/shop', '/water-care', '/inbox', '/dealer', '/services', '/onboarding'] as const;
 const ICON_OPTIONS = ['mail', 'water', 'cart', 'book', 'medkit', 'build', 'storefront'] as const;
+const DEALER_BUTTON_ICON_OPTIONS = [
+  'call-outline',
+  'navigate-outline',
+  'chatbubble-outline',
+  'calendar-outline',
+  'mail-outline',
+  'chatbubbles-outline',
+  'open-outline',
+] as const;
+const DEALER_SERVICE_ICON_OPTIONS = [
+  'water-outline',
+  'build-outline',
+  'construct-outline',
+  'chatbubble-ellipses-outline',
+  'cart-outline',
+  'sparkles-outline',
+] as const;
+const DEALER_ACTION_TYPES: DealerActionType[] = ['call', 'directions', 'message', 'book_service', 'chat', 'external_url'];
 
 function tipsItemsToText(items: unknown): string {
   if (!Array.isArray(items)) return '';
@@ -109,12 +194,12 @@ export default function AdminAppSetupPage() {
 
   const markDirty = useCallback(() => setUnsavedChanges(true), [setUnsavedChanges]);
 
-  const [tab, setTab] = useState<'onboarding' | 'home' | 'waterCare' | 'legal'>('onboarding');
+  const [tab, setTab] = useState<'onboarding' | 'home' | 'dealer' | 'waterCare' | 'legal'>('onboarding');
   const [onboarding, setOnboarding] = useState<OnboardingConfig | null>(null);
   const [homeDashboard, setHomeDashboard] = useState<HomeDashboardConfig | null>(null);
+  const [dealerPage, setDealerPage] = useState<DealerPageConfig | null>(null);
+  const [dealerContact, setDealerContact] = useState<DealerContact | null>(null);
   const [waterCare, setWaterCare] = useState<WaterCareConfig | null>(null);
-  const [dealerPhone, setDealerPhone] = useState('');
-  const [dealerAddress, setDealerAddress] = useState('');
   const [termsUrl, setTermsUrl] = useState('');
   const [privacyUrl, setPrivacyUrl] = useState('');
   const [loading, setLoading] = useState(true);
@@ -131,8 +216,9 @@ export default function AdminAppSetupPage() {
         data?: {
           onboarding?: OnboardingConfig;
           homeDashboard?: HomeDashboardConfig;
-          waterCare?: WaterCareConfig;
+          dealerPage?: DealerPageConfig;
           dealerContact?: DealerContact;
+          waterCare?: WaterCareConfig;
           legal?: Legal;
         };
       };
@@ -146,12 +232,9 @@ export default function AdminAppSetupPage() {
           quickLinksLayout: hd.quickLinksLayout === 'double' ? 'double' : 'single',
         });
       }
+      if (body?.data?.dealerPage) setDealerPage(body.data.dealerPage);
+      if (body?.data?.dealerContact) setDealerContact(body.data.dealerContact);
       if (body?.data?.waterCare) setWaterCare(body.data.waterCare);
-      const dc = body?.data?.dealerContact;
-      if (dc) {
-        setDealerPhone(dc.phone ?? '');
-        setDealerAddress(dc.address ?? '');
-      }
       const legal = body?.data?.legal;
       if (legal) {
         setTermsUrl(legal.termsUrl ?? '');
@@ -270,6 +353,96 @@ export default function AdminAppSetupPage() {
     updateWidget(b.id, (w) => ({ ...w, order: a.order }));
   }
 
+  function sortedDealerButtons(): DealerActionButton[] {
+    if (!dealerPage) return [];
+    return [...dealerPage.actionButtons].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  }
+
+  function updateDealerButton(id: string, fn: (button: DealerActionButton) => DealerActionButton) {
+    markDirty();
+    setDealerPage((prev) =>
+      prev
+        ? { ...prev, actionButtons: prev.actionButtons.map((button) => (button.id === id ? fn(button) : button)) }
+        : prev
+    );
+  }
+
+  function moveDealerButton(id: string, dir: -1 | 1) {
+    markDirty();
+    const list = sortedDealerButtons();
+    const idx = list.findIndex((button) => button.id === id);
+    const nextIdx = idx + dir;
+    if (idx < 0 || nextIdx < 0 || nextIdx >= list.length) return;
+    const current = list[idx];
+    const swap = list[nextIdx];
+    updateDealerButton(current.id, (button) => ({ ...button, order: swap.order }));
+    updateDealerButton(swap.id, (button) => ({ ...button, order: current.order }));
+  }
+
+  function sortedDealerServices(): DealerServiceItem[] {
+    if (!dealerPage) return [];
+    return [...dealerPage.servicesBlock.items].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  }
+
+  function updateDealerService(id: string, fn: (item: DealerServiceItem) => DealerServiceItem) {
+    markDirty();
+    setDealerPage((prev) =>
+      prev
+        ? {
+            ...prev,
+            servicesBlock: {
+              ...prev.servicesBlock,
+              items: prev.servicesBlock.items.map((item) => (item.id === id ? fn(item) : item)),
+            },
+          }
+        : prev
+    );
+  }
+
+  function moveDealerService(id: string, dir: -1 | 1) {
+    markDirty();
+    const list = sortedDealerServices();
+    const idx = list.findIndex((item) => item.id === id);
+    const nextIdx = idx + dir;
+    if (idx < 0 || nextIdx < 0 || nextIdx >= list.length) return;
+    const current = list[idx];
+    const swap = list[nextIdx];
+    updateDealerService(current.id, (item) => ({ ...item, order: swap.order }));
+    updateDealerService(swap.id, (item) => ({ ...item, order: current.order }));
+  }
+
+  function sortedDealerLatest(): DealerLatestItem[] {
+    if (!dealerPage) return [];
+    return [...dealerPage.latestBlock.items].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  }
+
+  function updateDealerLatest(id: string, fn: (item: DealerLatestItem) => DealerLatestItem) {
+    markDirty();
+    setDealerPage((prev) =>
+      prev
+        ? {
+            ...prev,
+            latestBlock: {
+              ...prev.latestBlock,
+              items: prev.latestBlock.items.map((item) => (item.id === id ? fn(item) : item)),
+            },
+          }
+        : prev
+    );
+  }
+
+  function moveDealerLatest(id: string, dir: -1 | 1) {
+    markDirty();
+    const list = sortedDealerLatest();
+    const idx = list.findIndex((item) => item.id === id);
+    const nextIdx = idx + dir;
+    if (idx < 0 || nextIdx < 0 || nextIdx >= list.length) return;
+    const current = list[idx];
+    const swap = list[nextIdx];
+    updateDealerLatest(current.id, (item) => ({ ...item, order: swap.order }));
+    updateDealerLatest(swap.id, (item) => ({ ...item, order: current.order }));
+  }
+
   async function saveHome() {
     if (!homeDashboard) return;
     setSaving(true);
@@ -278,21 +451,37 @@ export default function AdminAppSetupPage() {
     try {
       const body = (await api.put('/admin/settings/app-setup', {
         homeDashboard,
-        dealerContact: {
-          phone: dealerPhone.trim() || null,
-          address: dealerAddress.trim() || null,
-        },
       })) as {
         success?: boolean;
-        data?: { homeDashboard?: HomeDashboardConfig; dealerContact?: DealerContact };
+        data?: { homeDashboard?: HomeDashboardConfig };
         message?: string;
       };
       if (body?.data?.homeDashboard) setHomeDashboard(body.data.homeDashboard);
-      const dc = body?.data?.dealerContact;
-      if (dc) {
-        setDealerPhone(dc.phone ?? '');
-        setDealerAddress(dc.address ?? '');
-      }
+      setSuccess(body.message ?? 'Saved');
+      setUnsavedChanges(false);
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === 'object' && 'error' in e
+          ? (e as { error?: { message?: string } }).error?.message
+          : 'Failed to save';
+      setError(msg ?? 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveDealer() {
+    if (!dealerPage) return;
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const body = (await api.put('/admin/settings/app-setup', { dealerPage })) as {
+        success?: boolean;
+        data?: { dealerPage?: DealerPageConfig };
+        message?: string;
+      };
+      if (body?.data?.dealerPage) setDealerPage(body.data.dealerPage);
       setSuccess(body.message ?? 'Saved');
       setUnsavedChanges(false);
     } catch (e: unknown) {
@@ -368,14 +557,14 @@ export default function AdminAppSetupPage() {
     return <div className="flex items-center justify-center py-12">Loading...</div>;
   }
 
-    if (!onboarding || !homeDashboard || !waterCare) {
+    if (!onboarding || !homeDashboard || !dealerPage || !waterCare) {
     return <div className="rounded-lg bg-red-50 p-4 text-red-700">{error || 'Could not load app setup.'}</div>;
   }
 
   return (
-    <div className={tab === 'home' ? 'max-w-6xl' : 'max-w-3xl'}>
+    <div className={tab === 'home' || tab === 'dealer' ? 'max-w-6xl' : 'max-w-3xl'}>
       <h2 className="text-2xl font-semibold text-gray-900 mb-2">App setup</h2>
-      <p className="text-gray-600 mb-4">Customer mobile app: onboarding flow and home dashboard.</p>
+      <p className="text-gray-600 mb-4">Customer mobile app: onboarding flow, marketing surfaces, and Dealer tab content.</p>
 
       <div className="border-b border-gray-200 mb-6 flex gap-4">
         <button
@@ -398,12 +587,12 @@ export default function AdminAppSetupPage() {
         </button>
         <button
           type="button"
-          onClick={() => setTab('legal')}
+          onClick={() => setTab('dealer')}
           className={`pb-3 px-1 text-sm font-medium border-b-2 ${
-            tab === 'legal' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'
+            tab === 'dealer' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'
           }`}
         >
-          Legal
+          Dealer
         </button>
         <button
           type="button"
@@ -413,6 +602,15 @@ export default function AdminAppSetupPage() {
           }`}
         >
           Water Care
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('legal')}
+          className={`pb-3 px-1 text-sm font-medium border-b-2 ${
+            tab === 'legal' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'
+          }`}
+        >
+          Legal
         </button>
       </div>
 
@@ -530,38 +728,6 @@ export default function AdminAppSetupPage() {
       {tab === 'home' && (
         <div className="flex gap-8">
           <div className="min-w-0 flex-1 space-y-6">
-          <div className="card rounded-lg p-6 space-y-4">
-            <h3 className="text-sm font-semibold text-gray-900">Dealer contact (app)</h3>
-            <p className="text-xs text-gray-500">
-              Shown on the home dealer card and dealer tab. Not the same as customer account address.
-            </p>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Public phone</label>
-              <input
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                value={dealerPhone}
-                onChange={(e) => {
-                  markDirty();
-                  setDealerPhone(e.target.value);
-                }}
-                placeholder="(555) 123-4567"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Public address</label>
-              <textarea
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                rows={2}
-                value={dealerAddress}
-                onChange={(e) => {
-                  markDirty();
-                  setDealerAddress(e.target.value);
-                }}
-                placeholder="Street, city, state, ZIP"
-              />
-            </div>
-          </div>
-
           <div className="card rounded-lg p-6 space-y-6">
             <h3 className="text-sm font-semibold text-gray-900">Quick Links</h3>
             <p className="text-xs text-gray-500">
@@ -899,10 +1065,587 @@ export default function AdminAppSetupPage() {
             quickLinks={sortedQuickLinks()}
             quickLinksLayout={homeDashboard.quickLinksLayout}
             widgets={sortedWidgets()}
-            dealerPhone={dealerPhone}
-            dealerAddress={dealerAddress}
+            dealerPhone={dealerContact?.phone ?? ''}
+            dealerAddress={dealerContact?.address ?? ''}
             primaryColor={primaryColor}
           />
+        </div>
+      )}
+
+      {tab === 'dealer' && (
+        <div className="flex gap-8">
+          <div className="min-w-0 flex-1 space-y-6">
+            <div className="card rounded-lg p-6 space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Dealer page layout</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Controls the main Dealer tab experience in the mobile app. Shared phone, address, email, and hours now live in Settings.
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-medium text-gray-700">Action buttons layout:</span>
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="dealerButtonsLayout"
+                    className="border-gray-300"
+                    checked={dealerPage.layout.actionButtonsLayout === 'grid_2x2'}
+                    onChange={() => {
+                      markDirty();
+                      setDealerPage((prev) =>
+                        prev ? { ...prev, layout: { ...prev.layout, actionButtonsLayout: 'grid_2x2' } } : prev
+                      );
+                    }}
+                  />
+                  <span className="text-sm text-gray-700">2 x 2 grid</span>
+                </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="dealerButtonsLayout"
+                    className="border-gray-300"
+                    checked={dealerPage.layout.actionButtonsLayout === 'single'}
+                    onChange={() => {
+                      markDirty();
+                      setDealerPage((prev) =>
+                        prev ? { ...prev, layout: { ...prev.layout, actionButtonsLayout: 'single' } } : prev
+                      );
+                    }}
+                  />
+                  <span className="text-sm text-gray-700">Single column</span>
+                </label>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {(
+                  [
+                    ['showName', 'Show dealer name'],
+                    ['showAddress', 'Show address'],
+                    ['showPhone', 'Show phone'],
+                    ['showEmail', 'Show email'],
+                    ['showHours', 'Show hours'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label key={key} className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300"
+                      checked={dealerPage.dealerInfo[key]}
+                      onChange={() => {
+                        markDirty();
+                        setDealerPage((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                dealerInfo: {
+                                  ...prev.dealerInfo,
+                                  [key]: !prev.dealerInfo[key],
+                                },
+                              }
+                            : prev
+                        );
+                      }}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="card rounded-lg p-6 space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Dealer action buttons</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Reorder, hide, or relabel the four primary actions shown in the top Dealer card.
+                </p>
+              </div>
+              {sortedDealerButtons().map((button, index) => (
+                <div key={button.id} className="border border-gray-100 rounded-lg p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm font-medium text-gray-800">{button.label}</div>
+                    <div className="flex items-center gap-2">
+                      <label className="inline-flex items-center text-xs cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300"
+                          checked={button.enabled}
+                          onChange={() => updateDealerButton(button.id, (current) => ({ ...current, enabled: !current.enabled }))}
+                        />
+                        <span className="ml-1 text-gray-700">On</span>
+                      </label>
+                      <button
+                        type="button"
+                        className="text-xs text-blue-600 disabled:opacity-40"
+                        disabled={index === 0}
+                        onClick={() => moveDealerButton(button.id, -1)}
+                      >
+                        Up
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs text-blue-600 disabled:opacity-40"
+                        disabled={index === sortedDealerButtons().length - 1}
+                        onClick={() => moveDealerButton(button.id, 1)}
+                      >
+                        Down
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="text-xs text-gray-600">Label</label>
+                      <input
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                        value={button.label}
+                        onChange={(e) => updateDealerButton(button.id, (current) => ({ ...current, label: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600">Icon</label>
+                      <select
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                        value={button.iconKey}
+                        onChange={(e) => updateDealerButton(button.id, (current) => ({ ...current, iconKey: e.target.value }))}
+                      >
+                        {DEALER_BUTTON_ICON_OPTIONS.map((icon) => (
+                          <option key={icon} value={icon}>
+                            {icon}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600">Action type</label>
+                      <select
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                        value={button.actionType}
+                        onChange={(e) =>
+                          updateDealerButton(button.id, (current) => ({
+                            ...current,
+                            actionType: e.target.value as DealerActionType,
+                            actionValue: e.target.value === 'external_url' ? current.actionValue : null,
+                          }))
+                        }
+                      >
+                        {DEALER_ACTION_TYPES.map((actionType) => (
+                          <option key={actionType} value={actionType}>
+                            {actionType}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600">Custom URL / value</label>
+                      <input
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                        value={button.actionValue ?? ''}
+                        onChange={(e) =>
+                          updateDealerButton(button.id, (current) => ({ ...current, actionValue: e.target.value || null }))
+                        }
+                        placeholder={button.actionType === 'external_url' ? 'https://example.com' : 'Optional override'}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="card rounded-lg p-6 space-y-6">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Services We Offer block</h3>
+                  <p className="text-xs text-gray-500 mt-1">Editable marketing cards for the Dealer tab.</p>
+                </div>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300"
+                    checked={dealerPage.servicesBlock.enabled}
+                    onChange={() => {
+                      markDirty();
+                      setDealerPage((prev) =>
+                        prev ? { ...prev, servicesBlock: { ...prev.servicesBlock, enabled: !prev.servicesBlock.enabled } } : prev
+                      );
+                    }}
+                  />
+                  Enabled
+                </label>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs text-gray-600">Title</label>
+                  <input
+                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                    value={dealerPage.servicesBlock.title}
+                    onChange={(e) => {
+                      markDirty();
+                      setDealerPage((prev) =>
+                        prev ? { ...prev, servicesBlock: { ...prev.servicesBlock, title: e.target.value } } : prev
+                      );
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Subtitle</label>
+                  <input
+                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                    value={dealerPage.servicesBlock.subtitle ?? ''}
+                    onChange={(e) => {
+                      markDirty();
+                      setDealerPage((prev) =>
+                        prev
+                          ? { ...prev, servicesBlock: { ...prev.servicesBlock, subtitle: e.target.value || undefined } }
+                          : prev
+                      );
+                    }}
+                  />
+                </div>
+              </div>
+              {sortedDealerServices().map((item, index) => (
+                <div key={item.id} className="border border-gray-100 rounded-lg p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm font-medium text-gray-800">{item.title}</div>
+                    <div className="flex items-center gap-2">
+                      <label className="inline-flex items-center text-xs cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300"
+                          checked={item.enabled}
+                          onChange={() => updateDealerService(item.id, (current) => ({ ...current, enabled: !current.enabled }))}
+                        />
+                        <span className="ml-1 text-gray-700">On</span>
+                      </label>
+                      <button
+                        type="button"
+                        className="text-xs text-blue-600 disabled:opacity-40"
+                        disabled={index === 0}
+                        onClick={() => moveDealerService(item.id, -1)}
+                      >
+                        Up
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs text-blue-600 disabled:opacity-40"
+                        disabled={index === sortedDealerServices().length - 1}
+                        onClick={() => moveDealerService(item.id, 1)}
+                      >
+                        Down
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="text-xs text-gray-600">Title</label>
+                      <input
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                        value={item.title}
+                        onChange={(e) => updateDealerService(item.id, (current) => ({ ...current, title: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600">Icon</label>
+                      <select
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                        value={item.iconKey}
+                        onChange={(e) => updateDealerService(item.id, (current) => ({ ...current, iconKey: e.target.value }))}
+                      >
+                        {DEALER_SERVICE_ICON_OPTIONS.map((icon) => (
+                          <option key={icon} value={icon}>
+                            {icon}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">Body</label>
+                    <textarea
+                      className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                      rows={2}
+                      value={item.body}
+                      onChange={(e) => updateDealerService(item.id, (current) => ({ ...current, body: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="card rounded-lg p-6 space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Need Assistance block</h3>
+                  <p className="text-xs text-gray-500 mt-1">Use this for chat, phone support, or an external CTA.</p>
+                </div>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300"
+                    checked={dealerPage.assistanceBlock.enabled}
+                    onChange={() => {
+                      markDirty();
+                      setDealerPage((prev) =>
+                        prev
+                          ? { ...prev, assistanceBlock: { ...prev.assistanceBlock, enabled: !prev.assistanceBlock.enabled } }
+                          : prev
+                      );
+                    }}
+                  />
+                  Enabled
+                </label>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Title</label>
+                <input
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  value={dealerPage.assistanceBlock.title}
+                  onChange={(e) => {
+                    markDirty();
+                    setDealerPage((prev) =>
+                      prev ? { ...prev, assistanceBlock: { ...prev.assistanceBlock, title: e.target.value } } : prev
+                    );
+                  }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Body</label>
+                <textarea
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  rows={3}
+                  value={dealerPage.assistanceBlock.body}
+                  onChange={(e) => {
+                    markDirty();
+                    setDealerPage((prev) =>
+                      prev ? { ...prev, assistanceBlock: { ...prev.assistanceBlock, body: e.target.value } } : prev
+                    );
+                  }}
+                />
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs text-gray-600">Button label</label>
+                  <input
+                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                    value={dealerPage.assistanceBlock.buttonLabel}
+                    onChange={(e) => {
+                      markDirty();
+                      setDealerPage((prev) =>
+                        prev
+                          ? { ...prev, assistanceBlock: { ...prev.assistanceBlock, buttonLabel: e.target.value } }
+                          : prev
+                      );
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Action type</label>
+                  <select
+                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                    value={dealerPage.assistanceBlock.actionType}
+                    onChange={(e) => {
+                      markDirty();
+                      setDealerPage((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              assistanceBlock: {
+                                ...prev.assistanceBlock,
+                                actionType: e.target.value as DealerPageConfig['assistanceBlock']['actionType'],
+                                actionValue: e.target.value === 'external_url' ? prev.assistanceBlock.actionValue : null,
+                              },
+                            }
+                          : prev
+                      );
+                    }}
+                  >
+                    <option value="chat">chat</option>
+                    <option value="call">call</option>
+                    <option value="external_url">external_url</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Action value / URL</label>
+                <input
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  value={dealerPage.assistanceBlock.actionValue ?? ''}
+                  onChange={(e) => {
+                    markDirty();
+                    setDealerPage((prev) =>
+                      prev
+                        ? { ...prev, assistanceBlock: { ...prev.assistanceBlock, actionValue: e.target.value || null } }
+                        : prev
+                    );
+                  }}
+                  placeholder={dealerPage.assistanceBlock.actionType === 'external_url' ? 'https://example.com' : 'Optional override'}
+                />
+              </div>
+            </div>
+
+            <div className="card rounded-lg p-6 space-y-6">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Latest from dealer block</h3>
+                  <p className="text-xs text-gray-500 mt-1">For now this behaves like an editable tips and specials list.</p>
+                </div>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300"
+                    checked={dealerPage.latestBlock.enabled}
+                    onChange={() => {
+                      markDirty();
+                      setDealerPage((prev) =>
+                        prev ? { ...prev, latestBlock: { ...prev.latestBlock, enabled: !prev.latestBlock.enabled } } : prev
+                      );
+                    }}
+                  />
+                  Enabled
+                </label>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs text-gray-600">Title</label>
+                  <input
+                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                    value={dealerPage.latestBlock.title}
+                    onChange={(e) => {
+                      markDirty();
+                      setDealerPage((prev) =>
+                        prev ? { ...prev, latestBlock: { ...prev.latestBlock, title: e.target.value } } : prev
+                      );
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Subtitle</label>
+                  <input
+                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                    value={dealerPage.latestBlock.subtitle ?? ''}
+                    onChange={(e) => {
+                      markDirty();
+                      setDealerPage((prev) =>
+                        prev ? { ...prev, latestBlock: { ...prev.latestBlock, subtitle: e.target.value || undefined } } : prev
+                      );
+                    }}
+                  />
+                </div>
+              </div>
+              {sortedDealerLatest().map((item, index) => (
+                <div key={item.id} className="border border-gray-100 rounded-lg p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm font-medium text-gray-800">{item.title}</div>
+                    <div className="flex items-center gap-2">
+                      <label className="inline-flex items-center text-xs cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300"
+                          checked={item.enabled}
+                          onChange={() => updateDealerLatest(item.id, (current) => ({ ...current, enabled: !current.enabled }))}
+                        />
+                        <span className="ml-1 text-gray-700">On</span>
+                      </label>
+                      <button
+                        type="button"
+                        className="text-xs text-blue-600 disabled:opacity-40"
+                        disabled={index === 0}
+                        onClick={() => moveDealerLatest(item.id, -1)}
+                      >
+                        Up
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs text-blue-600 disabled:opacity-40"
+                        disabled={index === sortedDealerLatest().length - 1}
+                        onClick={() => moveDealerLatest(item.id, 1)}
+                      >
+                        Down
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="text-xs text-gray-600">Title</label>
+                      <input
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                        value={item.title}
+                        onChange={(e) => updateDealerLatest(item.id, (current) => ({ ...current, title: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600">Accent color</label>
+                      <input
+                        type="color"
+                        className="h-9 w-14 cursor-pointer rounded border p-0.5 bg-card"
+                        value={(item.accentColor ?? '#0ea5e9').slice(0, 7)}
+                        onChange={(e) => updateDealerLatest(item.id, (current) => ({ ...current, accentColor: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">Body</label>
+                    <textarea
+                      className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                      rows={2}
+                      value={item.body}
+                      onChange={(e) => updateDealerLatest(item.id, (current) => ({ ...current, body: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Button type="button" loading={saving} onClick={() => void saveDealer()}>
+              Save dealer page
+            </Button>
+          </div>
+
+          <div className="w-full max-w-sm shrink-0 rounded-3xl border border-gray-200 bg-gray-50 p-5 shadow-sm">
+            <div className="overflow-hidden rounded-[28px] border border-gray-300 bg-white">
+              <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-6 text-white">
+                <div className="text-2xl font-semibold">{config?.name ?? 'Your retailer'}</div>
+                <div className="mt-2 text-sm text-white/90">Your trusted hot tub care partner</div>
+              </div>
+              <div className="space-y-4 bg-gray-50 px-4 py-4">
+                <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                  <div className="text-lg font-semibold text-gray-900">{config?.name ?? 'Your retailer'}</div>
+                  <div className="mt-3 space-y-2 text-sm text-gray-600">
+                    {dealerPage.dealerInfo.showAddress ? <div>Address from Settings</div> : null}
+                    {dealerPage.dealerInfo.showPhone ? <div>Phone from Settings</div> : null}
+                    {dealerPage.dealerInfo.showEmail ? <div>Email from Settings</div> : null}
+                    {dealerPage.dealerInfo.showHours ? <div>Hours from Settings</div> : null}
+                  </div>
+                  <div className={`mt-4 grid gap-2 ${dealerPage.layout.actionButtonsLayout === 'single' ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                    {sortedDealerButtons().filter((button) => button.enabled).map((button) => (
+                      <div key={button.id} className="rounded-xl border border-cyan-500 px-3 py-2 text-center text-sm font-medium text-cyan-700">
+                        {button.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {dealerPage.servicesBlock.enabled ? (
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                    <div className="text-lg font-semibold text-gray-900">{dealerPage.servicesBlock.title}</div>
+                    {dealerPage.servicesBlock.subtitle ? (
+                      <div className="mt-1 text-sm text-gray-500">{dealerPage.servicesBlock.subtitle}</div>
+                    ) : null}
+                  </div>
+                ) : null}
+                {dealerPage.assistanceBlock.enabled ? (
+                  <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-center">
+                    <div className="text-lg font-semibold text-slate-800">{dealerPage.assistanceBlock.title}</div>
+                    <div className="mt-2 text-sm text-slate-600">{dealerPage.assistanceBlock.body}</div>
+                  </div>
+                ) : null}
+                {dealerPage.latestBlock.enabled ? (
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                    <div className="text-lg font-semibold text-gray-900">{dealerPage.latestBlock.title}</div>
+                    {dealerPage.latestBlock.subtitle ? (
+                      <div className="mt-1 text-sm text-gray-500">{dealerPage.latestBlock.subtitle}</div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

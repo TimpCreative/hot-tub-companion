@@ -2,12 +2,11 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../../services/api';
+import { AppHeroHeader } from '../../components/AppHeroHeader';
 import { StatusBarBar } from '../../components/StatusBarBar';
 import { useTenant } from '../../contexts/TenantContext';
-import { shiftHueSaturateHex } from '../../lib/colorUtils';
 import { useTheme } from '../../theme/ThemeProvider';
 
 type SpaProfile = {
@@ -121,8 +120,6 @@ export default function WaterCareScreen() {
 
   const comparisonRows = waterCare?.comparison ?? [];
   const primaryHex = colors.primary ?? '#1B4D7A';
-  const gradientStart = shiftHueSaturateHex(primaryHex, 16, 1.25);
-  const gradientColors = [gradientStart, primaryHex] as const;
   const scrollY = useRef(new Animated.Value(0)).current;
 
   function statusColor(status: 'low' | 'in_range' | 'high' | 'missing') {
@@ -188,18 +185,11 @@ export default function WaterCareScreen() {
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
         scrollEventThrottle={16}
       >
-        <LinearGradient
-          colors={gradientColors}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.hero, { paddingTop: insets.top + 20, marginHorizontal: -24 }]}
-        >
-          <View style={styles.heroTitleRow}>
-            <Ionicons name="water-outline" size={28} color="#fff" />
-            <Text style={styles.heroTitle}>Water Care</Text>
-          </View>
-          <Text style={styles.heroSubtitle}>Test, track & learn</Text>
-        </LinearGradient>
+        <AppHeroHeader
+          icon="water-outline"
+          title="Water Care"
+          subtitle="Test, track & learn"
+        />
 
         {!spa ? (
           <View style={[styles.card, styles.sectionCard, { backgroundColor: colors.contentBackground, borderColor: colors.border }]}>
@@ -325,28 +315,6 @@ const styles = StyleSheet.create({
   center: { justifyContent: 'center', alignItems: 'center' },
   scroll: { flex: 1 },
   content: { flexGrow: 1, padding: 24 },
-  hero: {
-    paddingHorizontal: 24,
-    paddingBottom: 36,
-    marginTop: -24,
-    marginBottom: 18,
-  },
-  heroTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  heroTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  heroSubtitle: {
-    color: 'rgba(255,255,255,0.95)',
-    fontSize: 15,
-    marginTop: 8,
-    fontWeight: '500',
-  },
   body: {
     fontSize: 15,
     color: '#64748b',

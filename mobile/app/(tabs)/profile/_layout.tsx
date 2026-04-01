@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { useTenant } from '../../../contexts/TenantContext';
+import { buildAppStackHeaderOptions } from '../../../lib/appHeader';
 
 export default function ProfileLayout() {
   const { config } = useTenant();
@@ -8,9 +9,7 @@ export default function ProfileLayout() {
   return (
     <Stack
       screenOptions={{
-        headerShown: true,
-        headerStyle: { backgroundColor: primary },
-        headerTintColor: '#fff',
+        ...buildAppStackHeaderOptions(primary),
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />

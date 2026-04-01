@@ -51,10 +51,13 @@ export default function Home() {
   const dashboard = config?.homeDashboard ?? DEFAULT_HOME_DASHBOARD;
   const quickLinks = [...(dashboard.quickLinks ?? [])]
     .filter((q) => q.enabled)
+    .filter((q) => (q.targetRoute === '/dealer' ? config?.features?.tabDealer !== false : true))
+    .filter((q) => (q.targetRoute === '/inbox' ? config?.features?.tabInbox !== false : true))
     .sort((a, b) => a.order - b.order);
   const quickLinksLayout = dashboard.quickLinksLayout ?? 'single';
   const widgets = [...(dashboard.widgets ?? [])]
     .filter((w) => w.enabled)
+    .filter((w) => (w.type === 'dealer_card' ? config?.features?.tabDealer !== false : true))
     .sort((a, b) => a.order - b.order);
 
   const loadSpa = useCallback(async () => {

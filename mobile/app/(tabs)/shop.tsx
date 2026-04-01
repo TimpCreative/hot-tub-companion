@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
+import { AppPageHeader } from '../../components/AppPageHeader';
 import { FinishSetupBanner } from '../../components/FinishSetupBanner';
 import { useFinishSetupNudge } from '../../hooks/useFinishSetupNudge';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -13,8 +14,7 @@ export default function Shop() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <View style={styles.center}>
-        <Text style={styles.title}>Shop</Text>
-        <Text style={styles.subtitle}>Coming in Phase 2</Text>
+        <AppPageHeader title="Shop" subtitle="Coming in Phase 2" />
       </View>
       </ScrollView>
       {showNudge ? (
@@ -37,13 +37,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
     minHeight: 280,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  subtitle: {
-    marginTop: 8,
-    color: '#666',
+    width: '100%',
   },
 });

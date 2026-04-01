@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import api from '../../services/api';
+import { AppPageHeader } from '../../components/AppPageHeader';
 import { useTheme } from '../../theme/ThemeProvider';
 
 type SpaProfile = {
@@ -95,12 +96,14 @@ export default function MaintenanceLogScreen() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={styles.content}>
-      <Text style={[styles.title, { color: colors.text }]}>Water Test History</Text>
-      {spa ? (
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {spa.nickname?.trim() || [spa.brand, spa.modelLine || spa.model, spa.year].filter(Boolean).join(' · ')}
-        </Text>
-      ) : null}
+      <AppPageHeader
+        title="Water Test History"
+        subtitle={
+          spa
+            ? spa.nickname?.trim() || [spa.brand, spa.modelLine || spa.model, spa.year].filter(Boolean).join(' · ')
+            : 'Add a spa first to view history.'
+        }
+      />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -130,8 +133,6 @@ export default function MaintenanceLogScreen() {
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 20, gap: 16 },
-  title: { fontSize: 24, fontWeight: '700' },
-  subtitle: { fontSize: 14 },
   copy: { fontSize: 15, lineHeight: 22 },
   card: { borderRadius: 16, padding: 16, gap: 10 },
   cardTitle: { fontSize: 16, fontWeight: '700' },

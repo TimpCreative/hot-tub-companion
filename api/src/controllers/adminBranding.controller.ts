@@ -25,6 +25,15 @@ function mapBranding(row: any) {
   };
 }
 
+function mapDealerContact(row: any) {
+  return {
+    phone: row.public_contact_phone?.trim() || null,
+    address: row.public_contact_address?.trim() || null,
+    email: row.public_contact_email?.trim() || null,
+    hours: row.public_contact_hours?.trim() || null,
+  };
+}
+
 export async function getBranding(req: Request, res: Response): Promise<void> {
   if (!requireManageSettings(req, res)) return;
   const tenantId = (req as any).tenant?.id as string | undefined;
@@ -39,7 +48,7 @@ export async function getBranding(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  success(res, { branding: mapBranding(tenant) });
+  success(res, { branding: mapBranding(tenant), dealerContact: mapDealerContact(tenant) });
 }
 
 export async function updateBranding(req: Request, res: Response): Promise<void> {
@@ -58,6 +67,12 @@ export async function updateBranding(req: Request, res: Response): Promise<void>
     accentColor?: string | null;
     fontFamily?: string | null;
     timezone?: string | null;
+    dealerContact?: {
+      phone?: string | null;
+      address?: string | null;
+      email?: string | null;
+      hours?: string | null;
+    };
   };
 
   const update: Record<string, unknown> = {};
@@ -68,13 +83,29 @@ export async function updateBranding(req: Request, res: Response): Promise<void>
   if (body.accentColor !== undefined) update.accent_color = body.accentColor || null;
   if (body.fontFamily !== undefined) update.font_family = body.fontFamily || null;
   if (body.timezone !== undefined) update.timezone = body.timezone?.trim() || 'America/Denver';
+  if (body.dealerContact?.phone !== undefined) {
+    update.public_contact_phone =
+      body.dealerContact.phone === null || body.dealerContact.phone === '' ? null : String(body.dealerContact.phone).trim().slice(0, 40);
+  }
+  if (body.dealerContact?.address !== undefined) {
+    update.public_contact_address =
+      body.dealerContact.address === null || body.dealerContact.address === '' ? null : String(body.dealerContact.address).trim().slice(0, 2000);
+  }
+  if (body.dealerContact?.email !== undefined) {
+    update.public_contact_email =
+      body.dealerContact.email === null || body.dealerContact.email === '' ? null : String(body.dealerContact.email).trim().slice(0, 320);
+  }
+  if (body.dealerContact?.hours !== undefined) {
+    update.public_contact_hours =
+      body.dealerContact.hours === null || body.dealerContact.hours === '' ? null : String(body.dealerContact.hours).trim().slice(0, 2000);
+  }
 
   if (Object.keys(update).length === 0) {
-    error(res, 'VALIDATION_ERROR', 'No branding fields provided', 400);
+    error(res, 'VALIDATION_ERROR', 'No settings fields provided', 400);
     return;
   }
 
   const [updated] = await db('tenants').where({ id: tenantId }).update(update).returning('*');
-  success(res, { branding: mapBranding(updated) }, 'Branding updated');
+  success(res, { branding: mapBranding(updated), dealerContact: mapDealerContact(updated) }, 'Settings updated');
 }
 

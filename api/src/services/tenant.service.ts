@@ -4,6 +4,7 @@ import { mapDealerContact, normalizeHomeDashboardConfig } from './homeDashboardC
 import { toProxyUrl } from '../utils/mediaUrl';
 import { getSanitationSystemOptions } from './sanitationSystem.service';
 import { normalizeWaterCareConfig } from './waterCareConfig.service';
+import { normalizeDealerPageConfig } from './dealerPageConfig.service';
 
 export async function getByApiKey(apiKey: string) {
   return db('tenants').where({ api_key: apiKey }).first();
@@ -48,6 +49,7 @@ export async function getConfig(tenantId: string) {
     homeDashboard: normalizeHomeDashboardConfig(tenant.home_dashboard_config),
     waterCare: normalizeWaterCareConfig((tenant as { water_care_config?: unknown }).water_care_config),
     dealerContact: mapDealerContact(tenant),
+    dealerPage: normalizeDealerPageConfig((tenant as { dealer_page_config?: unknown }).dealer_page_config),
     termsUrl: (tenant as any).terms_url?.trim() || null,
     privacyUrl: (tenant as any).privacy_url?.trim() || null,
     timezone: (tenant as any).timezone || 'America/Denver',
