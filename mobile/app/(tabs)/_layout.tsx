@@ -40,6 +40,7 @@ export default function TabLayout() {
         name="water-care"
         options={{
           title: 'Water Care',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => <Ionicons name="water-outline" size={size} color={color} />,
         }}
       />

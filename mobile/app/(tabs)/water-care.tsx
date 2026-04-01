@@ -1,10 +1,13 @@
-import { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../../services/api';
+import { StatusBarBar } from '../../components/StatusBarBar';
 import { useTenant } from '../../contexts/TenantContext';
+import { shiftHueSaturateHex } from '../../lib/colorUtils';
 import { useTheme } from '../../theme/ThemeProvider';
 
 type SpaProfile = {
@@ -117,6 +120,10 @@ export default function WaterCareScreen() {
   }, [config?.waterCare, waterCare?.testingTips]);
 
   const comparisonRows = waterCare?.comparison ?? [];
+  const primaryHex = colors.primary ?? '#1B4D7A';
+  const gradientStart = shiftHueSaturateHex(primaryHex, 16, 1.25);
+  const gradientColors = [gradientStart, primaryHex] as const;
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   function statusColor(status: 'low' | 'in_range' | 'high' | 'missing') {
     if (status === 'in_range') return '#15803d';
@@ -133,14 +140,39 @@ export default function WaterCareScreen() {
   }
 
   const topActions = [
-    { label: 'Water Test', icon: 'flask-outline' as const, route: '/water-test' },
-    { label: 'Guides & Videos', icon: 'play-circle-outline' as const, route: '/water-guides' },
-    { label: 'Maintenance Log', icon: 'build-outline' as const, route: '/maintenance-log' },
+    {
+      label: 'Water Test',
+      description: 'Test your water and get recommendations',
+      icon: 'flask-outline' as const,
+      route: '/water-test',
+      accent: '#0891b2',
+      accentSoft: 'rgba(8,145,178,0.10)',
+      border: 'rgba(56,189,248,0.35)',
+    },
+    {
+      label: 'Guides & Videos',
+      description: 'Step-by-step instructions for care',
+      icon: 'play-circle-outline' as const,
+      route: '/water-guides',
+      accent: '#7c3aed',
+      accentSoft: 'rgba(124,58,237,0.10)',
+      border: 'rgba(167,139,250,0.35)',
+    },
+    {
+      label: 'Maintenance Log',
+      description: 'View your test history and maintenance',
+      icon: 'build-outline' as const,
+      route: '/maintenance-log',
+      accent: '#475569',
+      accentSoft: 'rgba(71,85,105,0.10)',
+      border: 'rgba(148,163,184,0.35)',
+    },
   ];
 
   if (loading) {
     return (
       <View style={[styles.container, styles.center, { backgroundColor: colors.background }]}>
+        <StatusBarBar primaryColor={primaryHex} />
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -148,18 +180,29 @@ export default function WaterCareScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView
+      <StatusBarBar primaryColor={primaryHex} scrollY={scrollY} />
+      <Animated.ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+        scrollEventThrottle={16}
       >
-        <Text style={[styles.title, { color: colors.text }]}>Water Care</Text>
-        <Text style={[styles.body, { color: colors.textSecondary }]}>
-          Ideal chemistry ranges and tips for {spaSummary(spa)}.
-        </Text>
+        <LinearGradient
+          colors={gradientColors}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.hero, { paddingTop: insets.top + 20, marginHorizontal: -24 }]}
+        >
+          <View style={styles.heroTitleRow}>
+            <Ionicons name="water-outline" size={28} color="#fff" />
+            <Text style={styles.heroTitle}>Water Care</Text>
+          </View>
+          <Text style={styles.heroSubtitle}>Test, track & learn</Text>
+        </LinearGradient>
 
         {!spa ? (
-          <View style={[styles.card, { backgroundColor: colors.contentBackground }]}>
+          <View style={[styles.card, styles.sectionCard, { backgroundColor: colors.contentBackground, borderColor: colors.border }]}>
             <Text style={[styles.cardTitle, { color: colors.text }]}>Finish spa setup</Text>
             <Text style={[styles.body, { color: colors.textSecondary }]}>
               Add your spa to unlock Water Care ranges and recommendations.
@@ -170,23 +213,36 @@ export default function WaterCareScreen() {
           </View>
         ) : (
           <>
-            <View style={styles.actionGrid}>
+            <View style={styles.sectionStack}>
               {topActions.map((action) => (
                 <TouchableOpacity
                   key={action.label}
-                  style={[styles.actionCard, { backgroundColor: colors.contentBackground, borderColor: colors.border }]}
+                  style={[
+                    styles.actionCard,
+                    {
+                      backgroundColor: colors.contentBackground,
+                      borderColor: action.border,
+                    },
+                  ]}
                   onPress={() => router.push(action.route)}
                 >
-                  <Ionicons name={action.icon} size={24} color={colors.primary} />
-                  <Text style={[styles.actionLabel, { color: colors.text }]}>{action.label}</Text>
+                  <View style={[styles.actionIconWrap, { backgroundColor: action.accentSoft }]}>
+                    <Ionicons name={action.icon} size={26} color={action.accent} />
+                  </View>
+                  <View style={styles.actionCopy}>
+                    <Text style={[styles.actionLabel, { color: colors.text }]}>{action.label}</Text>
+                    <Text style={[styles.actionDescription, { color: colors.textSecondary }]}>{action.description}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={action.accent} />
                 </TouchableOpacity>
               ))}
             </View>
 
-            <View style={[styles.card, { backgroundColor: colors.contentBackground }]}>
+            <View style={[styles.card, styles.sectionCard, { backgroundColor: colors.contentBackground, borderColor: colors.border }]}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>Ideal Water Chemistry</Text>
               {waterCare?.profile ? (
                 <>
+                  <Text style={[styles.cardSubtitle, { color: colors.textMuted }]}>Target ranges for your hot tub</Text>
                   <Text style={[styles.testedAtText, { color: colors.textMuted }]}>
                     Recent Test: {formatShortDate(waterCare.latestTestDate)}
                   </Text>
@@ -199,19 +255,26 @@ export default function WaterCareScreen() {
                   ) : null}
                   <View style={styles.measurements}>
                     {comparisonRows.map((measurement) => (
-                      <View key={measurement.metricKey} style={[styles.measurementCard, { borderColor: colors.border }]}>
+                      <View
+                        key={measurement.metricKey}
+                        style={[styles.measurementCard, { backgroundColor: '#f8fafc', borderColor: '#eef2ff' }]}
+                      >
                         <View style={styles.measurementHeader}>
                           <Text style={[styles.measurementLabel, { color: colors.text }]}>{measurement.label}</Text>
-                          <Text style={[styles.statusPill, { color: statusColor(measurement.status) }]}>
-                            {statusLabel(measurement.status)}
-                          </Text>
+                          <View style={[styles.measurementMeta, measurement.recentValue == null && styles.measurementMetaWide]}>
+                            <Text style={[styles.measurementValue, { color: colors.text }]}>
+                              {measurement.idealMin} - {measurement.idealMax} {measurement.unit}
+                            </Text>
+                            <Text style={[styles.statusPill, { color: statusColor(measurement.status) }]}>
+                              {statusLabel(measurement.status)}
+                            </Text>
+                          </View>
                         </View>
-                        <Text style={[styles.measurementRange, { color: colors.primary }]}>
-                          Ideal: {measurement.idealMin} - {measurement.idealMax} {measurement.unit}
-                        </Text>
-                        <Text style={[styles.measurementRecent, { color: colors.textSecondary }]}>
-                          Recent: {measurement.recentValue == null ? '-' : `${measurement.recentValue} ${measurement.unit}`}
-                        </Text>
+                        {measurement.recentValue != null ? (
+                          <Text style={[styles.measurementRecent, { color: colors.textSecondary }]}>
+                            Recent: {measurement.recentValue} {measurement.unit}
+                          </Text>
+                        ) : null}
                       </View>
                     ))}
                   </View>
@@ -226,7 +289,14 @@ export default function WaterCareScreen() {
               )}
             </View>
 
-            <View style={[styles.card, { backgroundColor: colors.contentBackground }]}>
+            <View
+              style={[
+                styles.card,
+                styles.sectionCard,
+                styles.tipCard,
+                { backgroundColor: '#eff6ff', borderColor: 'rgba(96,165,250,0.35)' },
+              ]}
+            >
               <Text style={[styles.cardTitle, { color: colors.text }]}>
                 {testingTips.testingTipsTitle || 'Water Testing Tips'}
               </Text>
@@ -245,7 +315,7 @@ export default function WaterCareScreen() {
             </View>
           </>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 }
@@ -255,44 +325,85 @@ const styles = StyleSheet.create({
   center: { justifyContent: 'center', alignItems: 'center' },
   scroll: { flex: 1 },
   content: { flexGrow: 1, padding: 24 },
-  title: {
-    fontSize: 22,
+  hero: {
+    paddingHorizontal: 24,
+    paddingBottom: 36,
+    marginTop: -24,
+    marginBottom: 18,
+  },
+  heroTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  heroTitle: {
+    color: '#fff',
+    fontSize: 20,
     fontWeight: '700',
-    marginBottom: 12,
+  },
+  heroSubtitle: {
+    color: 'rgba(255,255,255,0.95)',
+    fontSize: 15,
+    marginTop: 8,
+    fontWeight: '500',
   },
   body: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#64748b',
     lineHeight: 24,
   },
-  actionGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
+  sectionStack: {
+    gap: 16,
     marginBottom: 24,
   },
   actionCard: {
-    flex: 1,
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 16,
+    minHeight: 118,
+  },
+  actionIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionCopy: {
+    flex: 1,
   },
   actionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  actionDescription: {
+    fontSize: 15,
+    lineHeight: 22,
   },
   card: {
     borderRadius: 20,
     padding: 18,
     marginBottom: 16,
   },
+  sectionCard: {
+    borderWidth: 1,
+  },
+  tipCard: {
+    marginBottom: 0,
+  },
   cardTitle: {
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: 10,
+    marginBottom: 8,
+  },
+  cardSubtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 12,
   },
   cardBody: {
     fontSize: 14,
@@ -314,7 +425,8 @@ const styles = StyleSheet.create({
   measurementCard: {
     borderWidth: 1,
     borderRadius: 14,
-    padding: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   measurementHeader: {
     flexDirection: 'row',
@@ -323,21 +435,28 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   measurementLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '500',
+    flex: 1,
+  },
+  measurementMeta: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  measurementMetaWide: {
+    flex: 1,
+  },
+  measurementValue: {
+    fontSize: 15,
+    fontWeight: '500',
   },
   statusPill: {
     fontSize: 12,
     fontWeight: '700',
   },
-  measurementRange: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginTop: 4,
-  },
   measurementRecent: {
     fontSize: 13,
-    marginTop: 4,
+    marginTop: 8,
   },
   tipRow: {
     flexDirection: 'row',

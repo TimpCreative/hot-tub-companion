@@ -148,6 +148,32 @@ export TENANT=htctest   # optional if TENANT is in .env
 npm run start
 ```
 
+#### Fresh dev-client scripts
+
+If the iOS dev client shows stale UI, use the fresh-launch scripts instead of a plain `expo start`. These scripts start Metro without `CI`, clear the usual stale-bundle path, and reconnect the dev client cleanly.
+
+Simulator:
+
+```bash
+cd mobile
+npm run dev:sim:htctest
+```
+
+Physical iPhone:
+
+```bash
+cd mobile
+DEVICE_ID=<your-iphone-udid> npm run dev:device:htctest
+```
+
+Notes:
+
+- These npm shortcuts are currently wired for the `htctest` tenant; duplicate the package scripts or call the shell scripts directly if you want the same workflow for another tenant
+- `dev:sim:htctest` uses the current default simulator UDID inside `mobile/scripts/dev-sim-reset.sh`
+- `dev:device:htctest` prints the dev-client deep link and keeps Metro running for on-device testing
+- Both scripts assume the current LAN Metro host baked into the script; update `METRO_HOST` in the script or export it when your local IP changes
+- Keep the terminal running while you test; stopping the script stops Metro too
+
 **EAS cloud builds (per retailer):** the **remote builder does not receive** arbitrary shell vars. Use a **named profile** so `env.TENANT` is set on the server. [`mobile/eas.json`](mobile/eas.json) is generated with **`preview-<slug>`** and **`production-<slug>`** for each folder under `mobile/tenants/` that has `tenant.json` (the template `default` tenant is skipped). Regenerate after adding a tenant:
 
 ```bash
