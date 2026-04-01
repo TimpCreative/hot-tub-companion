@@ -15,6 +15,12 @@ import {
   type SaasPlanPreset,
   type TenantFeatureRow,
 } from '../services/saasPlanPresets.service';
+import {
+  buildPosSecretInsert,
+  getTenantPosSummary,
+  testTenantPosConnection as testTenantPosConnectionService,
+  updateTenantPosConfig as updateTenantPosConfigService,
+} from '../services/tenantPosConfig.service';
 
 // Initialize SendGrid if API key is available
 if (env.SENDGRID_API_KEY) {
@@ -231,10 +237,12 @@ export async function createTenant(req: Request, res: Response): Promise<void> {
       secondary_color: body.secondaryColor || '#E8A832',
       // Super Admin-created tenants should be immediately reachable on retailer subdomains.
       status: body.status || 'active',
-      pos_type: body.posType || null,
-      shopify_store_url: body.shopifyStoreUrl || null,
-      shopify_storefront_token: body.shopifyStorefrontToken || null,
-      shopify_admin_token: body.shopifyAdminToken || null,
+      ...buildPosSecretInsert({
+        posType: body.posType || null,
+        shopifyStoreUrl: body.shopifyStoreUrl || null,
+        shopifyStorefrontToken: body.shopifyStorefrontToken || null,
+        shopifyAdminToken: body.shopifyAdminToken || null,
+      }),
     })
     .returning('*');
 
@@ -308,18 +316,13 @@ export async function createTenant(req: Request, res: Response): Promise<void> {
  */
 export async function getTenantPosConfig(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
-  const tenant = await db('tenants').where({ id }).first();
-  if (!tenant) {
+  const summary = await getTenantPosSummary(id);
+  if (!summary) {
     error(res, 'NOT_FOUND', 'Tenant not found', 404);
     return;
   }
 
-  success(res, {
-    tenantId: tenant.id,
-    posType: tenant.pos_type,
-    shopifyStoreUrl: tenant.shopify_store_url,
-    lastProductSyncAt: tenant.last_product_sync_at,
-  });
+  success(res, summary);
 }
 
 /**
@@ -339,37 +342,26 @@ export async function updateTenantPosConfig(req: Request, res: Response): Promis
     shopifyAdminToken?: string;
   };
 
-  const tenant = await db('tenants').where({ id }).first();
-  if (!tenant) {
-    error(res, 'NOT_FOUND', 'Tenant not found', 404);
-    return;
-  }
-
-  const update: Record<string, unknown> = {};
-
-  if (posType !== undefined) {
-    if (posType !== null && posType !== 'shopify') {
-      error(res, 'VALIDATION_ERROR', 'Unsupported POS type for this phase', 400);
+  try {
+    const summary = await updateTenantPosConfigService(id, {
+      posType,
+      shopifyStoreUrl,
+      shopifyStorefrontToken,
+      shopifyAdminToken,
+    });
+    success(res, summary, 'POS configuration saved');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to update POS configuration';
+    if (message === 'Tenant not found') {
+      error(res, 'NOT_FOUND', message, 404);
       return;
     }
-    update.pos_type = posType;
+    if (message === 'Unsupported POS type for this phase') {
+      error(res, 'VALIDATION_ERROR', message, 400);
+      return;
+    }
+    error(res, 'INTERNAL_ERROR', message, 500);
   }
-  if (shopifyStoreUrl !== undefined) update.shopify_store_url = shopifyStoreUrl || null;
-  if (shopifyStorefrontToken !== undefined) update.shopify_storefront_token = shopifyStorefrontToken || null;
-  if (shopifyAdminToken !== undefined) update.shopify_admin_token = shopifyAdminToken || null;
-
-  if (Object.keys(update).length === 0) {
-    success(res, { message: 'No changes applied' });
-    return;
-  }
-
-  const [updated] = await db('tenants').where({ id }).update(update).returning('*');
-
-  success(res, {
-    tenantId: updated.id,
-    posType: updated.pos_type,
-    shopifyStoreUrl: updated.shopify_store_url,
-  });
 }
 
 /**
@@ -377,21 +369,21 @@ export async function updateTenantPosConfig(req: Request, res: Response): Promis
  */
 export async function testTenantPosConnection(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
-  const tenant = await db('tenants').where({ id }).first();
-  if (!tenant) {
-    error(res, 'NOT_FOUND', 'Tenant not found', 404);
-    return;
+  try {
+    const result = await testTenantPosConnectionService(id);
+    success(res, result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to test POS connection';
+    if (message === 'Tenant not found') {
+      error(res, 'NOT_FOUND', message, 404);
+      return;
+    }
+    if (message === 'No POS adapter configured for this tenant') {
+      error(res, 'CONFIG_ERROR', message, 400);
+      return;
+    }
+    error(res, 'INTERNAL_ERROR', message, 500);
   }
-
-  const { getPosAdapter } = await import('../services/posAdapterRegistry');
-  const adapter = getPosAdapter(tenant.pos_type);
-  if (!adapter) {
-    error(res, 'CONFIG_ERROR', 'No POS adapter configured for this tenant', 400);
-    return;
-  }
-
-  const result = await adapter.testConnection(tenant.id);
-  success(res, result);
 }
 
 /**

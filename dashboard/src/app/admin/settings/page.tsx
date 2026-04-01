@@ -32,6 +32,37 @@ interface SettingsResponse {
   };
 }
 
+interface PosSettingsResponse {
+  success?: boolean;
+  message?: string;
+  error?: { message?: string };
+  data?: {
+    tenantId?: string;
+    posType?: string | null;
+    shopifyStoreUrl?: string | null;
+    lastProductSyncAt?: string | null;
+    shopifyStorefrontTokenConfigured?: boolean;
+    shopifyAdminTokenConfigured?: boolean;
+    shopifyWebhookSecretConfigured?: boolean;
+  };
+}
+
+interface SettingsSnapshot {
+  primaryColor: string;
+  secondaryColor: string;
+  logoUrl: string;
+  iconUrl: string;
+  timezone: string;
+  dealerPhone: string;
+  dealerAddress: string;
+  dealerEmail: string;
+  dealerHours: string;
+  posType: string;
+  shopifyStoreUrl: string;
+  shopifyAdminTokenDraft: string;
+  shopifyStorefrontTokenDraft: string;
+}
+
 function getErrorMessage(error: unknown, fallback: string) {
   if (error && typeof error === 'object') {
     if ('error' in error) {
@@ -61,20 +92,71 @@ export default function AdminSettingsPage() {
   const [dealerAddress, setDealerAddress] = useState<string>('');
   const [dealerEmail, setDealerEmail] = useState<string>('');
   const [dealerHours, setDealerHours] = useState<string>('');
+  const [posType, setPosType] = useState<string>('');
+  const [shopifyStoreUrl, setShopifyStoreUrl] = useState<string>('');
+  const [shopifyAdminTokenDraft, setShopifyAdminTokenDraft] = useState<string>('');
+  const [shopifyStorefrontTokenDraft, setShopifyStorefrontTokenDraft] = useState<string>('');
+  const [shopifyAdminTokenConfigured, setShopifyAdminTokenConfigured] = useState(false);
+  const [shopifyStorefrontTokenConfigured, setShopifyStorefrontTokenConfigured] = useState(false);
+  const [lastProductSyncAt, setLastProductSyncAt] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [posSaving, setPosSaving] = useState(false);
+  const [posTesting, setPosTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [posError, setPosError] = useState<string | null>(null);
+  const [posSuccess, setPosSuccess] = useState<string | null>(null);
+  const [initialSnapshot, setInitialSnapshot] = useState<SettingsSnapshot | null>(null);
+
+  useEffect(() => {
+    if (!initialSnapshot) return;
+    const dirty =
+      primaryColor !== initialSnapshot.primaryColor ||
+      secondaryColor !== initialSnapshot.secondaryColor ||
+      logoUrl !== initialSnapshot.logoUrl ||
+      iconUrl !== initialSnapshot.iconUrl ||
+      timezone !== initialSnapshot.timezone ||
+      dealerPhone !== initialSnapshot.dealerPhone ||
+      dealerAddress !== initialSnapshot.dealerAddress ||
+      dealerEmail !== initialSnapshot.dealerEmail ||
+      dealerHours !== initialSnapshot.dealerHours ||
+      posType !== initialSnapshot.posType ||
+      shopifyStoreUrl !== initialSnapshot.shopifyStoreUrl ||
+      shopifyAdminTokenDraft !== initialSnapshot.shopifyAdminTokenDraft ||
+      shopifyStorefrontTokenDraft !== initialSnapshot.shopifyStorefrontTokenDraft;
+    setUnsavedChanges(dirty);
+  }, [
+    dealerAddress,
+    dealerEmail,
+    dealerHours,
+    dealerPhone,
+    iconUrl,
+    initialSnapshot,
+    logoUrl,
+    posType,
+    primaryColor,
+    secondaryColor,
+    setUnsavedChanges,
+    shopifyAdminTokenDraft,
+    shopifyStoreUrl,
+    shopifyStorefrontTokenDraft,
+    timezone,
+  ]);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const res = await api.get('/admin/settings/branding') as SettingsResponse;
-        const branding = res?.data?.branding;
-        const dealerContact = res?.data?.dealerContact;
+        const [brandingRes, posRes] = await Promise.all([
+          api.get('/admin/settings/branding') as Promise<SettingsResponse>,
+          api.get('/admin/settings/pos') as Promise<PosSettingsResponse>,
+        ]);
+        const branding = brandingRes?.data?.branding;
+        const dealerContact = brandingRes?.data?.dealerContact;
+        const pos = posRes?.data;
         setPrimaryColor(branding?.primaryColor || '#1B4D7A');
         setSecondaryColor(branding?.secondaryColor || '#E8A832');
         setLogoUrl(branding?.logoUrl || '');
@@ -84,7 +166,28 @@ export default function AdminSettingsPage() {
         setDealerAddress(dealerContact?.address ?? '');
         setDealerEmail(dealerContact?.email ?? '');
         setDealerHours(dealerContact?.hours ?? '');
-        setUnsavedChanges(false);
+        setPosType(pos?.posType ?? '');
+        setShopifyStoreUrl(pos?.shopifyStoreUrl ?? '');
+        setShopifyAdminTokenDraft('');
+        setShopifyStorefrontTokenDraft('');
+        setShopifyAdminTokenConfigured(!!pos?.shopifyAdminTokenConfigured);
+        setShopifyStorefrontTokenConfigured(!!pos?.shopifyStorefrontTokenConfigured);
+        setLastProductSyncAt(pos?.lastProductSyncAt ?? null);
+        setInitialSnapshot({
+          primaryColor: branding?.primaryColor || '#1B4D7A',
+          secondaryColor: branding?.secondaryColor || '#E8A832',
+          logoUrl: branding?.logoUrl || '',
+          iconUrl: branding?.iconUrl || '',
+          timezone: branding?.timezone ?? 'America/Denver',
+          dealerPhone: dealerContact?.phone ?? '',
+          dealerAddress: dealerContact?.address ?? '',
+          dealerEmail: dealerContact?.email ?? '',
+          dealerHours: dealerContact?.hours ?? '',
+          posType: pos?.posType ?? '',
+          shopifyStoreUrl: pos?.shopifyStoreUrl ?? '',
+          shopifyAdminTokenDraft: '',
+          shopifyStorefrontTokenDraft: '',
+        });
       } catch (e: unknown) {
         setError(getErrorMessage(e, 'Failed to load settings'));
       } finally {
@@ -115,7 +218,22 @@ export default function AdminSettingsPage() {
 
       if (res?.success) {
         setSuccess(res.message ?? 'Settings saved');
-        setUnsavedChanges(false);
+        setInitialSnapshot((prev) =>
+          prev
+            ? {
+                ...prev,
+                primaryColor,
+                secondaryColor,
+                logoUrl,
+                iconUrl,
+                timezone: timezone.trim() || 'America/Denver',
+                dealerPhone,
+                dealerAddress,
+                dealerEmail,
+                dealerHours,
+              }
+            : prev
+        );
       } else {
         setError(res?.error?.message ?? 'Failed to save settings');
       }
@@ -123,6 +241,65 @@ export default function AdminSettingsPage() {
       setError(getErrorMessage(e, 'Failed to save settings'));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSavePos() {
+    setPosSaving(true);
+    setPosError(null);
+    setPosSuccess(null);
+    try {
+      const payload: Record<string, unknown> = {
+        posType: posType || null,
+        shopifyStoreUrl: shopifyStoreUrl.trim() || null,
+      };
+      if (shopifyAdminTokenDraft.trim()) payload.shopifyAdminToken = shopifyAdminTokenDraft.trim();
+      if (shopifyStorefrontTokenDraft.trim()) payload.shopifyStorefrontToken = shopifyStorefrontTokenDraft.trim();
+
+      const res = await api.put('/admin/settings/pos', payload) as PosSettingsResponse;
+      if (res?.success) {
+        setPosSuccess(res.message ?? 'POS configuration saved');
+        setShopifyAdminTokenDraft('');
+        setShopifyStorefrontTokenDraft('');
+        setShopifyAdminTokenConfigured(!!res.data?.shopifyAdminTokenConfigured);
+        setShopifyStorefrontTokenConfigured(!!res.data?.shopifyStorefrontTokenConfigured);
+        setLastProductSyncAt(res.data?.lastProductSyncAt ?? null);
+        setInitialSnapshot((prev) =>
+          prev
+            ? {
+                ...prev,
+                posType: res.data?.posType ?? posType,
+                shopifyStoreUrl: res.data?.shopifyStoreUrl ?? shopifyStoreUrl,
+                shopifyAdminTokenDraft: '',
+                shopifyStorefrontTokenDraft: '',
+              }
+            : prev
+        );
+      } else {
+        setPosError(res?.error?.message ?? 'Failed to save POS configuration');
+      }
+    } catch (e: unknown) {
+      setPosError(getErrorMessage(e, 'Failed to save POS configuration'));
+    } finally {
+      setPosSaving(false);
+    }
+  }
+
+  async function handleTestPos() {
+    setPosTesting(true);
+    setPosError(null);
+    setPosSuccess(null);
+    try {
+      const res = await api.post('/admin/settings/pos/test', {}) as PosSettingsResponse & { data?: { ok?: boolean; message?: string } };
+      if (res?.data?.ok) {
+        setPosSuccess(res.data.message ?? 'Connection successful');
+      } else {
+        setPosError(res?.data?.message ?? res?.error?.message ?? 'Connection test failed');
+      }
+    } catch (e: unknown) {
+      setPosError(getErrorMessage(e, 'Connection test failed'));
+    } finally {
+      setPosTesting(false);
     }
   }
 
@@ -310,6 +487,88 @@ export default function AdminSettingsPage() {
           <p className="text-xs text-gray-500">
             After upload, click Save Settings. Images only. Min 1KB, max 10MB.
           </p>
+        </div>
+      </div>
+
+      <div className="card mt-6 space-y-4 rounded-lg p-6">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">POS Integration</h3>
+          <p className="text-xs text-gray-500 mt-1">
+            Configure the Shopify connection used for product sync and future commerce. Stored tokens are never shown again after save.
+          </p>
+        </div>
+
+        {posError && <div className="rounded-lg bg-red-50 p-4 text-red-700">{posError}</div>}
+        {posSuccess && <div className="rounded-lg bg-green-50 p-4 text-green-800">{posSuccess}</div>}
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Provider</label>
+          <select
+            className="w-full rounded-lg border border-gray-300 px-3 py-2"
+            value={posType}
+            onChange={(e) => setPosType(e.target.value)}
+            disabled={posSaving || posTesting}
+          >
+            <option value="">Not configured</option>
+            <option value="shopify">Shopify</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Shopify store URL</label>
+          <input
+            className="w-full rounded-lg border border-gray-300 px-3 py-2"
+            value={shopifyStoreUrl}
+            onChange={(e) => setShopifyStoreUrl(e.target.value)}
+            disabled={posSaving || posTesting || posType !== 'shopify'}
+            placeholder="https://your-store.myshopify.com"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Shopify Admin Token</label>
+          <input
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
+            type="password"
+            value={shopifyAdminTokenDraft}
+            onChange={(e) => setShopifyAdminTokenDraft(e.target.value)}
+            disabled={posSaving || posTesting || posType !== 'shopify'}
+            placeholder="Paste a new token to replace the stored value"
+            autoComplete="new-password"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            {shopifyAdminTokenConfigured ? 'Configured.' : 'Not configured.'} If you need it again, regenerate it in Shopify.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Shopify Storefront Token</label>
+          <input
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
+            type="password"
+            value={shopifyStorefrontTokenDraft}
+            onChange={(e) => setShopifyStorefrontTokenDraft(e.target.value)}
+            disabled={posSaving || posTesting || posType !== 'shopify'}
+            placeholder="Paste a new token to replace the stored value"
+            autoComplete="new-password"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            {shopifyStorefrontTokenConfigured ? 'Configured.' : 'Not configured.'} If you need it again, regenerate it in Shopify.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Last product sync</label>
+          <p className="text-sm text-gray-600">{lastProductSyncAt ? new Date(lastProductSyncAt).toLocaleString() : 'Never'}</p>
+        </div>
+
+        <div className="flex items-center gap-3 pt-2">
+          <Button type="button" loading={posSaving} onClick={handleSavePos}>
+            Save POS Settings
+          </Button>
+          <Button type="button" variant="secondary" loading={posTesting} onClick={handleTestPos}>
+            Test Connection
+          </Button>
         </div>
       </div>
     </div>

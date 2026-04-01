@@ -7,6 +7,7 @@ import * as adminProductsController from '../controllers/adminProducts.controlle
 import * as adminBrandingController from '../controllers/adminBranding.controller';
 import * as adminBrandingMediaController from '../controllers/adminBrandingMedia.controller';
 import * as adminAppSetupController from '../controllers/adminAppSetup.controller';
+import * as adminPosController from '../controllers/adminPos.controller';
 import * as adminNotificationsController from '../controllers/adminNotifications.controller';
 import * as adminTeamController from '../controllers/adminTeam.controller';
 import adminContentRoutes from './adminContent.routes';
@@ -43,6 +44,9 @@ router.post('/products/sync', adminProductsController.syncNow);
 // Branding / settings
 router.get('/settings/branding', adminBrandingController.getBranding);
 router.put('/settings/branding', adminBrandingController.updateBranding);
+router.get('/settings/pos', adminPosController.getPosConfig);
+router.put('/settings/pos', adminPosController.updatePosConfig);
+router.post('/settings/pos/test', adminPosController.testPosConnection);
 
 // App setup (onboarding config, etc.)
 router.get('/settings/app-setup', adminAppSetupController.getAppSetup);

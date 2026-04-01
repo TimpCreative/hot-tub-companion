@@ -1,5 +1,6 @@
 import { db } from '../config/database';
 import { env } from '../config/environment';
+import { decryptTenantSecret } from '../utils/tenantSecrets';
 import type {
   DbPosProduct,
   PosAdapter,
@@ -57,13 +58,18 @@ async function shopifyFetch(
     throw new Error('Shopify credentials are not configured for this tenant');
   }
 
+  const adminToken = decryptTenantSecret(tenant.shopify_admin_token);
+  if (!adminToken) {
+    throw new Error('Shopify admin token is not configured for this tenant');
+  }
+
   const baseUrl = getShopifyBaseUrl(tenant.shopify_store_url);
   const url = `${baseUrl}/admin/api/2025-01${path}`;
 
   const res = await fetch(url, {
     method: 'GET',
     headers: {
-      'X-Shopify-Access-Token': tenant.shopify_admin_token,
+      'X-Shopify-Access-Token': adminToken,
       'Content-Type': 'application/json',
     },
   });

@@ -78,6 +78,7 @@ Create these files in `mobile/tenants/{slug}/`:
 | `icon.png` | 1024x1024px | App icon (no transparency for iOS) |
 | `adaptive-icon.png` | 1024x1024px | Android adaptive icon foreground |
 | `splash.png` | 1284x2778px | Splash screen image |
+| `tenant.json` | n/a | Tenant metadata used to generate EAS profiles and build config |
 
 ### Example Directory Structure
 
@@ -88,6 +89,28 @@ mobile/tenants/takeabreak/
 ├── splash.png
 └── tenant.json
 ```
+
+---
+
+### Required `tenant.json`
+
+Create `mobile/tenants/{slug}/tenant.json` with this shape:
+
+```json
+{
+  "name": "Take A Break Spas",
+  "slug": "takeabreak",
+  "bundleId": "com.hottubcompanion.takeabreak",
+  "icon": "icon.png",
+  "splash": "splash.png",
+  "adaptiveIcon": "adaptive-icon.png"
+}
+```
+
+Notes:
+- `slug` must match the tenant slug from Step 1 exactly
+- `bundleId` must match the app store identifiers you intend to ship
+- the file names should match the assets you placed in the tenant folder
 
 ---
 
@@ -258,53 +281,169 @@ Or submit manually:
 
 ## Step 8: Set Up Retailer Admin Access
 
-### 8.1 Create Admin User
+### 8.1 Understand the current admin-access flow
 
-The retailer's staff need accounts to access their dashboard:
+Retailer admin access is now primarily managed through the **Retailer Admin → Team** page.
 
-1. Have the retailer staff member create an account in the **mobile app** first (this creates them in Firebase + database)
-2. Or create the Firebase user manually in Firebase Console
+What is implemented today:
+- admins can invite other admins from the Team page
+- invited users get an `admin_roles` entry
+- new users can be provisioned automatically during invite
+- role/permission management is handled in the Team UI
 
-### 8.2 Grant Admin Role
+What is **not** fully self-serve yet:
+- Super Admin does **not** currently have a dedicated “create retailer admin user” UI
+- the **first** retailer owner/admin still needs a bootstrap path before they can invite others
 
-Currently, admin roles must be granted via direct database access:
+### 8.2 Bootstrap the first retailer admin
+
+Use one of these supported bootstrap methods:
+
+#### Option A: Existing tenant-admin override / internal bootstrap
+
+If your environment already grants internal tenant-admin override access, use that to log into the retailer admin and then invite the retailer's real users from **Team**.
+
+#### Option B: Direct database bootstrap for the first owner
+
+If no retailer admin exists yet, create the first owner role directly in the database.
+
+1. Make sure the future retailer admin user exists in Firebase and in `users`
+   - easiest path: have them create an account in the app first
+   - or create them manually in Firebase, then ensure a matching `users` row exists for the tenant
+
+2. Insert or update the initial owner role:
 
 ```sql
 -- Find the user
-SELECT id, email FROM users WHERE tenant_id = '{tenant_uuid}' AND email = 'admin@retailer.com';
+SELECT id, email
+FROM users
+WHERE tenant_id = '{tenant_uuid}'
+  AND email = 'admin@retailer.com';
 
--- Create admin role (can_send_notifications defaults to true)
-INSERT INTO admin_roles (tenant_id, user_id, role, can_view_customers, can_view_orders, can_manage_products, can_manage_content, can_manage_service_requests, can_view_analytics, can_manage_subscriptions, can_manage_settings)
+-- Create the first owner role
+INSERT INTO admin_roles (
+  tenant_id,
+  user_id,
+  role,
+  can_view_customers,
+  can_view_orders,
+  can_manage_products,
+  can_manage_content,
+  can_manage_service_requests,
+  can_send_notifications,
+  can_view_analytics,
+  can_manage_subscriptions,
+  can_manage_settings,
+  can_manage_users
+)
 VALUES (
   '{tenant_uuid}',
   '{user_uuid}',
   'owner',
-  true, true, true, true, true, true, true, true
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true
 );
 ```
 
-> **Future Enhancement:** Add admin role management to the super admin dashboard (Phase 1+)
+Once that first owner can log in, all additional retailer admins should be added through the Team page instead of direct database edits.
 
-### 8.3 Verify Dashboard Access
+### 8.3 Invite additional retailer admins
+
+After the first owner is in place:
+
+1. Log into `https://{slug}.hottubcompanion.com`
+2. Open **Team**
+3. Click **Invite admin**
+4. Enter the email and role
+5. Send the invite
+
+What the system does:
+- if the user already exists for that tenant, it updates/adds their admin role
+- if they do not exist yet, it provisions the user and creates the admin role
+- if SendGrid is configured, the invite email includes a sign-in or password-setup link
+
+### 8.4 Verify dashboard access
 
 1. Go to `https://{slug}.hottubcompanion.com`
 2. Log in with the admin user's credentials
 3. Verify dashboard loads with correct branding
+4. Verify the **Team** page is accessible for owner users
+5. Verify invited admins receive the expected permissions
 
 ---
 
-## Step 9: Configure POS Integration (if applicable)
+## Step 9: Configure Shopify POS Integration (if applicable)
 
-If the retailer uses Shopify:
+If the retailer uses Shopify, create a **Shopify custom app** and connect it to the tenant.
 
-1. Go to super admin → Tenants → {Tenant} → Edit
-2. Add Shopify credentials:
-   - **Shopify Store URL:** `{store}.myshopify.com`
-   - **Storefront API Token:** From Shopify Admin → Apps → Develop apps
-   - **Admin API Token:** From Shopify Admin → Apps → Develop apps
-3. Trigger initial product sync
+### 9.1 Create the Shopify custom app
 
-> **Note:** Full POS integration is implemented in Phase 1.
+In the retailer's Shopify admin:
+
+1. Go to **Settings** → **Apps and sales channels**
+2. Click **Develop apps**
+3. Click **Create an app**
+4. Name it something clear, such as **Hot Tub Companion**
+5. Open the new app and configure the API scopes
+
+### 9.2 Required Shopify access
+
+For the current integration, the connection is used for:
+- product sync through the Shopify Admin API
+- future Storefront cart and checkout work
+
+At minimum, configure the custom app so you can generate:
+
+- **Admin API access token**
+  - used by Hot Tub Companion to test the connection and sync products
+- **Storefront API access token**
+  - used later for cart and checkout work
+
+If Shopify asks for product-related scopes, enable the product/catalog access needed for sync and Storefront browsing. Keep scopes as narrow as practical.
+
+### 9.3 Save the connection in Hot Tub Companion
+
+You can currently save the Shopify connection in either of these places:
+
+- **Super Admin** → **Tenants** → `{Tenant}` → **POS Integration**
+- **Retailer Admin** → **Settings** → **POS Integration**
+
+Fill in:
+
+- **Provider:** `Shopify`
+- **Shopify Store URL:** `https://{store}.myshopify.com`
+- **Shopify Admin Token:** paste the Admin API token from the custom app
+- **Shopify Storefront Token:** paste the Storefront API token from the custom app
+
+### 9.4 Important security behavior
+
+- Tokens are stored securely on the server
+- Tokens are **write-only**
+- After saving, the UI will only show whether a token is configured
+- Tokens are **not revealable**
+- If a token is lost or needs to be viewed again, **regenerate it in Shopify** and replace it in Hot Tub Companion
+
+### 9.5 Test and sync
+
+1. Click **Test Connection**
+2. Confirm the connection succeeds
+3. In **Super Admin** → **Tenants** → `{Tenant}` → **POS Integration**, run the initial full sync
+
+### 9.6 Current limitations
+
+- The current **Test Connection** path validates the Shopify **Admin token** against product access
+- The **Storefront token** is stored securely now, but it will be exercised fully once cart and checkout work is implemented
+- Product sync currently works, but large-catalog pagination and deeper sync hardening are part of the next commerce phase
+
+> **Note:** POS credential management is now available in both Super Admin and Retailer Admin Settings, but the initial sync action remains in Super Admin.
 
 ---
 
@@ -315,12 +454,17 @@ Before announcing go-live to the retailer:
 - [ ] **Super Admin Dashboard**
   - [ ] Tenant appears in tenant list
   - [ ] Tenant details page shows correct info
-  - [ ] API key is masked and revealable
+  - [ ] API key is masked
+  - [ ] POS Integration shows configured state without revealing tokens
 
 - [ ] **Retailer Admin Dashboard**
   - [ ] `{slug}.hottubcompanion.com` loads
-  - [ ] Login works for admin user
+  - [ ] Login works for the initial owner/admin
   - [ ] Branding colors are correct
+  - [ ] Team page loads for users with `can_manage_users`
+  - [ ] Invite flow works for additional admins
+  - [ ] POS Integration appears in Settings
+  - [ ] Shopify tokens can be replaced, but not revealed
 
 - [ ] **Mobile App (iOS)**
   - [ ] App icon is correct

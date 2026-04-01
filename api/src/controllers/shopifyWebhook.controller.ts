@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { db } from '../config/database';
 import { error, success } from '../utils/response';
 import * as notificationService from '../services/notification.service';
+import { decryptTenantSecret } from '../utils/tenantSecrets';
 
 function normalizeShopDomain(domain: string): string {
   const s = domain.trim().toLowerCase();
@@ -50,7 +51,11 @@ export async function handleOrdersCreate(req: Request, res: Response): Promise<v
     return;
   }
 
-  const secret = tenant.shopify_webhook_secret;
+  const secret = decryptTenantSecret(tenant.shopify_webhook_secret);
+  if (!secret) {
+    error(res, 'CONFIG_ERROR', 'Webhook secret is not configured for this tenant', 500);
+    return;
+  }
   const hash = crypto.createHmac('sha256', secret).update(rawBody).digest('base64');
 
   try {

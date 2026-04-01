@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { format } from 'date-fns';
@@ -24,6 +24,9 @@ interface Tenant {
   posType?: string | null;
   shopifyStoreUrl?: string | null;
   lastProductSyncAt?: string | null;
+  shopifyAdminTokenConfigured?: boolean;
+  shopifyStorefrontTokenConfigured?: boolean;
+  shopifyWebhookSecretConfigured?: boolean;
   dashboardDomain?: string | null;
   vercelDomainStatus?: string | null;
   vercelDomainError?: string | null;
@@ -34,7 +37,6 @@ export default function TenantDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const fetchWithAuth = useSuperAdminFetch();
-  const router = useRouter();
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,8 +48,6 @@ export default function TenantDetailPage() {
   const [shopifyStoreUrlDraft, setShopifyStoreUrlDraft] = useState<string>('');
   const [shopifyAdminTokenDraft, setShopifyAdminTokenDraft] = useState<string>('');
   const [shopifyStorefrontTokenDraft, setShopifyStorefrontTokenDraft] = useState<string>('');
-  const [showShopifyAdminToken, setShowShopifyAdminToken] = useState(false);
-  const [showShopifyStorefrontToken, setShowShopifyStorefrontToken] = useState(false);
 
   const [brandingLoading, setBrandingLoading] = useState(false);
   const [brandingError, setBrandingError] = useState<string | null>(null);
@@ -78,6 +78,9 @@ export default function TenantDetailPage() {
             posType: pos?.posType ?? null,
             shopifyStoreUrl: pos?.shopifyStoreUrl ?? null,
             lastProductSyncAt: pos?.lastProductSyncAt ?? null,
+            shopifyAdminTokenConfigured: !!pos?.shopifyAdminTokenConfigured,
+            shopifyStorefrontTokenConfigured: !!pos?.shopifyStorefrontTokenConfigured,
+            shopifyWebhookSecretConfigured: !!pos?.shopifyWebhookSecretConfigured,
           });
           setPosTypeDraft(pos?.posType ?? '');
           setShopifyStoreUrlDraft(pos?.shopifyStoreUrl ?? '');
@@ -137,15 +140,16 @@ export default function TenantDetailPage() {
               ...prev,
               posType: (data.data?.posType ?? posTypeDraft) || null,
               shopifyStoreUrl: (data.data?.shopifyStoreUrl ?? shopifyStoreUrlDraft) || null,
+              shopifyAdminTokenConfigured: !!data.data?.shopifyAdminTokenConfigured,
+              shopifyStorefrontTokenConfigured: !!data.data?.shopifyStorefrontTokenConfigured,
+              shopifyWebhookSecretConfigured: !!data.data?.shopifyWebhookSecretConfigured,
             }
           : prev
       );
-      setPosSavedMessage(data.data?.message ?? 'POS configuration saved');
+      setPosSavedMessage(data.message ?? 'POS configuration saved');
 
       setShopifyAdminTokenDraft('');
       setShopifyStorefrontTokenDraft('');
-      setShowShopifyAdminToken(false);
-      setShowShopifyStorefrontToken(false);
     } catch (err: unknown) {
       setPosError(err instanceof Error ? err.message : 'Failed to save POS configuration');
     } finally {
@@ -522,54 +526,34 @@ export default function TenantDetailPage() {
           <div className="sm:grid sm:grid-cols-3 sm:gap-4">
             <dt className="text-sm font-medium text-gray-500">Shopify Admin Token</dt>
             <dd className="mt-1 sm:mt-0 sm:col-span-2">
-              <div className="flex items-center gap-2">
-                <input
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
-                  type={showShopifyAdminToken ? 'text' : 'password'}
-                  value={shopifyAdminTokenDraft}
-                  onChange={(e) => setShopifyAdminTokenDraft(e.target.value)}
-                  disabled={posLoading || posTypeDraft !== 'shopify'}
-                  placeholder="Enter to update (leave blank to keep existing)"
-                  autoComplete="off"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowShopifyAdminToken((v) => !v)}
-                  className="text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap"
-                  disabled={posLoading || posTypeDraft !== 'shopify'}
-                >
-                  {showShopifyAdminToken ? 'Hide' : 'Show'}
-                </button>
-              </div>
+              <input
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
+                type="password"
+                value={shopifyAdminTokenDraft}
+                onChange={(e) => setShopifyAdminTokenDraft(e.target.value)}
+                disabled={posLoading || posTypeDraft !== 'shopify'}
+                placeholder="Paste a new token to replace the stored value"
+                autoComplete="new-password"
+              />
               <div className="mt-1 text-xs text-gray-500">
-                Stored securely on the server. This field is intentionally blank unless you update it.
+                {tenant.shopifyAdminTokenConfigured ? 'Configured.' : 'Not configured.'} Tokens are never shown again after save. Regenerate in Shopify if you need a new one.
               </div>
             </dd>
           </div>
           <div className="sm:grid sm:grid-cols-3 sm:gap-4">
             <dt className="text-sm font-medium text-gray-500">Shopify Storefront Token</dt>
             <dd className="mt-1 sm:mt-0 sm:col-span-2">
-              <div className="flex items-center gap-2">
-                <input
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
-                  type={showShopifyStorefrontToken ? 'text' : 'password'}
-                  value={shopifyStorefrontTokenDraft}
-                  onChange={(e) => setShopifyStorefrontTokenDraft(e.target.value)}
-                  disabled={posLoading || posTypeDraft !== 'shopify'}
-                  placeholder="Enter to update (leave blank to keep existing)"
-                  autoComplete="off"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowShopifyStorefrontToken((v) => !v)}
-                  className="text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap"
-                  disabled={posLoading || posTypeDraft !== 'shopify'}
-                >
-                  {showShopifyStorefrontToken ? 'Hide' : 'Show'}
-                </button>
-              </div>
+              <input
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
+                type="password"
+                value={shopifyStorefrontTokenDraft}
+                onChange={(e) => setShopifyStorefrontTokenDraft(e.target.value)}
+                disabled={posLoading || posTypeDraft !== 'shopify'}
+                placeholder="Paste a new token to replace the stored value"
+                autoComplete="new-password"
+              />
               <div className="mt-1 text-xs text-gray-500">
-                Stored securely on the server. This field is intentionally blank unless you update it.
+                {tenant.shopifyStorefrontTokenConfigured ? 'Configured.' : 'Not configured.'} Tokens are never shown again after save. Regenerate in Shopify if you need a new one.
               </div>
             </dd>
           </div>
