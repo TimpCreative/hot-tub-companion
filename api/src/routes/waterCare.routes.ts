@@ -15,5 +15,7 @@ adminRoutes.delete('/mappings/:id', waterCareController.deleteMapping);
 const customerRoutes = Router();
 customerRoutes.use(authMiddleware);
 customerRoutes.get('/water-care/:spaProfileId', waterCareController.getResolvedWaterCare);
+customerRoutes.post('/water-tests', waterCareController.createWaterTest);
+customerRoutes.get('/water-tests/:spaProfileId', waterCareController.listWaterTests);
 
 export default customerRoutes;

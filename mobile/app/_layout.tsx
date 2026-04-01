@@ -25,6 +25,39 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="profile" options={{ headerShown: false }} />
             <Stack.Screen
+              name="water-test"
+              options={{
+                headerShown: true,
+                title: 'Water Test',
+                headerBackTitle: 'Back',
+                headerRight: () => <HeaderProfileButton />,
+                headerStyle: { backgroundColor: PRIMARY },
+                headerTintColor: '#fff',
+              }}
+            />
+            <Stack.Screen
+              name="maintenance-log"
+              options={{
+                headerShown: true,
+                title: 'Maintenance Log',
+                headerBackTitle: 'Back',
+                headerRight: () => <HeaderProfileButton />,
+                headerStyle: { backgroundColor: PRIMARY },
+                headerTintColor: '#fff',
+              }}
+            />
+            <Stack.Screen
+              name="water-guides"
+              options={{
+                headerShown: true,
+                title: 'Guides & Videos',
+                headerBackTitle: 'Back',
+                headerRight: () => <HeaderProfileButton />,
+                headerStyle: { backgroundColor: PRIMARY },
+                headerTintColor: '#fff',
+              }}
+            />
+            <Stack.Screen
               name="services"
               options={{
                 headerShown: true,

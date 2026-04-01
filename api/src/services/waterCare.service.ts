@@ -93,6 +93,79 @@ export interface WaterCareProfileMapping {
   updatedAt: Date;
 }
 
+interface OwnedSpaProfileRow {
+  id: string;
+  user_id: string;
+  tenant_id: string;
+  sanitization_system: string | null;
+  uhtd_spa_model_id: string | null;
+  brand_id: string | null;
+  model_line_id: string | null;
+  resolved_model_line_id: string | null;
+  last_water_test_at: Date | null;
+}
+
+interface WaterTestRow {
+  id: string;
+  user_id: string;
+  tenant_id: string;
+  spa_profile_id: string;
+  tested_at: Date;
+  shared_with_retailer: boolean;
+  notes: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+interface WaterTestMeasurementRow {
+  id: string;
+  water_test_id: string;
+  metric_key: string;
+  value: string | number;
+  unit: string;
+  created_at: Date;
+}
+
+export interface WaterTestMeasurementInput {
+  metricKey: string;
+  value: number;
+}
+
+export interface CreateWaterTestInput {
+  spaProfileId: string;
+  testedAt?: string | null;
+  notes?: string | null;
+  sharedWithRetailer?: boolean;
+  measurements: WaterTestMeasurementInput[];
+}
+
+export interface WaterTestMeasurement {
+  id: string;
+  metricKey: string;
+  value: number;
+  unit: string;
+}
+
+export interface WaterTestRecord {
+  id: string;
+  spaProfileId: string;
+  testedAt: Date;
+  sharedWithRetailer: boolean;
+  notes: string | null;
+  measurements: WaterTestMeasurement[];
+  createdAt: Date;
+}
+
+export interface WaterCareComparisonRow {
+  metricKey: string;
+  label: string;
+  unit: string;
+  idealMin: number;
+  idealMax: number;
+  recentValue: number | null;
+  status: 'low' | 'in_range' | 'high' | 'missing';
+}
+
 function mapMeasurement(row: WaterCareMeasurementRow) {
   return {
     id: row.id,
@@ -133,6 +206,60 @@ function mapMapping(row: WaterCareMappingRow): WaterCareProfileMapping {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function mapWaterTestMeasurement(row: WaterTestMeasurementRow): WaterTestMeasurement {
+  return {
+    id: row.id,
+    metricKey: row.metric_key,
+    value: Number(row.value),
+    unit: row.unit,
+  };
+}
+
+function mapWaterTest(
+  row: WaterTestRow,
+  measurements: WaterTestMeasurementRow[]
+): WaterTestRecord {
+  return {
+    id: row.id,
+    spaProfileId: row.spa_profile_id,
+    testedAt: row.tested_at,
+    sharedWithRetailer: row.shared_with_retailer,
+    notes: row.notes,
+    measurements: measurements
+      .filter((measurement) => measurement.water_test_id === row.id)
+      .sort((a, b) => a.metric_key.localeCompare(b.metric_key))
+      .map(mapWaterTestMeasurement),
+    createdAt: row.created_at,
+  };
+}
+
+async function getOwnedSpaProfile(
+  spaProfileId: string,
+  tenantId: string,
+  userId: string
+): Promise<OwnedSpaProfileRow | null> {
+  const spa = await db('spa_profiles as sp')
+    .leftJoin('scdb_spa_models as spa_model', 'sp.uhtd_spa_model_id', 'spa_model.id')
+    .leftJoin('scdb_model_lines as ml', 'spa_model.model_line_id', 'ml.id')
+    .select(
+      'sp.id',
+      'sp.user_id',
+      'sp.tenant_id',
+      'sp.sanitization_system',
+      'sp.uhtd_spa_model_id',
+      'sp.last_water_test_at',
+      'spa_model.brand_id',
+      'spa_model.model_line_id',
+      'ml.id as resolved_model_line_id'
+    )
+    .where('sp.id', spaProfileId)
+    .andWhere('sp.tenant_id', tenantId)
+    .andWhere('sp.user_id', userId)
+    .first();
+
+  return (spa as OwnedSpaProfileRow | undefined) ?? null;
 }
 
 async function replaceMeasurements(
@@ -293,32 +420,15 @@ function scopeRank(scopeType: WaterCareScopeType): number {
   return 3;
 }
 
-export async function resolveWaterCareForSpaProfile(spaProfileId: string, tenantId: string, userId: string) {
-  const spa = await db('spa_profiles as sp')
-    .leftJoin('scdb_spa_models as spa_model', 'sp.uhtd_spa_model_id', 'spa_model.id')
-    .leftJoin('scdb_model_lines as ml', 'spa_model.model_line_id', 'ml.id')
-    .select(
-      'sp.id',
-      'sp.tenant_id',
-      'sp.sanitization_system',
-      'sp.uhtd_spa_model_id',
-      'spa_model.brand_id',
-      'spa_model.model_line_id',
-      'ml.id as resolved_model_line_id'
-    )
-    .where('sp.id', spaProfileId)
-    .andWhere('sp.tenant_id', tenantId)
-    .andWhere('sp.user_id', userId)
-    .first();
-
-  if (!spa) return null;
-
+async function resolveWinningProfileMapping(spa: OwnedSpaProfileRow): Promise<WaterCareMappingRow | null> {
   const allMappings = (await db('water_care_profile_mappings').select('*')) as WaterCareMappingRow[];
   const ranked = allMappings
     .filter((mapping) => {
       if (mapping.scope_type === 'global') return !mapping.scope_id;
       if (mapping.scope_type === 'brand') return mapping.scope_id === spa.brand_id;
-      if (mapping.scope_type === 'model_line') return mapping.scope_id === (spa.model_line_id ?? spa.resolved_model_line_id);
+      if (mapping.scope_type === 'model_line') {
+        return mapping.scope_id === (spa.model_line_id ?? spa.resolved_model_line_id);
+      }
       if (mapping.scope_type === 'spa_model') return mapping.scope_id === spa.uhtd_spa_model_id;
       return false;
     })
@@ -334,10 +444,155 @@ export async function resolveWaterCareForSpaProfile(spaProfileId: string, tenant
       return a.priority - b.priority;
     });
 
-  const winner = ranked[ranked.length - 1] ?? null;
+  return ranked[ranked.length - 1] ?? null;
+}
+
+function getComparisonStatus(
+  recentValue: number | null,
+  idealMin: number,
+  idealMax: number
+): WaterCareComparisonRow['status'] {
+  if (recentValue == null) return 'missing';
+  if (recentValue < idealMin) return 'low';
+  if (recentValue > idealMax) return 'high';
+  return 'in_range';
+}
+
+export async function listWaterTestsForSpaProfile(
+  spaProfileId: string,
+  tenantId: string,
+  userId: string
+): Promise<WaterTestRecord[] | null> {
+  const spa = await getOwnedSpaProfile(spaProfileId, tenantId, userId);
+  if (!spa) return null;
+
+  const tests = (await db('water_tests')
+    .where({ spa_profile_id: spaProfileId, tenant_id: tenantId, user_id: userId })
+    .orderBy('tested_at', 'desc')
+    .orderBy('created_at', 'desc')) as WaterTestRow[];
+
+  if (tests.length === 0) return [];
+
+  const measurements = (await db('water_test_measurements')
+    .whereIn(
+      'water_test_id',
+      tests.map((test) => test.id)
+    )
+    .orderBy('created_at', 'asc')) as WaterTestMeasurementRow[];
+
+  return tests.map((test) => mapWaterTest(test, measurements));
+}
+
+export async function createWaterTest(
+  tenantId: string,
+  userId: string,
+  input: CreateWaterTestInput
+): Promise<WaterTestRecord | null> {
+  const spa = await getOwnedSpaProfile(input.spaProfileId, tenantId, userId);
+  if (!spa) return null;
+
+  const winner = await resolveWinningProfileMapping(spa);
   const profile = winner ? await getProfileById(winner.profile_id) : null;
+  const allowedMetrics = new Map(
+    (profile?.measurements ?? []).map((measurement) => [measurement.metricKey, measurement])
+  );
+
+  const measurements = input.measurements
+    .map((measurement) => ({
+      metricKey: measurement.metricKey?.trim() ?? '',
+      value: Number(measurement.value),
+    }))
+    .filter((measurement) => measurement.metricKey && Number.isFinite(measurement.value))
+    .filter((measurement) => allowedMetrics.has(measurement.metricKey));
+
+  if (measurements.length === 0) {
+    throw new Error('At least one valid measurement is required');
+  }
+
+  const testedAt = input.testedAt ? new Date(input.testedAt) : new Date();
+  if (Number.isNaN(testedAt.getTime())) {
+    throw new Error('Invalid testedAt');
+  }
+
+  const trx = await db.transaction();
+  try {
+    const [created] = await trx('water_tests')
+      .insert({
+        user_id: userId,
+        tenant_id: tenantId,
+        spa_profile_id: input.spaProfileId,
+        tested_at: testedAt,
+        shared_with_retailer: input.sharedWithRetailer === true,
+        notes: input.notes?.trim() || null,
+      })
+      .returning('*');
+
+    await trx('water_test_measurements').insert(
+      measurements.map((measurement) => ({
+        water_test_id: created.id,
+        metric_key: measurement.metricKey,
+        value: measurement.value,
+        unit: allowedMetrics.get(measurement.metricKey)?.unit ?? '',
+      }))
+    );
+
+    const latestForSpa = await trx('water_tests')
+      .where({
+        spa_profile_id: input.spaProfileId,
+        tenant_id: tenantId,
+        user_id: userId,
+      })
+      .max('tested_at as latest')
+      .first();
+
+    await trx('spa_profiles')
+      .where({ id: input.spaProfileId, tenant_id: tenantId, user_id: userId })
+      .update({
+        last_water_test_at: (latestForSpa as { latest?: Date | null } | undefined)?.latest ?? testedAt,
+        updated_at: trx.fn.now(),
+      });
+
+    await trx.commit();
+
+    const tests = await listWaterTestsForSpaProfile(input.spaProfileId, tenantId, userId);
+    return tests?.[0] ?? null;
+  } catch (error) {
+    await trx.rollback();
+    throw error;
+  }
+}
+
+export async function resolveWaterCareForSpaProfile(
+  spaProfileId: string,
+  tenantId: string,
+  userId: string
+) {
+  const spa = await getOwnedSpaProfile(spaProfileId, tenantId, userId);
+  if (!spa) return null;
+
+  const winner = await resolveWinningProfileMapping(spa);
+  const profile = winner ? await getProfileById(winner.profile_id) : null;
+  const latestTest = (await listWaterTestsForSpaProfile(spaProfileId, tenantId, userId))?.[0] ?? null;
+  const latestMeasurementMap = new Map(
+    (latestTest?.measurements ?? []).map((measurement) => [measurement.metricKey, measurement])
+  );
+  const comparison: WaterCareComparisonRow[] = (profile?.measurements ?? []).map((measurement) => {
+    const latest = latestMeasurementMap.get(measurement.metricKey);
+    const recentValue = latest?.value ?? null;
+    return {
+      metricKey: measurement.metricKey,
+      label: measurement.label,
+      unit: measurement.unit,
+      idealMin: measurement.minValue,
+      idealMax: measurement.maxValue,
+      recentValue,
+      status: getComparisonStatus(recentValue, measurement.minValue, measurement.maxValue),
+    };
+  });
   const tenant = await db('tenants').where({ id: tenantId }).first();
-  const waterCareConfig = normalizeWaterCareConfig((tenant as { water_care_config?: unknown } | undefined)?.water_care_config);
+  const waterCareConfig = normalizeWaterCareConfig(
+    (tenant as { water_care_config?: unknown } | undefined)?.water_care_config
+  );
 
   return {
     spaProfileId,
@@ -352,6 +607,10 @@ export async function resolveWaterCareForSpaProfile(spaProfileId: string, tenant
         }
       : null,
     profile,
+    latestTestId: latestTest?.id ?? null,
+    latestTestDate: latestTest?.testedAt ?? null,
+    latestMeasurements: latestTest?.measurements ?? [],
+    comparison,
     testingTips: waterCareConfig,
   };
 }

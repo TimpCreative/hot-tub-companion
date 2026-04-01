@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../../services/api';
 import { useTenant } from '../../contexts/TenantContext';
@@ -22,6 +22,23 @@ type WaterCareResponse = {
   spaProfileId: string;
   sanitationSystem: string | null;
   source: { scopeType: string } | null;
+  latestTestId: string | null;
+  latestTestDate: string | null;
+  latestMeasurements: Array<{
+    id: string;
+    metricKey: string;
+    value: number;
+    unit: string;
+  }>;
+  comparison: Array<{
+    metricKey: string;
+    label: string;
+    unit: string;
+    idealMin: number;
+    idealMax: number;
+    recentValue: number | null;
+    status: 'low' | 'in_range' | 'high' | 'missing';
+  }>;
   profile: {
     name: string;
     description?: string | null;
@@ -50,6 +67,13 @@ function spaSummary(spa: SpaProfile | null): string {
   if (!spa) return 'No spa selected';
   if (spa.nickname?.trim()) return spa.nickname.trim();
   return [spa.brand, spa.modelLine || spa.model, spa.year].filter(Boolean).join(' ') || 'Spa';
+}
+
+function formatShortDate(value: string | null): string {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export default function WaterCareScreen() {
@@ -82,17 +106,37 @@ export default function WaterCareScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load])
+  );
 
   const testingTips = useMemo(() => {
     return waterCare?.testingTips ?? config?.waterCare ?? { testingTipsTitle: 'Water Testing Tips', testingTips: [] };
   }, [config?.waterCare, waterCare?.testingTips]);
 
-  function handlePlaceholderPress(label: string) {
-    Alert.alert(label, 'This action surface is next on the Water Care buildout.');
+  const comparisonRows = waterCare?.comparison ?? [];
+
+  function statusColor(status: 'low' | 'in_range' | 'high' | 'missing') {
+    if (status === 'in_range') return '#15803d';
+    if (status === 'low') return '#b45309';
+    if (status === 'high') return '#b91c1c';
+    return colors.textMuted;
   }
+
+  function statusLabel(status: 'low' | 'in_range' | 'high' | 'missing') {
+    if (status === 'in_range') return 'In Range';
+    if (status === 'low') return 'Low';
+    if (status === 'high') return 'High';
+    return '-';
+  }
+
+  const topActions = [
+    { label: 'Water Test', icon: 'flask-outline' as const, route: '/water-test' },
+    { label: 'Guides & Videos', icon: 'play-circle-outline' as const, route: '/water-guides' },
+    { label: 'Maintenance Log', icon: 'build-outline' as const, route: '/maintenance-log' },
+  ];
 
   if (loading) {
     return (
@@ -127,15 +171,11 @@ export default function WaterCareScreen() {
         ) : (
           <>
             <View style={styles.actionGrid}>
-              {[
-                { label: 'Water Test', icon: 'flask-outline' as const },
-                { label: 'Guides & Videos', icon: 'play-circle-outline' as const },
-                { label: 'Maintenance Log', icon: 'build-outline' as const },
-              ].map((action) => (
+              {topActions.map((action) => (
                 <TouchableOpacity
                   key={action.label}
                   style={[styles.actionCard, { backgroundColor: colors.contentBackground, borderColor: colors.border }]}
-                  onPress={() => handlePlaceholderPress(action.label)}
+                  onPress={() => router.push(action.route)}
                 >
                   <Ionicons name={action.icon} size={24} color={colors.primary} />
                   <Text style={[styles.actionLabel, { color: colors.text }]}>{action.label}</Text>
@@ -147,6 +187,9 @@ export default function WaterCareScreen() {
               <Text style={[styles.cardTitle, { color: colors.text }]}>Ideal Water Chemistry</Text>
               {waterCare?.profile ? (
                 <>
+                  <Text style={[styles.testedAtText, { color: colors.textMuted }]}>
+                    Recent Test: {formatShortDate(waterCare.latestTestDate)}
+                  </Text>
                   <Text style={[styles.profileName, { color: colors.text }]}>
                     {waterCare.profile.name}
                     {waterCare.source ? ` · ${waterCare.source.scopeType}` : ''}
@@ -155,11 +198,19 @@ export default function WaterCareScreen() {
                     <Text style={[styles.cardBody, { color: colors.textSecondary }]}>{waterCare.profile.description}</Text>
                   ) : null}
                   <View style={styles.measurements}>
-                    {waterCare.profile.measurements.map((measurement) => (
-                      <View key={measurement.id} style={[styles.measurementCard, { borderColor: colors.border }]}>
-                        <Text style={[styles.measurementLabel, { color: colors.text }]}>{measurement.label}</Text>
+                    {comparisonRows.map((measurement) => (
+                      <View key={measurement.metricKey} style={[styles.measurementCard, { borderColor: colors.border }]}>
+                        <View style={styles.measurementHeader}>
+                          <Text style={[styles.measurementLabel, { color: colors.text }]}>{measurement.label}</Text>
+                          <Text style={[styles.statusPill, { color: statusColor(measurement.status) }]}>
+                            {statusLabel(measurement.status)}
+                          </Text>
+                        </View>
                         <Text style={[styles.measurementRange, { color: colors.primary }]}>
-                          {measurement.minValue} - {measurement.maxValue} {measurement.unit}
+                          Ideal: {measurement.idealMin} - {measurement.idealMax} {measurement.unit}
+                        </Text>
+                        <Text style={[styles.measurementRecent, { color: colors.textSecondary }]}>
+                          Recent: {measurement.recentValue == null ? '-' : `${measurement.recentValue} ${measurement.unit}`}
                         </Text>
                       </View>
                     ))}
@@ -252,6 +303,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
   },
+  testedAtText: {
+    fontSize: 13,
+    marginBottom: 8,
+  },
   measurements: {
     gap: 10,
     marginVertical: 12,
@@ -261,13 +316,27 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 12,
   },
+  measurementHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
   measurementLabel: {
     fontSize: 14,
     fontWeight: '600',
   },
-  measurementRange: {
-    fontSize: 16,
+  statusPill: {
+    fontSize: 12,
     fontWeight: '700',
+  },
+  measurementRange: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  measurementRecent: {
+    fontSize: 13,
     marginTop: 4,
   },
   tipRow: {

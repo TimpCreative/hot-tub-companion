@@ -128,3 +128,50 @@ export async function getResolvedWaterCare(req: Request, res: Response) {
     error(res, 'INTERNAL_ERROR', 'Failed to resolve water care', 500);
   }
 }
+
+export async function createWaterTest(req: Request, res: Response) {
+  const userId = requireCustomerUser(req, res);
+  if (!userId) return;
+
+  try {
+    const tenantId = (req as Request & { tenant?: { id?: string } }).tenant?.id;
+    if (!tenantId) return error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
+    const { spaProfileId, testedAt, notes, sharedWithRetailer, measurements } = req.body ?? {};
+    if (!spaProfileId || !Array.isArray(measurements)) {
+      return error(res, 'VALIDATION_ERROR', 'spaProfileId and measurements are required', 400);
+    }
+    const created = await waterCareService.createWaterTest(tenantId, userId, {
+      spaProfileId,
+      testedAt,
+      notes,
+      sharedWithRetailer,
+      measurements,
+    });
+    if (!created) return error(res, 'NOT_FOUND', 'Spa profile not found', 404);
+    res.status(201);
+    success(res, created, 'Water test logged');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to log water test';
+    if (message === 'At least one valid measurement is required' || message === 'Invalid testedAt') {
+      return error(res, 'VALIDATION_ERROR', message, 400);
+    }
+    console.error('Error creating water test:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to log water test', 500);
+  }
+}
+
+export async function listWaterTests(req: Request, res: Response) {
+  const userId = requireCustomerUser(req, res);
+  if (!userId) return;
+
+  try {
+    const tenantId = (req as Request & { tenant?: { id?: string } }).tenant?.id;
+    if (!tenantId) return error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
+    const tests = await waterCareService.listWaterTestsForSpaProfile(req.params.spaProfileId, tenantId, userId);
+    if (tests == null) return error(res, 'NOT_FOUND', 'Spa profile not found', 404);
+    success(res, { tests });
+  } catch (err) {
+    console.error('Error listing water tests:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to list water tests', 500);
+  }
+}
