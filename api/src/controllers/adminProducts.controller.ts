@@ -311,9 +311,20 @@ export async function syncNow(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  // If this tenant has never imported any POS products, don't apply an
+  // incremental `updated_at_min` cutoff. Otherwise we can "skip" the initial
+  // sync forever if `last_product_sync_at` was set during an earlier empty run.
+  const existingPosProduct = await db('pos_products').where({ tenant_id: tenantId }).select('id').first();
+  const hasAnyPosProducts = !!existingPosProduct;
+
+  const since =
+    hasAnyPosProducts && tenant.last_product_sync_at
+      ? new Date(tenant.last_product_sync_at)
+      : undefined;
+
   const summary = await adapter.syncCatalog(tenant.id, {
     full: false,
-    since: tenant.last_product_sync_at ? new Date(tenant.last_product_sync_at) : undefined,
+    since,
   });
 
   await db('tenants').where({ id: tenant.id }).update({ last_product_sync_at: new Date() });

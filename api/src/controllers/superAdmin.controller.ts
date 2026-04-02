@@ -438,8 +438,11 @@ export async function syncTenantCatalog(req: Request, res: Response): Promise<vo
     return;
   }
 
+  const existingPosProduct = await db('pos_products').where({ tenant_id: id }).select('id').first();
+  const hasAnyPosProducts = !!existingPosProduct;
+
   const since =
-    !full && tenant.last_product_sync_at
+    !full && hasAnyPosProducts && tenant.last_product_sync_at
       ? new Date(tenant.last_product_sync_at)
       : undefined;
 
