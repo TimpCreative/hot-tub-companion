@@ -41,6 +41,39 @@ function collectDashboard(files) {
       const p = mode === 'SuperAdmin' ? normalize(`/super-admin${raw}`) : normalize(raw);
       results.push({ method, path: p, file: rel(file), app: 'dashboard' });
     }
+
+    // Capture common client variable pattern:
+    // const api = createTenantApiClient(...); api.get('/admin/...')
+    const tenantVars = new Set();
+    const superVars = new Set();
+    for (const m of content.matchAll(/(?:const|let|var)\s+([a-zA-Z0-9_]+)\s*=\s*createTenantApiClient\(/g)) {
+      tenantVars.add(m[1]);
+    }
+    for (const m of content.matchAll(/(?:const|let|var)\s+([a-zA-Z0-9_]+)\s*=\s*createSuperAdminApiClient\(/g)) {
+      superVars.add(m[1]);
+    }
+    for (const varName of tenantVars) {
+      const r = new RegExp(`\\b${varName}\\.(get|post|put|patch|delete)\\(\\s*['"\`]([^'"\`]+)['"\`]`, 'g');
+      for (const m of content.matchAll(r)) {
+        results.push({ method: m[1].toUpperCase(), path: normalize(m[2]), file: rel(file), app: 'dashboard' });
+      }
+    }
+    for (const varName of superVars) {
+      const r = new RegExp(`\\b${varName}\\.(get|post|put|patch|delete)\\(\\s*['"\`]([^'"\`]+)['"\`]`, 'g');
+      for (const m of content.matchAll(r)) {
+        results.push({ method: m[1].toUpperCase(), path: normalize(`/super-admin${m[2]}`), file: rel(file), app: 'dashboard' });
+      }
+    }
+
+    // Capture useSuperAdminFetch(url, { method }) pattern.
+    for (const m of content.matchAll(/useSuperAdminFetch\(\s*['"`]([^'"`]+)['"`]\s*(?:,\s*\{[^}]*method:\s*['"`]([A-Za-z]+)['"`][^}]*\})?/g)) {
+      const url = m[1];
+      const method = (m[2] || 'GET').toUpperCase();
+      if (url.startsWith('/api/dashboard/super-admin/')) {
+        const suffix = url.replace('/api/dashboard/super-admin', '');
+        results.push({ method, path: normalize(`/super-admin${suffix}`), file: rel(file), app: 'dashboard' });
+      }
+    }
   }
   return results;
 }

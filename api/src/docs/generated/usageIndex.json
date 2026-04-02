@@ -1,7 +1,15 @@
 {
-  "generatedAt": "2026-04-02T15:16:10.086Z",
-  "endpointCount": 120,
+  "generatedAt": "2026-04-02T15:42:07.130Z",
+  "endpointCount": 121,
   "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/me",
+      "dashboard": [
+        "dashboard/src/contexts/AdminPermissionsContext.tsx"
+      ],
+      "mobile": []
+    },
     {
       "method": "*",
       "path": "/api/v1/admin/settings/branding/media/upload",

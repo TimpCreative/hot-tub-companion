@@ -214,22 +214,40 @@ router.get('/data', superAdminAuth, (req: Request, res: Response) => {
   const inventory = safeReadJson('apiInventory.json');
   const usage = safeReadJson('usageIndex.json');
   const usageMap = new Map<string, { dashboard: string[]; mobile: string[] }>();
+  const usageByPath = new Map<string, { dashboard: string[]; mobile: string[] }>();
   const usageItems = Array.isArray(usage.endpoints) ? usage.endpoints : [];
+  const mergeUnique = (a: string[], b: string[]) => Array.from(new Set([...(a || []), ...(b || [])]));
   for (const item of usageItems) {
     if (!item || typeof item !== 'object') continue;
-    const key = `${String((item as Record<string, unknown>).method || '')} ${String((item as Record<string, unknown>).path || '')}`;
-    usageMap.set(key, {
+    const method = String((item as Record<string, unknown>).method || '');
+    const path = String((item as Record<string, unknown>).path || '');
+    const key = `${method} ${path}`;
+    const row = {
       dashboard: Array.isArray((item as Record<string, unknown>).dashboard) ? (item as Record<string, unknown>).dashboard as string[] : [],
       mobile: Array.isArray((item as Record<string, unknown>).mobile) ? (item as Record<string, unknown>).mobile as string[] : [],
+    };
+    usageMap.set(key, {
+      dashboard: row.dashboard,
+      mobile: row.mobile,
+    });
+    const bucket = usageByPath.get(path) || { dashboard: [], mobile: [] };
+    usageByPath.set(path, {
+      dashboard: mergeUnique(bucket.dashboard, row.dashboard),
+      mobile: mergeUnique(bucket.mobile, row.mobile),
     });
   }
   const endpoints = Array.isArray(inventory.endpoints) ? inventory.endpoints : [];
   const merged = endpoints.map((entry) => {
     const row = entry as Record<string, unknown>;
-    const key = `${String(row.method || '')} ${String(row.path || '')}`;
+    const method = String(row.method || '');
+    const path = String(row.path || '');
+    const key = `${method} ${path}`;
+    const wildcardKey = `* ${path}`;
+    const fallbackByPath = usageByPath.get(path);
+    const usageRow = usageMap.get(key) || usageMap.get(wildcardKey) || fallbackByPath;
     return {
       ...row,
-      usage: usageMap.get(key) || { dashboard: [], mobile: [] },
+      usage: usageRow || { dashboard: [], mobile: [] },
     };
   });
   res.json({
