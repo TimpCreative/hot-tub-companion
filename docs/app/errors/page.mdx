@@ -1,0 +1,21 @@
+# Errors and Conventions
+
+## Response envelope
+
+Most API failures use an envelope with fields similar to:
+
+- `success: false`
+- `error.code`
+- `error.message`
+
+## Status code usage
+
+- `400`: request validation or malformed payload
+- `401`: missing/invalid authentication or tenant key
+- `403`: authenticated but not authorized
+- `404`: resource not found
+- `500`: unhandled server error
+
+## Operational recommendation
+
+When integrating new endpoints, document expected error codes and recovery strategies in the endpoint metadata registry to keep behavior explicit for new developers.

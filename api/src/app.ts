@@ -6,6 +6,7 @@ import compression from 'compression';
 import routes from './routes';
 import webhooksRoutes from './routes/webhooks.routes';
 import docsRoutes from './routes/docs.routes';
+import docsPublicRoutes from './routes/docsPublic.routes';
 import { defaultRateLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
 import { tenantMiddleware } from './middleware/tenant';
@@ -33,7 +34,8 @@ app.use(
 
 app.use(express.json({ limit: '10mb' }));
 app.use(requestContextMiddleware);
-app.use('/docs', docsRoutes);
+app.use('/internal/docs-explorer', docsRoutes);
+app.use('/docs', docsPublicRoutes);
 
 // Attach tenant context for tenant-scoped routes
 app.use(tenantMiddleware);

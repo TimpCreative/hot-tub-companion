@@ -1,0 +1,24 @@
+# Core Concepts
+
+## Tenant scoping
+
+Most customer-facing and retailer-admin routes are tenant-scoped. The API resolves tenant context via `x-tenant-key` and applies authorization per role.
+
+## Auth layers
+
+- **Public**: no auth required
+- **Tenant key**: requires `x-tenant-key`
+- **Tenant + Firebase**: tenant key plus authenticated customer/admin identity
+- **Retailer admin**: tenant admin permissions
+- **Super admin**: platform-level access
+- **Internal secret**: backend-only jobs/build integrations
+
+## Route mounting model
+
+`api/src/routes/index.ts` mounts route groups in a specific order. Super-admin prefixes are mounted before generic `/api/v1` routers to avoid accidental middleware interception.
+
+## Data ownership boundaries
+
+- Customer identity and preferences are tenant-bound
+- Platform governance and cross-tenant controls are super-admin only
+- Internal automation endpoints are never exposed to end users

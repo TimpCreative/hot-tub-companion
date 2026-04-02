@@ -15,7 +15,8 @@
     "docs:usage": "node scripts/generateUsageIndex.js",
     "docs:openapi": "node scripts/generateOpenApi.js",
     "docs:generate": "npm run docs:inventory && npm run docs:usage && npm run docs:openapi",
-    "docs:check": "npm run docs:generate && node scripts/checkDocsCoverage.js"
+    "docs:check": "npm run docs:generate && node scripts/checkDocsCoverage.js",
+    "docs:governance": "npm run docs:check && npm --prefix ../docs run reference:refresh"
   },
   "engines": {
     "node": ">=18.0.0"

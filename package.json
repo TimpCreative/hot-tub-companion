@@ -2,6 +2,10 @@
   "name": "hot-tub-companion",
   "private": true,
   "description": "Monorepo root - dashboard deploys via vercel.json",
+  "scripts": {
+    "docs:generate": "npm --prefix api run docs:generate && npm --prefix docs run reference:generate",
+    "docs:check": "npm --prefix api run docs:check && npm --prefix docs run reference:check"
+  },
   "dependencies": {
     "next": "16.1.6"
   }

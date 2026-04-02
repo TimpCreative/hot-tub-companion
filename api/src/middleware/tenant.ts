@@ -10,6 +10,8 @@ function shouldSkipTenant(path: string): boolean {
   const normalized = path.startsWith('/api/v1/') ? path.slice('/api/v1'.length) : path;
 
   return (
+    matchesPath(path, '/internal/docs-explorer') ||
+    matchesPath(normalized, '/internal/docs-explorer') ||
     matchesPath(path, '/docs') ||
     matchesPath(normalized, '/docs') ||
     path === '/health' ||

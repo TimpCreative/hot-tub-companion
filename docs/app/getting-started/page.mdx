@@ -1,0 +1,33 @@
+# Getting Started
+
+## Environment model
+
+- **API service**: Express + TypeScript + PostgreSQL
+- **Dashboard**: Next.js
+- **Mobile**: Expo React Native
+- **Docs**: this standalone docs app under `/docs`
+
+## API foundations
+
+- Base API domain: `https://api.hottubcompanion.com`
+- Tenant-scoped routes require `x-tenant-key`
+- Role-gated routes rely on Firebase bearer tokens
+- Internal routes require secret-based auth
+
+## Local workflow
+
+1. Generate API docs artifacts from the API package:
+
+`cd api && npm run docs:generate`
+
+2. Refresh reference content in docs package:
+
+`cd docs && npm run reference:refresh`
+
+3. Run docs locally:
+
+`cd docs && npm run dev`
+
+## Documentation ownership
+
+Generated artifacts provide coverage and contract anchors; technical writing explains why behavior exists, how to use it safely, and where each endpoint is used.

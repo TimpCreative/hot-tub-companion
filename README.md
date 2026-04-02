@@ -206,6 +206,8 @@ eas build --profile production-takeabreak --platform ios
 - **Project map**: `PROJECT-OVERVIEW.md`
 - **UHTD spec**: `UHTD-Architecture-Overview-v2.1.md`
 - **Phase specs**: `PHASE-0-FOUNDATION.md` … `PHASE-6-SCALE-POLISH.md`
-- **Super Admin API Docs (new)**: `https://api.hottubcompanion.com/docs`
+- **Public technical docs**: `https://api.hottubcompanion.com/docs` (proxied to docs workspace app via `DOCS_SITE_ORIGIN`)
+- **Internal endpoint explorer**: `https://api.hottubcompanion.com/internal/docs-explorer` (Super Admin auth required)
   - Generate inventory/usage/openapi data: `cd api && npm run docs:generate`
   - Run docs coverage gate (CI-friendly): `cd api && npm run docs:check`
+  - Refresh docs reference corpus: `cd docs && npm run reference:refresh`

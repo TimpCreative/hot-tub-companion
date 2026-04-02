@@ -47,6 +47,8 @@ export const env = {
   VERCEL_TOKEN: process.env.VERCEL_TOKEN?.trim() || '',
   VERCEL_PROJECT_ID: process.env.VERCEL_PROJECT_ID?.trim() || '',
   VERCEL_TEAM_ID: process.env.VERCEL_TEAM_ID?.trim() || '',
+  /** Optional docs frontend origin used by /docs proxy, e.g. https://docs-service.internal */
+  DOCS_SITE_ORIGIN: process.env.DOCS_SITE_ORIGIN?.trim() || '',
 };
 
 /** Hostname from DASHBOARD_BASE (e.g. hottubcompanion.com) for retailer subdomain URLs. */

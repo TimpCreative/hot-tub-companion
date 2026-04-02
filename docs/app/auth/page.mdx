@@ -1,0 +1,23 @@
+# Authentication
+
+## Headers
+
+- `Authorization: Bearer <firebase-id-token>` for user/super-admin identity
+- `x-tenant-key: <tenant-api-key>` for tenant-scoped routes
+
+## Role enforcement
+
+- Customer endpoints validate Firebase user records under tenant context.
+- Retailer admin endpoints enforce tenant admin permissions.
+- Super-admin endpoints validate allowlisted emails and/or platform user role.
+
+## Internal routes
+
+Internal routes use dedicated secrets such as cron dispatch and EAS build configuration secrets. These should never be called from client apps.
+
+## Failure patterns
+
+- Missing auth header: `401`
+- Invalid token: `401`
+- Role mismatch: `403`
+- Missing tenant key or invalid tenant key: `401`

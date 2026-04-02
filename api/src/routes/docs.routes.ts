@@ -121,7 +121,7 @@ function docsPageHtml() {
         summary.textContent = 'Not authenticated';
         return;
       }
-      const res = await fetch('/docs/data', { headers: { Authorization: 'Bearer ' + token } });
+      const res = await fetch('./data', { headers: { Authorization: 'Bearer ' + token } });
       if (!res.ok) {
         content.innerHTML = '<div class="muted">Auth failed. Check token and try again.</div>';
         summary.textContent = 'Auth failed';
@@ -197,16 +197,7 @@ function docsPageHtml() {
 </html>`;
 }
 
-function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
-  const header = req.headers.authorization || req.headers['x-authorization'];
-  if (!header) {
-    next();
-    return;
-  }
-  superAdminAuth(req, res, next).catch(next);
-}
-
-router.get('/', requireSuperAdmin, (_req: Request, res: Response) => {
+router.get('/', superAdminAuth, (_req: Request, res: Response) => {
   res.type('html').send(docsPageHtml());
 });
 
