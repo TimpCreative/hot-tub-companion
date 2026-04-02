@@ -155,8 +155,11 @@ async function upsertVariantRow(
     compare_at_price: compareAtPrice,
     sku,
     barcode,
-    images,
-    variants,
+    // Serialize explicitly for Postgres json/jsonb columns. Passing raw JS arrays
+    // can be interpreted as SQL array text by the driver and fail with
+    // "invalid input syntax for type json".
+    images: JSON.stringify(images),
+    variants: JSON.stringify(variants),
     inventory_quantity: inventoryQuantity,
     weight,
     weight_unit: weightUnit,
