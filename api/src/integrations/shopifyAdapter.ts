@@ -13,7 +13,7 @@ import type {
   PosSyncError,
 } from '../types/uhtd.types';
 
-interface ShopifyProduct {
+export interface ShopifyProduct {
   id: number;
   title: string;
   body_html: string | null;
@@ -29,6 +29,7 @@ interface ShopifyProduct {
     price: string;
     compare_at_price: string | null;
     inventory_quantity?: number;
+    inventory_item_id?: number;
     updated_at?: string;
     weight?: number;
     weight_unit?: string;
@@ -90,6 +91,44 @@ async function shopifyFetch(
     });
   }
 
+  return res;
+}
+
+/**
+ * Authenticated Admin API request (GET/POST/DELETE) with JSON body when provided.
+ */
+export async function shopifyAdminJson(
+  tenantId: string,
+  method: 'GET' | 'POST' | 'DELETE',
+  path: string,
+  body?: Record<string, unknown>
+): Promise<Response> {
+  const tokenResult = await getTenantShopifyAdminAccessToken(tenantId);
+  const baseUrl = getShopifyBaseUrl(tokenResult.shopDomain);
+  const url = `${baseUrl}/admin/api/2025-01${path}`;
+
+  const init: RequestInit = {
+    method,
+    headers: {
+      'X-Shopify-Access-Token': tokenResult.accessToken,
+      'Content-Type': 'application/json',
+    },
+  };
+  if (body != null && method !== 'GET') {
+    init.body = JSON.stringify(body);
+  }
+
+  let res = await fetch(url, init);
+  if ((res.status === 401 || res.status === 403) && tokenResult.source === 'client_credentials') {
+    const refreshed = await getTenantShopifyAdminAccessToken(tenantId, { forceRefresh: true });
+    res = await fetch(url, {
+      ...init,
+      headers: {
+        'X-Shopify-Access-Token': refreshed.accessToken,
+        'Content-Type': 'application/json',
+      },
+    });
+  }
   return res;
 }
 
@@ -160,6 +199,10 @@ async function upsertVariantRow(
   const posStatus = product.status || null;
   const posUpdatedAt =
     parseDate(variant.updated_at || product.updated_at || null);
+  const shopifyInventoryItemId =
+    typeof variant.inventory_item_id === 'number' && Number.isFinite(variant.inventory_item_id)
+      ? String(variant.inventory_item_id)
+      : null;
 
   // Use tenant_id + pos_product_id + pos_variant_id as uniqueness key
   const existing: DbPosProduct | undefined = await db<DbPosProduct>('pos_products')
@@ -194,6 +237,7 @@ async function upsertVariantRow(
     pos_status: posStatus,
     pos_updated_at: posUpdatedAt,
     last_synced_at: now,
+    shopify_inventory_item_id: shopifyInventoryItemId,
   };
 
   if (existing) {
@@ -281,9 +325,12 @@ export async function getShopifyCatalogSyncEstimate(tenantId: string): Promise<{
 }
 
 /**
- * Upsert all variants from one Shopify products page into pos_products.
+ * Upsert all variants from Shopify product payloads into pos_products (sync + webhooks).
  */
-async function syncProductListIntoDb(tenantId: string, products: ShopifyProduct[]): Promise<PosSyncSummary> {
+export async function applyShopifyProductsToPosProducts(
+  tenantId: string,
+  products: ShopifyProduct[]
+): Promise<PosSyncSummary> {
   const errors: PosSyncError[] = [];
   let created = 0;
   let updated = 0;
@@ -357,7 +404,7 @@ export async function syncShopifyCatalogPage(
     updatedAtMin,
   });
 
-  const summary = await syncProductListIntoDb(tenantId, products);
+  const summary = await applyShopifyProductsToPosProducts(tenantId, products);
   return {
     ...summary,
     nextPageInfo,
@@ -390,7 +437,7 @@ async function syncCatalogInternal(
       updatedAtMin: useIncrementalFirstPage ? options!.since : undefined,
     });
 
-    const pageSummary = await syncProductListIntoDb(tenantId, products);
+    const pageSummary = await applyShopifyProductsToPosProducts(tenantId, products);
     aggregated.created += pageSummary.created;
     aggregated.updated += pageSummary.updated;
     aggregated.deletedOrArchived += pageSummary.deletedOrArchived;

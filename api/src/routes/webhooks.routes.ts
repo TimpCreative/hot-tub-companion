@@ -1,8 +1,14 @@
 import { Router } from 'express';
 import * as shopifyWebhookController from '../controllers/shopifyWebhook.controller';
+import * as shopifyCatalogWebhooksController from '../controllers/shopifyCatalogWebhooks.controller';
 
 const router = Router();
 
 router.post('/shopify/orders', shopifyWebhookController.handleOrdersCreate);
+router.post('/shopify/products/update', shopifyCatalogWebhooksController.handleShopifyProductsUpdate);
+router.post(
+  '/shopify/inventory_levels/update',
+  shopifyCatalogWebhooksController.handleShopifyInventoryLevelsUpdate
+);
 
 export default router;

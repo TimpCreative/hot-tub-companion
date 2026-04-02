@@ -40,6 +40,11 @@ router.post(
   cronAuth,
   cronController.dispatchNotifications
 );
+router.post(
+  '/api/v1/internal/cron/sync-shopify-catalog',
+  cronAuth,
+  cronController.syncShopifyCatalog
+);
 
 // EAS build: fetch tenant API key by slug (EAS_BUILD_CONFIG_SECRET required)
 router.get(

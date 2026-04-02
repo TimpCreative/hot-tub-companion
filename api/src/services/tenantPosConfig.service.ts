@@ -19,6 +19,11 @@ type TenantRow = {
   shopify_admin_token: string | null;
   shopify_webhook_secret: string | null;
   last_product_sync_at: Date | string | null;
+  product_sync_interval_minutes: number | null;
+  shopify_catalog_sync_enabled: boolean;
+  last_cron_product_sync_at: Date | string | null;
+  shopify_webhook_subscription_ids: unknown | null;
+  pos_integration_last_activity_at: Date | string | null;
 };
 
 export interface PosConfigSummary {
@@ -27,10 +32,15 @@ export interface PosConfigSummary {
   shopifyStoreUrl: string | null;
   shopifyClientId: string | null;
   lastProductSyncAt: Date | string | null;
+  productSyncIntervalMinutes: number;
+  shopifyCatalogSyncEnabled: boolean;
+  lastCronProductSyncAt: Date | string | null;
   shopifyClientSecretConfigured: boolean;
   shopifyStorefrontTokenConfigured: boolean;
   shopifyAdminTokenConfigured: boolean;
   shopifyWebhookSecretConfigured: boolean;
+  /** Latest POS integration activity (webhook, sync, settings save, etc.) */
+  posIntegrationLastActivityAt: Date | string | null;
 }
 
 export interface UpdateTenantPosConfigInput {
@@ -41,19 +51,30 @@ export interface UpdateTenantPosConfigInput {
   shopifyStorefrontToken?: string | null;
   shopifyAdminToken?: string | null;
   shopifyWebhookSecret?: string | null;
+  shopifyCatalogSyncEnabled?: boolean;
+  productSyncIntervalMinutes?: number | null;
 }
 
 function mapSummary(tenant: TenantRow): PosConfigSummary {
+  const interval =
+    typeof tenant.product_sync_interval_minutes === 'number' &&
+    Number.isFinite(tenant.product_sync_interval_minutes)
+      ? tenant.product_sync_interval_minutes
+      : 30;
   return {
     tenantId: tenant.id,
     posType: tenant.pos_type,
     shopifyStoreUrl: tenant.shopify_store_url,
     shopifyClientId: tenant.shopify_client_id,
     lastProductSyncAt: tenant.last_product_sync_at,
+    productSyncIntervalMinutes: interval,
+    shopifyCatalogSyncEnabled: !!tenant.shopify_catalog_sync_enabled,
+    lastCronProductSyncAt: tenant.last_cron_product_sync_at ?? null,
     shopifyClientSecretConfigured: !!tenant.shopify_client_secret,
     shopifyStorefrontTokenConfigured: !!tenant.shopify_storefront_token,
     shopifyAdminTokenConfigured: !!tenant.shopify_admin_token,
     shopifyWebhookSecretConfigured: !!tenant.shopify_webhook_secret,
+    posIntegrationLastActivityAt: tenant.pos_integration_last_activity_at ?? null,
   };
 }
 
@@ -135,6 +156,19 @@ export async function updateTenantPosConfig(
   if (input.shopifyWebhookSecret !== undefined) {
     update.shopify_webhook_secret =
       input.shopifyWebhookSecret === null ? null : encryptTenantSecret(input.shopifyWebhookSecret);
+  }
+
+  if (input.shopifyCatalogSyncEnabled !== undefined) {
+    update.shopify_catalog_sync_enabled = input.shopifyCatalogSyncEnabled;
+  }
+
+  if (input.productSyncIntervalMinutes !== undefined) {
+    if (input.productSyncIntervalMinutes === null) {
+      update.product_sync_interval_minutes = 30;
+    } else {
+      const n = Math.floor(Number(input.productSyncIntervalMinutes));
+      update.product_sync_interval_minutes = Math.min(1440, Math.max(5, n));
+    }
   }
 
   if (Object.keys(update).length === 0) {

@@ -21,6 +21,14 @@ export const env = {
   NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: parseInt(process.env.PORT || '3000', 10),
   API_URL: process.env.API_URL || 'http://localhost:3000',
+  /**
+   * Public HTTPS base URL of this API (no trailing slash), used for Shopify webhook registration.
+   * e.g. https://api.hottubcompanion.com — falls back to API_URL if unset.
+   */
+  PUBLIC_API_URL: (process.env.PUBLIC_API_URL || process.env.API_URL || 'http://localhost:3000').replace(
+    /\/+$/,
+    ''
+  ),
   /** Base for retailer dashboard URLs (e.g. https://hottubcompanion.com). Used for invite emails. */
   DASHBOARD_BASE: process.env.DASHBOARD_BASE || 'https://hottubcompanion.com',
   DATABASE_URL: process.env.DATABASE_URL!,

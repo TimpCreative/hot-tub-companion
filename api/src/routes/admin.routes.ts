@@ -8,6 +8,7 @@ import * as adminBrandingController from '../controllers/adminBranding.controlle
 import * as adminBrandingMediaController from '../controllers/adminBrandingMedia.controller';
 import * as adminAppSetupController from '../controllers/adminAppSetup.controller';
 import * as adminPosController from '../controllers/adminPos.controller';
+import * as adminSettingsPosSyncController from '../controllers/adminSettingsPosSync.controller';
 import * as adminNotificationsController from '../controllers/adminNotifications.controller';
 import * as adminTeamController from '../controllers/adminTeam.controller';
 import adminContentRoutes from './adminContent.routes';
@@ -35,13 +36,10 @@ router.delete('/team/:userId', adminTeamController.removeTeamMember);
 
 // Products & mapping
 router.get('/products', adminProductsController.listProducts);
-router.get('/products/sync/estimate', adminProductsController.getProductSyncEstimate);
-router.post('/products/sync/batch', adminProductsController.syncProductBatch);
 router.get('/products/:id/uhtd-suggestions', adminProductsController.getUhtdSuggestions);
 router.post('/products/:id/map', adminProductsController.confirmMapping);
 router.delete('/products/:id/map', adminProductsController.clearMapping);
 router.put('/products/:id/visibility', adminProductsController.setVisibility);
-router.post('/products/sync', adminProductsController.syncNow);
 
 // Branding / settings
 router.get('/settings/branding', adminBrandingController.getBranding);
@@ -49,6 +47,10 @@ router.put('/settings/branding', adminBrandingController.updateBranding);
 router.get('/settings/pos', adminPosController.getPosConfig);
 router.put('/settings/pos', adminPosController.updatePosConfig);
 router.post('/settings/pos/test', adminPosController.testPosConnection);
+router.get('/settings/pos/activity', adminPosController.getPosIntegrationActivity);
+router.get('/settings/pos/sync/estimate', adminSettingsPosSyncController.getProductSyncEstimate);
+router.post('/settings/pos/sync/batch', adminSettingsPosSyncController.syncProductBatch);
+router.post('/settings/pos/sync/now', adminSettingsPosSyncController.syncCatalogNow);
 
 // App setup (onboarding config, etc.)
 router.get('/settings/app-setup', adminAppSetupController.getAppSetup);

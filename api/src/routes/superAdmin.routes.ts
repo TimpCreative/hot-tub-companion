@@ -22,6 +22,7 @@ router.post('/tenants', superAdminController.createTenant);
 router.get('/tenants/:id/branding', superAdminBrandingController.getTenantBranding);
 router.put('/tenants/:id/branding', superAdminBrandingController.updateTenantBranding);
 router.get('/tenants/:id/pos', superAdminController.getTenantPosConfig);
+router.get('/tenants/:id/pos/activity', superAdminController.getTenantPosIntegrationActivity);
 router.get('/tenants/:id/entitlements', superAdminController.getTenantEntitlements);
 router.put('/tenants/:id/entitlements', superAdminController.updateTenantEntitlements);
 router.put('/tenants/:id/pos', superAdminController.updateTenantPosConfig);

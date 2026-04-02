@@ -3,6 +3,8 @@ import { db } from '../config/database';
 import { success } from '../utils/response';
 import * as notificationService from '../services/notification.service';
 import { localToUTC, addDays } from '../utils/timezone';
+import { shopifyAdapter } from '../integrations/shopifyAdapter';
+import { logPosIntegrationActivity } from '../services/posIntegrationActivity.service';
 
 export async function dispatchNotifications(req: Request, res: Response): Promise<void> {
   const now = new Date();
@@ -174,4 +176,80 @@ export async function dispatchNotifications(req: Request, res: Response): Promis
   }
 
   success(res, { processed }, 'Dispatch complete');
+}
+
+/**
+ * Incremental Shopify catalog pull for tenants with automatic sync enabled.
+ * Run every 1–5 minutes externally; per-tenant `product_sync_interval_minutes` throttles work.
+ */
+export async function syncShopifyCatalog(req: Request, res: Response): Promise<void> {
+  const now = new Date();
+
+  type TenantCronRow = {
+    id: string;
+    product_sync_interval_minutes: number | null;
+    last_cron_product_sync_at: Date | string | null;
+    last_product_sync_at: Date | string | null;
+  };
+
+  const tenants = (await db('tenants')
+    .select('id', 'product_sync_interval_minutes', 'last_cron_product_sync_at', 'last_product_sync_at')
+    .where({ pos_type: 'shopify', shopify_catalog_sync_enabled: true })) as TenantCronRow[];
+
+  let processed = 0;
+  let skippedThrottle = 0;
+  let errors = 0;
+
+  for (const t of tenants) {
+    const intervalMin =
+      typeof t.product_sync_interval_minutes === 'number' &&
+      Number.isFinite(t.product_sync_interval_minutes)
+        ? Math.min(1440, Math.max(5, Math.floor(t.product_sync_interval_minutes)))
+        : 30;
+
+    const lastCron = t.last_cron_product_sync_at ? new Date(t.last_cron_product_sync_at) : null;
+    if (lastCron && now.getTime() - lastCron.getTime() < intervalMin * 60 * 1000) {
+      skippedThrottle++;
+      continue;
+    }
+
+    try {
+      const existingPosProduct = await db('pos_products').where({ tenant_id: t.id }).select('id').first();
+      const hasAnyPosProducts = !!existingPosProduct;
+      const since =
+        hasAnyPosProducts && t.last_product_sync_at
+          ? new Date(t.last_product_sync_at)
+          : undefined;
+
+      const syncSummary = await shopifyAdapter.syncCatalog(t.id, { full: false, since });
+
+      await db('tenants').where({ id: t.id }).update({
+        last_product_sync_at: now,
+        last_cron_product_sync_at: now,
+        updated_at: db.fn.now(),
+      });
+      await logPosIntegrationActivity(t.id, {
+        eventType: 'cron_incremental_sync',
+        summary: `Scheduled incremental sync: ${syncSummary.created} created, ${syncSummary.updated} updated, ${syncSummary.errors.length} error(s)`,
+        source: 'cron',
+        metadata: {
+          created: syncSummary.created,
+          updated: syncSummary.updated,
+          deletedOrArchived: syncSummary.deletedOrArchived,
+          errorCount: syncSummary.errors.length,
+        },
+      });
+      processed++;
+    } catch (err: unknown) {
+      errors++;
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[cron] syncShopifyCatalog tenant ${t.id}:`, msg);
+    }
+  }
+
+  success(
+    res,
+    { processed, skippedThrottle, errors, tenantsChecked: tenants.length },
+    'Shopify catalog cron complete'
+  );
 }

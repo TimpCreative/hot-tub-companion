@@ -50,6 +50,8 @@ When a tenant is created, the API can register **`{slug}.{hostname}`** on your V
 
 | Variable | Purpose |
 |----------|---------|
+| `PUBLIC_API_URL` | Public **HTTPS** base URL of the API (no trailing slash), e.g. `https://api.hottubcompanion.com`. Used when registering Shopify catalog webhooks. |
+| `CRON_SECRET` | Min 32 characters; required header for internal cron routes (e.g. incremental Shopify catalog pull). |
 | `EAS_BUILD_CONFIG_SECRET` | Min 32 characters; same value must be set in **Expo** env vars. EAS builds call `GET /api/v1/internal/eas-tenant-config` to load the tenant’s `api_key` by slug (no per-tenant key in Expo). |
 | `VERCEL_TOKEN` | Vercel personal or team token with permission to manage project domains. |
 | `VERCEL_PROJECT_ID` | Vercel project **id** or **name** (e.g. `hot-tub-companion`). |
@@ -443,9 +445,21 @@ Fill in:
 - **Shopify Client ID:** from Dev Dashboard app Settings
 - **Shopify Client Secret:** from Dev Dashboard app Settings (write-only in HTC)
 - **Shopify Storefront Token:** optional for now; required when storefront cart/checkout flows go live
-- **Shopify Webhook Secret:** required when webhook subscriptions are configured for this tenant
+- **Shopify Webhook Secret:** required for verifying webhooks (`orders/create` plus catalog webhooks when automatic sync is enabled)
 
-### 9.5 Important security behavior
+### 9.5 Automatic catalog and inventory sync (recommended)
+
+After POS credentials and **Shopify Webhook Secret** are saved:
+
+1. Set **`PUBLIC_API_URL`** on the API host to the public HTTPS origin of this service (no trailing slash), e.g. `https://api.hottubcompanion.com`. The API uses it when registering Shopify webhooks. Local development needs a tunnel with HTTPS if you test webhooks.
+2. In **Retailer Admin** → **Settings** → **POS Integration** (or Super Admin tenant POS), turn on **Automatic catalog & inventory sync**. The API registers Shopify Admin webhooks for:
+   - `products/update`
+   - `inventory_levels/update`
+3. Turning sync **off** removes those webhook registrations (best effort) and stops processing catalog webhooks for that tenant (requests still return success to Shopify).
+4. Schedule an external job (Railway cron, GitHub Actions, etc.) to `POST /api/v1/internal/cron/sync-shopify-catalog` every 1–5 minutes with the **`CRON_SECRET`** header. Per-tenant **incremental sync interval** (default 30 minutes, clamped 5–1440) throttles how often each store is pulled via `updated_at_min` pagination.
+5. **Full catalog sync** (all pages) is for onboarding or backfill; run it from **Settings** → **POS Integration**, not from the Products page. Day-to-day inventory freshness should rely on webhooks plus the incremental cron.
+
+### 9.6 Important security behavior
 
 - Secrets are stored securely on the server
 - Secret fields are **write-only**
@@ -453,20 +467,20 @@ Fill in:
 - Secrets are **not revealable**
 - If a secret is lost, regenerate in Shopify and replace it in Hot Tub Companion
 
-### 9.6 Test and sync
+### 9.7 Test and initial import
 
 1. Click **Test Connection**
 2. Confirm token exchange succeeds and shop domain matches this tenant
-3. In **Super Admin** → **Tenants** → `{Tenant}` → **POS Integration**, run the initial full sync
+3. Run **Run full catalog sync now** from **Settings** → **POS Integration** (retailer with `can_manage_settings`) or **Run Full Sync** from Super Admin tenant POS for support
 
-### 9.7 Current limitations
+### 9.8 Current limitations
 
 - The current **Test Connection** path validates Dev Dashboard app credentials and Admin API access for product sync
 - Storefront access is configured now, but full storefront cart/checkout usage is exercised in the next commerce milestones
-- Product sync currently works, but large-catalog pagination and deeper sync hardening are part of the next commerce phase
+- Large catalogs should use batched full import and rely on automatic sync for ongoing changes; monitor API rate limits
 - Tenant onboarding is now based on Dev Dashboard app credentials saved in POS Integration per tenant
 
-> **Note:** POS credential management is now available in both Super Admin and Retailer Admin Settings, but the initial sync action remains in Super Admin.
+> **Note:** POS credential management and catalog sync controls are available in both Super Admin and Retailer Admin **Settings** → **POS Integration**. Users running a full import from the retailer dashboard need **`can_manage_settings`**.
 
 ---
 

@@ -6,6 +6,8 @@ import { useUnsavedChanges } from '@/contexts/UnsavedChangesContext';
 import { createTenantApiClient } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { TenantMediaInput } from '@/components/ui/TenantMediaInput';
+import { Modal } from '@/components/ui/Modal';
+import { Pagination } from '@/components/ui/Pagination';
 
 interface DealerContactResponse {
   phone?: string | null;
@@ -46,7 +48,22 @@ interface PosSettingsResponse {
     shopifyStorefrontTokenConfigured?: boolean;
     shopifyAdminTokenConfigured?: boolean;
     shopifyWebhookSecretConfigured?: boolean;
+    shopifyCatalogSyncEnabled?: boolean;
+    productSyncIntervalMinutes?: number;
+    lastCronProductSyncAt?: string | null;
+    posIntegrationLastActivityAt?: string | null;
   };
+}
+
+interface PosActivityItem {
+  id: string;
+  eventType: string;
+  summary: string;
+  metadata: Record<string, unknown> | null;
+  source: string;
+  actorUserId: string | null;
+  actorLabel: string | null;
+  createdAt: string;
 }
 
 interface SettingsSnapshot {
@@ -63,6 +80,8 @@ interface SettingsSnapshot {
   shopifyStoreUrl: string;
   shopifyAdminTokenDraft: string;
   shopifyStorefrontTokenDraft: string;
+  shopifyCatalogSyncEnabled: boolean;
+  productSyncIntervalMinutes: number;
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -101,6 +120,26 @@ export default function AdminSettingsPage() {
   const [shopifyAdminTokenConfigured, setShopifyAdminTokenConfigured] = useState(false);
   const [shopifyStorefrontTokenConfigured, setShopifyStorefrontTokenConfigured] = useState(false);
   const [lastProductSyncAt, setLastProductSyncAt] = useState<string | null>(null);
+  const [lastCronProductSyncAt, setLastCronProductSyncAt] = useState<string | null>(null);
+  const [shopifyCatalogSyncEnabled, setShopifyCatalogSyncEnabled] = useState(false);
+  const [productSyncIntervalMinutes, setProductSyncIntervalMinutes] = useState(30);
+
+  const [syncImportOpen, setSyncImportOpen] = useState(false);
+  const [syncImportRunning, setSyncImportRunning] = useState(false);
+  const [syncImportError, setSyncImportError] = useState<string | null>(null);
+  const [syncPageIndex, setSyncPageIndex] = useState(0);
+  const [syncEstimatedPages, setSyncEstimatedPages] = useState(1);
+  const [syncTotalProducts, setSyncTotalProducts] = useState<number | null>(null);
+  const [syncStatusLine, setSyncStatusLine] = useState('');
+
+  const [posIntegrationLastActivityAt, setPosIntegrationLastActivityAt] = useState<string | null>(null);
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityRows, setActivityRows] = useState<PosActivityItem[]>([]);
+  const [activityPage, setActivityPage] = useState(1);
+  const [activityTotal, setActivityTotal] = useState(0);
+  const [activityPageSize] = useState(15);
+  const [activityError, setActivityError] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -127,7 +166,9 @@ export default function AdminSettingsPage() {
       posType !== initialSnapshot.posType ||
       shopifyStoreUrl !== initialSnapshot.shopifyStoreUrl ||
       shopifyAdminTokenDraft !== initialSnapshot.shopifyAdminTokenDraft ||
-      shopifyStorefrontTokenDraft !== initialSnapshot.shopifyStorefrontTokenDraft;
+      shopifyStorefrontTokenDraft !== initialSnapshot.shopifyStorefrontTokenDraft ||
+      shopifyCatalogSyncEnabled !== initialSnapshot.shopifyCatalogSyncEnabled ||
+      productSyncIntervalMinutes !== initialSnapshot.productSyncIntervalMinutes;
     setUnsavedChanges(dirty);
   }, [
     dealerAddress,
@@ -142,6 +183,8 @@ export default function AdminSettingsPage() {
     secondaryColor,
     setUnsavedChanges,
     shopifyAdminTokenDraft,
+    shopifyCatalogSyncEnabled,
+    productSyncIntervalMinutes,
     shopifyStoreUrl,
     shopifyStorefrontTokenDraft,
     timezone,
@@ -177,6 +220,12 @@ export default function AdminSettingsPage() {
           !!(pos?.shopifyClientSecretConfigured || pos?.shopifyStorefrontTokenConfigured)
         );
         setLastProductSyncAt(pos?.lastProductSyncAt ?? null);
+        setLastCronProductSyncAt(pos?.lastCronProductSyncAt ?? null);
+        setPosIntegrationLastActivityAt(pos?.posIntegrationLastActivityAt ?? null);
+        setShopifyCatalogSyncEnabled(!!pos?.shopifyCatalogSyncEnabled);
+        setProductSyncIntervalMinutes(
+          typeof pos?.productSyncIntervalMinutes === 'number' ? pos.productSyncIntervalMinutes : 30
+        );
         setInitialSnapshot({
           primaryColor: branding?.primaryColor || '#1B4D7A',
           secondaryColor: branding?.secondaryColor || '#E8A832',
@@ -191,6 +240,9 @@ export default function AdminSettingsPage() {
           shopifyStoreUrl: pos?.shopifyStoreUrl ?? '',
           shopifyAdminTokenDraft: '',
           shopifyStorefrontTokenDraft: '',
+          shopifyCatalogSyncEnabled: !!pos?.shopifyCatalogSyncEnabled,
+          productSyncIntervalMinutes:
+            typeof pos?.productSyncIntervalMinutes === 'number' ? pos.productSyncIntervalMinutes : 30,
         });
       } catch (e: unknown) {
         setError(getErrorMessage(e, 'Failed to load settings'));
@@ -259,6 +311,10 @@ export default function AdminSettingsPage() {
       };
       if (shopifyAdminTokenDraft.trim()) payload.shopifyClientId = shopifyAdminTokenDraft.trim();
       if (shopifyStorefrontTokenDraft.trim()) payload.shopifyClientSecret = shopifyStorefrontTokenDraft.trim();
+      if (posType === 'shopify') {
+        payload.shopifyCatalogSyncEnabled = shopifyCatalogSyncEnabled;
+        payload.productSyncIntervalMinutes = productSyncIntervalMinutes;
+      }
 
       const res = await api.put('/admin/settings/pos', payload) as PosSettingsResponse;
       if (res?.success) {
@@ -272,6 +328,12 @@ export default function AdminSettingsPage() {
           !!(res.data?.shopifyClientSecretConfigured || res.data?.shopifyStorefrontTokenConfigured)
         );
         setLastProductSyncAt(res.data?.lastProductSyncAt ?? null);
+        setLastCronProductSyncAt(res.data?.lastCronProductSyncAt ?? null);
+        setPosIntegrationLastActivityAt(res.data?.posIntegrationLastActivityAt ?? null);
+        if (typeof res.data?.productSyncIntervalMinutes === 'number') {
+          setProductSyncIntervalMinutes(res.data.productSyncIntervalMinutes);
+        }
+        setShopifyCatalogSyncEnabled(!!res.data?.shopifyCatalogSyncEnabled);
         setInitialSnapshot((prev) =>
           prev
             ? {
@@ -280,6 +342,11 @@ export default function AdminSettingsPage() {
                 shopifyStoreUrl: res.data?.shopifyStoreUrl ?? shopifyStoreUrl,
                 shopifyAdminTokenDraft: '',
                 shopifyStorefrontTokenDraft: '',
+                shopifyCatalogSyncEnabled: !!res.data?.shopifyCatalogSyncEnabled,
+                productSyncIntervalMinutes:
+                  typeof res.data?.productSyncIntervalMinutes === 'number'
+                    ? res.data.productSyncIntervalMinutes
+                    : productSyncIntervalMinutes,
               }
             : prev
         );
@@ -290,6 +357,141 @@ export default function AdminSettingsPage() {
       setPosError(getErrorMessage(e, 'Failed to save POS configuration'));
     } finally {
       setPosSaving(false);
+    }
+  }
+
+  async function runFullCatalogSync() {
+    setSyncImportError(null);
+    setError(null);
+    setSyncImportOpen(true);
+    setSyncImportRunning(true);
+    setSyncPageIndex(0);
+    setSyncEstimatedPages(1);
+    setSyncTotalProducts(null);
+    setSyncStatusLine('Getting catalog size from Shopify…');
+
+    let failed = false;
+
+    try {
+      let estimatedPages = 1;
+      let totalProducts: number | null = null;
+
+      try {
+        const estRes = (await api.get('/admin/settings/pos/sync/estimate')) as {
+          success?: boolean;
+          data?: { totalProducts?: number; estimatedPages?: number; pageSize?: number };
+          error?: { message?: string };
+        };
+        if (estRes?.success && estRes.data) {
+          estimatedPages = Math.max(1, Number(estRes.data.estimatedPages) || 1);
+          totalProducts =
+            typeof estRes.data.totalProducts === 'number' ? estRes.data.totalProducts : null;
+          setSyncEstimatedPages(estimatedPages);
+          setSyncTotalProducts(totalProducts);
+        }
+      } catch {
+        setSyncEstimatedPages(1);
+        setSyncTotalProducts(null);
+      }
+
+      let pageInfo: string | null = null;
+      let page = 0;
+
+      while (true) {
+        page += 1;
+        setSyncPageIndex(page);
+        setSyncStatusLine(
+          totalProducts != null
+            ? `Importing from Shopify… page ${page} of ~${estimatedPages} (${totalProducts.toLocaleString()} products in store). Each page is up to 250 products; rows are per variant.`
+            : `Importing from Shopify… page ${page} (up to 250 products per page; rows are per variant).`
+        );
+
+        const batchRes = (await api.post(
+          '/admin/settings/pos/sync/batch',
+          { pageInfo, mode: 'full' },
+          { timeout: 180000 }
+        )) as {
+          success?: boolean;
+          data?: {
+            created?: number;
+            updated?: number;
+            errors?: { id?: string; message: string }[];
+            nextPageInfo?: string | null;
+          };
+          error?: { message?: string };
+        };
+
+        if (!batchRes?.success) {
+          throw new Error(batchRes?.error?.message || 'Sync batch failed');
+        }
+
+        const d = batchRes.data;
+        pageInfo = d?.nextPageInfo ?? null;
+        if (!pageInfo) break;
+      }
+
+      setSyncEstimatedPages(page);
+      setSyncPageIndex(page);
+
+      const posRes = (await api.get('/admin/settings/pos')) as PosSettingsResponse;
+      if (posRes?.data?.lastProductSyncAt) {
+        setLastProductSyncAt(posRes.data.lastProductSyncAt);
+      }
+      if (posRes?.data?.lastCronProductSyncAt !== undefined) {
+        setLastCronProductSyncAt(posRes.data.lastCronProductSyncAt ?? null);
+      }
+      if (posRes?.data?.posIntegrationLastActivityAt !== undefined) {
+        setPosIntegrationLastActivityAt(posRes.data.posIntegrationLastActivityAt ?? null);
+      }
+    } catch (err: unknown) {
+      failed = true;
+      const msg =
+        err &&
+        typeof err === 'object' &&
+        'error' in err &&
+        (err as { error?: { message?: string } }).error?.message
+          ? (err as { error?: { message?: string } }).error?.message
+          : err instanceof Error
+            ? err.message
+            : 'Full catalog sync failed';
+      setSyncImportError(msg || 'Full catalog sync failed');
+    } finally {
+      setSyncImportRunning(false);
+    }
+
+    if (!failed) {
+      setSyncImportOpen(false);
+      setSyncStatusLine('');
+    }
+  }
+
+  async function loadPosActivityPage(page: number) {
+    setActivityLoading(true);
+    setActivityError(null);
+    try {
+      const res = (await api.get(
+        `/admin/settings/pos/activity?page=${page}&pageSize=${activityPageSize}`
+      )) as {
+        success?: boolean;
+        data?: PosActivityItem[];
+        pagination?: { total?: number; page?: number };
+        error?: { message?: string };
+      };
+      if (!res?.success) {
+        setActivityError(res?.error?.message ?? 'Failed to load activity');
+        setActivityRows([]);
+        setActivityTotal(0);
+        return;
+      }
+      setActivityRows(Array.isArray(res.data) ? res.data : []);
+      setActivityTotal(res.pagination?.total ?? 0);
+      setActivityPage(res.pagination?.page ?? page);
+    } catch (e: unknown) {
+      setActivityError(getErrorMessage(e, 'Failed to load activity'));
+      setActivityRows([]);
+      setActivityTotal(0);
+    } finally {
+      setActivityLoading(false);
     }
   }
 
@@ -502,7 +704,7 @@ export default function AdminSettingsPage() {
         <div>
           <h3 className="text-sm font-semibold text-gray-900">POS Integration</h3>
           <p className="text-xs text-gray-500 mt-1">
-            Configure the Shopify connection used for product sync and future commerce. Stored secrets are never shown again after save.
+            Configure the Shopify connection used for catalog data and future commerce. Stored secrets are never shown again after save. Use automatic sync for day-to-day inventory; run a full import for onboarding or backfill.
           </p>
         </div>
 
@@ -565,9 +767,84 @@ export default function AdminSettingsPage() {
           </p>
         </div>
 
+        <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-4 space-y-3">
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-900">
+              <input
+                type="checkbox"
+                checked={shopifyCatalogSyncEnabled}
+                onChange={(e) => setShopifyCatalogSyncEnabled(e.target.checked)}
+                disabled={posSaving || posTesting || posType !== 'shopify'}
+              />
+              Automatic catalog &amp; inventory sync
+            </label>
+            <p className="text-xs text-gray-600 mt-1 ml-6">
+              When enabled, Shopify sends product and inventory webhooks to Hot Tub Companion, and a periodic incremental pull runs as a safety net (interval below).
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Incremental sync interval (minutes)
+            </label>
+            <input
+              type="number"
+              min={5}
+              max={1440}
+              className="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              value={productSyncIntervalMinutes}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (!Number.isNaN(n)) setProductSyncIntervalMinutes(Math.min(1440, Math.max(5, n)));
+              }}
+              disabled={posSaving || posTesting || posType !== 'shopify'}
+            />
+            <p className="text-xs text-gray-500 mt-1">Default 30. Used to throttle background incremental sync (5–1440).</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Last product sync</label>
+            <p className="text-sm text-gray-600">{lastProductSyncAt ? new Date(lastProductSyncAt).toLocaleString() : 'Never'}</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Last incremental cron run</label>
+            <p className="text-sm text-gray-600">
+              {lastCronProductSyncAt ? new Date(lastCronProductSyncAt).toLocaleString() : '—'}
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Last activity</label>
+            <button
+              type="button"
+              className="text-sm text-blue-600 hover:text-blue-800 underline underline-offset-2 text-left disabled:opacity-50 disabled:no-underline"
+              disabled={posType !== 'shopify'}
+              onClick={() => {
+                setActivityModalOpen(true);
+                void loadPosActivityPage(1);
+              }}
+            >
+              {posIntegrationLastActivityAt
+                ? new Date(posIntegrationLastActivityAt).toLocaleString()
+                : 'No activity yet — click to open history'}
+            </button>
+            <p className="text-xs text-gray-500 mt-1">
+              Latest webhook, sync, or settings change. Opens a full paginated log.
+            </p>
+          </div>
+        </div>
+
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Last product sync</label>
-          <p className="text-sm text-gray-600">{lastProductSyncAt ? new Date(lastProductSyncAt).toLocaleString() : 'Never'}</p>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Full catalog import</label>
+          <p className="text-xs text-gray-500 mb-2">
+            Imports every product page from Shopify (all variants). Use for initial setup or recovery; automatic sync keeps day-to-day changes fresh.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            loading={syncImportRunning}
+            disabled={syncImportRunning || posType !== 'shopify' || posSaving || posTesting}
+            onClick={() => void runFullCatalogSync()}
+          >
+            Run full catalog sync now
+          </Button>
         </div>
 
         <div className="flex items-center gap-3 pt-2">
@@ -579,6 +856,97 @@ export default function AdminSettingsPage() {
           </Button>
         </div>
       </div>
+
+      <Modal
+        isOpen={syncImportOpen}
+        onClose={() => {
+          if (syncImportRunning) return;
+          setSyncImportOpen(false);
+          setSyncImportError(null);
+          setSyncStatusLine('');
+        }}
+        preventDismiss={syncImportRunning}
+        title={syncImportRunning ? 'Importing catalog' : 'Catalog import'}
+        size="md"
+      >
+        <div className="space-y-4">
+          {syncImportError ? <p className="text-sm text-red-700">{syncImportError}</p> : null}
+          <p className="text-sm text-gray-600">{syncStatusLine}</p>
+          <div>
+            <div className="h-3 w-full rounded-full bg-gray-200 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-blue-600 transition-[width] duration-300 ease-out"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    Math.round(
+                      (syncPageIndex / Math.max(syncEstimatedPages, syncPageIndex, 1)) * 100
+                    )
+                  )}%`,
+                }}
+              />
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              {syncImportRunning
+                ? `Page ${syncPageIndex} · ~${syncEstimatedPages} expected from Shopify product count${
+                    syncTotalProducts != null ? ` (${syncTotalProducts.toLocaleString()} products)` : ''
+                  }`
+                : null}
+            </div>
+          </div>
+          {!syncImportRunning && syncImportError ? (
+            <Button variant="primary" onClick={() => setSyncImportOpen(false)}>
+              Close
+            </Button>
+          ) : null}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={activityModalOpen}
+        onClose={() => {
+          setActivityModalOpen(false);
+          setActivityError(null);
+        }}
+        title="POS integration activity"
+        size="xl"
+      >
+        <div className="space-y-3">
+          {activityError ? <p className="text-sm text-red-600">{activityError}</p> : null}
+          {activityLoading ? (
+            <p className="text-sm text-gray-600">Loading…</p>
+          ) : activityTotal === 0 ? (
+            <p className="text-sm text-gray-600">No activity recorded yet. Save settings, run a sync, or wait for webhooks/cron.</p>
+          ) : (
+            <ul className="divide-y divide-gray-200 max-h-[min(420px,60vh)] overflow-y-auto text-sm">
+              {activityRows.map((row) => (
+                <li key={row.id} className="py-3 first:pt-0">
+                  <div className="font-medium text-gray-900">{row.summary}</div>
+                  <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                    <span>{new Date(row.createdAt).toLocaleString()}</span>
+                    <span className="capitalize">{row.source.replace(/_/g, ' ')}</span>
+                    {row.eventType ? <span className="font-mono">{row.eventType}</span> : null}
+                    {row.actorLabel ? <span>by {row.actorLabel}</span> : null}
+                  </div>
+                  {row.metadata && Object.keys(row.metadata).length > 0 ? (
+                    <pre className="mt-2 text-xs bg-gray-50 rounded p-2 overflow-x-auto text-gray-700 max-h-24">
+                      {JSON.stringify(row.metadata, null, 2)}
+                    </pre>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+          {!activityLoading && activityTotal > 0 ? (
+            <Pagination
+              page={activityPage}
+              pageSize={activityPageSize}
+              total={activityTotal}
+              onPageChange={(p) => void loadPosActivityPage(p)}
+            />
+          ) : null}
+        </div>
+      </Modal>
     </div>
   );
 }

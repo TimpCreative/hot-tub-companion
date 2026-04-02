@@ -31,8 +31,14 @@ Shopify CLI remains useful for broader app-lifecycle workflows, but the tenant o
 ### Partial
 
 - Existing plaintext compatibility is preserved in code paths so current tenants do not break if legacy values exist
-- Webhook verification uses decrypted secret values, but webhook idempotency and receipt tracking are still outstanding
-- Product sync security is improved through secret handling, but sync pagination/retry hardening is still outstanding
+- Product sync pagination/retry hardening for very large catalogs is still outstanding
+
+### Recently added (catalog freshness)
+
+- **`products/update`** and **`inventory_levels/update`** webhooks with HMAC verification; idempotency via `shopify_webhook_receipts` and `X-Shopify-Webhook-Id`
+- Per-tenant **`shopify_catalog_sync_enabled`** toggle; webhook registration/removal on enable/disable; requires **`PUBLIC_API_URL`** for callback addresses
+- Internal cron: **`POST /api/v1/internal/cron/sync-shopify-catalog`** (with **`CRON_SECRET`**) for incremental `updated_at_min` pulls; throttled by **`product_sync_interval_minutes`**
+- Retailer **full catalog import** and sync APIs moved to **`/api/v1/admin/settings/pos/sync/*`** with **`can_manage_settings`**
 
 ### Not Yet Started
 
@@ -137,11 +143,11 @@ Commerce build does not proceed until this milestone is complete.
 - Log webhook verification and processing failures with enough context for support, but never secrets
 
 **Implemented:**
-- Webhook verification now uses decrypted secret values at point of use
+- Webhook verification uses a shared HMAC helper (`verifyShopifyWebhookRequest`) for `orders/create` and catalog topics
+- Catalog webhooks (`products/update`, `inventory_levels/update`) record **`X-Shopify-Webhook-Id`** in **`shopify_webhook_receipts`** to skip duplicates
 
 **Still outstanding:**
-- duplicate-delivery idempotency
-- webhook receipt persistence
+- Extend the same idempotency pattern to **`orders/create`** if duplicate order notifications become an issue
 
 ### 0.5 Minimize Shopify scopes
 

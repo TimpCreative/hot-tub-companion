@@ -763,6 +763,7 @@ export interface DbPosProduct {
   tenant_id: string;
   pos_product_id: string;
   pos_variant_id: string | null;
+  shopify_inventory_item_id?: string | null;
   title: string;
   description: string | null;
   vendor: string | null;

@@ -1,10 +1,17 @@
 import { Request, Response } from 'express';
+import { db } from '../config/database';
 import { error, success } from '../utils/response';
 import {
   getTenantPosSummary,
   testTenantPosConnection,
   updateTenantPosConfig,
 } from '../services/tenantPosConfig.service';
+import { reconcileShopifyCatalogWebhooks } from '../services/shopifyWebhooks.service';
+import {
+  listPosIntegrationActivity,
+  logPosIntegrationActivity,
+  retailerPosActivityActor,
+} from '../services/posIntegrationActivity.service';
 
 function requireManageSettings(req: Request, res: Response): string | null {
   const role = (req as any).adminRole as Record<string, unknown> | undefined;
@@ -35,9 +42,30 @@ export async function getPosConfig(req: Request, res: Response): Promise<void> {
   success(res, summary);
 }
 
+export async function getPosIntegrationActivity(req: Request, res: Response): Promise<void> {
+  const tenantId = requireManageSettings(req, res);
+  if (!tenantId) return;
+
+  const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize ?? '20'), 10) || 20));
+
+  const { items, total } = await listPosIntegrationActivity(tenantId, page, pageSize);
+  success(res, items, undefined, {
+    page,
+    pageSize,
+    total,
+    totalPages: Math.ceil(total / pageSize) || 1,
+  });
+}
+
 export async function updatePosConfig(req: Request, res: Response): Promise<void> {
   const tenantId = requireManageSettings(req, res);
   if (!tenantId) return;
+
+  const prev = await db('tenants')
+    .where({ id: tenantId })
+    .select('pos_type', 'shopify_catalog_sync_enabled')
+    .first();
 
   const {
     posType,
@@ -47,6 +75,8 @@ export async function updatePosConfig(req: Request, res: Response): Promise<void
     shopifyStorefrontToken,
     shopifyAdminToken,
     shopifyWebhookSecret,
+    shopifyCatalogSyncEnabled,
+    productSyncIntervalMinutes,
   } = req.body as {
     posType?: string | null;
     shopifyStoreUrl?: string | null;
@@ -55,6 +85,8 @@ export async function updatePosConfig(req: Request, res: Response): Promise<void
     shopifyStorefrontToken?: string | null;
     shopifyAdminToken?: string | null;
     shopifyWebhookSecret?: string | null;
+    shopifyCatalogSyncEnabled?: boolean;
+    productSyncIntervalMinutes?: number | null;
   };
 
   try {
@@ -66,8 +98,31 @@ export async function updatePosConfig(req: Request, res: Response): Promise<void
       shopifyStorefrontToken,
       shopifyAdminToken,
       shopifyWebhookSecret,
+      shopifyCatalogSyncEnabled,
+      productSyncIntervalMinutes,
     });
-    success(res, summary, 'POS configuration saved');
+    await reconcileShopifyCatalogWebhooks({
+      tenantId,
+      wasShopify: prev?.pos_type === 'shopify',
+      wasCatalogSyncEnabled: !!prev?.shopify_catalog_sync_enabled,
+      isShopify: summary.posType === 'shopify',
+      isCatalogSyncEnabled: summary.shopifyCatalogSyncEnabled,
+    });
+    const actor = retailerPosActivityActor(req);
+    await logPosIntegrationActivity(tenantId, {
+      eventType: 'pos_settings_saved',
+      summary: 'POS settings saved',
+      metadata: {
+        posType: summary.posType,
+        catalogSyncEnabled: summary.shopifyCatalogSyncEnabled,
+        productSyncIntervalMinutes: summary.productSyncIntervalMinutes,
+      },
+      source: 'retailer_admin',
+      actorUserId: actor.actorUserId,
+      actorLabel: actor.actorLabel,
+    });
+    const fresh = await getTenantPosSummary(tenantId);
+    success(res, fresh ?? summary, 'POS configuration saved');
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to update POS configuration';
     if (message === 'Tenant not found') {

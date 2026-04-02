@@ -7,6 +7,8 @@ import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/Button';
 import { MediaInput } from '@/components/ui/MediaInput';
+import { Modal } from '@/components/ui/Modal';
+import { Pagination } from '@/components/ui/Pagination';
 
 interface Tenant {
   id: string;
@@ -29,6 +31,10 @@ interface Tenant {
   shopifyAdminTokenConfigured?: boolean;
   shopifyStorefrontTokenConfigured?: boolean;
   shopifyWebhookSecretConfigured?: boolean;
+  shopifyCatalogSyncEnabled?: boolean;
+  productSyncIntervalMinutes?: number;
+  lastCronProductSyncAt?: string | null;
+  posIntegrationLastActivityAt?: string | null;
   dashboardDomain?: string | null;
   vercelDomainStatus?: string | null;
   vercelDomainError?: string | null;
@@ -50,6 +56,8 @@ export default function TenantDetailPage() {
   const [shopifyStoreUrlDraft, setShopifyStoreUrlDraft] = useState<string>('');
   const [shopifyAdminTokenDraft, setShopifyAdminTokenDraft] = useState<string>('');
   const [shopifyStorefrontTokenDraft, setShopifyStorefrontTokenDraft] = useState<string>('');
+  const [shopifyCatalogSyncDraft, setShopifyCatalogSyncDraft] = useState(false);
+  const [productSyncIntervalDraft, setProductSyncIntervalDraft] = useState(30);
 
   const [brandingLoading, setBrandingLoading] = useState(false);
   const [brandingError, setBrandingError] = useState<string | null>(null);
@@ -58,6 +66,45 @@ export default function TenantDetailPage() {
   const [secondaryColorDraft, setSecondaryColorDraft] = useState<string>('#E8A832');
   const [logoUrlDraft, setLogoUrlDraft] = useState<string>('');
   const [iconUrlDraft, setIconUrlDraft] = useState<string>('');
+
+  interface PosActivityItem {
+    id: string;
+    eventType: string;
+    summary: string;
+    metadata: Record<string, unknown> | null;
+    source: string;
+    actorUserId: string | null;
+    actorLabel: string | null;
+    createdAt: string;
+  }
+
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityRows, setActivityRows] = useState<PosActivityItem[]>([]);
+  const [activityPage, setActivityPage] = useState(1);
+  const [activityTotal, setActivityTotal] = useState(0);
+  const activityPageSize = 15;
+
+  async function loadPosActivityPage(page: number) {
+    if (!tenant) return;
+    setActivityLoading(true);
+    try {
+      const res = await fetchWithAuth(
+        `/api/dashboard/super-admin/tenants/${tenant.id}/pos/activity?page=${page}&pageSize=${activityPageSize}`
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        setActivityRows([]);
+        setActivityTotal(0);
+        return;
+      }
+      setActivityRows(Array.isArray(json.data) ? json.data : []);
+      setActivityTotal(json.pagination?.total ?? 0);
+      setActivityPage(json.pagination?.page ?? page);
+    } finally {
+      setActivityLoading(false);
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -86,9 +133,18 @@ export default function TenantDetailPage() {
             shopifyStorefrontTokenConfigured:
               !!(pos?.shopifyClientSecretConfigured || pos?.shopifyStorefrontTokenConfigured),
             shopifyWebhookSecretConfigured: !!pos?.shopifyWebhookSecretConfigured,
+            shopifyCatalogSyncEnabled: !!pos?.shopifyCatalogSyncEnabled,
+            productSyncIntervalMinutes:
+              typeof pos?.productSyncIntervalMinutes === 'number' ? pos.productSyncIntervalMinutes : 30,
+            lastCronProductSyncAt: pos?.lastCronProductSyncAt ?? null,
+            posIntegrationLastActivityAt: pos?.posIntegrationLastActivityAt ?? null,
           });
           setPosTypeDraft(pos?.posType ?? '');
           setShopifyStoreUrlDraft(pos?.shopifyStoreUrl ?? '');
+          setShopifyCatalogSyncDraft(!!pos?.shopifyCatalogSyncEnabled);
+          setProductSyncIntervalDraft(
+            typeof pos?.productSyncIntervalMinutes === 'number' ? pos.productSyncIntervalMinutes : 30
+          );
 
           setPrimaryColorDraft(found.primaryColor || '#1B4D7A');
           setSecondaryColorDraft(found.secondaryColor || '#E8A832');
@@ -127,6 +183,10 @@ export default function TenantDetailPage() {
       };
       if (shopifyAdminTokenDraft.trim().length > 0) body.shopifyClientId = shopifyAdminTokenDraft.trim();
       if (shopifyStorefrontTokenDraft.trim().length > 0) body.shopifyClientSecret = shopifyStorefrontTokenDraft.trim();
+      if (posTypeDraft === 'shopify') {
+        body.shopifyCatalogSyncEnabled = shopifyCatalogSyncDraft;
+        body.productSyncIntervalMinutes = productSyncIntervalDraft;
+      }
 
       const res = await fetchWithAuth(`/api/dashboard/super-admin/tenants/${tenant.id}/pos`, {
         method: 'PUT',
@@ -155,9 +215,21 @@ export default function TenantDetailPage() {
                   data.data?.shopifyStorefrontTokenConfigured
                 ),
               shopifyWebhookSecretConfigured: !!data.data?.shopifyWebhookSecretConfigured,
+              shopifyCatalogSyncEnabled: !!data.data?.shopifyCatalogSyncEnabled,
+              productSyncIntervalMinutes:
+                typeof data.data?.productSyncIntervalMinutes === 'number'
+                  ? data.data.productSyncIntervalMinutes
+                  : productSyncIntervalDraft,
+              lastCronProductSyncAt: data.data?.lastCronProductSyncAt ?? prev.lastCronProductSyncAt,
+              posIntegrationLastActivityAt:
+                data.data?.posIntegrationLastActivityAt ?? prev.posIntegrationLastActivityAt,
             }
           : prev
       );
+      if (typeof data.data?.productSyncIntervalMinutes === 'number') {
+        setProductSyncIntervalDraft(data.data.productSyncIntervalMinutes);
+      }
+      setShopifyCatalogSyncDraft(!!data.data?.shopifyCatalogSyncEnabled);
       setPosSavedMessage(data.message ?? 'POS configuration saved');
 
       setShopifyAdminTokenDraft('');
@@ -221,11 +293,32 @@ export default function TenantDetailPage() {
     setPosLoading(true);
     setPosError(null);
     try {
-      await fetchWithAuth(`/api/dashboard/super-admin/tenants/${tenant.id}/pos/sync`, {
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/tenants/${tenant.id}/pos/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ full: true }),
       });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        setPosError(errBody.error?.message || 'Sync failed');
+        return;
+      }
+      const posRes = await fetchWithAuth(`/api/dashboard/super-admin/tenants/${tenant.id}/pos`);
+      const posJson = await posRes.json();
+      const pos = posJson.data;
+      if (pos) {
+        setTenant((prev) =>
+          prev
+            ? {
+                ...prev,
+                lastProductSyncAt: pos.lastProductSyncAt ?? prev.lastProductSyncAt,
+                lastCronProductSyncAt: pos.lastCronProductSyncAt ?? prev.lastCronProductSyncAt,
+                posIntegrationLastActivityAt:
+                  pos.posIntegrationLastActivityAt ?? prev.posIntegrationLastActivityAt,
+              }
+            : prev
+        );
+      }
     } catch (err: unknown) {
       setPosError(err instanceof Error ? err.message : 'Failed to sync catalog');
     } finally {
@@ -570,11 +663,67 @@ export default function TenantDetailPage() {
             </dd>
           </div>
           <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Automatic catalog sync</dt>
+            <dd className="mt-1 sm:mt-0 sm:col-span-2 space-y-2">
+              <label className="flex items-center gap-2 text-sm text-gray-900">
+                <input
+                  type="checkbox"
+                  checked={shopifyCatalogSyncDraft}
+                  onChange={(e) => setShopifyCatalogSyncDraft(e.target.checked)}
+                  disabled={posLoading || posTypeDraft !== 'shopify'}
+                />
+                Enable webhooks + incremental cron (Shopify)
+              </label>
+              <div>
+                <span className="text-xs text-gray-500 block mb-1">Incremental interval (minutes, 5–1440)</span>
+                <input
+                  type="number"
+                  min={5}
+                  max={1440}
+                  className="w-32 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  value={productSyncIntervalDraft}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10);
+                    if (!Number.isNaN(n)) setProductSyncIntervalDraft(Math.min(1440, Math.max(5, n)));
+                  }}
+                  disabled={posLoading || posTypeDraft !== 'shopify'}
+                />
+              </div>
+            </dd>
+          </div>
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
             <dt className="text-sm font-medium text-gray-500">Last Product Sync</dt>
             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
               {tenant.lastProductSyncAt
                 ? format(new Date(tenant.lastProductSyncAt), 'MMM d, yyyy HH:mm')
                 : 'Never'}
+            </dd>
+          </div>
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Last cron incremental</dt>
+            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+              {tenant.lastCronProductSyncAt
+                ? format(new Date(tenant.lastCronProductSyncAt), 'MMM d, yyyy HH:mm')
+                : '—'}
+            </dd>
+          </div>
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Last activity</dt>
+            <dd className="mt-1 sm:mt-0 sm:col-span-2">
+              <button
+                type="button"
+                className="text-sm text-blue-600 hover:text-blue-800 underline underline-offset-2 disabled:opacity-50"
+                disabled={posTypeDraft !== 'shopify'}
+                onClick={() => {
+                  setActivityModalOpen(true);
+                  void loadPosActivityPage(1);
+                }}
+              >
+                {tenant.posIntegrationLastActivityAt
+                  ? format(new Date(tenant.posIntegrationLastActivityAt), 'MMM d, yyyy HH:mm')
+                  : 'No activity yet — open history'}
+              </button>
+              <p className="text-xs text-gray-500 mt-1">Webhooks, syncs, and POS changes.</p>
             </dd>
           </div>
           {posError && (
@@ -596,6 +745,48 @@ export default function TenantDetailPage() {
           </div>
         </div>
       </div>
+
+      <Modal
+        isOpen={activityModalOpen}
+        onClose={() => setActivityModalOpen(false)}
+        title="POS integration activity"
+        size="xl"
+      >
+        <div className="space-y-3">
+          {activityLoading ? (
+            <p className="text-sm text-gray-600">Loading…</p>
+          ) : activityTotal === 0 ? (
+            <p className="text-sm text-gray-600">No activity recorded yet.</p>
+          ) : (
+            <ul className="divide-y divide-gray-200 max-h-[min(420px,60vh)] overflow-y-auto text-sm">
+              {activityRows.map((row) => (
+                <li key={row.id} className="py-3 first:pt-0">
+                  <div className="font-medium text-gray-900">{row.summary}</div>
+                  <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                    <span>{new Date(row.createdAt).toLocaleString()}</span>
+                    <span className="capitalize">{row.source.replace(/_/g, ' ')}</span>
+                    <span className="font-mono">{row.eventType}</span>
+                    {row.actorLabel ? <span>by {row.actorLabel}</span> : null}
+                  </div>
+                  {row.metadata && Object.keys(row.metadata).length > 0 ? (
+                    <pre className="mt-2 text-xs bg-gray-50 rounded p-2 overflow-x-auto text-gray-700 max-h-24">
+                      {JSON.stringify(row.metadata, null, 2)}
+                    </pre>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+          {!activityLoading && activityTotal > 0 ? (
+            <Pagination
+              page={activityPage}
+              pageSize={activityPageSize}
+              total={activityTotal}
+              onPageChange={(p) => void loadPosActivityPage(p)}
+            />
+          ) : null}
+        </div>
+      </Modal>
     </div>
   );
 }

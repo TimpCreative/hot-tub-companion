@@ -21,6 +21,11 @@ import {
   testTenantPosConnection as testTenantPosConnectionService,
   updateTenantPosConfig as updateTenantPosConfigService,
 } from '../services/tenantPosConfig.service';
+import { reconcileShopifyCatalogWebhooks } from '../services/shopifyWebhooks.service';
+import {
+  listPosIntegrationActivity,
+  logPosIntegrationActivity,
+} from '../services/posIntegrationActivity.service';
 
 // Initialize SendGrid if API key is available
 if (env.SENDGRID_API_KEY) {
@@ -331,6 +336,26 @@ export async function getTenantPosConfig(req: Request, res: Response): Promise<v
   success(res, summary);
 }
 
+export async function getTenantPosIntegrationActivity(req: Request, res: Response): Promise<void> {
+  const { id } = req.params;
+  const tenant = await db('tenants').where({ id }).select('id').first();
+  if (!tenant) {
+    error(res, 'NOT_FOUND', 'Tenant not found', 404);
+    return;
+  }
+
+  const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize ?? '20'), 10) || 20));
+
+  const { items, total } = await listPosIntegrationActivity(id, page, pageSize);
+  success(res, items, undefined, {
+    page,
+    pageSize,
+    total,
+    totalPages: Math.ceil(total / pageSize) || 1,
+  });
+}
+
 /**
  * Update POS configuration for a tenant (Shopify-only for Phase 1).
  */
@@ -344,6 +369,8 @@ export async function updateTenantPosConfig(req: Request, res: Response): Promis
     shopifyStorefrontToken,
     shopifyAdminToken,
     shopifyWebhookSecret,
+    shopifyCatalogSyncEnabled,
+    productSyncIntervalMinutes,
   } = req.body as {
     posType?: string | null;
     shopifyStoreUrl?: string;
@@ -352,7 +379,14 @@ export async function updateTenantPosConfig(req: Request, res: Response): Promis
     shopifyStorefrontToken?: string;
     shopifyAdminToken?: string;
     shopifyWebhookSecret?: string;
+    shopifyCatalogSyncEnabled?: boolean;
+    productSyncIntervalMinutes?: number | null;
   };
+
+  const prev = await db('tenants')
+    .where({ id })
+    .select('pos_type', 'shopify_catalog_sync_enabled')
+    .first();
 
   try {
     const summary = await updateTenantPosConfigService(id, {
@@ -363,8 +397,30 @@ export async function updateTenantPosConfig(req: Request, res: Response): Promis
       shopifyStorefrontToken,
       shopifyAdminToken,
       shopifyWebhookSecret,
+      shopifyCatalogSyncEnabled,
+      productSyncIntervalMinutes,
     });
-    success(res, summary, 'POS configuration saved');
+    await reconcileShopifyCatalogWebhooks({
+      tenantId: id,
+      wasShopify: prev?.pos_type === 'shopify',
+      wasCatalogSyncEnabled: !!prev?.shopify_catalog_sync_enabled,
+      isShopify: summary.posType === 'shopify',
+      isCatalogSyncEnabled: summary.shopifyCatalogSyncEnabled,
+    });
+    const saEmail = (req as Request & { superAdminEmail?: string }).superAdminEmail ?? null;
+    await logPosIntegrationActivity(id, {
+      eventType: 'pos_settings_saved',
+      summary: 'POS settings saved (super admin)',
+      metadata: {
+        posType: summary.posType,
+        catalogSyncEnabled: summary.shopifyCatalogSyncEnabled,
+        productSyncIntervalMinutes: summary.productSyncIntervalMinutes,
+      },
+      source: 'super_admin',
+      actorLabel: saEmail,
+    });
+    const fresh = await getTenantPosSummary(id);
+    success(res, fresh ?? summary, 'POS configuration saved');
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to update POS configuration';
     if (message === 'Tenant not found') {
@@ -454,6 +510,20 @@ export async function syncTenantCatalog(req: Request, res: Response): Promise<vo
   await db('tenants')
     .where({ id: tenant.id })
     .update({ last_product_sync_at: new Date() });
+
+  const saEmail = (req as Request & { superAdminEmail?: string }).superAdminEmail ?? null;
+  await logPosIntegrationActivity(id, {
+    eventType: full ? 'sync_full_catalog_super_admin' : 'sync_incremental_super_admin',
+    summary: `${full ? 'Full' : 'Incremental'} catalog sync: ${summary.created} created, ${summary.updated} updated`,
+    source: 'super_admin',
+    actorLabel: saEmail,
+    metadata: {
+      full: !!full,
+      created: summary.created,
+      updated: summary.updated,
+      errorCount: summary.errors.length,
+    },
+  });
 
   success(res, summary);
 }
