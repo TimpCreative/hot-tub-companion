@@ -17,3 +17,73 @@ a:hover { text-decoration: underline; }
 .table { width: 100%; border-collapse: collapse; }
 .table th, .table td { border-bottom: 1px solid #253458; text-align: left; padding: 10px 8px; vertical-align: top; }
 .search { width: 100%; border: 1px solid #2a3a60; border-radius: 8px; background: #0f1730; color: #e7ecff; padding: 8px; margin: 10px 0; }
+
+/* Sidebar navigation */
+.sidebar-nav { display: flex; flex-direction: column; gap: 4px; }
+.sidebar-link {
+  display: block;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #7fc1ff;
+}
+.sidebar-link:hover { background: #1a2544; text-decoration: none; }
+.sidebar-link--external { margin-top: 6px; padding-top: 10px; border-top: 1px solid #243252; }
+
+.sidebar-details { margin: 4px 0; border-radius: 8px; }
+.sidebar-details--root { border: 1px solid #2a3a60; background: #0f1730; overflow: hidden; }
+.sidebar-details--nested { margin: 4px 0 4px 6px; border-left: 2px solid #2f3f64; padding-left: 6px; }
+.sidebar-summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 8px 10px;
+  font-weight: 600;
+  color: #c6d3f7;
+  user-select: none;
+}
+.sidebar-summary::-webkit-details-marker { display: none; }
+.sidebar-summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 0.15s ease;
+  color: #7fc1ff;
+  font-size: 0.75rem;
+}
+.sidebar-details[open] > .sidebar-summary::before { transform: rotate(90deg); }
+.sidebar-summary--nested {
+  font-weight: 500;
+  font-size: 0.9rem;
+  padding: 6px 8px;
+}
+.sidebar-submenu { display: flex; flex-direction: column; gap: 2px; padding: 0 8px 8px; }
+.sidebar-submenu--scroll {
+  max-height: min(55vh, 520px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.sidebar-sublink {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  color: #9fb0d8;
+  line-height: 1.35;
+}
+.sidebar-sublink:hover { background: #1a2544; color: #e7ecff; text-decoration: none; }
+.sidebar-sublink--index {
+  font-weight: 500;
+  color: #7fc1ff;
+  margin-bottom: 4px;
+}
+.sidebar-method {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #7fc1ff;
+  min-width: 2.5rem;
+}
+.sidebar-path { word-break: break-all; color: #c6d3f7; }
