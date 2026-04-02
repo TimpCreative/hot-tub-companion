@@ -1,0 +1,1011 @@
+{
+  "generatedAt": "2026-04-02T15:16:10.086Z",
+  "endpointCount": 120,
+  "endpoints": [
+    {
+      "method": "*",
+      "path": "/api/v1/admin/settings/branding/media/upload",
+      "dashboard": [
+        "dashboard/src/components/ui/TenantMediaInput.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/register",
+      "dashboard": [],
+      "mobile": [
+        "mobile/contexts/AuthContext.tsx"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/verify",
+      "dashboard": [],
+      "mobile": [
+        "mobile/contexts/AuthContext.tsx"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/consumer-uhtd-suggestions",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/onboarding.tsx"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/content",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/(tabs)/water-guides.tsx"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/content/${params.id}",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/(tabs)/content/[id].tsx"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/products",
+      "dashboard": [],
+      "mobile": [
+        "mobile/components/home/ProductStripWidget.tsx"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scdb/brands",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/onboarding.tsx"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scdb/search?${params.toString()}",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/onboarding.tsx"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/spa-profiles",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/(tabs)/profile/more.tsx"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/spa-profiles",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/(tabs)/home.tsx",
+        "mobile/app/(tabs)/maintenance-log.tsx",
+        "mobile/app/(tabs)/profile/index.tsx",
+        "mobile/app/(tabs)/profile/spa/edit/[id].tsx",
+        "mobile/app/(tabs)/water-care.tsx",
+        "mobile/app/(tabs)/water-guides.tsx",
+        "mobile/app/(tabs)/water-test.tsx",
+        "mobile/app/index.tsx",
+        "mobile/hooks/useFinishSetupNudge.ts"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/spa-profiles",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/onboarding.tsx"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/spa-profiles/${id}",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/(tabs)/profile/spa/edit/[id].tsx"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/spa-profiles/${spa.id}",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/(tabs)/profile/index.tsx"
+      ]
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/*",
+      "dashboard": [
+        "dashboard/src/hooks/useSuperAdminFetch.ts"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/announcements/send",
+      "dashboard": [
+        "dashboard/src/app/super-admin/announcements/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/audit/logs?${params}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/audit-log/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/audit/review/confirm",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/review-queue/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/audit/review/pending?${params}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/review-queue/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/audit/review/reject",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/review-queue/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/audit/review/stats",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/review-queue/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/audit/stats",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/audit-log/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/auth/check-email",
+      "dashboard": [
+        "dashboard/src/app/auth/signup/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/auth/register",
+      "dashboard": [
+        "dashboard/src/app/auth/signup/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/comps",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/comps/new/page.tsx",
+        "dashboard/src/components/uhtd/CreateCompModal.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/comps?${params}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/comps/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/comps/${compId}",
+      "dashboard": [
+        "dashboard/src/components/uhtd/CompQuickview.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/comps/${compId}/spas",
+      "dashboard": [
+        "dashboard/src/components/uhtd/CompQuickview.tsx",
+        "dashboard/src/components/uhtd/PartForm.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/comps/${encodeURIComponent(compId",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/comps/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/comps/${encodeURIComponent(formData.id",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/comps/new/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/comps/compatibility",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/parts/[id]/edit/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/comps/compatibility?partId=${partId}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/parts/[id]/edit/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/parts/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/comps/compatibility/${compatId}/status",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/parts/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/comps/compatibility/bulk",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/parts/[id]/edit/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/parts/new/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/comps/compatibility/matrix",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/comp-builder/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/comps/generate-id?brandCode=${formData.brandCode}&categoryCode=${formData.categoryCode}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/comps/new/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/comps/near-matches",
+      "dashboard": [
+        "dashboard/src/components/uhtd/CompSidebar.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/comps/spa/${spaId}/parts",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/spas/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/consumer-uhtd-suggestions?${params}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/review-queue/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/consumer-uhtd-suggestions/${id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/review-queue/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/import/${importType}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/import/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/import/templates/parts",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/import/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/import/templates/spas",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/import/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/journal",
+      "dashboard": [
+        "dashboard/src/app/super-admin/journal/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/journal/${editingId}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/journal/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/journal/${entry.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/journal/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/journal/${entry.id}/reorder",
+      "dashboard": [
+        "dashboard/src/app/super-admin/journal/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/media?${params}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/media/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/media/${deleteConfirm.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/media/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/media/data-sources${params}",
+      "dashboard": [
+        "dashboard/src/components/ui/DataSourceInput.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/media/upload",
+      "dashboard": [
+        "dashboard/src/components/ui/MediaInput.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/merge/${entityType}s",
+      "dashboard": [
+        "dashboard/src/components/uhtd/MergeModal.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/merge/${entityType}s/preview",
+      "dashboard": [
+        "dashboard/src/components/uhtd/MergeModal.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/pcdb/categories",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/categories/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/comps/new/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/parts/new/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/parts/page.tsx",
+        "dashboard/src/components/uhtd/PartForm.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/pcdb/categories?tree=true",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/categories/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/pcdb/categories/${editingCategory.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/categories/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/pcdb/categories/${id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/categories/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/pcdb/parts",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/parts/new/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/pcdb/parts?${params}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/parts/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/pcdb/parts/${partId}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/parts/[id]/edit/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/parts/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/pcdb/parts/search?${params}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/comp-builder/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/platform-users",
+      "dashboard": [
+        "dashboard/src/app/super-admin/platform-users/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/platform-users/${editing.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/platform-users/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/platform-users/${u.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/platform-users/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/qdb/brand-qualifiers/${params.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/brands/[id]/edit/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/qdb/part-qualifiers/${partId}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/parts/[id]/edit/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/parts/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/qdb/part-qualifiers/${partId}/${qid}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/parts/[id]/edit/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/qdb/part-qualifiers/${partId}/${qualifierId}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/parts/new/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/qdb/qualifiers",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/brands/[id]/edit/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/qualifiers/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/water-care/page.tsx",
+        "dashboard/src/components/uhtd/PartQualifiersInput.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/qdb/qualifiers/${editingQualifier.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/qualifiers/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/qdb/qualifiers/${id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/qualifiers/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/qdb/qualifiers/for-brand/${brandId}",
+      "dashboard": [
+        "dashboard/src/components/uhtd/SpaQualifiersInput.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/qdb/sections",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/qualifiers/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/qdb/sections/${editingSection.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/qualifiers/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/qdb/sections/${id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/qualifiers/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/qdb/sections/${other.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/qualifiers/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/qdb/sections/${section.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/qualifiers/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/qdb/spa-qualifiers/${spaId}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/spas/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/brands",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/brands/new/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/model-lines/new/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/model-lines/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/spas/new/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/spas/page.tsx",
+        "dashboard/src/components/uhtd/QuickCreateBrandModal.tsx",
+        "dashboard/src/components/uhtd/QuickCreateModelLineModal.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/brands?${params}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/brands/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/brands?page=1&pageSize=500",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/qualifiers/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/water-care/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/brands/${params.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/brands/[id]/edit/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/brands/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/model-lines",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/model-lines/new/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/spas/new/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/water-care/page.tsx",
+        "dashboard/src/components/uhtd/QuickCreateModelLineModal.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/model-lines?${params}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/model-lines/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/model-lines?brandId=${params.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/brands/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/model-lines/${modelLineId}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/model-lines/[id]/models/new/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/model-lines/${params.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/model-lines/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/spa-models",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/model-lines/[id]/models/new/page.tsx",
+        "dashboard/src/app/super-admin/uhtd/spas/new/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/spa-models?${params}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/spas/page.tsx",
+        "dashboard/src/components/uhtd/SpaSelector.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/spa-models?modelLineId=${params.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/model-lines/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/spa-models?page=1&pageSize=500",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/water-care/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/spa-models/${spaId}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/spas/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/spa-models/bulk",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/spas/new/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/scdb/spa-models/search?${params}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/comp-builder/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/settings",
+      "dashboard": [
+        "dashboard/src/app/super-admin/settings/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/stats/search?q=${encodeURIComponent(term",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/stats/uhtd",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/tenants",
+      "dashboard": [
+        "dashboard/src/app/super-admin/announcements/page.tsx",
+        "dashboard/src/app/super-admin/platform-users/page.tsx",
+        "dashboard/src/app/super-admin/tenants/[id]/page.tsx",
+        "dashboard/src/app/super-admin/tenants/new/page.tsx",
+        "dashboard/src/app/super-admin/tenants/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/tenants/${id}/pos",
+      "dashboard": [
+        "dashboard/src/app/super-admin/tenants/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/tenants/${tenant.id}/branding",
+      "dashboard": [
+        "dashboard/src/app/super-admin/tenants/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/tenants/${tenant.id}/pos",
+      "dashboard": [
+        "dashboard/src/app/super-admin/tenants/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/tenants/${tenant.id}/pos/sync",
+      "dashboard": [
+        "dashboard/src/app/super-admin/tenants/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/tenants/${tenant.id}/pos/test",
+      "dashboard": [
+        "dashboard/src/app/super-admin/tenants/[id]/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/water-care/mappings",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/water-care/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/water-care/mappings/${editingMapping.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/water-care/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/water-care/mappings/${id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/water-care/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/water-care/profiles",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/water-care/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/water-care/profiles/${editingProfile.id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/water-care/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/water-care/profiles/${id}",
+      "dashboard": [
+        "dashboard/src/app/super-admin/uhtd/water-care/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/whitelist",
+      "dashboard": [
+        "dashboard/src/app/super-admin/settings/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/whitelist/${encodeURIComponent(email",
+      "dashboard": [
+        "dashboard/src/app/super-admin/settings/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "*",
+      "path": "/api/v1/super-admin/whitelist/invite",
+      "dashboard": [
+        "dashboard/src/app/super-admin/settings/page.tsx"
+      ],
+      "mobile": []
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenant/config",
+      "dashboard": [],
+      "mobile": [
+        "mobile/contexts/TenantContext.tsx"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/users/me",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/(tabs)/profile/more.tsx"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/me",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/(tabs)/profile/account.tsx",
+        "mobile/app/(tabs)/profile/index.tsx",
+        "mobile/app/(tabs)/profile/notifications.tsx",
+        "mobile/app/(tabs)/profile/privacy.tsx"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/users/me",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/(tabs)/profile/account.tsx",
+        "mobile/app/(tabs)/profile/notifications.tsx",
+        "mobile/app/(tabs)/profile/privacy.tsx",
+        "mobile/app/onboarding.tsx"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/users/me/fcm-token",
+      "dashboard": [],
+      "mobile": [
+        "mobile/lib/registerPushToken.ts"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/water-care/${primarySpa.id}",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/(tabs)/water-care.tsx",
+        "mobile/app/(tabs)/water-test.tsx"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/water-tests",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/(tabs)/water-test.tsx"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/water-tests/${primarySpa.id}",
+      "dashboard": [],
+      "mobile": [
+        "mobile/app/(tabs)/maintenance-log.tsx"
+      ]
+    }
+  ]
+}

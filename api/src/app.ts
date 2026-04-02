@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import compression from 'compression';
 import routes from './routes';
 import webhooksRoutes from './routes/webhooks.routes';
+import docsRoutes from './routes/docs.routes';
 import { defaultRateLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
 import { tenantMiddleware } from './middleware/tenant';
@@ -32,6 +33,7 @@ app.use(
 
 app.use(express.json({ limit: '10mb' }));
 app.use(requestContextMiddleware);
+app.use('/docs', docsRoutes);
 
 // Attach tenant context for tenant-scoped routes
 app.use(tenantMiddleware);

@@ -10,7 +10,12 @@
     "migrate": "knex migrate:latest",
     "migrate:rollback": "knex migrate:rollback",
     "seed": "knex seed:run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "docs:inventory": "node scripts/generateApiInventory.js",
+    "docs:usage": "node scripts/generateUsageIndex.js",
+    "docs:openapi": "node scripts/generateOpenApi.js",
+    "docs:generate": "npm run docs:inventory && npm run docs:usage && npm run docs:openapi",
+    "docs:check": "npm run docs:generate && node scripts/checkDocsCoverage.js"
   },
   "engines": {
     "node": ">=18.0.0"

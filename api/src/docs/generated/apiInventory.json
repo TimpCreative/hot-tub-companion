@@ -1,0 +1,2035 @@
+{
+  "generatedAt": "2026-04-02T15:16:09.917Z",
+  "endpointCount": 225,
+  "unresolvedRouteFiles": [
+    "api/src/routes/adminContent.routes.ts",
+    "api/src/routes/tenant.routes.ts"
+  ],
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/content",
+      "routeFile": "api/src/routes/adminContent.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "content",
+      "family": "/api/v1/admin/content",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/content",
+      "routeFile": "api/src/routes/adminContent.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "content",
+      "family": "/api/v1/admin/content",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/content/:id",
+      "routeFile": "api/src/routes/adminContent.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "content",
+      "family": "/api/v1/admin/content",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/content/:id",
+      "routeFile": "api/src/routes/adminContent.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "content",
+      "family": "/api/v1/admin/content",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/content/:id/suppress",
+      "routeFile": "api/src/routes/adminContent.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "content",
+      "family": "/api/v1/admin/content",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/me",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "me",
+      "family": "/api/v1/admin/me",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/notifications",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "notifications",
+      "family": "/api/v1/admin/notifications",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/notifications",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "notifications",
+      "family": "/api/v1/admin/notifications",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/notifications/:id",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "notifications",
+      "family": "/api/v1/admin/notifications",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/notifications/:id/cancel",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "notifications",
+      "family": "/api/v1/admin/notifications",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/notifications/:id/stats",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "notifications",
+      "family": "/api/v1/admin/notifications",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/products",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "products",
+      "family": "/api/v1/admin/products",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/products/:id/map",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "products",
+      "family": "/api/v1/admin/products",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/products/:id/map",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "products",
+      "family": "/api/v1/admin/products",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/products/:id/uhtd-suggestions",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "products",
+      "family": "/api/v1/admin/products",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/products/:id/visibility",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "products",
+      "family": "/api/v1/admin/products",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/products/sync",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "products",
+      "family": "/api/v1/admin/products",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/app-setup",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "settings",
+      "family": "/api/v1/admin/settings",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/settings/app-setup",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "settings",
+      "family": "/api/v1/admin/settings",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/branding",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "settings",
+      "family": "/api/v1/admin/settings",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/settings/branding",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "settings",
+      "family": "/api/v1/admin/settings",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/settings/branding/media/upload",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "settings",
+      "family": "/api/v1/admin/settings",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/pos",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "settings",
+      "family": "/api/v1/admin/settings",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/settings/pos",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "settings",
+      "family": "/api/v1/admin/settings",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/settings/pos/test",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "settings",
+      "family": "/api/v1/admin/settings",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/team",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "team",
+      "family": "/api/v1/admin/team",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/team/:userId",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "team",
+      "family": "/api/v1/admin/team",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/team/:userId",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "team",
+      "family": "/api/v1/admin/team",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/team/audit",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "team",
+      "family": "/api/v1/admin/team",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/team/invite",
+      "routeFile": "api/src/routes/admin.routes.ts",
+      "domain": "Retailer Admin",
+      "group": "team",
+      "family": "/api/v1/admin/team",
+      "authType": "retailer_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "routeFile": "api/src/routes/auth.routes.ts",
+      "domain": "Public",
+      "group": "auth",
+      "family": "/api/v1/auth/login",
+      "authType": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/register",
+      "routeFile": "api/src/routes/auth.routes.ts",
+      "domain": "Public",
+      "group": "auth",
+      "family": "/api/v1/auth/register",
+      "authType": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/verify",
+      "routeFile": "api/src/routes/auth.routes.ts",
+      "domain": "Public",
+      "group": "auth",
+      "family": "/api/v1/auth/verify",
+      "authType": "public"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/consumer-uhtd-suggestions",
+      "routeFile": "api/src/routes/consumerUhtdSuggestions.routes.ts",
+      "domain": "Customer",
+      "group": "consumer-uhtd-suggestions",
+      "family": "/api/v1/consumer-uhtd-suggestions",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/content",
+      "routeFile": "api/src/routes/content.routes.ts",
+      "domain": "Customer",
+      "group": "content",
+      "family": "/api/v1/content",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/content/:id",
+      "routeFile": "api/src/routes/content.routes.ts",
+      "domain": "Customer",
+      "group": "content",
+      "family": "/api/v1/content/:id",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/content/categories",
+      "routeFile": "api/src/routes/content.routes.ts",
+      "domain": "Customer",
+      "group": "content",
+      "family": "/api/v1/content/categories",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/internal/cron/dispatch-notifications",
+      "routeFile": "api/src/routes/index.ts",
+      "domain": "Internal",
+      "group": "internal",
+      "family": "/api/v1/internal/cron",
+      "authType": "internal_secret"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/internal/eas-tenant-config",
+      "routeFile": "api/src/routes/index.ts",
+      "domain": "Internal",
+      "group": "internal",
+      "family": "/api/v1/internal/eas-tenant-config",
+      "authType": "internal_secret"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/media/debug/:id",
+      "routeFile": "api/src/routes/mediaPublic.routes.ts",
+      "domain": "Public",
+      "group": "media",
+      "family": "/api/v1/media/debug",
+      "authType": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/media/serve",
+      "routeFile": "api/src/routes/mediaPublic.routes.ts",
+      "domain": "Public",
+      "group": "media",
+      "family": "/api/v1/media/serve",
+      "authType": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/media/serve/:id",
+      "routeFile": "api/src/routes/mediaPublic.routes.ts",
+      "domain": "Public",
+      "group": "media",
+      "family": "/api/v1/media/serve",
+      "authType": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/products",
+      "routeFile": "api/src/routes/products.routes.ts",
+      "domain": "Customer",
+      "group": "products",
+      "family": "/api/v1/products",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/products/:id",
+      "routeFile": "api/src/routes/products.routes.ts",
+      "domain": "Customer",
+      "group": "products",
+      "family": "/api/v1/products/:id",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/products/categories",
+      "routeFile": "api/src/routes/products.routes.ts",
+      "domain": "Customer",
+      "group": "products",
+      "family": "/api/v1/products/categories",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/products/compatible/:spaProfileId",
+      "routeFile": "api/src/routes/products.routes.ts",
+      "domain": "Customer",
+      "group": "products",
+      "family": "/api/v1/products/compatible",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scdb/brands",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/brands",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/scdb/brands",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/brands",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scdb/brands/:brandId/model-lines",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/brands",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scdb/brands/:brandId/years",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/brands",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/scdb/brands/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/brands",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scdb/brands/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/brands",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/scdb/brands/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/brands",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scdb/model-lines",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/model-lines",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/scdb/model-lines",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/model-lines",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/scdb/model-lines/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/model-lines",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scdb/model-lines/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/model-lines",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/scdb/model-lines/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/model-lines",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scdb/model-lines/:modelLineId/models",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/model-lines",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scdb/model-lines/:modelLineId/names",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/model-lines",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scdb/model-lines/:modelLineId/names/:modelName/years",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/model-lines",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scdb/search",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/search",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scdb/spa-models",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/spa-models",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/scdb/spa-models",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/spa-models",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/scdb/spa-models/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/spa-models",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scdb/spa-models/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/spa-models",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/scdb/spa-models/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/spa-models",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/scdb/spa-models/bulk",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/spa-models",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scdb/spa-models/search",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Customer",
+      "group": "scdb",
+      "family": "/api/v1/scdb/spa-models",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/spa-profiles",
+      "routeFile": "api/src/routes/spaProfiles.routes.ts",
+      "domain": "Customer",
+      "group": "spa-profiles",
+      "family": "/api/v1/spa-profiles",
+      "authType": "tenant_firebase"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/spa-profiles",
+      "routeFile": "api/src/routes/spaProfiles.routes.ts",
+      "domain": "Customer",
+      "group": "spa-profiles",
+      "family": "/api/v1/spa-profiles",
+      "authType": "tenant_firebase"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/spa-profiles",
+      "routeFile": "api/src/routes/spaProfiles.routes.ts",
+      "domain": "Customer",
+      "group": "spa-profiles",
+      "family": "/api/v1/spa-profiles",
+      "authType": "tenant_firebase"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/spa-profiles/:id",
+      "routeFile": "api/src/routes/spaProfiles.routes.ts",
+      "domain": "Customer",
+      "group": "spa-profiles",
+      "family": "/api/v1/spa-profiles/:id",
+      "authType": "tenant_firebase"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/spa-profiles/:id",
+      "routeFile": "api/src/routes/spaProfiles.routes.ts",
+      "domain": "Customer",
+      "group": "spa-profiles",
+      "family": "/api/v1/spa-profiles/:id",
+      "authType": "tenant_firebase"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/announcements/send",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "announcements",
+      "family": "/api/v1/super-admin/announcements",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/audit/logs",
+      "routeFile": "api/src/routes/audit.routes.ts",
+      "domain": "Super Admin",
+      "group": "audit",
+      "family": "/api/v1/super-admin/audit",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/audit/review/confirm",
+      "routeFile": "api/src/routes/audit.routes.ts",
+      "domain": "Super Admin",
+      "group": "audit",
+      "family": "/api/v1/super-admin/audit",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/audit/review/pending",
+      "routeFile": "api/src/routes/audit.routes.ts",
+      "domain": "Super Admin",
+      "group": "audit",
+      "family": "/api/v1/super-admin/audit",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/audit/review/reject",
+      "routeFile": "api/src/routes/audit.routes.ts",
+      "domain": "Super Admin",
+      "group": "audit",
+      "family": "/api/v1/super-admin/audit",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/audit/review/stats",
+      "routeFile": "api/src/routes/audit.routes.ts",
+      "domain": "Super Admin",
+      "group": "audit",
+      "family": "/api/v1/super-admin/audit",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/audit/stats",
+      "routeFile": "api/src/routes/audit.routes.ts",
+      "domain": "Super Admin",
+      "group": "audit",
+      "family": "/api/v1/super-admin/audit",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/auth/check-email",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "auth",
+      "family": "/api/v1/super-admin/auth",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/auth/register",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "auth",
+      "family": "/api/v1/super-admin/auth",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/comps/",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps/",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/comps/:id",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/comps/:id",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/comps/:id",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/comps/:id/parts",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/comps/:id/spas",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/comps/:id/spas",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/comps/:id/spas",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/comps/:id/spas",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/comps/",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps/",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/comps/assign-part",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/comps/compatibility",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/comps/compatibility/:partId/:spaModelId",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/super-admin/comps/compatibility/:partId/:spaModelId/status",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/comps/compatibility/bulk",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/comps/compatibility/matrix",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/comps/compatibility/part/:partId",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/comps/compatibility/spa/:spaModelId",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/comps/generate-id",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/comps/near-matches",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/comps/review-queue",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/comps/stats",
+      "routeFile": "api/src/routes/comp.routes.ts",
+      "domain": "Super Admin",
+      "group": "comps",
+      "family": "/api/v1/super-admin/comps",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/consumer-uhtd-suggestions",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "consumer-uhtd-suggestions",
+      "family": "/api/v1/super-admin/consumer-uhtd-suggestions",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/super-admin/consumer-uhtd-suggestions/:id",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "consumer-uhtd-suggestions",
+      "family": "/api/v1/super-admin/consumer-uhtd-suggestions",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/content/",
+      "routeFile": "api/src/routes/superAdminContent.routes.ts",
+      "domain": "Super Admin",
+      "group": "content",
+      "family": "/api/v1/super-admin/content/",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/content/:id",
+      "routeFile": "api/src/routes/superAdminContent.routes.ts",
+      "domain": "Super Admin",
+      "group": "content",
+      "family": "/api/v1/super-admin/content",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/content/:id",
+      "routeFile": "api/src/routes/superAdminContent.routes.ts",
+      "domain": "Super Admin",
+      "group": "content",
+      "family": "/api/v1/super-admin/content",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/content/",
+      "routeFile": "api/src/routes/superAdminContent.routes.ts",
+      "domain": "Super Admin",
+      "group": "content",
+      "family": "/api/v1/super-admin/content/",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/content/categories",
+      "routeFile": "api/src/routes/superAdminContent.routes.ts",
+      "domain": "Super Admin",
+      "group": "content",
+      "family": "/api/v1/super-admin/content",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/content/categories",
+      "routeFile": "api/src/routes/superAdminContent.routes.ts",
+      "domain": "Super Admin",
+      "group": "content",
+      "family": "/api/v1/super-admin/content",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/content/categories/:id",
+      "routeFile": "api/src/routes/superAdminContent.routes.ts",
+      "domain": "Super Admin",
+      "group": "content",
+      "family": "/api/v1/super-admin/content",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/content/categories/:id",
+      "routeFile": "api/src/routes/superAdminContent.routes.ts",
+      "domain": "Super Admin",
+      "group": "content",
+      "family": "/api/v1/super-admin/content",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/import/brands",
+      "routeFile": "api/src/routes/import.routes.ts",
+      "domain": "Super Admin",
+      "group": "import",
+      "family": "/api/v1/super-admin/import",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/import/compatibility",
+      "routeFile": "api/src/routes/import.routes.ts",
+      "domain": "Super Admin",
+      "group": "import",
+      "family": "/api/v1/super-admin/import",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/import/comps",
+      "routeFile": "api/src/routes/import.routes.ts",
+      "domain": "Super Admin",
+      "group": "import",
+      "family": "/api/v1/super-admin/import",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/import/model-lines",
+      "routeFile": "api/src/routes/import.routes.ts",
+      "domain": "Super Admin",
+      "group": "import",
+      "family": "/api/v1/super-admin/import",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/import/parts",
+      "routeFile": "api/src/routes/import.routes.ts",
+      "domain": "Super Admin",
+      "group": "import",
+      "family": "/api/v1/super-admin/import",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/import/spas",
+      "routeFile": "api/src/routes/import.routes.ts",
+      "domain": "Super Admin",
+      "group": "import",
+      "family": "/api/v1/super-admin/import",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/import/templates/:type",
+      "routeFile": "api/src/routes/import.routes.ts",
+      "domain": "Super Admin",
+      "group": "import",
+      "family": "/api/v1/super-admin/import",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/journal",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "journal",
+      "family": "/api/v1/super-admin/journal",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/journal",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "journal",
+      "family": "/api/v1/super-admin/journal",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/journal/:id",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "journal",
+      "family": "/api/v1/super-admin/journal",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/journal/:id",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "journal",
+      "family": "/api/v1/super-admin/journal",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/journal/:id/reorder",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "journal",
+      "family": "/api/v1/super-admin/journal",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/media/",
+      "routeFile": "api/src/routes/media.routes.ts",
+      "domain": "Super Admin",
+      "group": "media",
+      "family": "/api/v1/super-admin/media/",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/media/:id",
+      "routeFile": "api/src/routes/media.routes.ts",
+      "domain": "Super Admin",
+      "group": "media",
+      "family": "/api/v1/super-admin/media",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/media/:id",
+      "routeFile": "api/src/routes/media.routes.ts",
+      "domain": "Super Admin",
+      "group": "media",
+      "family": "/api/v1/super-admin/media",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/media/data-sources",
+      "routeFile": "api/src/routes/media.routes.ts",
+      "domain": "Super Admin",
+      "group": "media",
+      "family": "/api/v1/super-admin/media",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/media/upload",
+      "routeFile": "api/src/routes/media.routes.ts",
+      "domain": "Super Admin",
+      "group": "media",
+      "family": "/api/v1/super-admin/media",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/merge/brands",
+      "routeFile": "api/src/routes/merge.routes.ts",
+      "domain": "Super Admin",
+      "group": "merge",
+      "family": "/api/v1/super-admin/merge",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/merge/brands/preview",
+      "routeFile": "api/src/routes/merge.routes.ts",
+      "domain": "Super Admin",
+      "group": "merge",
+      "family": "/api/v1/super-admin/merge",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/merge/model-lines",
+      "routeFile": "api/src/routes/merge.routes.ts",
+      "domain": "Super Admin",
+      "group": "merge",
+      "family": "/api/v1/super-admin/merge",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/merge/model-lines/preview",
+      "routeFile": "api/src/routes/merge.routes.ts",
+      "domain": "Super Admin",
+      "group": "merge",
+      "family": "/api/v1/super-admin/merge",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/merge/spas",
+      "routeFile": "api/src/routes/merge.routes.ts",
+      "domain": "Super Admin",
+      "group": "merge",
+      "family": "/api/v1/super-admin/merge",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/merge/spas/preview",
+      "routeFile": "api/src/routes/merge.routes.ts",
+      "domain": "Super Admin",
+      "group": "merge",
+      "family": "/api/v1/super-admin/merge",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/pcdb/categories",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/pcdb/categories",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/pcdb/categories/:id",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/pcdb/categories/:id",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/pcdb/categories/:id",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/pcdb/categories/:id/ancestors",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/pcdb/interchange-groups",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/pcdb/interchange-groups",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/pcdb/interchange-groups/:id",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/pcdb/interchange-groups/:id",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/pcdb/interchange-groups/:id",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/pcdb/interchange-groups/:id/parts",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/pcdb/manufacturers",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/pcdb/parts",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/pcdb/parts",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/pcdb/parts/:id",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/pcdb/parts/:id",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/pcdb/parts/:id",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/pcdb/parts/search",
+      "routeFile": "api/src/routes/pcdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "pcdb",
+      "family": "/api/v1/super-admin/pcdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/platform-users",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "platform-users",
+      "family": "/api/v1/super-admin/platform-users",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/platform-users",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "platform-users",
+      "family": "/api/v1/super-admin/platform-users",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/platform-users/:id",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "platform-users",
+      "family": "/api/v1/super-admin/platform-users",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/platform-users/:id",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "platform-users",
+      "family": "/api/v1/super-admin/platform-users",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/qdb/brand-qualifiers/:brandId",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/qdb/brand-qualifiers/:brandId",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/qdb/part-qualifiers/:partId",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/qdb/part-qualifiers/:partId/:qualifierId",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/qdb/part-qualifiers/:partId/:qualifierId",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/qdb/qualifiers",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/qdb/qualifiers",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/qdb/qualifiers/:id",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/qdb/qualifiers/:id",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/qdb/qualifiers/:id",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/qdb/qualifiers/for-brand/:brandId",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/qdb/sections",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/qdb/sections",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/qdb/sections/:id",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/qdb/sections/:id",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/qdb/spa-qualifiers/:spaModelId",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/qdb/spa-qualifiers/:spaModelId/:qualifierId",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/qdb/spa-qualifiers/:spaModelId/:qualifierId",
+      "routeFile": "api/src/routes/qdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "qdb",
+      "family": "/api/v1/super-admin/qdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/scdb/brands",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/scdb/brands",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/scdb/brands/:brandId/model-lines",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/scdb/brands/:brandId/years",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/scdb/brands/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/scdb/brands/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/scdb/brands/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/scdb/model-lines",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/scdb/model-lines",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/scdb/model-lines/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/scdb/model-lines/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/scdb/model-lines/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/scdb/model-lines/:modelLineId/models",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/scdb/model-lines/:modelLineId/names",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/scdb/model-lines/:modelLineId/names/:modelName/years",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/scdb/search",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/scdb/spa-models",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/scdb/spa-models",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/scdb/spa-models/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/scdb/spa-models/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/scdb/spa-models/:id",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/scdb/spa-models/bulk",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/scdb/spa-models/search",
+      "routeFile": "api/src/routes/scdb.routes.ts",
+      "domain": "Super Admin",
+      "group": "scdb",
+      "family": "/api/v1/super-admin/scdb",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/settings",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "settings",
+      "family": "/api/v1/super-admin/settings",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/stats/search",
+      "routeFile": "api/src/routes/stats.routes.ts",
+      "domain": "Super Admin",
+      "group": "stats",
+      "family": "/api/v1/super-admin/stats",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/stats/uhtd",
+      "routeFile": "api/src/routes/stats.routes.ts",
+      "domain": "Super Admin",
+      "group": "stats",
+      "family": "/api/v1/super-admin/stats",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/tenants",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "tenants",
+      "family": "/api/v1/super-admin/tenants",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/tenants",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "tenants",
+      "family": "/api/v1/super-admin/tenants",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/tenants/:id/branding",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "tenants",
+      "family": "/api/v1/super-admin/tenants",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/tenants/:id/branding",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "tenants",
+      "family": "/api/v1/super-admin/tenants",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/tenants/:id/entitlements",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "tenants",
+      "family": "/api/v1/super-admin/tenants",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/tenants/:id/entitlements",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "tenants",
+      "family": "/api/v1/super-admin/tenants",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/super-admin/tenants/:id/pos",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "tenants",
+      "family": "/api/v1/super-admin/tenants",
+      "authType": "super_admin"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/super-admin/tenants/:id/pos",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "tenants",
+      "family": "/api/v1/super-admin/tenants",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/tenants/:id/pos/sync",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "tenants",
+      "family": "/api/v1/super-admin/tenants",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/tenants/:id/pos/test",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "tenants",
+      "family": "/api/v1/super-admin/tenants",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/whitelist",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "whitelist",
+      "family": "/api/v1/super-admin/whitelist",
+      "authType": "super_admin"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/super-admin/whitelist/:email",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "whitelist",
+      "family": "/api/v1/super-admin/whitelist",
+      "authType": "super_admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/super-admin/whitelist/invite",
+      "routeFile": "api/src/routes/superAdmin.routes.ts",
+      "domain": "Super Admin",
+      "group": "whitelist",
+      "family": "/api/v1/super-admin/whitelist",
+      "authType": "super_admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenant/config",
+      "routeFile": "api/src/routes/index.ts",
+      "domain": "Customer",
+      "group": "tenant",
+      "family": "/api/v1/tenant/config",
+      "authType": "tenant_key"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/users/me",
+      "routeFile": "api/src/routes/users.routes.ts",
+      "domain": "Customer",
+      "group": "users",
+      "family": "/api/v1/users/me",
+      "authType": "tenant_firebase"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/me",
+      "routeFile": "api/src/routes/users.routes.ts",
+      "domain": "Customer",
+      "group": "users",
+      "family": "/api/v1/users/me",
+      "authType": "tenant_firebase"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/users/me",
+      "routeFile": "api/src/routes/users.routes.ts",
+      "domain": "Customer",
+      "group": "users",
+      "family": "/api/v1/users/me",
+      "authType": "tenant_firebase"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/users/me/fcm-token",
+      "routeFile": "api/src/routes/users.routes.ts",
+      "domain": "Customer",
+      "group": "users",
+      "family": "/api/v1/users/me",
+      "authType": "tenant_firebase"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/webhooks/shopify/orders",
+      "routeFile": "api/src/routes/webhooks.routes.ts",
+      "domain": "Webhooks",
+      "group": "webhooks",
+      "family": "/api/v1/webhooks/shopify",
+      "authType": "webhook"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "routeFile": "api/src/routes/health.routes.ts",
+      "domain": "Public",
+      "group": "health",
+      "family": "/health",
+      "authType": "public"
+    }
+  ]
+}
