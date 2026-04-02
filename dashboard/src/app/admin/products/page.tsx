@@ -73,9 +73,13 @@ export default function AdminProductsPage() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [syncInfo, setSyncInfo] = useState<string | null>(null);
 
-  async function fetchProducts() {
-    setLoading(true);
+  async function fetchProducts(options?: { skipLoading?: boolean }) {
+    const silent = options?.skipLoading === true;
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const params = new URLSearchParams({
@@ -94,9 +98,14 @@ export default function AdminProductsPage() {
         setError(res?.error?.message || 'Failed to load products');
       }
     } catch (err: any) {
+      if (silent) {
+        setSyncInfo(null);
+      }
       setError(err?.error?.message || err?.message || 'Failed to load products');
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }
 
@@ -162,9 +171,53 @@ export default function AdminProductsPage() {
 
   async function syncNow() {
     setActionLoading(true);
+    setSyncInfo(null);
+    setError(null);
     try {
-      await api.post('/admin/products/sync', {});
-      await fetchProducts();
+      const res = (await api.post(
+        '/admin/products/sync',
+        {},
+        { timeout: 180000 }
+      )) as {
+        success?: boolean;
+        data?: {
+          created?: number;
+          updated?: number;
+          deletedOrArchived?: number;
+          errors?: { id?: string; message: string }[];
+        };
+        error?: { message?: string };
+      };
+
+      if (res && res.success === false) {
+        setError(res.error?.message || 'Sync failed');
+        return;
+      }
+
+      const summary = res?.data;
+      if (summary) {
+        const errCount = summary.errors?.length ?? 0;
+        const parts = [
+          `${summary.created ?? 0} created`,
+          `${summary.updated ?? 0} updated`,
+          `${summary.deletedOrArchived ?? 0} removed/archived`,
+        ];
+        if (errCount > 0) {
+          parts.push(`${errCount} row error(s)`);
+        }
+        setSyncInfo(`Last sync: ${parts.join(' · ')}.`);
+      } else {
+        setSyncInfo('Last sync completed.');
+      }
+
+      await fetchProducts({ skipLoading: true });
+    } catch (err: any) {
+      const msg =
+        err?.error?.message ||
+        err?.message ||
+        (typeof err === 'string' ? err : null) ||
+        'Sync failed';
+      setError(msg);
     } finally {
       setActionLoading(false);
     }
@@ -235,6 +288,10 @@ export default function AdminProductsPage() {
       </div>
 
       {error && <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700">{error}</div>}
+
+      {syncInfo && !error && (
+        <div className="mb-4 rounded-lg bg-emerald-50 p-4 text-emerald-900 text-sm">{syncInfo}</div>
+      )}
 
       <div className="card rounded-lg p-4 mb-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
