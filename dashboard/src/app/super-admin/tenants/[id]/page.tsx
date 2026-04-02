@@ -23,7 +23,9 @@ interface Tenant {
   createdAt: string;
   posType?: string | null;
   shopifyStoreUrl?: string | null;
+  shopifyClientId?: string | null;
   lastProductSyncAt?: string | null;
+  shopifyClientSecretConfigured?: boolean;
   shopifyAdminTokenConfigured?: boolean;
   shopifyStorefrontTokenConfigured?: boolean;
   shopifyWebhookSecretConfigured?: boolean;
@@ -78,8 +80,11 @@ export default function TenantDetailPage() {
             posType: pos?.posType ?? null,
             shopifyStoreUrl: pos?.shopifyStoreUrl ?? null,
             lastProductSyncAt: pos?.lastProductSyncAt ?? null,
-            shopifyAdminTokenConfigured: !!pos?.shopifyAdminTokenConfigured,
-            shopifyStorefrontTokenConfigured: !!pos?.shopifyStorefrontTokenConfigured,
+            shopifyClientId: pos?.shopifyClientId ?? null,
+            shopifyClientSecretConfigured: !!pos?.shopifyClientSecretConfigured,
+            shopifyAdminTokenConfigured: !!(pos?.shopifyClientId || pos?.shopifyAdminTokenConfigured),
+            shopifyStorefrontTokenConfigured:
+              !!(pos?.shopifyClientSecretConfigured || pos?.shopifyStorefrontTokenConfigured),
             shopifyWebhookSecretConfigured: !!pos?.shopifyWebhookSecretConfigured,
           });
           setPosTypeDraft(pos?.posType ?? '');
@@ -120,8 +125,8 @@ export default function TenantDetailPage() {
         posType: posTypeDraft || null,
         shopifyStoreUrl: shopifyStoreUrlDraft || null,
       };
-      if (shopifyAdminTokenDraft.trim().length > 0) body.shopifyAdminToken = shopifyAdminTokenDraft.trim();
-      if (shopifyStorefrontTokenDraft.trim().length > 0) body.shopifyStorefrontToken = shopifyStorefrontTokenDraft.trim();
+      if (shopifyAdminTokenDraft.trim().length > 0) body.shopifyClientId = shopifyAdminTokenDraft.trim();
+      if (shopifyStorefrontTokenDraft.trim().length > 0) body.shopifyClientSecret = shopifyStorefrontTokenDraft.trim();
 
       const res = await fetchWithAuth(`/api/dashboard/super-admin/tenants/${tenant.id}/pos`, {
         method: 'PUT',
@@ -140,8 +145,15 @@ export default function TenantDetailPage() {
               ...prev,
               posType: (data.data?.posType ?? posTypeDraft) || null,
               shopifyStoreUrl: (data.data?.shopifyStoreUrl ?? shopifyStoreUrlDraft) || null,
-              shopifyAdminTokenConfigured: !!data.data?.shopifyAdminTokenConfigured,
-              shopifyStorefrontTokenConfigured: !!data.data?.shopifyStorefrontTokenConfigured,
+              shopifyClientId: (data.data?.shopifyClientId ?? shopifyAdminTokenDraft) || null,
+              shopifyClientSecretConfigured: !!data.data?.shopifyClientSecretConfigured,
+              shopifyAdminTokenConfigured:
+                !!(data.data?.shopifyClientId || data.data?.shopifyAdminTokenConfigured),
+              shopifyStorefrontTokenConfigured:
+                !!(
+                  data.data?.shopifyClientSecretConfigured ||
+                  data.data?.shopifyStorefrontTokenConfigured
+                ),
               shopifyWebhookSecretConfigured: !!data.data?.shopifyWebhookSecretConfigured,
             }
           : prev
@@ -524,24 +536,24 @@ export default function TenantDetailPage() {
             </dd>
           </div>
           <div className="sm:grid sm:grid-cols-3 sm:gap-4">
-            <dt className="text-sm font-medium text-gray-500">Shopify Admin Token</dt>
+            <dt className="text-sm font-medium text-gray-500">Shopify Client ID</dt>
             <dd className="mt-1 sm:mt-0 sm:col-span-2">
               <input
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
-                type="password"
+                type="text"
                 value={shopifyAdminTokenDraft}
                 onChange={(e) => setShopifyAdminTokenDraft(e.target.value)}
                 disabled={posLoading || posTypeDraft !== 'shopify'}
-                placeholder="Paste a new token to replace the stored value"
-                autoComplete="new-password"
+                placeholder="Paste the Client ID from Shopify Dev Dashboard"
+                autoComplete="off"
               />
               <div className="mt-1 text-xs text-gray-500">
-                {tenant.shopifyAdminTokenConfigured ? 'Configured.' : 'Not configured.'} Tokens are never shown again after save. Regenerate in Shopify if you need a new one.
+                {tenant.shopifyAdminTokenConfigured ? 'Configured.' : 'Not configured.'} This value can be viewed in Shopify Dev Dashboard if needed.
               </div>
             </dd>
           </div>
           <div className="sm:grid sm:grid-cols-3 sm:gap-4">
-            <dt className="text-sm font-medium text-gray-500">Shopify Storefront Token</dt>
+            <dt className="text-sm font-medium text-gray-500">Shopify Client Secret</dt>
             <dd className="mt-1 sm:mt-0 sm:col-span-2">
               <input
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
@@ -549,11 +561,11 @@ export default function TenantDetailPage() {
                 value={shopifyStorefrontTokenDraft}
                 onChange={(e) => setShopifyStorefrontTokenDraft(e.target.value)}
                 disabled={posLoading || posTypeDraft !== 'shopify'}
-                placeholder="Paste a new token to replace the stored value"
+                placeholder="Paste a new Client Secret to replace the stored value"
                 autoComplete="new-password"
               />
               <div className="mt-1 text-xs text-gray-500">
-                {tenant.shopifyStorefrontTokenConfigured ? 'Configured.' : 'Not configured.'} Tokens are never shown again after save. Regenerate in Shopify if you need a new one.
+                {tenant.shopifyStorefrontTokenConfigured ? 'Configured.' : 'Not configured.'} This value is write-only after save.
               </div>
             </dd>
           </div>

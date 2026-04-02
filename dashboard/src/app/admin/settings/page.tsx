@@ -40,7 +40,9 @@ interface PosSettingsResponse {
     tenantId?: string;
     posType?: string | null;
     shopifyStoreUrl?: string | null;
+    shopifyClientId?: string | null;
     lastProductSyncAt?: string | null;
+    shopifyClientSecretConfigured?: boolean;
     shopifyStorefrontTokenConfigured?: boolean;
     shopifyAdminTokenConfigured?: boolean;
     shopifyWebhookSecretConfigured?: boolean;
@@ -170,8 +172,10 @@ export default function AdminSettingsPage() {
         setShopifyStoreUrl(pos?.shopifyStoreUrl ?? '');
         setShopifyAdminTokenDraft('');
         setShopifyStorefrontTokenDraft('');
-        setShopifyAdminTokenConfigured(!!pos?.shopifyAdminTokenConfigured);
-        setShopifyStorefrontTokenConfigured(!!pos?.shopifyStorefrontTokenConfigured);
+        setShopifyAdminTokenConfigured(!!(pos?.shopifyClientId || pos?.shopifyAdminTokenConfigured));
+        setShopifyStorefrontTokenConfigured(
+          !!(pos?.shopifyClientSecretConfigured || pos?.shopifyStorefrontTokenConfigured)
+        );
         setLastProductSyncAt(pos?.lastProductSyncAt ?? null);
         setInitialSnapshot({
           primaryColor: branding?.primaryColor || '#1B4D7A',
@@ -253,16 +257,20 @@ export default function AdminSettingsPage() {
         posType: posType || null,
         shopifyStoreUrl: shopifyStoreUrl.trim() || null,
       };
-      if (shopifyAdminTokenDraft.trim()) payload.shopifyAdminToken = shopifyAdminTokenDraft.trim();
-      if (shopifyStorefrontTokenDraft.trim()) payload.shopifyStorefrontToken = shopifyStorefrontTokenDraft.trim();
+      if (shopifyAdminTokenDraft.trim()) payload.shopifyClientId = shopifyAdminTokenDraft.trim();
+      if (shopifyStorefrontTokenDraft.trim()) payload.shopifyClientSecret = shopifyStorefrontTokenDraft.trim();
 
       const res = await api.put('/admin/settings/pos', payload) as PosSettingsResponse;
       if (res?.success) {
         setPosSuccess(res.message ?? 'POS configuration saved');
         setShopifyAdminTokenDraft('');
         setShopifyStorefrontTokenDraft('');
-        setShopifyAdminTokenConfigured(!!res.data?.shopifyAdminTokenConfigured);
-        setShopifyStorefrontTokenConfigured(!!res.data?.shopifyStorefrontTokenConfigured);
+        setShopifyAdminTokenConfigured(
+          !!(res.data?.shopifyClientId || res.data?.shopifyAdminTokenConfigured)
+        );
+        setShopifyStorefrontTokenConfigured(
+          !!(res.data?.shopifyClientSecretConfigured || res.data?.shopifyStorefrontTokenConfigured)
+        );
         setLastProductSyncAt(res.data?.lastProductSyncAt ?? null);
         setInitialSnapshot((prev) =>
           prev
@@ -494,7 +502,7 @@ export default function AdminSettingsPage() {
         <div>
           <h3 className="text-sm font-semibold text-gray-900">POS Integration</h3>
           <p className="text-xs text-gray-500 mt-1">
-            Configure the Shopify connection used for product sync and future commerce. Stored tokens are never shown again after save.
+            Configure the Shopify connection used for product sync and future commerce. Stored secrets are never shown again after save.
           </p>
         </div>
 
@@ -526,34 +534,34 @@ export default function AdminSettingsPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Shopify Admin Token</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Shopify Client ID</label>
           <input
             className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
-            type="password"
+            type="text"
             value={shopifyAdminTokenDraft}
             onChange={(e) => setShopifyAdminTokenDraft(e.target.value)}
             disabled={posSaving || posTesting || posType !== 'shopify'}
-            placeholder="Paste a new token to replace the stored value"
-            autoComplete="new-password"
+            placeholder="Paste the Client ID from Shopify Dev Dashboard"
+            autoComplete="off"
           />
           <p className="mt-1 text-xs text-gray-500">
-            {shopifyAdminTokenConfigured ? 'Configured.' : 'Not configured.'} If you need it again, regenerate it in Shopify.
+            {shopifyAdminTokenConfigured ? 'Configured.' : 'Not configured.'} This is safe to view in Shopify Dev Dashboard if needed.
           </p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Shopify Storefront Token</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Shopify Client Secret</label>
           <input
             className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
             type="password"
             value={shopifyStorefrontTokenDraft}
             onChange={(e) => setShopifyStorefrontTokenDraft(e.target.value)}
             disabled={posSaving || posTesting || posType !== 'shopify'}
-            placeholder="Paste a new token to replace the stored value"
+            placeholder="Paste a new Client Secret to replace the stored value"
             autoComplete="new-password"
           />
           <p className="mt-1 text-xs text-gray-500">
-            {shopifyStorefrontTokenConfigured ? 'Configured.' : 'Not configured.'} If you need it again, regenerate it in Shopify.
+            {shopifyStorefrontTokenConfigured ? 'Configured.' : 'Not configured.'} This value is write-only after save.
           </p>
         </div>
 
