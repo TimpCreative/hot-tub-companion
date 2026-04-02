@@ -2,10 +2,19 @@ import { db } from '../config/database';
 import { encryptTenantSecret } from '../utils/tenantSecrets';
 import { getPosAdapter } from './posAdapterRegistry';
 
+export function normalizeShopDomain(domain: string): string {
+  const s = domain.trim().toLowerCase();
+  if (s.startsWith('https://')) return s.slice(8).replace(/\/.*$/, '');
+  if (s.startsWith('http://')) return s.slice(7).replace(/\/.*$/, '');
+  return s.split('/')[0];
+}
+
 type TenantRow = {
   id: string;
   pos_type: string | null;
   shopify_store_url: string | null;
+  shopify_client_id: string | null;
+  shopify_client_secret: string | null;
   shopify_storefront_token: string | null;
   shopify_admin_token: string | null;
   shopify_webhook_secret: string | null;
@@ -16,7 +25,9 @@ export interface PosConfigSummary {
   tenantId: string;
   posType: string | null;
   shopifyStoreUrl: string | null;
+  shopifyClientId: string | null;
   lastProductSyncAt: Date | string | null;
+  shopifyClientSecretConfigured: boolean;
   shopifyStorefrontTokenConfigured: boolean;
   shopifyAdminTokenConfigured: boolean;
   shopifyWebhookSecretConfigured: boolean;
@@ -25,6 +36,8 @@ export interface PosConfigSummary {
 export interface UpdateTenantPosConfigInput {
   posType?: string | null;
   shopifyStoreUrl?: string | null;
+  shopifyClientId?: string | null;
+  shopifyClientSecret?: string | null;
   shopifyStorefrontToken?: string | null;
   shopifyAdminToken?: string | null;
   shopifyWebhookSecret?: string | null;
@@ -35,7 +48,9 @@ function mapSummary(tenant: TenantRow): PosConfigSummary {
     tenantId: tenant.id,
     posType: tenant.pos_type,
     shopifyStoreUrl: tenant.shopify_store_url,
+    shopifyClientId: tenant.shopify_client_id,
     lastProductSyncAt: tenant.last_product_sync_at,
+    shopifyClientSecretConfigured: !!tenant.shopify_client_secret,
     shopifyStorefrontTokenConfigured: !!tenant.shopify_storefront_token,
     shopifyAdminTokenConfigured: !!tenant.shopify_admin_token,
     shopifyWebhookSecretConfigured: !!tenant.shopify_webhook_secret,
@@ -51,7 +66,18 @@ export async function getTenantPosSummary(tenantId: string): Promise<PosConfigSu
 export function buildPosSecretInsert(input: UpdateTenantPosConfigInput): Record<string, unknown> {
   const insert: Record<string, unknown> = {};
   if (input.posType !== undefined) insert.pos_type = input.posType;
-  if (input.shopifyStoreUrl !== undefined) insert.shopify_store_url = input.shopifyStoreUrl;
+  if (input.shopifyStoreUrl !== undefined) {
+    insert.shopify_store_url =
+      input.shopifyStoreUrl === null ? null : normalizeShopDomain(input.shopifyStoreUrl);
+  }
+  if (input.shopifyClientId !== undefined) {
+    insert.shopify_client_id =
+      input.shopifyClientId === null ? null : input.shopifyClientId.trim() || null;
+  }
+  if (input.shopifyClientSecret !== undefined) {
+    insert.shopify_client_secret =
+      input.shopifyClientSecret === null ? null : encryptTenantSecret(input.shopifyClientSecret);
+  }
   if (input.shopifyStorefrontToken !== undefined) {
     insert.shopify_storefront_token =
       input.shopifyStorefrontToken === null ? null : encryptTenantSecret(input.shopifyStorefrontToken);
@@ -81,8 +107,19 @@ export async function updateTenantPosConfig(
   }
 
   if (input.shopifyStoreUrl !== undefined) {
-    const normalized = input.shopifyStoreUrl === null ? null : input.shopifyStoreUrl.trim() || null;
+    const normalized =
+      input.shopifyStoreUrl === null ? null : normalizeShopDomain(input.shopifyStoreUrl);
     update.shopify_store_url = normalized;
+  }
+
+  if (input.shopifyClientId !== undefined) {
+    update.shopify_client_id =
+      input.shopifyClientId === null ? null : input.shopifyClientId.trim() || null;
+  }
+
+  if (input.shopifyClientSecret !== undefined) {
+    update.shopify_client_secret =
+      input.shopifyClientSecret === null ? null : encryptTenantSecret(input.shopifyClientSecret);
   }
 
   if (input.shopifyStorefrontToken !== undefined) {

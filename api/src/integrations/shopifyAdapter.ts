@@ -1,6 +1,10 @@
 import { db } from '../config/database';
 import { env } from '../config/environment';
-import { decryptTenantSecret } from '../utils/tenantSecrets';
+import {
+  fetchTenantShopDomainFromShopify,
+  getTenantShopifyAdminAccessToken,
+  ShopifyAuthError,
+} from '../services/shopifyAuth.service';
 import type {
   DbPosProduct,
   PosAdapter,
@@ -53,26 +57,29 @@ async function shopifyFetch(
   tenantId: string,
   path: string
 ): Promise<Response> {
-  const tenant = await db('tenants').where({ id: tenantId }).first();
-  if (!tenant || !tenant.shopify_store_url || !tenant.shopify_admin_token) {
-    throw new Error('Shopify credentials are not configured for this tenant');
-  }
-
-  const adminToken = decryptTenantSecret(tenant.shopify_admin_token);
-  if (!adminToken) {
-    throw new Error('Shopify admin token is not configured for this tenant');
-  }
-
-  const baseUrl = getShopifyBaseUrl(tenant.shopify_store_url);
+  const tokenResult = await getTenantShopifyAdminAccessToken(tenantId);
+  const baseUrl = getShopifyBaseUrl(tokenResult.shopDomain);
   const url = `${baseUrl}/admin/api/2025-01${path}`;
 
-  const res = await fetch(url, {
+  let res = await fetch(url, {
     method: 'GET',
     headers: {
-      'X-Shopify-Access-Token': adminToken,
+      'X-Shopify-Access-Token': tokenResult.accessToken,
       'Content-Type': 'application/json',
     },
   });
+
+  // Retry once with a forced refresh if the token-exchange path returns stale credentials.
+  if ((res.status === 401 || res.status === 403) && tokenResult.source === 'client_credentials') {
+    const refreshed = await getTenantShopifyAdminAccessToken(tenantId, { forceRefresh: true });
+    res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'X-Shopify-Access-Token': refreshed.accessToken,
+        'Content-Type': 'application/json',
+      },
+    });
+  }
 
   return res;
 }
@@ -266,12 +273,27 @@ async function syncCatalogInternal(
 export const shopifyAdapter: PosAdapter = {
   async testConnection(tenantId: string) {
     try {
+      const shopDomainCheck = await fetchTenantShopDomainFromShopify(tenantId);
+      if (shopDomainCheck.configuredShopDomain !== shopDomainCheck.returnedShopDomain) {
+        return {
+          ok: false,
+          message: `Shop domain mismatch: configured ${shopDomainCheck.configuredShopDomain}, Shopify returned ${shopDomainCheck.returnedShopDomain}`,
+          details: {
+            code: 'DOMAIN_MISMATCH',
+            configuredShopDomain: shopDomainCheck.configuredShopDomain,
+            returnedShopDomain: shopDomainCheck.returnedShopDomain,
+            authSource: shopDomainCheck.authSource,
+          },
+        };
+      }
+
       const res = await shopifyFetch(tenantId, '/products.json?limit=1');
       if (res.status === 401 || res.status === 403) {
         const text = await res.text();
         return {
           ok: false,
           message: `Shopify auth failed (${res.status}): ${text}`,
+          details: { code: 'AUTH_ERROR' },
         };
       }
       if (!res.ok) {
@@ -279,13 +301,29 @@ export const shopifyAdapter: PosAdapter = {
         return {
           ok: false,
           message: `Shopify API error (${res.status}): ${text}`,
+          details: { code: 'API_ERROR' },
         };
       }
-      return { ok: true };
+      return {
+        ok: true,
+        details: {
+          code: 'OK',
+          shopDomain: shopDomainCheck.returnedShopDomain,
+          authSource: shopDomainCheck.authSource,
+        },
+      };
     } catch (err: any) {
+      if (err instanceof ShopifyAuthError) {
+        return {
+          ok: false,
+          message: err.message,
+          details: { code: err.code },
+        };
+      }
       return {
         ok: false,
         message: err?.message || 'Unknown error testing Shopify connection',
+        details: { code: 'INTERNAL_ERROR' },
       };
     }
   },

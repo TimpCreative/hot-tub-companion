@@ -2,17 +2,31 @@
 
 This document turns the Phase 3 commerce roadmap into a practical implementation plan, starting with security hardening for Take A Break's live Shopify integration.
 
+## Shopify Platform Direction
+
+Shopify's current app-platform direction is centered on the **Dev Dashboard** plus **Shopify CLI-managed app configuration** rather than dashboard-only app setup. For app teams, Shopify now expects app configuration to live in code (`shopify.app.toml` and related config files), with `shopify app deploy` used to release app versions and extensions. If an app already exists in the Dev Dashboard, Shopify recommends importing and linking it into a local CLI project rather than continuing to manage it only in the dashboard. [Shopify CLI for apps](https://shopify.dev/docs/apps/build/cli-for-apps) [Migrate from a Dev Dashboard-managed app](https://shopify.dev/docs/apps/build/cli-for-apps/migrate-from-dashboard)
+
+For Hot Tub Companion, this now translates to one clear implementation direction:
+
+- each tenant connects Shopify through a Dev Dashboard app
+- credentials are saved in HTC POS Integration per tenant
+- backend exchanges credentials for short-lived access tokens at runtime
+- tenant-to-shop domain matching is mandatory for isolation
+
+Shopify CLI remains useful for broader app-lifecycle workflows, but the tenant onboarding path in this phase is Dev Dashboard credentials in POS Integration.
+
 ## Status Review
 
 ### Implemented
 
-- Shopify Admin and Storefront tenant secrets are now encrypted at rest
+- Shopify tenant secrets are encrypted at rest
 - Shopify secrets are decrypted only at point of use in backend integration paths
 - POS config APIs now return non-secret summary/configured-state values instead of raw tokens
 - Shared tenant POS config service exists for secure load/update/test flows
 - Retailer Admin Settings now includes a POS Integration section
 - Super Admin and Retailer Admin both use write-only token replacement UX
-- Stored tokens are no longer revealable in the admin UI
+- Stored secrets are no longer revealable in the admin UI
+- Dev Dashboard-first onboarding is now the required model for new tenant Shopify connections
 
 ### Partial
 
@@ -40,10 +54,11 @@ This document turns the Phase 3 commerce roadmap into a practical implementation
 
 1. Shopify is the source of truth for checkout and orders.
 2. We never collect or store payment data.
-3. Admin tokens never reach the mobile app.
+3. Shopify credentials and runtime tokens never reach the mobile app.
 4. Every commerce operation is tenant-scoped and server-verified.
 5. Webhooks are authoritative for order confirmation and reconciliation.
 6. Security hardening happens before cart and checkout work.
+7. Per-tenant Dev Dashboard credentials are the canonical onboarding model for commerce.
 
 ## Current State
 
@@ -55,6 +70,7 @@ This document turns the Phase 3 commerce roadmap into a practical implementation
 - Mobile app has the shell for Shop but not the commerce UI
 - Phase 3 content work is already partially shipped, so commerce is the biggest remaining Phase 3 workstream
 - Secure tenant secret handling and admin POS management foundations are now implemented
+- Current onboarding is Dev Dashboard-first and tenant-scoped through POS Integration in Super Admin/Retailer Admin
 
 ### Current gaps and risks
 
@@ -63,6 +79,7 @@ This document turns the Phase 3 commerce roadmap into a practical implementation
 - Storefront cart and Checkout Kit flows are not yet implemented
 - Variant mapping to Storefront GIDs needs to be made explicit and reliable
 - Webhook idempotency and receipt tracking are still not implemented
+- Runtime credential exchange and strict tenant shop-domain validation still need to be completed end-to-end
 
 ## Milestone 0: Security Hardening
 
@@ -74,8 +91,8 @@ Commerce build does not proceed until this milestone is complete.
 
 - Add a dedicated crypto utility using `ENCRYPTION_KEY`
 - Encrypt before persisting:
-  - `shopify_storefront_token`
-  - `shopify_admin_token`
+  - `shopify_client_secret`
+  - `shopify_storefront_token` (optional storefront phase)
   - `shopify_webhook_secret`
 - Decrypt only inside backend code paths that need the secret
 - Add a safe migration/backfill strategy for any existing plaintext tenant secrets
@@ -88,14 +105,14 @@ Commerce build does not proceed until this milestone is complete.
 
 ### 0.2 Remove secret exposure from admin flows
 
-- Never return raw Shopify tokens from create/update APIs after save
-- Replace returned values with booleans like `storefrontTokenConfigured` and `adminTokenConfigured`
-- Audit logs, error payloads, and debug output so tokens cannot leak through failures
+- Never return raw Shopify secrets from create/update APIs after save
+- Replace returned values with booleans like `clientSecretConfigured`, `storefrontTokenConfigured`, and `webhookSecretConfigured`
+- Audit logs, error payloads, and debug output so secrets cannot leak through failures
 
 **Implemented:**
 - POS summary APIs now return configured-state booleans rather than raw secrets
-- Super Admin and Retailer Admin token fields are now write-only replacement inputs
-- Reveal/show behavior was removed from the admin token UI
+- Super Admin and Retailer Admin secret fields are now write-only replacement inputs
+- Reveal/show behavior was removed from Shopify secret UI fields
 
 ### 0.3 Harden tenant isolation
 
@@ -106,6 +123,11 @@ Commerce build does not proceed until this milestone is complete.
 **Implemented in this phase:**
 - Retailer-admin POS endpoints are tenant-derived from authenticated tenant context rather than URL-selected tenant IDs
 - Shared POS config service is reused across admin surfaces to reduce drift
+
+**Required for Dev Dashboard rollout:**
+- Normalize and persist canonical `{shop}.myshopify.com` per tenant
+- On connection test, verify returned Shopify shop domain matches tenant-configured domain
+- Reject mismatched shop domain saves and webhook processing
 
 ### 0.4 Make webhook processing safe
 
@@ -126,6 +148,7 @@ Commerce build does not proceed until this milestone is complete.
 - Review Storefront API scopes and keep only what mobile cart and checkout need
 - Review Admin API scopes and keep only what sync and webhook-related workflows need
 - Document the required TAB Shopify app configuration clearly for future tenants
+- Keep the current merchant-side setup narrow while we evaluate whether later commerce milestones justify a Partner/CLI-managed app
 
 ### 0.6 Add observability
 
@@ -138,6 +161,18 @@ Commerce build does not proceed until this milestone is complete.
 - Expose a simple internal health summary in admin or super admin
 
 **Still outstanding.**
+
+### 0.7 Implement Dev Dashboard credential onboarding
+
+- POS Integration in Super Admin and Retailer Admin must support:
+  - `shopify_store_url`
+  - `shopify_client_id`
+  - `shopify_client_secret` (write-only)
+  - `shopify_storefront_token` (optional)
+  - `shopify_webhook_secret` (write-only)
+- Replace static Admin token dependency with runtime client-credentials exchange
+- Cache short-lived tokens server-side with safe expiry buffer
+- Keep all credential handling tenant-scoped and encrypted
 
 ## Milestone 1: Commerce Backend Foundation
 
@@ -191,6 +226,16 @@ Build a safe backend foundation before exposing customer purchase flows.
 - product detail endpoint with variants, inventory, pricing, images, and compatibility context
 
 **Not yet implemented.**
+
+### 1.5 Runtime token exchange for Admin API
+
+- Add a dedicated token provider that exchanges:
+  - `shopify_client_id`
+  - `shopify_client_secret`
+  against:
+  - `POST https://{shop}.myshopify.com/admin/oauth/access_token`
+- Cache tokens per tenant in memory with proactive refresh
+- Ensure sync and connection tests use runtime-exchanged token paths only
 
 ## Milestone 2: Read-Only Shop Experience
 
@@ -323,12 +368,13 @@ Before broad rollout, validate against real TAB data and real operating conditio
 ## Recommended Delivery Order
 
 1. Security hardening
-2. Product sync hardening and order reference persistence
-3. Read-only shop experience
-4. Cart service
-5. Checkout Kit integration
-6. Home/order completion
-7. TAB pilot QA and hardening
+2. Dev Dashboard credential onboarding + runtime token exchange
+3. Product sync hardening and order reference persistence
+4. Read-only shop experience
+5. Cart service
+6. Checkout Kit integration
+7. Home/order completion
+8. TAB pilot QA and hardening
 
 ## Must-Complete Before TAB Pilot
 

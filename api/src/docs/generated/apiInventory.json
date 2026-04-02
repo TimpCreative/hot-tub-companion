@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-02T15:16:09.917Z",
+  "generatedAt": "2026-04-02T15:42:06.955Z",
   "endpointCount": 225,
   "unresolvedRouteFiles": [
     "api/src/routes/adminContent.routes.ts",

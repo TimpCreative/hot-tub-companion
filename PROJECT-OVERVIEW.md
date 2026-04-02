@@ -66,7 +66,7 @@ TimpCreative manages a single multi-tenant backend that powers all retailer apps
 These are the core entities. Each phase file contains detailed schemas for the tables it introduces.
 
 ### Tenant (Retailer)
-- `id`, `name`, `slug` (for subdomain), branding config (colors, logos, fonts), feature flags, POS connection credentials, Shopify store URL, fulfillment preference, contract details, onboarding config, home dashboard config, dealer page config, and shared public dealer contact details.
+- `id`, `name`, `slug` (for subdomain), branding config (colors, logos, fonts), feature flags, POS connection credentials (`shopify_store_url`, `shopify_client_id`, encrypted `shopify_client_secret`, optional storefront/webhook secrets), fulfillment preference, contract details, onboarding config, home dashboard config, dealer page config, and shared public dealer contact details.
 
 ### User (Customer)
 - `id`, `tenant_id`, `email`, `name`, `phone`, `address`, Firebase UID, notification preferences, loyalty points, referral code.
@@ -246,7 +246,7 @@ These values are used to:
 1. Contract signed → features, pricing, fulfillment preference agreed
 2. Admin dashboard provisioned → `[retailer].hottubcompanion.com`
 3. Branding package collected → logos, colors, fonts, app icon, splash screen
-4. POS/Shopify connection established via admin dashboard
+4. POS/Shopify connection established via admin dashboard using tenant-scoped Dev Dashboard credentials
 5. Product catalog initial sync
 6. Product → UHTD mapping (collaborative, fuzzy matching assisted)
 7. Feature configuration → toggle subscriptions, referrals, loyalty, service types, etc.

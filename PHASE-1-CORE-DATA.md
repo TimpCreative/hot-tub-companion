@@ -10,7 +10,7 @@
 1. **Confirm TAB's POS system.** Contact Take A Break and determine whether they use Lightspeed R-Series, Lightspeed X-Series, or Shopify. Get the exact product name. This determines which API integration to build first.
 
 2. **Get POS API credentials:**
-   - **If Shopify:** Go to TAB's Shopify admin → Settings → Apps → Develop Apps → Create App → Configure Storefront API scopes (read products, read product listings, read inventory) AND Admin API scopes (read products, read inventory, read orders, write orders). Install the app and copy both tokens.
+   - **If Shopify:** Use Shopify Dev Dashboard for TAB's store/app. Configure scopes, install the app, and collect `shopify_store_url`, `shopify_client_id`, and `shopify_client_secret` for tenant POS Integration. Configure storefront/webhook credentials as needed for upcoming phases.
    - **If Lightspeed X-Series:** Register at https://x-series-api.lightspeedhq.com/, create an app (Add-on type for multi-retailer use), get client_id and client_secret. Have TAB authorize your app via OAuth flow.
 
 3. **Begin UHTD data collection (parallel track).** Start a spreadsheet with the following columns for each spa model TAB sells:

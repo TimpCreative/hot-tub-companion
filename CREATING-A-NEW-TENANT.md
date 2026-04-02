@@ -16,6 +16,9 @@ Before starting, ensure you have:
   - Splash screen image (1284x2778px PNG recommended)
   - Brand colors (primary, secondary hex codes)
 - [ ] Retailer's Shopify store URL (if using Shopify)
+- [ ] Decide which Shopify setup path applies:
+  - merchant-managed credentials only (current HTC flow)
+  - future Partner/CLI-managed Shopify app (not required for current onboarding)
 - [ ] EAS CLI installed (`npm install -g eas-cli`)
 - [ ] Apple Developer account access
 - [ ] Google Play Console access
@@ -382,17 +385,36 @@ What the system does:
 
 ## Step 9: Configure Shopify POS Integration (if applicable)
 
-If the retailer uses Shopify, create a **Shopify custom app** and connect it to the tenant.
+If the retailer uses Shopify, connect Shopify to the tenant.
 
-### 9.1 Create the Shopify custom app
+### 9.0 Choose the right Shopify setup model first
 
-In the retailer's Shopify admin:
+There are two different Shopify patterns that can sound similar but are **not** the same:
 
-1. Go to **Settings** → **Apps and sales channels**
-2. Click **Develop apps**
-3. Click **Create an app**
-4. Name it something clear, such as **Hot Tub Companion**
-5. Open the new app and configure the API scopes
+- **Current Hot Tub Companion onboarding:** merchant-managed credentials saved into HTC
+- **Shopify's newer recommended app-development workflow:** a Dev Dashboard / Shopify CLI-managed app project
+
+For **current tenant onboarding**, continue using the merchant-managed credential flow below. That is what our platform supports today.
+
+Why this matters:
+- Shopify's CLI guidance is for building and managing Shopify apps in code
+- it uses files like `shopify.app.toml` and commands such as `shopify app init`, `shopify app config link`, and `shopify app deploy`
+- Shopify also notes that CLI deployment automation is for **Partner organization** apps and is **not** the CI/CD path for merchant-owned apps created in the Dev Dashboard or directly in Shopify admin
+
+References:
+- [Shopify CLI for apps](https://shopify.dev/docs/apps/build/cli-for-apps)
+- [Migrate from a Dev Dashboard-managed app to Shopify CLI](https://shopify.dev/docs/apps/build/cli-for-apps/migrate-from-dashboard)
+- [Deploy app components in a CD pipeline](https://shopify.dev/docs/apps/launch/deployment/deploy-in-ci-cd-pipeline)
+
+### 9.1 Create the Shopify app in Dev Dashboard
+
+For new tenants, use Shopify's **Dev Dashboard** flow.
+
+1. In Shopify admin, go to **Settings** → **Apps**
+2. Click **Build apps in Dev Dashboard**
+3. In Dev Dashboard, create the app for this retailer
+4. Configure scopes and release a version
+5. Install the app on the retailer store
 
 ### 9.2 Required Shopify access
 
@@ -400,16 +422,14 @@ For the current integration, the connection is used for:
 - product sync through the Shopify Admin API
 - future Storefront cart and checkout work
 
-At minimum, configure the custom app so you can generate:
+At minimum, configure app access for:
 
-- **Admin API access token**
-  - used by Hot Tub Companion to test the connection and sync products
-- **Storefront API access token**
-  - used later for cart and checkout work
+- **Admin API access** (required now for product sync + connection tests)
+- **Storefront API access** (required for upcoming cart/checkout work)
 
 If Shopify asks for product-related scopes, enable the product/catalog access needed for sync and Storefront browsing. Keep scopes as narrow as practical.
 
-### 9.3 Save the connection in Hot Tub Companion
+### 9.4 Save the connection in Hot Tub Companion
 
 You can currently save the Shopify connection in either of these places:
 
@@ -419,29 +439,32 @@ You can currently save the Shopify connection in either of these places:
 Fill in:
 
 - **Provider:** `Shopify`
-- **Shopify Store URL:** `https://{store}.myshopify.com`
-- **Shopify Admin Token:** paste the Admin API token from the custom app
-- **Shopify Storefront Token:** paste the Storefront API token from the custom app
+- **Shopify Store URL:** `https://{store}.myshopify.com` (normalized to `{store}.myshopify.com`)
+- **Shopify Client ID:** from Dev Dashboard app Settings
+- **Shopify Client Secret:** from Dev Dashboard app Settings (write-only in HTC)
+- **Shopify Storefront Token:** optional for now; required when storefront cart/checkout flows go live
+- **Shopify Webhook Secret:** required when webhook subscriptions are configured for this tenant
 
-### 9.4 Important security behavior
+### 9.5 Important security behavior
 
-- Tokens are stored securely on the server
-- Tokens are **write-only**
-- After saving, the UI will only show whether a token is configured
-- Tokens are **not revealable**
-- If a token is lost or needs to be viewed again, **regenerate it in Shopify** and replace it in Hot Tub Companion
+- Secrets are stored securely on the server
+- Secret fields are **write-only**
+- After saving, the UI should only show configured/unconfigured state
+- Secrets are **not revealable**
+- If a secret is lost, regenerate in Shopify and replace it in Hot Tub Companion
 
-### 9.5 Test and sync
+### 9.6 Test and sync
 
 1. Click **Test Connection**
-2. Confirm the connection succeeds
+2. Confirm token exchange succeeds and shop domain matches this tenant
 3. In **Super Admin** → **Tenants** → `{Tenant}` → **POS Integration**, run the initial full sync
 
-### 9.6 Current limitations
+### 9.7 Current limitations
 
-- The current **Test Connection** path validates the Shopify **Admin token** against product access
-- The **Storefront token** is stored securely now, but it will be exercised fully once cart and checkout work is implemented
+- The current **Test Connection** path validates Dev Dashboard app credentials and Admin API access for product sync
+- Storefront access is configured now, but full storefront cart/checkout usage is exercised in the next commerce milestones
 - Product sync currently works, but large-catalog pagination and deeper sync hardening are part of the next commerce phase
+- Tenant onboarding is now based on Dev Dashboard app credentials saved in POS Integration per tenant
 
 > **Note:** POS credential management is now available in both Super Admin and Retailer Admin Settings, but the initial sync action remains in Super Admin.
 
@@ -455,7 +478,7 @@ Before announcing go-live to the retailer:
   - [ ] Tenant appears in tenant list
   - [ ] Tenant details page shows correct info
   - [ ] API key is masked
-  - [ ] POS Integration shows configured state without revealing tokens
+  - [ ] POS Integration shows configured state without revealing secrets
 
 - [ ] **Retailer Admin Dashboard**
   - [ ] `{slug}.hottubcompanion.com` loads
@@ -464,7 +487,7 @@ Before announcing go-live to the retailer:
   - [ ] Team page loads for users with `can_manage_users`
   - [ ] Invite flow works for additional admins
   - [ ] POS Integration appears in Settings
-  - [ ] Shopify tokens can be replaced, but not revealed
+  - [ ] Shopify secrets can be replaced, but not revealed
 
 - [ ] **Mobile App (iOS)**
   - [ ] App icon is correct

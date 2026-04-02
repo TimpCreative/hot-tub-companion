@@ -4,13 +4,7 @@ import { db } from '../config/database';
 import { error, success } from '../utils/response';
 import * as notificationService from '../services/notification.service';
 import { decryptTenantSecret } from '../utils/tenantSecrets';
-
-function normalizeShopDomain(domain: string): string {
-  const s = domain.trim().toLowerCase();
-  if (s.startsWith('https://')) return s.slice(8).replace(/\/.*$/, '');
-  if (s.startsWith('http://')) return s.slice(7).replace(/\/.*$/, '');
-  return s.split('/')[0];
-}
+import { normalizeShopDomain } from '../services/tenantPosConfig.service';
 
 export async function handleOrdersCreate(req: Request, res: Response): Promise<void> {
   const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
@@ -32,19 +26,11 @@ export async function handleOrdersCreate(req: Request, res: Response): Promise<v
   }
 
   const normalizedDomain = normalizeShopDomain(shopDomain);
-  const tenants = await db('tenants')
+  const tenant = (await db('tenants')
     .select('id', 'shopify_store_url', 'shopify_webhook_secret')
-    .whereNotNull('shopify_store_url')
-    .whereNotNull('shopify_webhook_secret');
-
-  let tenant: { id: string; shopify_webhook_secret: string } | null = null;
-  for (const t of tenants) {
-    const tenantUrl = (t as { shopify_store_url?: string }).shopify_store_url as string;
-    if (tenantUrl && normalizeShopDomain(tenantUrl) === normalizedDomain) {
-      tenant = t as { id: string; shopify_webhook_secret: string };
-      break;
-    }
-  }
+    .whereRaw('LOWER(shopify_store_url) = ?', [normalizedDomain])
+    .whereNotNull('shopify_webhook_secret')
+    .first()) as { id: string; shopify_webhook_secret: string } | undefined;
 
   if (!tenant) {
     error(res, 'NOT_FOUND', 'Tenant not found for this shop', 404);

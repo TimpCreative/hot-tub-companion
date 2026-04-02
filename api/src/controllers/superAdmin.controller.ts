@@ -209,8 +209,11 @@ export async function createTenant(req: Request, res: Response): Promise<void> {
     status?: string;
     posType?: string | null;
     shopifyStoreUrl?: string;
+    shopifyClientId?: string;
+    shopifyClientSecret?: string;
     shopifyStorefrontToken?: string;
     shopifyAdminToken?: string;
+    shopifyWebhookSecret?: string;
   };
 
   if (!body.name || !body.slug) {
@@ -240,8 +243,11 @@ export async function createTenant(req: Request, res: Response): Promise<void> {
       ...buildPosSecretInsert({
         posType: body.posType || null,
         shopifyStoreUrl: body.shopifyStoreUrl || null,
+        shopifyClientId: body.shopifyClientId || null,
+        shopifyClientSecret: body.shopifyClientSecret || null,
         shopifyStorefrontToken: body.shopifyStorefrontToken || null,
         shopifyAdminToken: body.shopifyAdminToken || null,
+        shopifyWebhookSecret: body.shopifyWebhookSecret || null,
       }),
     })
     .returning('*');
@@ -333,21 +339,30 @@ export async function updateTenantPosConfig(req: Request, res: Response): Promis
   const {
     posType,
     shopifyStoreUrl,
+    shopifyClientId,
+    shopifyClientSecret,
     shopifyStorefrontToken,
     shopifyAdminToken,
+    shopifyWebhookSecret,
   } = req.body as {
     posType?: string | null;
     shopifyStoreUrl?: string;
+    shopifyClientId?: string;
+    shopifyClientSecret?: string;
     shopifyStorefrontToken?: string;
     shopifyAdminToken?: string;
+    shopifyWebhookSecret?: string;
   };
 
   try {
     const summary = await updateTenantPosConfigService(id, {
       posType,
       shopifyStoreUrl,
+      shopifyClientId,
+      shopifyClientSecret,
       shopifyStorefrontToken,
       shopifyAdminToken,
+      shopifyWebhookSecret,
     });
     success(res, summary, 'POS configuration saved');
   } catch (err) {
@@ -371,6 +386,23 @@ export async function testTenantPosConnection(req: Request, res: Response): Prom
   const { id } = req.params;
   try {
     const result = await testTenantPosConnectionService(id);
+    if (!result.ok) {
+      const code = (result.details as { code?: string } | undefined)?.code;
+      if (code === 'DOMAIN_MISMATCH') {
+        error(res, 'DOMAIN_MISMATCH', result.message || 'Shop domain mismatch', 400);
+        return;
+      }
+      if (code === 'AUTH_ERROR') {
+        error(res, 'AUTH_ERROR', result.message || 'Shopify authentication failed', 400);
+        return;
+      }
+      if (code === 'CONFIG_ERROR') {
+        error(res, 'CONFIG_ERROR', result.message || 'Shopify configuration is incomplete', 400);
+        return;
+      }
+      error(res, 'INTERNAL_ERROR', result.message || 'Shopify connection test failed', 500);
+      return;
+    }
     success(res, result);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to test POS connection';

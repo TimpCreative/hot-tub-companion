@@ -42,21 +42,30 @@ export async function updatePosConfig(req: Request, res: Response): Promise<void
   const {
     posType,
     shopifyStoreUrl,
+    shopifyClientId,
+    shopifyClientSecret,
     shopifyStorefrontToken,
     shopifyAdminToken,
+    shopifyWebhookSecret,
   } = req.body as {
     posType?: string | null;
     shopifyStoreUrl?: string | null;
+    shopifyClientId?: string | null;
+    shopifyClientSecret?: string | null;
     shopifyStorefrontToken?: string | null;
     shopifyAdminToken?: string | null;
+    shopifyWebhookSecret?: string | null;
   };
 
   try {
     const summary = await updateTenantPosConfig(tenantId, {
       posType,
       shopifyStoreUrl,
+      shopifyClientId,
+      shopifyClientSecret,
       shopifyStorefrontToken,
       shopifyAdminToken,
+      shopifyWebhookSecret,
     });
     success(res, summary, 'POS configuration saved');
   } catch (err) {
@@ -79,6 +88,23 @@ export async function testPosConnection(req: Request, res: Response): Promise<vo
 
   try {
     const result = await testTenantPosConnection(tenantId);
+    if (!result.ok) {
+      const code = (result.details as { code?: string } | undefined)?.code;
+      if (code === 'DOMAIN_MISMATCH') {
+        error(res, 'DOMAIN_MISMATCH', result.message || 'Shop domain mismatch', 400);
+        return;
+      }
+      if (code === 'AUTH_ERROR') {
+        error(res, 'AUTH_ERROR', result.message || 'Shopify authentication failed', 400);
+        return;
+      }
+      if (code === 'CONFIG_ERROR') {
+        error(res, 'CONFIG_ERROR', result.message || 'Shopify configuration is incomplete', 400);
+        return;
+      }
+      error(res, 'INTERNAL_ERROR', result.message || 'Shopify connection test failed', 500);
+      return;
+    }
     success(res, result);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to test POS connection';

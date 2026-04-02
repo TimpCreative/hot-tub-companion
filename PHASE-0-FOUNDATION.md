@@ -40,7 +40,7 @@ Before any code is written, a human must complete these tasks:
    - `/dashboard` — Next.js web app (retailer + super admin dashboards)
 
 9. **Obtain TAB's Shopify/Lightspeed credentials** (or set up a Shopify development store for testing):
-   - If TAB uses Shopify: Get Storefront API access token and Admin API access token
+   - If TAB uses Shopify: Create/connect TAB's app in Shopify Dev Dashboard, then collect app credentials (Shop domain, Client ID, Client Secret). Storefront token/webhook secret may be configured as needed.
    - If TAB uses Lightspeed X-Series: Register a developer account at Lightspeed, create an app, get client_id and client_secret
    - For initial development, use a Shopify development store (free through Shopify Partners program at https://partners.shopify.com)
 
@@ -257,8 +257,10 @@ CREATE TABLE tenants (
   -- POS Integration
   pos_type VARCHAR(50),  -- 'shopify' | 'lightspeed' | null
   shopify_store_url VARCHAR(255),
-  shopify_storefront_token TEXT,  -- encrypted
-  shopify_admin_token TEXT,  -- encrypted
+  shopify_client_id VARCHAR(255),
+  shopify_client_secret TEXT,  -- encrypted
+  shopify_storefront_token TEXT,  -- encrypted (optional storefront phase)
+  shopify_webhook_secret TEXT,  -- encrypted
   lightspeed_client_id VARCHAR(255),  -- encrypted
   lightspeed_client_secret TEXT,  -- encrypted
   lightspeed_access_token TEXT,  -- encrypted

@@ -557,7 +557,11 @@ export interface PosAdapter {
    * Performs a lightweight connectivity and credential check for the given
    * tenant. Implementations should avoid expensive catalog operations.
    */
-  testConnection(tenantId: string): Promise<{ ok: boolean; message?: string }>;
+  testConnection(tenantId: string): Promise<{
+    ok: boolean;
+    message?: string;
+    details?: Record<string, unknown>;
+  }>;
 
   /**
    * Synchronizes the tenant's product catalog into the normalized
