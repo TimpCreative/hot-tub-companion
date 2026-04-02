@@ -2,6 +2,10 @@ import { Request, Response } from 'express';
 import { db } from '../config/database';
 import { success, error } from '../utils/response';
 import { getPosAdapter } from '../services/posAdapterRegistry';
+import {
+  getShopifyCatalogSyncEstimate,
+  syncShopifyCatalogPage,
+} from '../integrations/shopifyAdapter';
 
 function requireManageProducts(req: Request, res: Response): boolean {
   const role = (req as any).adminRole as Record<string, unknown> | undefined;
@@ -330,5 +334,102 @@ export async function syncNow(req: Request, res: Response): Promise<void> {
   await db('tenants').where({ id: tenant.id }).update({ last_product_sync_at: new Date() });
 
   success(res, summary);
+}
+
+/**
+ * Shopify-only: estimated pages for catalog import (GET /products/count + limit 250).
+ */
+export async function getProductSyncEstimate(req: Request, res: Response): Promise<void> {
+  if (!requireManageProducts(req, res)) return;
+  const tenantId = (req as any).tenant?.id as string | undefined;
+  if (!tenantId) {
+    error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
+    return;
+  }
+
+  const tenant = await db('tenants').where({ id: tenantId }).first();
+  if (!tenant) {
+    error(res, 'NOT_FOUND', 'Tenant not found', 404);
+    return;
+  }
+  if (tenant.pos_type !== 'shopify') {
+    error(res, 'CONFIG_ERROR', 'Catalog sync estimate is only available for Shopify tenants', 400);
+    return;
+  }
+
+  try {
+    const estimate = await getShopifyCatalogSyncEstimate(tenantId);
+    success(res, estimate);
+  } catch (err: any) {
+    error(
+      res,
+      'UPSTREAM_ERROR',
+      err?.message || 'Failed to fetch Shopify product count',
+      502
+    );
+  }
+}
+
+type SyncBatchMode = 'full' | 'incremental';
+
+/**
+ * Shopify-only: sync one REST page so dashboards can show progress without long single requests.
+ */
+export async function syncProductBatch(req: Request, res: Response): Promise<void> {
+  if (!requireManageProducts(req, res)) return;
+  const tenantId = (req as any).tenant?.id as string | undefined;
+  if (!tenantId) {
+    error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
+    return;
+  }
+
+  const tenant = await db('tenants').where({ id: tenantId }).first();
+  if (!tenant) {
+    error(res, 'NOT_FOUND', 'Tenant not found', 404);
+    return;
+  }
+  if (tenant.pos_type !== 'shopify') {
+    error(res, 'CONFIG_ERROR', 'Batched catalog sync is only available for Shopify tenants', 400);
+    return;
+  }
+
+  const body = req.body as { pageInfo?: string | null; mode?: SyncBatchMode };
+  const mode: SyncBatchMode = body.mode === 'incremental' ? 'incremental' : 'full';
+  const pageInfo =
+    typeof body.pageInfo === 'string' && body.pageInfo.length > 0 ? body.pageInfo : null;
+
+  const existingPosProduct = await db('pos_products').where({ tenant_id: tenantId }).select('id').first();
+  const hasAnyPosProducts = !!existingPosProduct;
+
+  let since: Date | undefined;
+  if (mode === 'incremental') {
+    if (!pageInfo && hasAnyPosProducts && tenant.last_product_sync_at) {
+      since = new Date(tenant.last_product_sync_at);
+    }
+  }
+
+  try {
+    const batch = await syncShopifyCatalogPage(tenantId, {
+      pageInfo,
+      mode,
+      since,
+    });
+
+    if (!batch.nextPageInfo) {
+      await db('tenants').where({ id: tenant.id }).update({ last_product_sync_at: new Date() });
+    }
+
+    success(res, {
+      created: batch.created,
+      updated: batch.updated,
+      deletedOrArchived: batch.deletedOrArchived,
+      errors: batch.errors,
+      nextPageInfo: batch.nextPageInfo,
+      productsInPage: batch.productsInPage,
+      done: !batch.nextPageInfo,
+    });
+  } catch (err: any) {
+    error(res, 'SYNC_ERROR', err?.message || 'Catalog sync batch failed', 502);
+  }
 }
 

@@ -45,6 +45,15 @@ interface ShopifyProductsResponse {
   products: ShopifyProduct[];
 }
 
+interface ShopifyProductCountResponse {
+  count?: number;
+}
+
+export const SHOPIFY_PRODUCTS_PAGE_LIMIT = 250;
+
+/** Safety cap: ~6.25M products before we stop (unlikely; avoids infinite loops). */
+const SHOPIFY_SYNC_MAX_PAGES = 25000;
+
 function getShopifyBaseUrl(storeUrl: string): string {
   const trimmed = storeUrl.trim();
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
@@ -82,6 +91,25 @@ async function shopifyFetch(
   }
 
   return res;
+}
+
+/**
+ * Parse Shopify REST Link header for cursor pagination (rel="next").
+ */
+export function parseNextPageInfoFromLink(linkHeader: string | null): string | null {
+  if (!linkHeader) return null;
+  for (const rawPart of linkHeader.split(',')) {
+    const part = rawPart.trim();
+    const m = part.match(/^<([^>]+)>;\s*rel="next"/);
+    if (!m) continue;
+    try {
+      const url = new URL(m[1]);
+      return url.searchParams.get('page_info');
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 
 function parseTags(tags: string | null): string[] | null {
@@ -193,16 +221,17 @@ async function upsertVariantRow(
   }
 }
 
-async function fetchProductsPage(
+async function fetchProductsPageWithCursor(
   tenantId: string,
-  options?: PosSyncOptions
-): Promise<ShopifyProduct[]> {
+  params: { pageInfo?: string | null; updatedAtMin?: Date }
+): Promise<{ products: ShopifyProduct[]; nextPageInfo: string | null }> {
   const searchParams = new URLSearchParams();
-  searchParams.set('limit', '250');
+  searchParams.set('limit', String(SHOPIFY_PRODUCTS_PAGE_LIMIT));
 
-  if (options?.since) {
-    // Shopify uses ISO 8601 timestamps for updated_at_min
-    searchParams.set('updated_at_min', options.since.toISOString());
+  if (params.pageInfo) {
+    searchParams.set('page_info', params.pageInfo);
+  } else if (params.updatedAtMin) {
+    searchParams.set('updated_at_min', params.updatedAtMin.toISOString());
   }
 
   const res = await shopifyFetch(tenantId, `/products.json?${searchParams.toString()}`);
@@ -217,26 +246,51 @@ async function fetchProductsPage(
     throw new Error(`Shopify API error (${res.status}): ${text}`);
   }
 
+  const link = res.headers.get('link');
+  const nextPageInfo = parseNextPageInfoFromLink(link);
   const data = (await res.json()) as ShopifyProductsResponse;
-  return data.products || [];
+  return { products: data.products || [], nextPageInfo };
 }
 
-async function syncCatalogInternal(
-  tenantId: string,
-  options?: PosSyncOptions
-): Promise<PosSyncSummary> {
+/**
+ * Total product count for progress estimates (Shopify Products REST).
+ */
+export async function fetchShopifyProductCount(tenantId: string): Promise<number> {
+  const res = await shopifyFetch(tenantId, '/products/count.json');
+  if (res.status === 401 || res.status === 403) {
+    const text = await res.text();
+    throw new Error(`Shopify auth failed (${res.status}): ${text}`);
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Shopify API error (${res.status}): ${text}`);
+  }
+  const body = (await res.json()) as ShopifyProductCountResponse;
+  return typeof body.count === 'number' && Number.isFinite(body.count) ? body.count : 0;
+}
+
+export async function getShopifyCatalogSyncEstimate(tenantId: string): Promise<{
+  totalProducts: number;
+  pageSize: number;
+  estimatedPages: number;
+}> {
+  const totalProducts = await fetchShopifyProductCount(tenantId);
+  const pageSize = SHOPIFY_PRODUCTS_PAGE_LIMIT;
+  const estimatedPages = Math.max(1, Math.ceil(totalProducts / pageSize));
+  return { totalProducts, pageSize, estimatedPages };
+}
+
+/**
+ * Upsert all variants from one Shopify products page into pos_products.
+ */
+async function syncProductListIntoDb(tenantId: string, products: ShopifyProduct[]): Promise<PosSyncSummary> {
   const errors: PosSyncError[] = [];
   let created = 0;
   let updated = 0;
-  let deletedOrArchived = 0;
-
-  // For Phase 1, we keep the implementation intentionally simple:
-  // - Single-page fetch up to 250 products
-  // - No deep pagination yet
-  const products = await fetchProductsPage(tenantId, options);
+  const deletedOrArchived = 0;
 
   for (const product of products) {
-    for (const variant of product.variants) {
+    for (const variant of product.variants || []) {
       try {
         const before = await db('pos_products')
           .where({
@@ -262,15 +316,99 @@ async function syncCatalogInternal(
     }
   }
 
-  // In a future iteration we can reconcile removed/archived products here
-  // and increment deletedOrArchived accordingly.
-
   return {
     created,
     updated,
     deletedOrArchived,
     errors,
   };
+}
+
+export type ShopifyCatalogSyncMode = 'full' | 'incremental';
+
+/**
+ * Sync a single Shopify products page (for batched / interactive imports).
+ * When pageInfo is set, only the cursor is used (Shopify REST rules).
+ */
+export async function syncShopifyCatalogPage(
+  tenantId: string,
+  input: {
+    pageInfo?: string | null;
+    mode: ShopifyCatalogSyncMode;
+    /** Used only for the first page of an incremental sync (when pageInfo is null). */
+    since?: Date;
+  }
+): Promise<
+  PosSyncSummary & {
+    nextPageInfo: string | null;
+    productsInPage: number;
+  }
+> {
+  const pageInfo = input.pageInfo ?? null;
+  let updatedAtMin: Date | undefined;
+  if (!pageInfo) {
+    if (input.mode === 'incremental' && input.since) {
+      updatedAtMin = input.since;
+    }
+  }
+
+  const { products, nextPageInfo } = await fetchProductsPageWithCursor(tenantId, {
+    pageInfo,
+    updatedAtMin,
+  });
+
+  const summary = await syncProductListIntoDb(tenantId, products);
+  return {
+    ...summary,
+    nextPageInfo,
+    productsInPage: products.length,
+  };
+}
+
+async function syncCatalogInternal(
+  tenantId: string,
+  options?: PosSyncOptions
+): Promise<PosSyncSummary> {
+  const aggregated: PosSyncSummary = {
+    created: 0,
+    updated: 0,
+    deletedOrArchived: 0,
+    errors: [],
+  };
+
+  let pageInfo: string | null = null;
+  let pages = 0;
+
+  while (pages < SHOPIFY_SYNC_MAX_PAGES) {
+    const useIncrementalFirstPage =
+      !options?.full &&
+      !pageInfo &&
+      !!options?.since;
+
+    const { products, nextPageInfo } = await fetchProductsPageWithCursor(tenantId, {
+      pageInfo,
+      updatedAtMin: useIncrementalFirstPage ? options!.since : undefined,
+    });
+
+    const pageSummary = await syncProductListIntoDb(tenantId, products);
+    aggregated.created += pageSummary.created;
+    aggregated.updated += pageSummary.updated;
+    aggregated.deletedOrArchived += pageSummary.deletedOrArchived;
+    aggregated.errors.push(...pageSummary.errors);
+
+    pageInfo = nextPageInfo;
+    pages += 1;
+    if (!pageInfo) break;
+  }
+
+  if (pages >= SHOPIFY_SYNC_MAX_PAGES && pageInfo) {
+    aggregated.errors.push({
+      message:
+        `Shopify sync stopped after ${SHOPIFY_SYNC_MAX_PAGES} pages to avoid an infinite loop; more catalog pages remain.`,
+    });
+  }
+
+  return aggregated;
 }
 
 export const shopifyAdapter: PosAdapter = {

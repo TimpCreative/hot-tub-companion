@@ -35,6 +35,8 @@ router.delete('/team/:userId', adminTeamController.removeTeamMember);
 
 // Products & mapping
 router.get('/products', adminProductsController.listProducts);
+router.get('/products/sync/estimate', adminProductsController.getProductSyncEstimate);
+router.post('/products/sync/batch', adminProductsController.syncProductBatch);
 router.get('/products/:id/uhtd-suggestions', adminProductsController.getUhtdSuggestions);
 router.post('/products/:id/map', adminProductsController.confirmMapping);
 router.delete('/products/:id/map', adminProductsController.clearMapping);

@@ -75,6 +75,14 @@ export default function AdminProductsPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [syncInfo, setSyncInfo] = useState<string | null>(null);
 
+  const [syncImportOpen, setSyncImportOpen] = useState(false);
+  const [syncImportRunning, setSyncImportRunning] = useState(false);
+  const [syncImportError, setSyncImportError] = useState<string | null>(null);
+  const [syncPageIndex, setSyncPageIndex] = useState(0);
+  const [syncEstimatedPages, setSyncEstimatedPages] = useState(1);
+  const [syncTotalProducts, setSyncTotalProducts] = useState<number | null>(null);
+  const [syncStatusLine, setSyncStatusLine] = useState('');
+
   async function fetchProducts(options?: { skipLoading?: boolean }) {
     const silent = options?.skipLoading === true;
     if (!silent) {
@@ -169,57 +177,114 @@ export default function AdminProductsPage() {
     }
   }
 
-  async function syncNow() {
-    setActionLoading(true);
+  async function runFullCatalogSync() {
+    setSyncImportError(null);
     setSyncInfo(null);
     setError(null);
+    setSyncImportOpen(true);
+    setSyncImportRunning(true);
+    setSyncPageIndex(0);
+    setSyncEstimatedPages(1);
+    setSyncTotalProducts(null);
+    setSyncStatusLine('Getting catalog size from Shopify…');
+
+    let failed = false;
+
     try {
-      const res = (await api.post(
-        '/admin/products/sync',
-        {},
-        { timeout: 180000 }
-      )) as {
-        success?: boolean;
-        data?: {
-          created?: number;
-          updated?: number;
-          deletedOrArchived?: number;
-          errors?: { id?: string; message: string }[];
+      let estimatedPages = 1;
+      let totalProducts: number | null = null;
+
+      try {
+        const estRes = (await api.get('/admin/products/sync/estimate')) as {
+          success?: boolean;
+          data?: { totalProducts?: number; estimatedPages?: number; pageSize?: number };
+          error?: { message?: string };
         };
-        error?: { message?: string };
-      };
-
-      if (res && res.success === false) {
-        setError(res.error?.message || 'Sync failed');
-        return;
-      }
-
-      const summary = res?.data;
-      if (summary) {
-        const errCount = summary.errors?.length ?? 0;
-        const parts = [
-          `${summary.created ?? 0} created`,
-          `${summary.updated ?? 0} updated`,
-          `${summary.deletedOrArchived ?? 0} removed/archived`,
-        ];
-        if (errCount > 0) {
-          parts.push(`${errCount} row error(s)`);
+        if (estRes?.success && estRes.data) {
+          estimatedPages = Math.max(1, Number(estRes.data.estimatedPages) || 1);
+          totalProducts =
+            typeof estRes.data.totalProducts === 'number' ? estRes.data.totalProducts : null;
+          setSyncEstimatedPages(estimatedPages);
+          setSyncTotalProducts(totalProducts);
         }
-        setSyncInfo(`Last sync: ${parts.join(' · ')}.`);
-      } else {
-        setSyncInfo('Last sync completed.');
+      } catch {
+        setSyncEstimatedPages(1);
+        setSyncTotalProducts(null);
       }
+
+      let pageInfo: string | null = null;
+      let page = 0;
+      let totalCreated = 0;
+      let totalUpdated = 0;
+      let totalRowErrors = 0;
+
+      while (true) {
+        page += 1;
+        setSyncPageIndex(page);
+        setSyncStatusLine(
+          totalProducts != null
+            ? `Importing from Shopify… page ${page} of ~${estimatedPages} (${totalProducts.toLocaleString()} products in store). Each page is up to 250 products; rows are per variant.`
+            : `Importing from Shopify… page ${page} (up to 250 products per page; rows are per variant).`
+        );
+
+        const batchRes = (await api.post(
+          '/admin/products/sync/batch',
+          { pageInfo, mode: 'full' },
+          { timeout: 180000 }
+        )) as {
+          success?: boolean;
+          data?: {
+            created?: number;
+            updated?: number;
+            deletedOrArchived?: number;
+            errors?: { id?: string; message: string }[];
+            nextPageInfo?: string | null;
+            productsInPage?: number;
+            done?: boolean;
+          };
+          error?: { message?: string };
+        };
+
+        if (!batchRes?.success) {
+          throw new Error(batchRes?.error?.message || 'Sync batch failed');
+        }
+
+        const d = batchRes.data;
+        totalCreated += d?.created ?? 0;
+        totalUpdated += d?.updated ?? 0;
+        const errs = d?.errors ?? [];
+        totalRowErrors += errs.length;
+
+        pageInfo = d?.nextPageInfo ?? null;
+        if (!pageInfo) break;
+      }
+
+      setSyncEstimatedPages(page);
+      setSyncPageIndex(page);
+
+      const parts = [
+        `${totalCreated.toLocaleString()} variant rows created`,
+        `${totalUpdated.toLocaleString()} updated`,
+        `${totalRowErrors.toLocaleString()} row error(s)`,
+      ];
+      setSyncInfo(`Last full catalog sync: ${parts.join(' · ')}.`);
 
       await fetchProducts({ skipLoading: true });
     } catch (err: any) {
+      failed = true;
       const msg =
         err?.error?.message ||
         err?.message ||
         (typeof err === 'string' ? err : null) ||
-        'Sync failed';
-      setError(msg);
+        'Full catalog sync failed';
+      setSyncImportError(msg);
     } finally {
-      setActionLoading(false);
+      setSyncImportRunning(false);
+    }
+
+    if (!failed) {
+      setSyncImportOpen(false);
+      setSyncStatusLine('');
     }
   }
 
@@ -280,10 +345,17 @@ export default function AdminProductsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">Products</h2>
-          <p className="text-sm text-gray-500 mt-1">Sync from POS and map to UHTD parts for compatibility filtering.</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Pull your full Shopify catalog (all pages), then map variants to UHTD parts for compatibility filtering.
+          </p>
         </div>
-        <Button onClick={syncNow} loading={actionLoading} variant="secondary">
-          Sync now
+        <Button
+          onClick={runFullCatalogSync}
+          loading={syncImportRunning}
+          disabled={syncImportRunning}
+          variant="secondary"
+        >
+          Sync full catalog
         </Button>
       </div>
 
@@ -332,8 +404,9 @@ export default function AdminProductsPage() {
         data={rows}
         keyField="id"
         loading={loading}
-        emptyMessage="No products found. Run a sync to import your catalog."
+        emptyMessage="No products found. Run a full catalog sync to import your Shopify variants."
         onRowClick={(item) => {
+          if (syncImportRunning) return;
           setSelected(item);
           loadSuggestions(item.id);
         }}
@@ -346,6 +419,55 @@ export default function AdminProductsPage() {
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
       />
+
+      <Modal
+        isOpen={syncImportOpen}
+        onClose={() => {
+          if (syncImportRunning) return;
+          setSyncImportOpen(false);
+          setSyncImportError(null);
+          setSyncStatusLine('');
+        }}
+        preventDismiss={syncImportRunning}
+        title={syncImportRunning ? 'Importing catalog' : 'Catalog import'}
+        size="md"
+      >
+        <div className="space-y-4">
+          {syncImportError ? (
+            <p className="text-sm text-red-700">{syncImportError}</p>
+          ) : null}
+          <p className="text-sm text-gray-600">{syncStatusLine}</p>
+          <div>
+            <div className="h-3 w-full rounded-full bg-gray-200 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-blue-600 transition-[width] duration-300 ease-out"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    Math.round(
+                      (syncPageIndex / Math.max(syncEstimatedPages, syncPageIndex, 1)) * 100
+                    )
+                  )}%`,
+                }}
+              />
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              {syncImportRunning
+                ? `Page ${syncPageIndex} · ~${syncEstimatedPages} expected from Shopify product count${
+                    syncTotalProducts != null
+                      ? ` (${syncTotalProducts.toLocaleString()} products)`
+                      : ''
+                  }`
+                : null}
+            </div>
+          </div>
+          {!syncImportRunning && syncImportError ? (
+            <Button variant="primary" onClick={() => setSyncImportOpen(false)}>
+              Close
+            </Button>
+          ) : null}
+        </div>
+      </Modal>
 
       <Modal
         isOpen={!!selected}
