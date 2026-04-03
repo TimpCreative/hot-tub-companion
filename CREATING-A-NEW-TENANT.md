@@ -421,15 +421,48 @@ For new tenants, use Shopify's **Dev Dashboard** flow.
 ### 9.2 Required Shopify access
 
 For the current integration, the connection is used for:
-- product sync through the Shopify Admin API
-- future Storefront cart and checkout work
 
-At minimum, configure app access for:
+- product sync through the Shopify **Admin API**
+- registering and receiving webhooks (`products/update`, `inventory_levels/update`, `orders/create`, etc.) — permission comes from **resource** scopes, not a separate “webhooks” scope in the current picker
+- **Storefront API** when the mobile app uses cart + Checkout Kit ([PHASE-3-ENGAGEMENT.md](./PHASE-3-ENGAGEMENT.md))
+- future **loyalty / discount-code** flows via Admin API ([PHASE-5-GROWTH.md](./PHASE-5-GROWTH.md))
 
-- **Admin API access** (required now for product sync + connection tests)
-- **Storefront API access** (required for upcoming cart/checkout work)
+#### Distribution (one app, many unrelated stores)
 
-If Shopify asks for product-related scopes, enable the product/catalog access needed for sync and Storefront browsing. Keep scopes as narrow as practical.
+To install the **same** Partner app on **many independent retailers**, use **[Public distribution](https://shopify.dev/docs/apps/launch/distribution)** and the normal listing / install flow. **[Custom distribution](https://shopify.dev/docs/apps/launch/distribution)** is geared toward one shop, **Plus** org siblings, or controlled install links — see [Select a distribution method](https://shopify.dev/docs/apps/launch/distribution/select-distribution-method). Shopify **does not allow changing distribution after you choose it**; pick the model that matches how many merchants you serve.
+
+**Credentials:** one **Client ID** and **Client Secret** for the app; each HTC tenant row stores that retailer’s **`{shop}.myshopify.com`** (and secrets remain encrypted server-side).
+
+#### Admin API — exact scopes (current Dev Dashboard picker)
+
+These string names match Shopify’s [authenticated access scopes](https://shopify.dev/docs/api/usage/access-scopes) and the Dev Dashboard checklist. The picker **does not** list `read_shop` or `read_webhooks` / `write_webhooks`; subscribing to `products/update`, `inventory_levels/update`, and order topics is governed by **`read_products`**, **`read_inventory`**, and **`read_orders`** respectively (see [webhook topics](https://shopify.dev/docs/api/admin-rest/latest/resources/webhook) / Shopify’s topic-to-scope notes).
+
+Enable **read** variants only unless you need writes:
+
+| Scope | Purpose |
+|-------|---------|
+| `read_products` | `GET /products.json` / count — full and incremental catalog sync; `products/update` webhooks. |
+| `read_inventory` | Inventory alignment; `inventory_levels/update` webhooks. |
+| `read_orders` | `orders/create`, `orders/paid`, etc., when registered. |
+| `read_price_rules` | Read price rules (pairs with discount APIs for loyalty). |
+| `write_price_rules` | Create/update price rules (loyalty / programmatic discounts). |
+| `read_discounts` | Read discount configuration. |
+| `write_discounts` | Create/update discounts (e.g. codes from redemption flow). |
+
+**Optional tightening:** if you delay loyalty shipping, you may omit the four discount/price-rule scopes until that feature exists — then merchants must **re-approve** a new app version when you add them.
+
+The backend still calls `GET /admin/api/.../shop.json` to compare the configured shop with Shopify’s response. That works with the token produced for an install using the scopes above; if a scope or API version ever returns **403** on that call alone, reinstall after a scope change and check Shopify’s docs for that version.
+
+#### Storefront API — cart, Checkout Kit, browse
+
+Enable when the mobile storefront path is live:
+
+- `unauthenticated_read_checkouts`
+- `unauthenticated_write_checkouts`
+- `unauthenticated_read_product_listings`
+- `unauthenticated_read_product_inventory`
+
+Add other Storefront scopes only if you build those features (e.g. `unauthenticated_read_selling_plans`, bundles).
 
 ### 9.4 Save the connection in Hot Tub Companion
 

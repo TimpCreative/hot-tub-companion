@@ -793,3 +793,33 @@ export interface DbPosProduct {
   created_at: Date;
   updated_at: Date;
 }
+
+export interface DbPosShopifyCollection {
+  id: string;
+  tenant_id: string;
+  shopify_collection_id: string;
+  collection_type: 'custom' | 'smart';
+  handle: string | null;
+  title: string | null;
+  shopify_updated_at: Date | null;
+  raw: unknown | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface DbPosProductShopifyCollection {
+  id: string;
+  tenant_id: string;
+  pos_product_id: string;
+  shopify_collection_id: string;
+  created_at: Date;
+}
+
+export interface DbTenantCollectionCategoryMap {
+  id: string;
+  tenant_id: string;
+  shopify_collection_id: string;
+  pcdb_category_id: string;
+  created_at: Date;
+  updated_at: Date;
+}

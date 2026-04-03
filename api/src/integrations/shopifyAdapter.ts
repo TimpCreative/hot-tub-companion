@@ -50,6 +50,30 @@ interface ShopifyProductCountResponse {
   count?: number;
 }
 
+interface ShopifyCollect {
+  id: number;
+  collection_id: number;
+  product_id: number;
+}
+
+interface ShopifyCollectsResponse {
+  collects?: ShopifyCollect[];
+}
+
+interface ShopifyCustomCollection {
+  id: number;
+  handle: string | null;
+  title: string | null;
+  updated_at?: string;
+}
+
+interface ShopifySmartCollection {
+  id: number;
+  handle: string | null;
+  title: string | null;
+  updated_at?: string;
+}
+
 export const SHOPIFY_PRODUCTS_PAGE_LIMIT = 250;
 
 /** Safety cap: ~6.25M products before we stop (unlikely; avoids infinite loops). */
@@ -265,6 +289,151 @@ async function upsertVariantRow(
   }
 }
 
+/**
+ * Paginate Shopify collects for a product (REST).
+ */
+async function fetchCollectsForProduct(
+  tenantId: string,
+  productId: number
+): Promise<number[]> {
+  const collectionIds: number[] = [];
+  let pageInfo: string | null = null;
+  let guard = 0;
+  while (guard < 100) {
+    guard += 1;
+    const searchParams = new URLSearchParams();
+    searchParams.set('limit', '250');
+    if (pageInfo) {
+      searchParams.set('page_info', pageInfo);
+    } else {
+      searchParams.set('product_id', String(productId));
+    }
+
+    const res = await shopifyFetch(tenantId, `/collects.json?${searchParams.toString()}`);
+    if (res.status === 401 || res.status === 403) {
+      const text = await res.text();
+      throw new Error(`Shopify auth failed (${res.status}): ${text}`);
+    }
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Shopify collects error (${res.status}): ${text}`);
+    }
+    const data = (await res.json()) as ShopifyCollectsResponse;
+    for (const row of data.collects || []) {
+      if (typeof row.collection_id === 'number') collectionIds.push(row.collection_id);
+    }
+    pageInfo = parseNextPageInfoFromLink(res.headers.get('link'));
+    if (!pageInfo) break;
+  }
+  return collectionIds;
+}
+
+async function upsertShopifyCollectionRow(
+  tenantId: string,
+  collectionIdNum: number
+): Promise<void> {
+  const idStr = String(collectionIdNum);
+  let collType: 'custom' | 'smart' = 'custom';
+  let res = await shopifyFetch(tenantId, `/custom_collections/${collectionIdNum}.json`);
+  if (!res.ok) {
+    collType = 'smart';
+    res = await shopifyFetch(tenantId, `/smart_collections/${collectionIdNum}.json`);
+  }
+  const now = new Date();
+  if (!res.ok) {
+    await db('pos_shopify_collections')
+      .insert({
+        tenant_id: tenantId,
+        shopify_collection_id: idStr,
+        collection_type: 'custom',
+        handle: null,
+        title: `Collection ${idStr}`,
+        shopify_updated_at: null,
+        raw: null,
+        created_at: now,
+        updated_at: now,
+      })
+      .onConflict(['tenant_id', 'shopify_collection_id'])
+      .merge({
+        updated_at: now,
+      });
+    return;
+  }
+  const body = (await res.json()) as {
+    custom_collection?: ShopifyCustomCollection;
+    smart_collection?: ShopifySmartCollection;
+  };
+  const c =
+    collType === 'custom' ? body.custom_collection : body.smart_collection;
+  if (!c || typeof c.id !== 'number') return;
+
+  await db('pos_shopify_collections')
+    .insert({
+      tenant_id: tenantId,
+      shopify_collection_id: idStr,
+      collection_type: collType,
+      handle: c.handle ?? null,
+      title: c.title ?? null,
+      shopify_updated_at: parseDate(c.updated_at),
+      raw: null,
+      created_at: now,
+      updated_at: now,
+    })
+    .onConflict(['tenant_id', 'shopify_collection_id'])
+    .merge({
+      collection_type: collType,
+      handle: c.handle ?? null,
+      title: c.title ?? null,
+      shopify_updated_at: parseDate(c.updated_at),
+      updated_at: now,
+    });
+}
+
+/**
+ * Replace collection membership for all pos_products rows belonging to this Shopify product.
+ * Call after variants are upserted.
+ */
+export async function syncShopifyCollectionsForProduct(
+  tenantId: string,
+  shopifyProductId: number
+): Promise<void> {
+  const posProductIdStr = String(shopifyProductId);
+  const variantRows = await db('pos_products')
+    .where({ tenant_id: tenantId, pos_product_id: posProductIdStr })
+    .select('id');
+  if (!variantRows.length) return;
+
+  const collectionIds = await fetchCollectsForProduct(tenantId, shopifyProductId);
+  const collIdStrings = [...new Set(collectionIds.map(String))];
+
+  for (const cid of collectionIds) {
+    await upsertShopifyCollectionRow(tenantId, cid);
+  }
+
+  const posIds = variantRows.map((r: { id: string }) => r.id);
+
+  await db.transaction(async (trx) => {
+    await trx('pos_product_shopify_collections').whereIn('pos_product_id', posIds).delete();
+    const rows: Array<{
+      tenant_id: string;
+      pos_product_id: string;
+      shopify_collection_id: string;
+    }> = [];
+    for (const pid of posIds) {
+      for (const cid of collIdStrings) {
+        rows.push({
+          tenant_id: tenantId,
+          pos_product_id: pid,
+          shopify_collection_id: cid,
+        });
+      }
+    }
+    if (rows.length) {
+      await trx('pos_product_shopify_collections').insert(rows);
+    }
+  });
+}
+
 async function fetchProductsPageWithCursor(
   tenantId: string,
   params: { pageInfo?: string | null; updatedAtMin?: Date }
@@ -360,6 +529,16 @@ export async function applyShopifyProductsToPosProducts(
           message: err?.message || 'Unknown error syncing variant',
         });
       }
+    }
+    try {
+      if (typeof product.id === 'number') {
+        await syncShopifyCollectionsForProduct(tenantId, product.id);
+      }
+    } catch (err: any) {
+      errors.push({
+        id: String(product.id),
+        message: err?.message || 'Unknown error syncing collections for product',
+      });
     }
   }
 

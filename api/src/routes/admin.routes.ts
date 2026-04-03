@@ -34,8 +34,27 @@ router.post('/team/invite', adminTeamController.inviteTeamMember);
 router.put('/team/:userId', adminTeamController.updateTeamMember);
 router.delete('/team/:userId', adminTeamController.removeTeamMember);
 
-// Products & mapping
+// Products & mapping (static paths before :id)
+router.get('/products/export.csv', adminProductsController.exportProductsCsv);
+router.post('/products/bulk-selection', adminProductsController.bulkSelection);
+router.post('/products/bulk-apply', adminProductsController.bulkApply);
+router.post(
+  '/products/import',
+  upload.single('file'),
+  adminProductsController.importProductsCsv
+);
 router.get('/products', adminProductsController.listProducts);
+router.get('/shopify-collections', adminProductsController.listShopifyCollections);
+router.get('/collection-category-maps', adminProductsController.listCollectionCategoryMaps);
+router.put(
+  '/collection-category-maps/:shopifyCollectionId',
+  adminProductsController.upsertCollectionCategoryMap
+);
+router.delete(
+  '/collection-category-maps/:shopifyCollectionId',
+  adminProductsController.deleteCollectionCategoryMap
+);
+router.get('/pcdb-categories', adminProductsController.searchPcdbCategories);
 router.get('/products/:id/uhtd-suggestions', adminProductsController.getUhtdSuggestions);
 router.post('/products/:id/map', adminProductsController.confirmMapping);
 router.delete('/products/:id/map', adminProductsController.clearMapping);

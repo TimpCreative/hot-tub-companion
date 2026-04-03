@@ -7,7 +7,13 @@ const ADMIN_NAV = [
   { label: 'Dashboard', href: '/dashboard' },
   { label: 'Customers', href: '/customers', comingPhase: 2 },
   { label: 'Orders', href: '/orders', comingPhase: 2 },
-  { label: 'Products', href: '/products' },
+  {
+    label: 'Products',
+    children: [
+      { label: 'All products', href: '/products' },
+      { label: 'Categories', href: '/products/categories' },
+    ],
+  },
   { label: 'Services', href: '/services', comingPhase: 4 },
   { label: 'Content', href: '/content' },
   { label: 'Notifications', href: '/notifications' },

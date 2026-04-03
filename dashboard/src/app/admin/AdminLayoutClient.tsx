@@ -5,32 +5,51 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenant } from '@/contexts/TenantContext';
 import { useAdminPermissions } from '@/contexts/AdminPermissionsContext';
-import { Sidebar } from '@/components/ui/Sidebar';
+import { Sidebar, type NavItem } from '@/components/ui/Sidebar';
 import { Header } from '@/components/ui/Header';
 
-interface NavItem {
-  label: string;
-  href: string;
-  comingPhase?: number;
+interface AdminNavItem extends NavItem {
   requiresCanManageUsers?: boolean;
 }
 
 interface AdminLayoutClientProps {
   children: React.ReactNode;
-  navItems: NavItem[];
+  navItems: AdminNavItem[];
   basePath: string;
 }
 
-function getPageLabelFromPath(pathname: string, basePath: string, navItems: NavItem[]): string {
-  const relative = pathname.startsWith(basePath)
-    ? pathname.slice(basePath.length)
-    : pathname;
+function flattenNavLabels(items: AdminNavItem[], basePath: string): { prefix: string; label: string }[] {
+  const out: { prefix: string; label: string }[] = [];
+  for (const item of items) {
+    if (item.href) {
+      const href = item.href.startsWith('/') ? item.href : `/${item.href}`;
+      out.push({ prefix: `${basePath}${href}`, label: item.label });
+    }
+    if (item.children?.length) {
+      for (const c of item.children) {
+        if (c.href) {
+          const href = c.href.startsWith('/') ? c.href : `/${c.href}`;
+          out.push({ prefix: `${basePath}${href}`, label: c.label });
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function getPageLabelFromPath(pathname: string, basePath: string, navItems: AdminNavItem[]): string {
+  const flat = flattenNavLabels(navItems, basePath);
+  let best: { prefix: string; label: string } | null = null;
+  for (const entry of flat) {
+    if (pathname === entry.prefix || pathname.startsWith(`${entry.prefix}/`)) {
+      if (!best || entry.prefix.length > best.prefix.length) best = entry;
+    }
+  }
+  if (best) return best.label;
+  const relative = pathname.startsWith(basePath) ? pathname.slice(basePath.length) : pathname;
   const segments = relative.split('/').filter(Boolean);
   if (segments.length === 0) return 'Dashboard';
-  const first = `/${segments[0]}`;
-  const matched = navItems.find((item) => item.href === first);
-  if (matched?.label) return matched.label;
-  return segments[0]
+  return segments[segments.length - 1]
     .split('-')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
@@ -51,7 +70,7 @@ export default function AdminLayoutClient({
     return navItems.filter((item) => {
       if (item.requiresCanManageUsers && !permissions?.can_manage_users) return false;
       return true;
-    });
+    }) as NavItem[];
   }, [navItems, permissions?.can_manage_users]);
 
   useEffect(() => {

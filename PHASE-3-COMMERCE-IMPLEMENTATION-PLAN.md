@@ -153,6 +153,7 @@ Commerce build does not proceed until this milestone is complete.
 
 - Review Storefront API scopes and keep only what mobile cart and checkout need
 - Review Admin API scopes and keep only what sync and webhook-related workflows need
+- **Canonical OAuth scope list:** [CREATING-A-NEW-TENANT.md §9.2](./CREATING-A-NEW-TENANT.md#92-required-shopify-access) (Admin, Storefront, future loyalty)
 - Document the required TAB Shopify app configuration clearly for future tenants
 - Keep the current merchant-side setup narrow while we evaluate whether later commerce milestones justify a Partner/CLI-managed app
 

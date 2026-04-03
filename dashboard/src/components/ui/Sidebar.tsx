@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUnsavedChanges } from '@/contexts/UnsavedChangesContext';
 
-interface NavItem {
+export interface NavItem {
   label: string;
-  href: string;
+  href?: string;
+  children?: NavItem[];
   comingPhase?: number;
   icon?: React.ReactNode;
 }
@@ -35,9 +36,15 @@ export function Sidebar({ navItems, bottomItems, basePath, title }: SidebarProps
   const router = useRouter();
   const { confirmNavigate } = useUnsavedChanges();
 
-  const renderNavItem = (item: NavItem) => {
+  const linkClass = (isActive: boolean) =>
+    `flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors ${
+      isActive ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+    }`;
+
+  const renderLeaf = (item: NavItem, nested?: boolean) => {
+    if (!item.href) return null;
     const href = resolveSidebarHref(item.href, basePath);
-    const isActive = pathname === href || pathname.startsWith(href + '/');
+    const isActive = pathname === href || pathname.startsWith(`${href}/`);
     return (
       <Link
         key={href}
@@ -50,9 +57,7 @@ export function Sidebar({ navItems, bottomItems, basePath, title }: SidebarProps
           e.preventDefault();
           confirmNavigate(href, () => router.push(href));
         }}
-        className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors ${
-          isActive ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-        }`}
+        className={`${linkClass(isActive)} ${nested ? 'pl-10' : ''}`}
       >
         {item.icon && <span className="w-5 h-5">{item.icon}</span>}
         {item.label}
@@ -63,17 +68,40 @@ export function Sidebar({ navItems, bottomItems, basePath, title }: SidebarProps
     );
   };
 
+  const renderNavItem = (item: NavItem) => {
+    if (item.children?.length) {
+      const groupActive = item.children.some((c) => {
+        if (!c.href) return false;
+        const h = resolveSidebarHref(c.href, basePath);
+        return pathname === h || pathname.startsWith(`${h}/`);
+      });
+      return (
+        <div key={item.label} className="space-y-0.5">
+          <div
+            className={`px-4 py-2 text-xs font-semibold uppercase tracking-wide ${
+              groupActive ? 'text-white' : 'text-gray-500'
+            }`}
+          >
+            {item.label}
+          </div>
+          <div className="space-y-1">{item.children.map((c) => renderLeaf(c, true))}</div>
+        </div>
+      );
+    }
+    return renderLeaf(item, false);
+  };
+
   return (
     <aside className="w-64 min-h-screen bg-gray-900 text-white flex flex-col">
       <div className="p-6 border-b border-gray-700">
         <h2 className="text-lg font-semibold">{title}</h2>
       </div>
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-3">
         {navItems.map(renderNavItem)}
       </nav>
       {bottomItems && bottomItems.length > 0 && (
         <div className="p-4 border-t border-gray-700 space-y-1">
-          {bottomItems.map(renderNavItem)}
+          {bottomItems.map((item) => renderNavItem(item))}
         </div>
       )}
     </aside>
