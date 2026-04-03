@@ -21,6 +21,7 @@ import {
   testTenantPosConnection as testTenantPosConnectionService,
   updateTenantPosConfig as updateTenantPosConfigService,
 } from '../services/tenantPosConfig.service';
+import { ensureCanonicalShopifyStoreDomain } from '../services/shopifyAuth.service';
 import { reconcileShopifyCatalogWebhooks } from '../services/shopifyWebhooks.service';
 import {
   listPosIntegrationActivity,
@@ -400,6 +401,9 @@ export async function updateTenantPosConfig(req: Request, res: Response): Promis
       shopifyCatalogSyncEnabled,
       productSyncIntervalMinutes,
     });
+    if (summary.posType === 'shopify') {
+      await ensureCanonicalShopifyStoreDomain(id);
+    }
     await reconcileShopifyCatalogWebhooks({
       tenantId: id,
       wasShopify: prev?.pos_type === 'shopify',

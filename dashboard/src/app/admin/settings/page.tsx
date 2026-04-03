@@ -733,6 +733,10 @@ export default function AdminSettingsPage() {
             disabled={posSaving || posTesting || posType !== 'shopify'}
             placeholder="https://your-store.myshopify.com"
           />
+          <p className="mt-1 text-xs text-gray-600">
+            Use your store’s <strong className="font-medium">*.myshopify.com</strong> admin hostname (shown in the Shopify admin URL), not a public custom domain.
+            Webhooks always identify the shop that way; a mismatch returns HTTP 404 on webhook delivery.
+          </p>
         </div>
 
         <div>

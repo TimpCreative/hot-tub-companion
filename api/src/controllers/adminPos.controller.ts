@@ -6,6 +6,7 @@ import {
   testTenantPosConnection,
   updateTenantPosConfig,
 } from '../services/tenantPosConfig.service';
+import { ensureCanonicalShopifyStoreDomain } from '../services/shopifyAuth.service';
 import { reconcileShopifyCatalogWebhooks } from '../services/shopifyWebhooks.service';
 import {
   listPosIntegrationActivity,
@@ -101,6 +102,9 @@ export async function updatePosConfig(req: Request, res: Response): Promise<void
       shopifyCatalogSyncEnabled,
       productSyncIntervalMinutes,
     });
+    if (summary.posType === 'shopify') {
+      await ensureCanonicalShopifyStoreDomain(tenantId);
+    }
     await reconcileShopifyCatalogWebhooks({
       tenantId,
       wasShopify: prev?.pos_type === 'shopify',

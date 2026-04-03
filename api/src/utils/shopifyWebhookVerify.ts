@@ -45,6 +45,10 @@ export async function verifyShopifyWebhookRequest(
     .first()) as { id: string; shopify_webhook_secret: string } | undefined;
 
   if (!tenant) {
+    console.warn(
+      '[shopifyWebhookVerify] No tenant for webhook shop domain (POS "Shopify store URL" must be the same *.myshopify.com host Shopify sends, not a custom storefront domain):',
+      normalizedDomain
+    );
     error(res, 'NOT_FOUND', 'Tenant not found for this shop', 404);
     return null;
   }

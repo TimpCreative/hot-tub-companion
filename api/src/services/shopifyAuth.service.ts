@@ -139,6 +139,36 @@ export async function getTenantShopifyAdminAccessToken(
   };
 }
 
+/**
+ * Persist `shopify_store_url` as Shopify's canonical *.myshopify.com host when the Admin API is reachable.
+ * Webhook deliveries send `X-Shopify-Shop-Domain` as that host; a custom primary domain in the DB causes 404 on ingest.
+ */
+export async function ensureCanonicalShopifyStoreDomain(tenantId: string): Promise<void> {
+  const tenant = await db<TenantShopifyAuthRow>('tenants')
+    .where({ id: tenantId })
+    .select('pos_type', 'shopify_store_url')
+    .first();
+  if (!tenant || tenant.pos_type !== 'shopify' || !tenant.shopify_store_url?.trim()) return;
+
+  try {
+    const probe = await fetchTenantShopDomainFromShopify(tenantId);
+    const canonical = probe.returnedShopDomain;
+    const current = normalizeShopDomain(tenant.shopify_store_url);
+    if (!canonical || canonical === current) return;
+
+    await db('tenants').where({ id: tenantId }).update({
+      shopify_store_url: canonical,
+      updated_at: db.fn.now(),
+    });
+    clearTenantShopifyTokenCache(tenantId);
+    console.warn(
+      `[shopifyAuth] canonicalized shopify_store_url for tenant ${tenantId}: "${current}" -> "${canonical}" (webhook shop domain must match)`
+    );
+  } catch (err) {
+    console.warn('[shopifyAuth] ensureCanonicalShopifyStoreDomain failed (non-fatal):', err);
+  }
+}
+
 export async function fetchTenantShopDomainFromShopify(
   tenantId: string
 ): Promise<{ configuredShopDomain: string; returnedShopDomain: string; authSource: string }> {
