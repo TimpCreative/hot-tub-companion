@@ -1,17 +1,30 @@
 /**
  * Profile/legal fields and soft-delete on users.
- * Filename must stay in sync with knex_migrations rows on deployed DBs (e.g. Railway).
+ * Idempotent `up` so DBs that already applied this DDL under another filename (see 20260225110709 shim) stay safe.
  */
 exports.up = async function up(knex) {
-  await knex.schema.alterTable('users', (table) => {
-    table.timestamp('deleted_at');
-  });
-  await knex.schema.raw('CREATE INDEX idx_users_active ON users(tenant_id) WHERE deleted_at IS NULL');
+  const usersHasDeletedAt = await knex.schema.hasColumn('users', 'deleted_at');
+  if (!usersHasDeletedAt) {
+    await knex.schema.alterTable('users', (table) => {
+      table.timestamp('deleted_at');
+    });
+  }
+  await knex.schema.raw(
+    'CREATE INDEX IF NOT EXISTS idx_users_active ON users(tenant_id) WHERE deleted_at IS NULL'
+  );
 
-  await knex.schema.alterTable('tenants', (table) => {
-    table.text('terms_url');
-    table.text('privacy_url');
-  });
+  const tenantsHasTerms = await knex.schema.hasColumn('tenants', 'terms_url');
+  if (!tenantsHasTerms) {
+    await knex.schema.alterTable('tenants', (table) => {
+      table.text('terms_url');
+    });
+  }
+  const tenantsHasPrivacy = await knex.schema.hasColumn('tenants', 'privacy_url');
+  if (!tenantsHasPrivacy) {
+    await knex.schema.alterTable('tenants', (table) => {
+      table.text('privacy_url');
+    });
+  }
 };
 
 exports.down = async function down(knex) {
