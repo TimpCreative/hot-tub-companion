@@ -1,3 +1,7 @@
+/**
+ * Profile/legal fields and soft-delete on users.
+ * Filename must stay in sync with knex_migrations rows on deployed DBs (e.g. Railway).
+ */
 exports.up = async function up(knex) {
   await knex.schema.alterTable('users', (table) => {
     table.timestamp('deleted_at');
