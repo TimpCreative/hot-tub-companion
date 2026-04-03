@@ -4,6 +4,7 @@ import { error, success } from '../utils/response';
 import { getPosAdapter } from '../services/posAdapterRegistry';
 import {
   getShopifyCatalogSyncEstimate,
+  pruneOrphanedShopifyPosProductsAfterFullBatchedImport,
   syncShopifyCatalogPage,
 } from '../integrations/shopifyAdapter';
 import { logPosIntegrationActivity, retailerPosActivityActor } from '../services/posIntegrationActivity.service';
@@ -138,14 +139,24 @@ export async function syncProductBatch(req: Request, res: Response): Promise<voi
       since,
     });
 
+    let orphanRemoved = 0;
+    let orphanPruneTruncated = false;
+    if (mode === 'full' && !batch.nextPageInfo) {
+      const prune = await pruneOrphanedShopifyPosProductsAfterFullBatchedImport(tenantId);
+      orphanRemoved = prune.removed;
+      orphanPruneTruncated = prune.truncated;
+    }
+
     if (!batch.nextPageInfo) {
       await db('tenants').where({ id: tenant.id }).update({ last_product_sync_at: new Date() });
     }
 
     const actor = retailerPosActivityActor(req);
+    const runComplete = !batch.nextPageInfo;
+    const deletedTotal = batch.deletedOrArchived + orphanRemoved;
     await logPosIntegrationActivity(tenantId, {
       eventType: 'sync_catalog_batch',
-      summary: `${mode === 'full' ? 'Full' : 'Incremental'} import page: ${batch.productsInPage} product(s), +${batch.created} created, ${batch.updated} updated${!batch.nextPageInfo ? ' (run complete)' : ''}`,
+      summary: `${mode === 'full' ? 'Full' : 'Incremental'} import page: ${batch.productsInPage} product(s), +${batch.created} created, ${batch.updated} updated${deletedTotal > 0 ? `, ${deletedTotal} removed` : ''}${runComplete ? ' (run complete)' : ''}`,
       source: 'retailer_admin',
       actorUserId: actor.actorUserId,
       actorLabel: actor.actorLabel,
@@ -154,19 +165,30 @@ export async function syncProductBatch(req: Request, res: Response): Promise<voi
         productsInPage: batch.productsInPage,
         created: batch.created,
         updated: batch.updated,
-        done: !batch.nextPageInfo,
+        deletedOrArchived: deletedTotal,
+        orphanPruneTruncated,
+        done: runComplete,
         errorCount: batch.errors.length,
       },
     });
 
+    const batchErrors = [...batch.errors];
+    if (orphanPruneTruncated) {
+      batchErrors.push({
+        message:
+          'Catalog enumeration hit the page safety limit; local products not pruned. Retry or use a smaller catalog.',
+      });
+    }
+
     success(res, {
       created: batch.created,
       updated: batch.updated,
-      deletedOrArchived: batch.deletedOrArchived,
-      errors: batch.errors,
+      deletedOrArchived: deletedTotal,
+      errors: batchErrors,
       nextPageInfo: batch.nextPageInfo,
       productsInPage: batch.productsInPage,
-      done: !batch.nextPageInfo,
+      done: runComplete,
+      orphanPruneTruncated,
     });
   } catch (err: any) {
     error(res, 'SYNC_ERROR', err?.message || 'Catalog sync batch failed', 502);

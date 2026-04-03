@@ -494,6 +494,62 @@ export async function getShopifyCatalogSyncEstimate(tenantId: string): Promise<{
 }
 
 /**
+ * After a full catalog pull, remove local rows for Shopify products that no longer exist.
+ * Deletes variant rows; `pos_product_shopify_collections` cascades on `pos_products` delete.
+ */
+async function deletePosProductsNotInShopifyProductSet(
+  tenantId: string,
+  seenShopifyProductIds: Set<string>
+): Promise<number> {
+  let q = db('pos_products').where({ tenant_id: tenantId });
+  if (seenShopifyProductIds.size > 0) {
+    q = q.whereNotIn('pos_product_id', [...seenShopifyProductIds]);
+  }
+  const n = await q.delete();
+  return typeof n === 'number' ? n : 0;
+}
+
+/**
+ * Paginate through all Shopify products (no upsert) to build the live product id set.
+ */
+async function enumerateShopifyProductIdsForTenant(tenantId: string): Promise<{
+  ids: Set<string>;
+  truncated: boolean;
+}> {
+  const ids = new Set<string>();
+  let pageInfo: string | null = null;
+  let pages = 0;
+  while (pages < SHOPIFY_SYNC_MAX_PAGES) {
+    const { products, nextPageInfo } = await fetchProductsPageWithCursor(tenantId, {
+      pageInfo,
+    });
+    for (const p of products) {
+      ids.add(String(p.id));
+    }
+    pageInfo = nextPageInfo;
+    pages += 1;
+    if (!pageInfo) break;
+  }
+  const truncated = pages >= SHOPIFY_SYNC_MAX_PAGES && !!pageInfo;
+  return { ids, truncated };
+}
+
+/**
+ * After a batched full import (page-by-page UI), remove local rows for products no longer in Shopify.
+ * Re-enumerates the live catalog so we do not rely on in-memory state across HTTP requests.
+ */
+export async function pruneOrphanedShopifyPosProductsAfterFullBatchedImport(
+  tenantId: string
+): Promise<{ removed: number; truncated: boolean }> {
+  const { ids, truncated } = await enumerateShopifyProductIdsForTenant(tenantId);
+  if (truncated) {
+    return { removed: 0, truncated: true };
+  }
+  const removed = await deletePosProductsNotInShopifyProductSet(tenantId, ids);
+  return { removed, truncated: false };
+}
+
+/**
  * Upsert all variants from Shopify product payloads into pos_products (sync + webhooks).
  */
 export async function applyShopifyProductsToPosProducts(
@@ -604,6 +660,7 @@ async function syncCatalogInternal(
 
   let pageInfo: string | null = null;
   let pages = 0;
+  const seenShopifyProductIds = options?.full ? new Set<string>() : null;
 
   while (pages < SHOPIFY_SYNC_MAX_PAGES) {
     const useIncrementalFirstPage =
@@ -616,6 +673,12 @@ async function syncCatalogInternal(
       updatedAtMin: useIncrementalFirstPage ? options!.since : undefined,
     });
 
+    if (seenShopifyProductIds) {
+      for (const p of products) {
+        seenShopifyProductIds.add(String(p.id));
+      }
+    }
+
     const pageSummary = await applyShopifyProductsToPosProducts(tenantId, products);
     aggregated.created += pageSummary.created;
     aggregated.updated += pageSummary.updated;
@@ -627,11 +690,25 @@ async function syncCatalogInternal(
     if (!pageInfo) break;
   }
 
-  if (pages >= SHOPIFY_SYNC_MAX_PAGES && pageInfo) {
+  const catalogTruncated = pages >= SHOPIFY_SYNC_MAX_PAGES && !!pageInfo;
+
+  if (catalogTruncated) {
     aggregated.errors.push({
       message:
         `Shopify sync stopped after ${SHOPIFY_SYNC_MAX_PAGES} pages to avoid an infinite loop; more catalog pages remain.`,
     });
+  }
+
+  if (options?.full && seenShopifyProductIds && !catalogTruncated) {
+    try {
+      const removed = await deletePosProductsNotInShopifyProductSet(tenantId, seenShopifyProductIds);
+      aggregated.deletedOrArchived += removed;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      aggregated.errors.push({
+        message: `Failed to remove products deleted from Shopify: ${msg}`,
+      });
+    }
   }
 
   return aggregated;

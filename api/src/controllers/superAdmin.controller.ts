@@ -518,13 +518,16 @@ export async function syncTenantCatalog(req: Request, res: Response): Promise<vo
   const saEmail = (req as Request & { superAdminEmail?: string }).superAdminEmail ?? null;
   await logPosIntegrationActivity(id, {
     eventType: full ? 'sync_full_catalog_super_admin' : 'sync_incremental_super_admin',
-    summary: `${full ? 'Full' : 'Incremental'} catalog sync: ${summary.created} created, ${summary.updated} updated`,
+    summary: `${full ? 'Full' : 'Incremental'} catalog sync: ${summary.created} created, ${summary.updated} updated${
+      full && summary.deletedOrArchived ? `, ${summary.deletedOrArchived} removed` : ''
+    }`,
     source: 'super_admin',
     actorLabel: saEmail,
     metadata: {
       full: !!full,
       created: summary.created,
       updated: summary.updated,
+      deletedOrArchived: summary.deletedOrArchived,
       errorCount: summary.errors.length,
     },
   });
