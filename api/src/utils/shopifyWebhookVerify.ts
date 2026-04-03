@@ -39,23 +39,38 @@ export async function verifyShopifyWebhookRequest(
 
   const normalizedDomain = normalizeShopDomain(shopDomain);
   const tenant = (await db('tenants')
-    .select('id', 'shopify_store_url', 'shopify_webhook_secret')
+    .select('id', 'shopify_store_url', 'shopify_webhook_secret', 'shopify_client_secret')
     .whereRaw('LOWER(shopify_store_url) = ?', [normalizedDomain])
-    .whereNotNull('shopify_webhook_secret')
-    .first()) as { id: string; shopify_webhook_secret: string } | undefined;
+    .first()) as {
+    id: string;
+    shopify_webhook_secret: string | null;
+    shopify_client_secret: string | null;
+  } | undefined;
 
   if (!tenant) {
     console.warn(
-      '[shopifyWebhookVerify] No tenant for webhook shop domain (POS "Shopify store URL" must be the same *.myshopify.com host Shopify sends, not a custom storefront domain):',
+      '[shopifyWebhookVerify] No tenant for webhook shop domain (POS "Shopify store URL" must match *.myshopify.com from X-Shopify-Shop-Domain):',
       normalizedDomain
     );
     error(res, 'NOT_FOUND', 'Tenant not found for this shop', 404);
     return null;
   }
 
-  const secret = decryptTenantSecret(tenant.shopify_webhook_secret);
+  /** Shopify signs webhooks with the custom app's API secret — same value saved as Client Secret in POS. */
+  const webhookSecret = tenant.shopify_webhook_secret
+    ? decryptTenantSecret(tenant.shopify_webhook_secret)
+    : null;
+  const clientSecret = tenant.shopify_client_secret
+    ? decryptTenantSecret(tenant.shopify_client_secret)
+    : null;
+  const secret = webhookSecret || clientSecret;
   if (!secret) {
-    error(res, 'CONFIG_ERROR', 'Webhook secret is not configured for this tenant', 500);
+    error(
+      res,
+      'CONFIG_ERROR',
+      'Shopify signing secret missing: save Client Secret in POS (or webhook secret)',
+      500
+    );
     return null;
   }
   const hash = crypto.createHmac('sha256', secret).update(rawBody).digest('base64');
