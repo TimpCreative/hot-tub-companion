@@ -3,7 +3,12 @@ import { env } from '../config/environment';
 import { shopifyAdminJson } from '../integrations/shopifyAdapter';
 import { logPosIntegrationActivity } from './posIntegrationActivity.service';
 
-const CATALOG_WEBHOOK_TOPICS = ['products/update', 'inventory_levels/update'] as const;
+const CATALOG_WEBHOOK_TOPICS = [
+  'products/create',
+  'products/update',
+  'products/delete',
+  'inventory_levels/update',
+] as const;
 const TOPIC_SET = new Set<string>(CATALOG_WEBHOOK_TOPICS);
 
 function publicApiBase(): string {
@@ -147,15 +152,18 @@ export async function reconcileShopifyCatalogWebhooks(opts: {
     });
   }
 
-  if (wantsHooks && !wasCatalogSyncEnabled) {
+  if (wantsHooks) {
     try {
       await ensureShopifyCatalogWebhooks(tenantId);
     } catch (e) {
-      await db('tenants').where({ id: tenantId }).update({
-        shopify_catalog_sync_enabled: false,
-        updated_at: db.fn.now(),
-      });
-      throw e;
+      if (!wasCatalogSyncEnabled) {
+        await db('tenants').where({ id: tenantId }).update({
+          shopify_catalog_sync_enabled: false,
+          updated_at: db.fn.now(),
+        });
+        throw e;
+      }
+      console.warn('[shopifyWebhooks] ensureShopifyCatalogWebhooks failed (catalog sync was already on):', e);
     }
   }
 }

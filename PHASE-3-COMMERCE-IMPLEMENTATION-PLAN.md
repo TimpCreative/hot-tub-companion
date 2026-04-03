@@ -37,7 +37,7 @@ Shopify CLI remains useful for broader app-lifecycle workflows, but the tenant o
 
 - **`products/update`** and **`inventory_levels/update`** webhooks with HMAC verification; idempotency via `shopify_webhook_receipts` and `X-Shopify-Webhook-Id`
 - Per-tenant **`shopify_catalog_sync_enabled`** toggle; webhook registration/removal on enable/disable; requires **`PUBLIC_API_URL`** for callback addresses
-- Internal cron: **`POST /api/v1/internal/cron/sync-shopify-catalog`** (with **`CRON_SECRET`**) for incremental `updated_at_min` pulls; throttled by **`product_sync_interval_minutes`**
+- Internal cron: **`POST /api/v1/internal/cron/sync-shopify-catalog`** (with **`CRON_SECRET`**) every 1–2 minutes for incremental `updated_at_min` pulls; throttled by **`product_sync_interval_minutes`** (1–1440). Catalog webhooks: **`products/create`**, **`products/update`**, **`products/delete`**, **`inventory_levels/update`**.
 - Retailer **full catalog import** and sync APIs moved to **`/api/v1/admin/settings/pos/sync/*`** with **`can_manage_settings`**
 
 ### Not Yet Started

@@ -167,7 +167,7 @@ export async function updateTenantPosConfig(
       update.product_sync_interval_minutes = 30;
     } else {
       const n = Math.floor(Number(input.productSyncIntervalMinutes));
-      update.product_sync_interval_minutes = Math.min(1440, Math.max(5, n));
+      update.product_sync_interval_minutes = Math.min(1440, Math.max(1, n));
     }
   }
 

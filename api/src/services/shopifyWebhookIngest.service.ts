@@ -51,6 +51,37 @@ export async function ingestProductsUpdateWebhook(tenantId: string, payload: unk
   return true;
 }
 
+/** Same payload shape as update; Shopify sends full product on create. */
+export async function ingestProductsCreateWebhook(tenantId: string, payload: unknown): Promise<boolean> {
+  return ingestProductsUpdateWebhook(tenantId, payload);
+}
+
+function parseShopifyProductIdFromDeletePayload(payload: unknown): number | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const o = payload as Record<string, unknown>;
+  if (typeof o.id === 'number' && Number.isFinite(o.id)) return o.id;
+  if (typeof o.id === 'string' && /^\d+$/.test(o.id)) return parseInt(o.id, 10);
+  if (o.product && typeof o.product === 'object') {
+    const p = (o.product as Record<string, unknown>).id;
+    if (typeof p === 'number' && Number.isFinite(p)) return p;
+    if (typeof p === 'string' && /^\d+$/.test(p)) return parseInt(p, 10);
+  }
+  return null;
+}
+
+/**
+ * Remove all variant rows for this Shopify product id. Collection membership cascades on pos_products FK.
+ */
+export async function ingestProductsDeleteWebhook(tenantId: string, payload: unknown): Promise<number> {
+  const shopifyProductId = parseShopifyProductIdFromDeletePayload(payload);
+  if (shopifyProductId == null) return 0;
+  const posProductIdStr = String(shopifyProductId);
+  const n = await db('pos_products')
+    .where({ tenant_id: tenantId, pos_product_id: posProductIdStr })
+    .delete();
+  return typeof n === 'number' ? n : 0;
+}
+
 export async function ingestInventoryLevelsUpdateWebhook(tenantId: string, payload: unknown): Promise<number> {
   if (!payload || typeof payload !== 'object') return 0;
   const o = payload as Record<string, unknown>;

@@ -779,7 +779,7 @@ export default function AdminSettingsPage() {
               Automatic catalog &amp; inventory sync
             </label>
             <p className="text-xs text-gray-600 mt-1 ml-6">
-              When enabled, Shopify sends product and inventory webhooks to Hot Tub Companion, and a periodic incremental pull runs as a safety net (interval below).
+              When enabled, Shopify sends product create/update/delete and inventory webhooks to Hot Tub Companion, and a periodic incremental pull runs as a safety net (interval below). Save these settings once after deploy to register any new webhook topics.
             </p>
           </div>
           <div>
@@ -788,17 +788,19 @@ export default function AdminSettingsPage() {
             </label>
             <input
               type="number"
-              min={5}
+              min={1}
               max={1440}
               className="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm"
               value={productSyncIntervalMinutes}
               onChange={(e) => {
                 const n = parseInt(e.target.value, 10);
-                if (!Number.isNaN(n)) setProductSyncIntervalMinutes(Math.min(1440, Math.max(5, n)));
+                if (!Number.isNaN(n)) setProductSyncIntervalMinutes(Math.min(1440, Math.max(1, n)));
               }}
               disabled={posSaving || posTesting || posType !== 'shopify'}
             />
-            <p className="text-xs text-gray-500 mt-1">Default 30. Used to throttle background incremental sync (5–1440).</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Default 30. Throttles background incremental sync (1–1440). Call the sync cron every 1–2 minutes so this interval can take effect.
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Last product sync</label>

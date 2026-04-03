@@ -180,7 +180,7 @@ export async function dispatchNotifications(req: Request, res: Response): Promis
 
 /**
  * Incremental Shopify catalog pull for tenants with automatic sync enabled.
- * Run every 1–5 minutes externally; per-tenant `product_sync_interval_minutes` throttles work.
+ * Run every 1–2 minutes externally (e.g. Railway cron); per-tenant `product_sync_interval_minutes` throttles work.
  */
 export async function syncShopifyCatalog(req: Request, res: Response): Promise<void> {
   const now = new Date();
@@ -204,7 +204,7 @@ export async function syncShopifyCatalog(req: Request, res: Response): Promise<v
     const intervalMin =
       typeof t.product_sync_interval_minutes === 'number' &&
       Number.isFinite(t.product_sync_interval_minutes)
-        ? Math.min(1440, Math.max(5, Math.floor(t.product_sync_interval_minutes)))
+        ? Math.min(1440, Math.max(1, Math.floor(t.product_sync_interval_minutes)))
         : 30;
 
     const lastCron = t.last_cron_product_sync_at ? new Date(t.last_cron_product_sync_at) : null;
