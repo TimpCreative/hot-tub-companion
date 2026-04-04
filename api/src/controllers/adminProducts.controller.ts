@@ -27,6 +27,16 @@ function tenantIdFromReq(req: Request): string | null {
   return ((req as any).tenant?.id as string | undefined) ?? null;
 }
 
+/** `users.id` is a UUID. Whitelisted tenant admins without a users row get synthetic `admin_<firebaseUid>` — invalid for uuid columns. */
+const USER_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function posProductsAuditUserId(req: Request): string | null {
+  const raw = (req as any).user?.id as string | undefined;
+  if (!raw) return null;
+  return USER_UUID_RE.test(raw) ? raw : null;
+}
+
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
@@ -310,13 +320,13 @@ export async function importProductsCsv(req: Request, res: Response): Promise<vo
   }
 
   if (apply && errors.length === 0 && parsedRows.length) {
-    const userId = (req as any).user?.id as string | undefined;
+    const auditUserId = posProductsAuditUserId(req);
     await db.transaction(async (trx) => {
       for (const pr of parsedRows) {
         const patch: Record<string, unknown> = {
           is_hidden: pr.is_hidden,
           hidden_at: pr.is_hidden ? trx.fn.now() : null,
-          hidden_by: pr.is_hidden ? userId ?? null : null,
+          hidden_by: pr.is_hidden ? auditUserId : null,
           updated_at: trx.fn.now(),
         };
         if (pr.uhtd.mode === 'clear') {
@@ -329,7 +339,7 @@ export async function importProductsCsv(req: Request, res: Response): Promise<vo
           patch.uhtd_part_id = pr.uhtd.partId;
           patch.mapping_status = 'confirmed';
           patch.mapped_at = trx.fn.now();
-          patch.mapped_by = userId ?? null;
+          patch.mapped_by = auditUserId;
         }
         await trx('pos_products').where({ id: pr.id, tenant_id: tenantId }).update(patch);
       }
@@ -416,7 +426,7 @@ export async function bulkApply(req: Request, res: Response): Promise<void> {
   const idRows = await idQuery;
   const ids = idRows.map((r: { id: string }) => r.id);
 
-  const userId = (req as any).user?.id as string | undefined;
+  const auditUserId = posProductsAuditUserId(req);
   let updated = 0;
 
   if (action === 'set_hidden') {
@@ -429,7 +439,7 @@ export async function bulkApply(req: Request, res: Response): Promise<void> {
       updated = await db('pos_products').whereIn('id', ids).update({
         is_hidden: isHidden,
         hidden_at: isHidden ? db.fn.now() : null,
-        hidden_by: isHidden ? userId ?? null : null,
+        hidden_by: isHidden ? auditUserId : null,
         updated_at: db.fn.now(),
       });
     }
@@ -595,7 +605,7 @@ export async function searchPcdbCategories(req: Request, res: Response): Promise
 export async function setVisibility(req: Request, res: Response): Promise<void> {
   if (!requireManageProducts(req, res)) return;
   const tenantId = tenantIdFromReq(req);
-  const userId = (req as any).user?.id as string | undefined;
+  const auditUserId = posProductsAuditUserId(req);
   const { id } = req.params;
   const { isHidden } = req.body as { isHidden?: boolean };
 
@@ -619,7 +629,7 @@ export async function setVisibility(req: Request, res: Response): Promise<void> 
     .update({
       is_hidden: isHidden,
       hidden_at: isHidden ? db.fn.now() : null,
-      hidden_by: isHidden ? userId ?? null : null,
+      hidden_by: isHidden ? auditUserId : null,
       updated_at: db.fn.now(),
     })
     .returning('*');
@@ -826,7 +836,7 @@ export async function getUhtdSuggestions(req: Request, res: Response): Promise<v
 export async function confirmMapping(req: Request, res: Response): Promise<void> {
   if (!requireManageProducts(req, res)) return;
   const tenantId = tenantIdFromReq(req);
-  const userId = (req as any).user?.id as string | undefined;
+  const auditUserId = posProductsAuditUserId(req);
   const { id } = req.params;
   const { uhtdPartId, mappingConfidence } = req.body as {
     uhtdPartId?: string;
@@ -860,7 +870,7 @@ export async function confirmMapping(req: Request, res: Response): Promise<void>
       uhtd_part_id: uhtdPartId,
       mapping_status: 'confirmed',
       mapping_confidence: typeof mappingConfidence === 'number' ? mappingConfidence : null,
-      mapped_by: userId ?? null,
+      mapped_by: auditUserId,
       mapped_at: db.fn.now(),
       updated_at: db.fn.now(),
     })
