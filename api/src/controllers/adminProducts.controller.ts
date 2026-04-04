@@ -12,6 +12,10 @@ import {
   verifyBulkProductSelectionToken,
   BULK_APPLY_MAX_ROWS,
 } from '../utils/productBulkSelection';
+import {
+  getUhtdSuggestionsForProduct,
+  getTopSuggestionScore,
+} from '../services/uhtdProductSuggestions.service';
 
 function requireManageProducts(req: Request, res: Response): boolean {
   const role = (req as any).adminRole as Record<string, unknown> | undefined;
@@ -35,10 +39,6 @@ function posProductsAuditUserId(req: Request): string | null {
   const raw = (req as any).user?.id as string | undefined;
   if (!raw) return null;
   return USER_UUID_RE.test(raw) ? raw : null;
-}
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function csvEscape(cell: string): string {
@@ -86,6 +86,41 @@ function parseCsvRows(text: string): string[][] {
 
 const EXPORT_ROW_CHUNK = 2000;
 
+/** List enrichment: avoid exhausting PG pool on large page sizes. */
+const TOP_SUGGESTION_SCORE_CONCURRENCY = 4;
+
+async function enrichListRowsWithTopSuggestionScore(
+  rows: Record<string, unknown>[],
+  tenantId: string
+): Promise<void> {
+  const toScore = rows.filter((r) => r.mapping_status !== 'confirmed');
+  for (let i = 0; i < toScore.length; i += TOP_SUGGESTION_SCORE_CONCURRENCY) {
+    const batch = toScore.slice(i, i + TOP_SUGGESTION_SCORE_CONCURRENCY);
+    await Promise.all(
+      batch.map(async (row) => {
+        const score = await getTopSuggestionScore(
+          {
+            id: row.id as string,
+            title: (row.title as string) ?? null,
+            sku: (row.sku as string) ?? null,
+            barcode: (row.barcode as string) ?? null,
+            description: (row.description as string) ?? null,
+            vendor: (row.vendor as string) ?? null,
+            tags: row.tags as string[] | null | undefined,
+          },
+          tenantId
+        );
+        row.top_suggestion_score = score;
+      })
+    );
+  }
+  for (const row of rows) {
+    if (row.mapping_status === 'confirmed') {
+      row.top_suggestion_score = null;
+    }
+  }
+}
+
 export async function listProducts(req: Request, res: Response): Promise<void> {
   if (!requireManageProducts(req, res)) return;
   const tenantId = tenantIdFromReq(req);
@@ -102,6 +137,11 @@ export async function listProducts(req: Request, res: Response): Promise<void> {
   const filters = parseAdminProductFilters(q);
 
   let query = db('pos_products')
+    .leftJoin('pcdb_parts', (join) => {
+      join
+        .on('pos_products.uhtd_part_id', 'pcdb_parts.id')
+        .andOnNull('pcdb_parts.deleted_at');
+    })
     .select(
       'pos_products.id',
       'pos_products.title',
@@ -118,6 +158,8 @@ export async function listProducts(req: Request, res: Response): Promise<void> {
       'pos_products.mapping_confidence',
       'pos_products.is_hidden',
       'pos_products.uhtd_part_id',
+      'pcdb_parts.name as uhtd_part_name',
+      'pcdb_parts.part_number as uhtd_part_number',
       'pos_products.pos_product_id',
       'pos_products.pos_variant_id',
       'pos_products.last_synced_at',
@@ -157,6 +199,8 @@ export async function listProducts(req: Request, res: Response): Promise<void> {
 
   const [rows, countRow] = await Promise.all([query, countQ]);
   const total = parseInt(String((countRow as { count?: string })?.count ?? '0'), 10);
+
+  await enrichListRowsWithTopSuggestionScore(rows as Record<string, unknown>[], tenantId);
 
   success(res, rows, undefined, {
     page: p,
@@ -665,171 +709,7 @@ export async function getUhtdSuggestions(req: Request, res: Response): Promise<v
     return;
   }
 
-  const collRows = await db('pos_product_shopify_collections')
-    .where('pos_product_id', id)
-    .select('shopify_collection_id');
-  const collIds = collRows.map((r: { shopify_collection_id: string }) => r.shopify_collection_id);
-  const mappedCategoryIds = new Set<string>();
-  if (collIds.length) {
-    const maps = await db('tenant_collection_category_map')
-      .where({ tenant_id: tenantId })
-      .whereIn('shopify_collection_id', collIds)
-      .select('pcdb_category_id');
-    for (const m of maps) mappedCategoryIds.add(m.pcdb_category_id);
-  }
-
-  const descPlain = product.description ? stripHtml(String(product.description)) : '';
-  const descSnippet = descPlain.length > 2000 ? descPlain.slice(0, 2000) : descPlain;
-
-  const suggestions: Array<{
-    partId: string;
-    name: string;
-    partNumber: string | null;
-    manufacturer: string | null;
-    score: number;
-    reason: string;
-  }> = [];
-
-  function pushSuggestion(
-    row: {
-      id: string;
-      name: string;
-      part_number: string | null;
-      manufacturer: string | null;
-      category_id?: string;
-    },
-    baseScore: number,
-    baseReason: string
-  ) {
-    let score = baseScore;
-    const reasons: string[] = [baseReason];
-    if (
-      product.vendor &&
-      row.manufacturer &&
-      String(product.vendor).trim().toLowerCase() === String(row.manufacturer).trim().toLowerCase()
-    ) {
-      score += 0.08;
-      reasons.push('vendor_match');
-    }
-    if (row.category_id && mappedCategoryIds.size > 0 && mappedCategoryIds.has(row.category_id)) {
-      score += 0.12;
-      reasons.push('collection_category');
-    }
-    if (Array.isArray(product.tags) && product.tags.length && row.name) {
-      const nameLower = row.name.toLowerCase();
-      for (const t of product.tags) {
-        if (t && nameLower.includes(String(t).toLowerCase())) {
-          score += 0.04;
-          reasons.push('tag_overlap');
-          break;
-        }
-      }
-    }
-    suggestions.push({
-      partId: row.id,
-      name: row.name,
-      partNumber: row.part_number,
-      manufacturer: row.manufacturer,
-      score: Math.min(score, 0.99),
-      reason: reasons.join('+'),
-    });
-  }
-
-  if (product.barcode) {
-    const barcodeMatches = await db('pcdb_parts')
-      .whereNull('deleted_at')
-      .andWhere((qb: any) => qb.where('upc', product.barcode).orWhere('ean', product.barcode))
-      .limit(10)
-      .select('id', 'name', 'part_number', 'manufacturer', 'category_id');
-
-    for (const m of barcodeMatches) {
-      pushSuggestion(m, 0.95, 'barcode');
-    }
-  }
-
-  if (product.sku) {
-    const skuMatches = await db('pcdb_parts')
-      .whereNull('deleted_at')
-      .andWhere((qb: any) =>
-        qb.whereRaw('LOWER(part_number) = LOWER(?)', [product.sku]).orWhereRaw('? = ANY(sku_aliases)', [
-          product.sku,
-        ])
-      )
-      .limit(10)
-      .select('id', 'name', 'part_number', 'manufacturer', 'category_id');
-
-    for (const m of skuMatches) {
-      pushSuggestion(m, 0.75, 'sku');
-    }
-  }
-
-  if (product.title) {
-    const nameMatches = await db('pcdb_parts')
-      .whereNull('deleted_at')
-      .select(
-        'id',
-        'name',
-        'part_number',
-        'manufacturer',
-        'category_id',
-        db.raw('similarity(name, ?) as score', [product.title])
-      )
-      .whereRaw('similarity(name, ?) >= 0.15', [product.title])
-      .orderBy('score', 'desc')
-      .limit(10);
-
-    for (const m of nameMatches as any[]) {
-      pushSuggestion(
-        {
-          id: m.id,
-          name: m.name,
-          part_number: m.part_number,
-          manufacturer: m.manufacturer,
-          category_id: m.category_id,
-        },
-        Number(m.score) || 0,
-        'name_similarity'
-      );
-    }
-  }
-
-  if (descSnippet.length > 12) {
-    const descMatches = await db('pcdb_parts')
-      .whereNull('deleted_at')
-      .select(
-        'id',
-        'name',
-        'part_number',
-        'manufacturer',
-        'category_id',
-        db.raw('similarity(name, ?) as score', [descSnippet])
-      )
-      .whereRaw('similarity(name, ?) >= 0.12', [descSnippet])
-      .orderBy('score', 'desc')
-      .limit(8);
-
-    for (const m of descMatches as any[]) {
-      pushSuggestion(
-        {
-          id: m.id,
-          name: m.name,
-          part_number: m.part_number,
-          manufacturer: m.manufacturer,
-          category_id: m.category_id,
-        },
-        Math.min(0.35, Number(m.score) || 0),
-        'description_similarity'
-      );
-    }
-  }
-
-  const best = new Map<string, (typeof suggestions)[number]>();
-  for (const s of suggestions) {
-    const cur = best.get(s.partId);
-    if (!cur || s.score > cur.score) best.set(s.partId, s);
-  }
-
-  const out = Array.from(best.values()).sort((a, b) => b.score - a.score).slice(0, 10);
+  const out = await getUhtdSuggestionsForProduct(product, tenantId);
   success(res, out);
 }
 

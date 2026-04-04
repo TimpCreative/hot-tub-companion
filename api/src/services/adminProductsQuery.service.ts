@@ -9,6 +9,12 @@ export const ADMIN_PRODUCT_SORTS = [
   'price_desc',
   'inventory_desc',
   'inventory_asc',
+  'is_hidden_asc',
+  'is_hidden_desc',
+  'mapping_status_asc',
+  'mapping_status_desc',
+  'mapping_confidence_asc',
+  'mapping_confidence_desc',
 ] as const;
 
 export type AdminProductSort = (typeof ADMIN_PRODUCT_SORTS)[number];
@@ -139,6 +145,24 @@ export function applyAdminProductSort(qb: Knex.QueryBuilder, sort: AdminProductS
       break;
     case 'inventory_desc':
       qb.orderBy('pos_products.inventory_quantity', 'desc');
+      break;
+    case 'is_hidden_asc':
+      qb.orderBy('pos_products.is_hidden', 'asc');
+      break;
+    case 'is_hidden_desc':
+      qb.orderBy('pos_products.is_hidden', 'desc');
+      break;
+    case 'mapping_status_asc':
+      qb.orderBy('pos_products.mapping_status', 'asc');
+      break;
+    case 'mapping_status_desc':
+      qb.orderBy('pos_products.mapping_status', 'desc');
+      break;
+    case 'mapping_confidence_asc':
+      qb.orderByRaw('pos_products.mapping_confidence ASC NULLS LAST');
+      break;
+    case 'mapping_confidence_desc':
+      qb.orderByRaw('pos_products.mapping_confidence DESC NULLS LAST');
       break;
     default:
       qb.orderBy('pos_products.updated_at', 'desc');

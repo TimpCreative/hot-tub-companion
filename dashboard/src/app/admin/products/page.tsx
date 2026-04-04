@@ -37,6 +37,9 @@ type PosProductRow = Record<string, unknown> & {
   mapping_confidence: number | null;
   is_hidden: boolean;
   uhtd_part_id: string | null;
+  uhtd_part_name?: string | null;
+  uhtd_part_number?: string | null;
+  top_suggestion_score?: number | null;
   pos_product_id: string;
   pos_variant_id: string | null;
   last_synced_at: string;
@@ -74,6 +77,58 @@ function statusBadge(status: MappingStatus) {
     default:
       return <Badge variant="default">Unmapped</Badge>;
   }
+}
+
+/** Tier colors for suggestion / mapping confidence 0–1 scores (red / orange / yellow). */
+function confidenceTierClasses(score: number): string {
+  const pct = Math.round(score * 100);
+  if (pct < 50) return 'bg-red-100 text-red-800 border-red-200';
+  if (pct < 90) return 'bg-orange-100 text-orange-800 border-orange-200';
+  return 'bg-yellow-100 text-yellow-900 border-yellow-200';
+}
+
+function ConfidencePill({ score }: { score: number }) {
+  const pct = Math.round(score * 100);
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${confidenceTierClasses(
+        score
+      )}`}
+    >
+      {pct}%
+    </span>
+  );
+}
+
+const TABLE_SORTABLE_API_FIELDS = [
+  'title',
+  'price',
+  'inventory',
+  'mapping_status',
+  'is_hidden',
+] as const;
+
+function tableSortProps(sortVal: string): {
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+} {
+  const m = sortVal.match(
+    /^(title|price|inventory|mapping_status|is_hidden|mapping_confidence|updated_at)_(asc|desc)$/
+  );
+  if (!m) return {};
+  return { sortBy: m[1], sortOrder: m[2] as 'asc' | 'desc' };
+}
+
+function toggleSortForColumn(currentSort: string, columnKey: string): string | null {
+  const field = columnKey;
+  if (!TABLE_SORTABLE_API_FIELDS.includes(columnKey as (typeof TABLE_SORTABLE_API_FIELDS)[number])) {
+    return null;
+  }
+  const asc = `${field}_asc`;
+  const desc = `${field}_desc`;
+  if (currentSort === asc) return desc;
+  if (currentSort === desc) return asc;
+  return asc;
 }
 
 function stripHtml(html: string): string {
@@ -174,8 +229,14 @@ export default function AdminProductsPage() {
         const params = buildListParams(idsParam);
         const res = (await api.get(`/admin/products?${params.toString()}`)) as any;
         if (res?.success) {
-          setRows(res.data || []);
+          const data = (res.data || []) as PosProductRow[];
+          setRows(data);
           setTotal(res.pagination?.total || 0);
+          setSelected((prev) => {
+            if (!prev) return prev;
+            const hit = data.find((r) => r.id === prev.id);
+            return hit ? { ...prev, ...hit } : prev;
+          });
         } else {
           setError(res?.error?.message || 'Failed to load products');
         }
@@ -264,16 +325,36 @@ export default function AdminProductsPage() {
     }
   }
 
-  async function confirmMappingTo(partId: string, confidence?: number) {
+  async function confirmMappingTo(
+    partId: string,
+    confidence?: number,
+    partMeta?: { name: string; partNumber: string | null }
+  ) {
     if (!selected) return;
+    const selId = selected.id;
     setActionLoading(true);
     try {
-      await api.post(`/admin/products/${selected.id}/map`, {
+      const res = (await api.post(`/admin/products/${selId}/map`, {
         uhtdPartId: partId,
         mappingConfidence: typeof confidence === 'number' ? confidence : null,
-      });
+      })) as any;
+      if (res?.success && res.data) {
+        const updated = res.data as Record<string, unknown>;
+        setSelected((prev) =>
+          prev && prev.id === selId
+            ? ({
+                ...prev,
+                ...updated,
+                collections: prev.collections,
+                first_image_url: prev.first_image_url,
+                uhtd_part_name: partMeta?.name ?? prev.uhtd_part_name,
+                uhtd_part_number: partMeta?.partNumber ?? prev.uhtd_part_number,
+                top_suggestion_score: null,
+              } as PosProductRow)
+            : prev
+        );
+      }
       await fetchProducts({ skipLoading: true });
-      setSelected(null);
     } finally {
       setActionLoading(false);
     }
@@ -281,11 +362,27 @@ export default function AdminProductsPage() {
 
   async function clearMapping() {
     if (!selected) return;
+    const selId = selected.id;
     setActionLoading(true);
     try {
-      await api.delete(`/admin/products/${selected.id}/map`);
+      const res = (await api.delete(`/admin/products/${selId}/map`)) as any;
+      if (res?.success && res.data) {
+        const updated = res.data as Record<string, unknown>;
+        setSelected((prev) =>
+          prev && prev.id === selId
+            ? ({
+                ...prev,
+                ...updated,
+                collections: prev.collections,
+                first_image_url: prev.first_image_url,
+                uhtd_part_name: null,
+                uhtd_part_number: null,
+              } as PosProductRow)
+            : prev
+        );
+        void loadSuggestions(selId);
+      }
       await fetchProducts({ skipLoading: true });
-      setSelected(null);
     } finally {
       setActionLoading(false);
     }
@@ -446,6 +543,8 @@ export default function AdminProductsPage() {
   const allPageSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
   const selectedOnPageCount = rows.filter((r) => selectedIds.has(r.id)).length;
 
+  const { sortBy: tableSortBy, sortOrder: tableSortOrder } = tableSortProps(sort);
+
   const columns = [
     {
       key: '_check',
@@ -484,6 +583,7 @@ export default function AdminProductsPage() {
     {
       key: 'title',
       header: 'Product',
+      sortable: true,
       render: (item: PosProductRow) => (
         <div className="min-w-[260px]">
           <div className="font-medium text-gray-900 truncate">{item.title}</div>
@@ -501,12 +601,14 @@ export default function AdminProductsPage() {
     {
       key: 'price',
       header: 'Price',
+      sortable: true,
       render: (item: PosProductRow) => formatCents(item.price),
       className: 'w-28',
     },
     {
       key: 'inventory',
       header: 'Stock',
+      sortable: true,
       render: (item: PosProductRow) => (
         <span className={item.inventory_quantity <= 0 ? 'text-red-600' : 'text-gray-900'}>
           {item.inventory_quantity}
@@ -517,19 +619,26 @@ export default function AdminProductsPage() {
     {
       key: 'mapping_status',
       header: 'Mapping',
+      sortable: true,
       render: (item: PosProductRow) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {statusBadge(item.mapping_status)}
-          {typeof item.mapping_confidence === 'number' && (
-            <span className="text-xs text-gray-500">{Math.round(item.mapping_confidence * 100)}%</span>
-          )}
+          {item.mapping_status === 'confirmed' && typeof item.mapping_confidence === 'number' ? (
+            <ConfidencePill score={item.mapping_confidence} />
+          ) : null}
+          {item.mapping_status !== 'confirmed' &&
+          typeof item.top_suggestion_score === 'number' &&
+          item.top_suggestion_score != null ? (
+            <ConfidencePill score={item.top_suggestion_score} />
+          ) : null}
         </div>
       ),
-      className: 'w-36',
+      className: 'w-44',
     },
     {
       key: 'is_hidden',
       header: 'Visible',
+      sortable: true,
       render: (item: PosProductRow) =>
         item.is_hidden ? <Badge variant="warning">Hidden</Badge> : <Badge variant="success">Shown</Badge>,
       className: 'w-24',
@@ -769,6 +878,13 @@ export default function AdminProductsPage() {
               <option value="price_asc">Price low–high</option>
               <option value="price_desc">Price high–low</option>
               <option value="inventory_desc">Stock high–low</option>
+              <option value="inventory_asc">Stock low–high</option>
+              <option value="is_hidden_asc">Visibility (shown first)</option>
+              <option value="is_hidden_desc">Visibility (hidden first)</option>
+              <option value="mapping_status_asc">Mapping status A–Z</option>
+              <option value="mapping_status_desc">Mapping status Z–A</option>
+              <option value="mapping_confidence_desc">Mapping confidence (high)</option>
+              <option value="mapping_confidence_asc">Mapping confidence (low)</option>
             </select>
           </div>
         </div>
@@ -851,9 +967,20 @@ export default function AdminProductsPage() {
         keyField="id"
         loading={loading}
         emptyMessage="No products found. Run catalog sync from Settings → POS Integration."
+        sortBy={tableSortBy}
+        sortOrder={tableSortOrder}
+        onSort={(key) => {
+          const next = toggleSortForColumn(sort, key);
+          if (next) setSort(next);
+        }}
         onRowClick={(item) => {
           setSelected(item);
-          loadSuggestions(item.id);
+          if (item.mapping_status === 'confirmed' && item.uhtd_part_id) {
+            setSuggestions([]);
+            setSuggestionsLoading(false);
+          } else {
+            void loadSuggestions(item.id);
+          }
         }}
       />
 
@@ -959,50 +1086,80 @@ export default function AdminProductsPage() {
               </div>
             ) : null}
 
-            <div className="border-t pt-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-gray-900">UHTD Suggestions</h3>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => selected && loadSuggestions(selected.id)}
-                  loading={suggestionsLoading}
-                >
-                  Refresh
-                </Button>
-              </div>
-              {suggestionsLoading ? (
-                <div className="text-sm text-gray-500">Loading suggestions…</div>
-              ) : suggestions.length === 0 ? (
-                <div className="text-sm text-gray-500">
-                  No suggestions found. Add UHTD parts (PCdb) and try again.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {suggestions.map((s) => (
-                    <div
-                      key={s.partId}
-                      className="flex items-center justify-between border border-gray-200 rounded-lg p-3"
-                    >
-                      <div>
-                        <div className="font-medium text-gray-900">{s.name}</div>
-                        <div className="text-xs text-gray-500">
-                          {s.partNumber ? `#${s.partNumber}` : '—'} · {s.manufacturer || '—'} · {s.reason} ·{' '}
-                          {Math.round(s.score * 100)}%
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => confirmMappingTo(s.partId, s.score)}
-                        loading={actionLoading}
-                      >
-                        Map
-                      </Button>
+            {selected.mapping_status === 'confirmed' && selected.uhtd_part_id ? (
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Product mapping</h3>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 text-sm">
+                  <div className="font-medium text-gray-900">
+                    {selected.uhtd_part_name || 'Linked UHTD part'}
+                  </div>
+                  <div className="text-xs text-gray-600 font-mono mt-1">
+                    {selected.uhtd_part_number
+                      ? `Part #${selected.uhtd_part_number}`
+                      : `Part ID ${selected.uhtd_part_id}`}
+                  </div>
+                  {typeof selected.mapping_confidence === 'number' ? (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-xs text-gray-600">Confidence:</span>
+                      <ConfidencePill score={selected.mapping_confidence} />
                     </div>
-                  ))}
+                  ) : null}
                 </div>
-              )}
-            </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Clear mapping below to see UHTD suggestions again.
+                </p>
+              </div>
+            ) : (
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-gray-900">UHTD Suggestions</h3>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => selected && loadSuggestions(selected.id)}
+                    loading={suggestionsLoading}
+                  >
+                    Refresh
+                  </Button>
+                </div>
+                {suggestionsLoading ? (
+                  <div className="text-sm text-gray-500">Loading suggestions…</div>
+                ) : suggestions.length === 0 ? (
+                  <div className="text-sm text-gray-500">
+                    No suggestions found. Add UHTD parts (PCdb) and try again.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {suggestions.map((s) => (
+                      <div
+                        key={s.partId}
+                        className="flex items-center justify-between border border-gray-200 rounded-lg p-3"
+                      >
+                        <div>
+                          <div className="font-medium text-gray-900">{s.name}</div>
+                          <div className="text-xs text-gray-500">
+                            {s.partNumber ? `#${s.partNumber}` : '—'} · {s.manufacturer || '—'} · {s.reason} ·{' '}
+                            {Math.round(s.score * 100)}%
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            confirmMappingTo(s.partId, s.score, {
+                              name: s.name,
+                              partNumber: s.partNumber,
+                            })
+                          }
+                          loading={actionLoading}
+                        >
+                          Map
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </Modal>
