@@ -19,6 +19,7 @@ router.get('/products', productsController.listProducts);
 router.get('/products/categories', productsController.listProductCategories);
 router.get('/products/compatible/:spaProfileId', authMiddleware, productsController.listCompatibleProducts);
 router.get('/products/shop/categories', authMiddleware, productsController.listShopCategories);
+router.get('/products/shop/price-bounds', authMiddleware, productsController.listShopPriceBounds);
 router.get('/products/shop', authMiddleware, productsController.listShopProducts);
 router.get('/products/:id', productDetailAuthIfSpa, productsController.getProductById);
 

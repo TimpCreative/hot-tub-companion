@@ -9,7 +9,7 @@ import { useTheme } from '../theme/ThemeProvider';
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 interface AppHeroHeaderProps {
-  title: string;
+  title?: string;
   subtitle?: string;
   icon?: IoniconName;
 }
@@ -28,10 +28,12 @@ export function AppHeroHeader({ title, subtitle, icon }: AppHeroHeaderProps) {
       end={{ x: 1, y: 1 }}
       style={[styles.hero, { paddingTop: insets.top + 20 }]}
     >
-      <View style={styles.titleRow}>
-        {icon ? <Ionicons name={icon} size={28} color="#fff" /> : null}
-        <Text style={styles.title}>{title}</Text>
-      </View>
+      {icon || title ? (
+        <View style={styles.titleRow}>
+          {icon ? <Ionicons name={icon} size={28} color="#fff" /> : null}
+          {title ? <Text style={styles.title}>{title}</Text> : null}
+        </View>
+      ) : null}
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </LinearGradient>
   );

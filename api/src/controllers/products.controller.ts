@@ -71,18 +71,36 @@ function shopSelectColumns(spaCtx: SpaContext, qualId: string | undefined, sanit
   ];
 }
 
+type ShopInnerFilters = {
+  search?: string;
+  categoryKey: ReturnType<typeof parseCategoryKey> | null;
+  /** When true, only products with inventory_quantity > 0. Default true for customer shop. */
+  hideOutOfStock: boolean;
+  /** Minimum price in cents (pos_products.price), inclusive */
+  priceMin?: number;
+  /** Maximum price in cents, inclusive */
+  priceMax?: number;
+};
+
+function parseOptionalPriceCents(raw: string | undefined): number | undefined {
+  if (raw == null || raw === '') return undefined;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+
 function buildShopInnerQuery(
   tenantId: string,
   spaCtx: SpaContext,
   qualId: string | undefined,
-  search: string | undefined,
-  categoryKey: ReturnType<typeof parseCategoryKey>
+  filters: ShopInnerFilters
 ) {
   const sanitizationSystem = spaContextIsEvaluable(spaCtx) ? spaCtx.sanitizationSystem : null;
 
   let inner = db('pos_products as pp');
   applyShopProductJoins(inner, tenantId, spaCtx, qualId);
   inner.select(shopSelectColumns(spaCtx, qualId, sanitizationSystem));
+
+  const { categoryKey, search, hideOutOfStock, priceMin, priceMax } = filters;
 
   if (categoryKey?.kind === 'uhtd') {
     inner = inner.andWhere('cat.id', categoryKey.id);
@@ -96,6 +114,17 @@ function buildShopInnerQuery(
     inner = inner.andWhere((qb: Knex.QueryBuilder) => {
       qb.where('pp.title', 'ilike', s).orWhere('pp.description', 'ilike', s);
     });
+  }
+
+  if (hideOutOfStock) {
+    inner = inner.andWhere('pp.inventory_quantity', '>', 0);
+  }
+
+  if (typeof priceMin === 'number') {
+    inner = inner.andWhere('pp.price', '>=', priceMin);
+  }
+  if (typeof priceMax === 'number') {
+    inner = inner.andWhere('pp.price', '<=', priceMax);
   }
 
   return inner;
@@ -210,7 +239,11 @@ export async function getProductById(req: Request, res: Response): Promise<void>
     }
     const spaCtx = await resolveSpaContext(tenantId, userId, spaProfileId.trim());
     const qualId = await getSanitizationQualifierId();
-    const inner = buildShopInnerQuery(tenantId, spaCtx, qualId, undefined, null).andWhere('pp.id', id);
+    const inner = buildShopInnerQuery(tenantId, spaCtx, qualId, {
+      categoryKey: null,
+      hideOutOfStock: false,
+      search: undefined,
+    }).andWhere('pp.id', id);
     const sub = inner.as('t');
     const compatRow = await db.from(sub).select('shop_compatibility').first();
     const shopCompat = (compatRow as { shop_compatibility?: ShopCompatibility } | undefined)?.shop_compatibility;
@@ -258,15 +291,24 @@ export async function listShopProducts(req: Request, res: Response): Promise<voi
   const spaProfileId = req.query.spaProfileId as string | undefined;
   const includeOtherSpaParts = parseBoolQuery(req.query.includeOtherSpaParts as string, false);
   const includeGeneralStore = parseBoolQuery(req.query.includeGeneralStore as string, true);
+  const hideOutOfStock = parseBoolQuery(req.query.hideOutOfStock as string, true);
   const { page = '1', pageSize = '20', search } = req.query as Record<string, string>;
   const p = Math.max(1, parseInt(page, 10) || 1);
   const ps = Math.min(100, Math.max(1, parseInt(pageSize, 10) || 20));
   const categoryKey = parseCategoryKey(req.query.categoryKey as string | undefined);
+  const priceMin = parseOptionalPriceCents(req.query.priceMin as string | undefined);
+  const priceMax = parseOptionalPriceCents(req.query.priceMax as string | undefined);
 
   const spaCtx = await resolveSpaContext(tenantId, userId, spaProfileId?.trim() || undefined);
   const qualId = await getSanitizationQualifierId();
 
-  const inner = buildShopInnerQuery(tenantId, spaCtx, qualId, search, categoryKey);
+  const inner = buildShopInnerQuery(tenantId, spaCtx, qualId, {
+    search,
+    categoryKey,
+    hideOutOfStock,
+    priceMin,
+    priceMax,
+  });
   const sub = inner.as('shop_inner');
   let outer = db.from(sub);
   applyShopToggles(outer, includeOtherSpaParts, includeGeneralStore);
@@ -296,6 +338,70 @@ export async function listShopProducts(req: Request, res: Response): Promise<voi
   });
 }
 
+/** Min/max price in cents for the current shop criteria, excluding any price-range filter. */
+export async function listShopPriceBounds(req: Request, res: Response): Promise<void> {
+  const tenantId = getTenantId(req);
+  if (!tenantId) {
+    error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
+    return;
+  }
+  const userId = getUserId(req);
+  if (!userId) {
+    error(res, 'UNAUTHORIZED', 'Authentication required', 401);
+    return;
+  }
+
+  const spaProfileId = req.query.spaProfileId as string | undefined;
+  const includeOtherSpaParts = parseBoolQuery(req.query.includeOtherSpaParts as string, false);
+  const includeGeneralStore = parseBoolQuery(req.query.includeGeneralStore as string, true);
+  const hideOutOfStock = parseBoolQuery(req.query.hideOutOfStock as string, true);
+  const { search } = req.query as Record<string, string>;
+  const categoryKey = parseCategoryKey(req.query.categoryKey as string | undefined);
+
+  const spaCtx = await resolveSpaContext(tenantId, userId, spaProfileId?.trim() || undefined);
+  const qualId = await getSanitizationQualifierId();
+
+  const inner = buildShopInnerQuery(tenantId, spaCtx, qualId, {
+    search,
+    categoryKey,
+    hideOutOfStock,
+  });
+  const sub = inner.as('shop_inner');
+  let outer = db.from(sub);
+  applyShopToggles(outer, includeOtherSpaParts, includeGeneralStore);
+
+  // Use a single raw select: chained .min().max() is unreliable with some Knex/pg setups, and
+  // unquoted aliases become lowercase in PostgreSQL (mincents), which broke parsing.
+  const row = await outer
+    .clone()
+    .clearOrder()
+    .clearSelect()
+    .select(
+      db.raw(
+        'MIN(price) FILTER (WHERE price IS NOT NULL) AS "minCents", MAX(price) FILTER (WHERE price IS NOT NULL) AS "maxCents"'
+      )
+    )
+    .first();
+
+  const raw = row as Record<string, unknown> | undefined;
+  const parseAgg = (v: unknown): number | null => {
+    if (v == null || v === '') return null;
+    const n = typeof v === 'string' ? parseInt(v, 10) : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const minCents = parseAgg(raw?.minCents ?? raw?.mincents);
+  const maxCents = parseAgg(raw?.maxCents ?? raw?.maxcents);
+
+  success(res, {
+    minCents,
+    maxCents:
+      minCents != null && maxCents != null && maxCents < minCents
+        ? minCents
+        : maxCents,
+  });
+}
+
 export async function listShopCategories(req: Request, res: Response): Promise<void> {
   const tenantId = getTenantId(req);
   if (!tenantId) {
@@ -311,12 +417,21 @@ export async function listShopCategories(req: Request, res: Response): Promise<v
   const spaProfileId = req.query.spaProfileId as string | undefined;
   const includeOtherSpaParts = parseBoolQuery(req.query.includeOtherSpaParts as string, false);
   const includeGeneralStore = parseBoolQuery(req.query.includeGeneralStore as string, true);
+  const hideOutOfStock = parseBoolQuery(req.query.hideOutOfStock as string, true);
+  const priceMin = parseOptionalPriceCents(req.query.priceMin as string | undefined);
+  const priceMax = parseOptionalPriceCents(req.query.priceMax as string | undefined);
 
   const spaCtx = await resolveSpaContext(tenantId, userId, spaProfileId?.trim() || undefined);
   const qualId = await getSanitizationQualifierId();
 
-  // No search filter: categories stay stable while user types in search
-  const inner = buildShopInnerQuery(tenantId, spaCtx, qualId, undefined, null);
+  // No category or search: categories stay stable while user types or picks a single category in the UI
+  const inner = buildShopInnerQuery(tenantId, spaCtx, qualId, {
+    categoryKey: null,
+    search: undefined,
+    hideOutOfStock,
+    priceMin,
+    priceMax,
+  });
   const sub = inner.as('shop_inner');
   let filtered = db.from(sub);
   applyShopToggles(filtered, includeOtherSpaParts, includeGeneralStore);

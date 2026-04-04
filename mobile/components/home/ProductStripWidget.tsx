@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import api from '../../services/api';
+import { formatProductPriceCents } from '../../lib/formatProductPrice';
 import { useTheme } from '../../theme/ThemeProvider';
 
 type ProductRow = {
@@ -124,7 +125,7 @@ export function ProductStripWidget({ title, subtitle, sanitizationLabel }: Produ
                 </Text>
                 {p.price != null && p.price !== '' ? (
                   <Text style={[typography.body, { color: colors.primary, marginTop: 4, fontWeight: '600' }]}>
-                    {formatPrice(p.price)}
+                    {formatProductPriceCents(p.price)}
                   </Text>
                 ) : null}
               </Pressable>

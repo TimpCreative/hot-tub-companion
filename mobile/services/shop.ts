@@ -34,6 +34,11 @@ export type ShopListParams = {
   spaProfileId?: string;
   includeOtherSpaParts: boolean;
   includeGeneralStore: boolean;
+  hideOutOfStock: boolean;
+  /** Whole USD cents, inclusive (API `priceMin`) */
+  priceMin?: number;
+  /** Whole USD cents, inclusive (API `priceMax`) */
+  priceMax?: number;
   page: number;
   pageSize: number;
   search?: string;
@@ -46,6 +51,9 @@ export async function fetchShopProducts(params: ShopListParams) {
       spaProfileId: params.spaProfileId,
       includeOtherSpaParts: params.includeOtherSpaParts,
       includeGeneralStore: params.includeGeneralStore,
+      hideOutOfStock: params.hideOutOfStock,
+      ...(typeof params.priceMin === 'number' ? { priceMin: params.priceMin } : {}),
+      ...(typeof params.priceMax === 'number' ? { priceMax: params.priceMax } : {}),
       page: params.page,
       pageSize: params.pageSize,
       ...(params.search?.trim() ? { search: params.search.trim() } : {}),
@@ -59,16 +67,43 @@ export async function fetchShopProducts(params: ShopListParams) {
   return res;
 }
 
+export async function fetchShopPriceBounds(params: {
+  spaProfileId?: string;
+  includeOtherSpaParts: boolean;
+  includeGeneralStore: boolean;
+  hideOutOfStock: boolean;
+  categoryKey?: string | null;
+  search?: string;
+}) {
+  const res = (await api.get('/products/shop/price-bounds', {
+    params: {
+      spaProfileId: params.spaProfileId,
+      includeOtherSpaParts: params.includeOtherSpaParts,
+      includeGeneralStore: params.includeGeneralStore,
+      hideOutOfStock: params.hideOutOfStock,
+      ...(params.search?.trim() ? { search: params.search.trim() } : {}),
+      ...(params.categoryKey ? { categoryKey: params.categoryKey } : {}),
+    },
+  })) as { success?: boolean; data?: { minCents: number | null; maxCents: number | null } };
+  return res;
+}
+
 export async function fetchShopCategories(params: {
   spaProfileId?: string;
   includeOtherSpaParts: boolean;
   includeGeneralStore: boolean;
+  hideOutOfStock: boolean;
+  priceMin?: number;
+  priceMax?: number;
 }) {
   const res = (await api.get('/products/shop/categories', {
     params: {
       spaProfileId: params.spaProfileId,
       includeOtherSpaParts: params.includeOtherSpaParts,
       includeGeneralStore: params.includeGeneralStore,
+      hideOutOfStock: params.hideOutOfStock,
+      ...(typeof params.priceMin === 'number' ? { priceMin: params.priceMin } : {}),
+      ...(typeof params.priceMax === 'number' ? { priceMax: params.priceMax } : {}),
     },
   })) as { success?: boolean; data?: ShopCategory[] };
   return res;

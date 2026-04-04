@@ -13,6 +13,7 @@ import { useLocalSearchParams } from 'expo-router';
 import RenderHtml from 'react-native-render-html';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../../services/api';
+import { formatProductPriceCents } from '../../../lib/formatProductPrice';
 import { fetchProductDetail, type ProductDetail, type ShopCompatibility } from '../../../services/shop';
 import { useTheme } from '../../../theme/ThemeProvider';
 
@@ -37,11 +38,6 @@ function firstImageUrls(images: unknown): string[] {
       .filter((x): x is string => !!x);
   }
   return [];
-}
-
-function formatPrice(p: number | null | undefined): string {
-  if (p == null) return '';
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(Number(p));
 }
 
 function compatCopy(status: ShopCompatibility | undefined): { text: string; tone: 'ok' | 'warn' | 'muted' } {
@@ -143,7 +139,9 @@ export default function ProductDetailScreen() {
     );
   }
 
-  const compare = product.compare_at_price != null && Number(product.compare_at_price) > Number(product.price);
+  const compare =
+    product.compare_at_price != null &&
+    Number(product.compare_at_price) > Number(product.price);
   const stock = product.inventory_quantity ?? 0;
 
   return (
@@ -183,10 +181,10 @@ export default function ProductDetailScreen() {
       <Text style={[styles.title, { color: colors.text }]}>{product.title}</Text>
 
       <View style={styles.priceRow}>
-        <Text style={[styles.price, { color: colors.primary }]}>{formatPrice(product.price)}</Text>
+        <Text style={[styles.price, { color: colors.primary }]}>{formatProductPriceCents(product.price)}</Text>
         {compare ? (
           <Text style={[styles.compare, { color: colors.textSecondary, textDecorationLine: 'line-through' }]}>
-            {formatPrice(Number(product.compare_at_price))}
+            {formatProductPriceCents(product.compare_at_price)}
           </Text>
         ) : null}
       </View>
