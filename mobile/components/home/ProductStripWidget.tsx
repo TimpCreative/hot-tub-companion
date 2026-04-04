@@ -112,7 +112,7 @@ export function ProductStripWidget({ title, subtitle, sanitizationLabel }: Produ
                     marginRight: spacing.sm,
                   },
                 ]}
-                onPress={() => router.push('/shop' as Href)}
+                onPress={() => router.push(`/(tabs)/shop/${p.id}` as Href)}
               >
                 {img ? (
                   <Image source={{ uri: img }} style={styles.thumb} resizeMode="cover" />

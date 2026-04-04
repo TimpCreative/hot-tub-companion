@@ -35,7 +35,9 @@ function handleNotificationTap(data: Record<string, string> | null, router: Retu
       router.push('/(tabs)/shop');
       break;
     case 'product':
-      router.push(linkId ? `/(tabs)/shop?productId=${encodeURIComponent(linkId)}` : '/(tabs)/shop');
+      router.push(
+        linkId ? (`/(tabs)/shop/${encodeURIComponent(linkId)}` as const) : '/(tabs)/shop'
+      );
       break;
     case 'inbox':
       router.push('/(tabs)/inbox');

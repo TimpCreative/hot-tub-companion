@@ -1,9 +1,113 @@
 import { Request, Response } from 'express';
 import { db } from '../config/database';
 import { success, error } from '../utils/response';
+import {
+  applyShopProductJoins,
+  applyListCompatibleWhere,
+  getSanitizationQualifierId,
+  joinPartSpaCompatibility,
+  joinRequiredSanitizationQualifier,
+  resolveSpaContext,
+  shopCompatibilityRaw,
+  spaContextIsEvaluable,
+  type ShopCompatibility,
+  type SpaContext,
+} from '../services/shopProductCompatibility.service';
+import type { Knex } from 'knex';
 
 function getTenantId(req: Request): string | null {
   return ((req as any).tenant?.id as string | undefined) ?? null;
+}
+
+function getUserId(req: Request): string | undefined {
+  return (req as any).user?.id as string | undefined;
+}
+
+function parseBoolQuery(raw: string | undefined, defaultVal: boolean): boolean {
+  if (raw === undefined || raw === '') return defaultVal;
+  if (raw === 'true' || raw === '1') return true;
+  if (raw === 'false' || raw === '0') return false;
+  return defaultVal;
+}
+
+/** categoryKey: `uhtd:<uuid>` or `ptype:<url-encoded product_type>` */
+function parseCategoryKey(raw: string | undefined): { kind: 'uhtd'; id: string } | { kind: 'ptype'; value: string } | null {
+  if (!raw?.trim()) return null;
+  const s = raw.trim();
+  if (s.startsWith('uhtd:')) return { kind: 'uhtd', id: s.slice('uhtd:'.length) };
+  if (s.startsWith('ptype:')) {
+    const rest = s.slice('ptype:'.length);
+    try {
+      return { kind: 'ptype', value: decodeURIComponent(rest) };
+    } catch {
+      return { kind: 'ptype', value: rest };
+    }
+  }
+  return null;
+}
+
+function shopSelectColumns(spaCtx: SpaContext, qualId: string | undefined, sanitizationSystem: string | null) {
+  const sys = spaContextIsEvaluable(spaCtx) ? sanitizationSystem : null;
+  return [
+    'pp.id',
+    'pp.title',
+    'pp.description',
+    'pp.price',
+    'pp.compare_at_price',
+    'pp.sku',
+    'pp.barcode',
+    'pp.images',
+    'pp.inventory_quantity',
+    'pp.product_type',
+    'part.id as uhtd_part_id',
+    'part.name as uhtd_part_name',
+    'part.part_number as uhtd_part_number',
+    'part.is_universal as uhtd_part_is_universal',
+    'cat.id as category_id',
+    'cat.display_name as category_name',
+    'cat.sort_order as category_sort',
+    'part.display_importance as part_display_importance',
+    shopCompatibilityRaw(spaCtx, qualId, sys),
+  ];
+}
+
+function buildShopInnerQuery(
+  tenantId: string,
+  spaCtx: SpaContext,
+  qualId: string | undefined,
+  search: string | undefined,
+  categoryKey: ReturnType<typeof parseCategoryKey>
+) {
+  const sanitizationSystem = spaContextIsEvaluable(spaCtx) ? spaCtx.sanitizationSystem : null;
+
+  let inner = db('pos_products as pp');
+  applyShopProductJoins(inner, tenantId, spaCtx, qualId);
+  inner.select(shopSelectColumns(spaCtx, qualId, sanitizationSystem));
+
+  if (categoryKey?.kind === 'uhtd') {
+    inner = inner.andWhere('cat.id', categoryKey.id);
+  }
+  if (categoryKey?.kind === 'ptype') {
+    inner = inner.andWhere('pp.product_type', categoryKey.value);
+  }
+
+  if (search?.trim()) {
+    const s = `%${search.trim()}%`;
+    inner = inner.andWhere((qb: Knex.QueryBuilder) => {
+      qb.where('pp.title', 'ilike', s).orWhere('pp.description', 'ilike', s);
+    });
+  }
+
+  return inner;
+}
+
+function applyShopToggles(qb: Knex.QueryBuilder, includeOtherSpaParts: boolean, includeGeneralStore: boolean): void {
+  if (!includeOtherSpaParts) {
+    qb.whereNot('shop_compatibility', 'other_model');
+  }
+  if (!includeGeneralStore) {
+    qb.whereNot('shop_compatibility', 'general');
+  }
 }
 
 export async function listProducts(req: Request, res: Response): Promise<void> {
@@ -97,6 +201,24 @@ export async function getProductById(req: Request, res: Response): Promise<void>
     return;
   }
 
+  const spaProfileId = req.query.spaProfileId as string | undefined;
+  if (spaProfileId?.trim()) {
+    const userId = getUserId(req);
+    if (!userId) {
+      error(res, 'UNAUTHORIZED', 'Authentication required for spa-scoped product detail', 401);
+      return;
+    }
+    const spaCtx = await resolveSpaContext(tenantId, userId, spaProfileId.trim());
+    const qualId = await getSanitizationQualifierId();
+    const inner = buildShopInnerQuery(tenantId, spaCtx, qualId, undefined, null).andWhere('pp.id', id);
+    const sub = inner.as('t');
+    const compatRow = await db.from(sub).select('shop_compatibility').first();
+    const shopCompat = (compatRow as { shop_compatibility?: ShopCompatibility } | undefined)?.shop_compatibility;
+    if (shopCompat) {
+      (row as Record<string, unknown>).shopCompatibility = shopCompat;
+    }
+  }
+
   success(res, row);
 }
 
@@ -107,7 +229,6 @@ export async function listProductCategories(req: Request, res: Response): Promis
     return;
   }
 
-  // Categories represented by visible, confirmed mapped products for this tenant
   const rows = await db('pcdb_categories as cat')
     .distinct('cat.id', 'cat.name', 'cat.display_name', 'cat.sort_order')
     .join('pcdb_parts as part', 'cat.id', 'part.category_id')
@@ -122,6 +243,127 @@ export async function listProductCategories(req: Request, res: Response): Promis
   success(res, rows);
 }
 
+export async function listShopProducts(req: Request, res: Response): Promise<void> {
+  const tenantId = getTenantId(req);
+  if (!tenantId) {
+    error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
+    return;
+  }
+  const userId = getUserId(req);
+  if (!userId) {
+    error(res, 'UNAUTHORIZED', 'Authentication required', 401);
+    return;
+  }
+
+  const spaProfileId = req.query.spaProfileId as string | undefined;
+  const includeOtherSpaParts = parseBoolQuery(req.query.includeOtherSpaParts as string, false);
+  const includeGeneralStore = parseBoolQuery(req.query.includeGeneralStore as string, true);
+  const { page = '1', pageSize = '20', search } = req.query as Record<string, string>;
+  const p = Math.max(1, parseInt(page, 10) || 1);
+  const ps = Math.min(100, Math.max(1, parseInt(pageSize, 10) || 20));
+  const categoryKey = parseCategoryKey(req.query.categoryKey as string | undefined);
+
+  const spaCtx = await resolveSpaContext(tenantId, userId, spaProfileId?.trim() || undefined);
+  const qualId = await getSanitizationQualifierId();
+
+  const inner = buildShopInnerQuery(tenantId, spaCtx, qualId, search, categoryKey);
+  const sub = inner.as('shop_inner');
+  let outer = db.from(sub);
+  applyShopToggles(outer, includeOtherSpaParts, includeGeneralStore);
+
+  const countRow = await outer.clone().clearSelect().clearOrder().count('* as count').first();
+  const total = parseInt(String((countRow as { count?: string })?.count ?? '0'), 10);
+
+  const rows = await outer
+    .clone()
+    .orderByRaw(`CASE shop_compatibility
+      WHEN 'compatible' THEN 0
+      WHEN 'needs_spa' THEN 1
+      WHEN 'general' THEN 2
+      WHEN 'other_model' THEN 3
+      ELSE 4 END`)
+    .orderBy('category_sort', 'asc')
+    .orderBy('part_display_importance', 'asc')
+    .orderBy('title', 'asc')
+    .limit(ps)
+    .offset((p - 1) * ps);
+
+  success(res, rows, undefined, {
+    page: p,
+    pageSize: ps,
+    total,
+    totalPages: Math.ceil(total / ps),
+  });
+}
+
+export async function listShopCategories(req: Request, res: Response): Promise<void> {
+  const tenantId = getTenantId(req);
+  if (!tenantId) {
+    error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
+    return;
+  }
+  const userId = getUserId(req);
+  if (!userId) {
+    error(res, 'UNAUTHORIZED', 'Authentication required', 401);
+    return;
+  }
+
+  const spaProfileId = req.query.spaProfileId as string | undefined;
+  const includeOtherSpaParts = parseBoolQuery(req.query.includeOtherSpaParts as string, false);
+  const includeGeneralStore = parseBoolQuery(req.query.includeGeneralStore as string, true);
+
+  const spaCtx = await resolveSpaContext(tenantId, userId, spaProfileId?.trim() || undefined);
+  const qualId = await getSanitizationQualifierId();
+
+  // No search filter: categories stay stable while user types in search
+  const inner = buildShopInnerQuery(tenantId, spaCtx, qualId, undefined, null);
+  const sub = inner.as('shop_inner');
+  let filtered = db.from(sub);
+  applyShopToggles(filtered, includeOtherSpaParts, includeGeneralStore);
+
+  const uhtdRows = await filtered
+    .clone()
+    .whereNotNull('category_id')
+    .select('category_id as id', 'category_name as display_name', 'category_sort as sort_order')
+    .groupBy('category_id', 'category_name', 'category_sort')
+    .orderBy('category_sort', 'asc');
+
+  const uhtdSorted = uhtdRows as { id: string; display_name: string | null; sort_order: number | null }[];
+
+  const typeRows = await filtered
+    .clone()
+    .whereNotNull('product_type')
+    .andWhere('product_type', '<>', '')
+    .select('product_type')
+    .groupBy('product_type')
+    .orderBy('product_type', 'asc');
+
+  const out: Array<
+    | { kind: 'uhtd'; id: string; displayName: string; sortOrder: number | null }
+    | { kind: 'product_type'; key: string; displayName: string }
+  > = [];
+
+  for (const r of uhtdSorted) {
+    if (!r.id) continue;
+    out.push({
+      kind: 'uhtd',
+      id: r.id,
+      displayName: r.display_name || r.id,
+      sortOrder: r.sort_order != null ? Number(r.sort_order) : null,
+    });
+  }
+
+  for (const r of typeRows as { product_type: string }[]) {
+    out.push({
+      kind: 'product_type',
+      key: r.product_type,
+      displayName: r.product_type,
+    });
+  }
+
+  success(res, out);
+}
+
 export async function listCompatibleProducts(req: Request, res: Response): Promise<void> {
   const tenantId = getTenantId(req);
   if (!tenantId) {
@@ -129,7 +371,7 @@ export async function listCompatibleProducts(req: Request, res: Response): Promi
     return;
   }
 
-  const userId = (req as any).user?.id as string | undefined;
+  const userId = getUserId(req);
   if (!userId) {
     error(res, 'UNAUTHORIZED', 'Authentication required', 401);
     return;
@@ -151,56 +393,25 @@ export async function listCompatibleProducts(req: Request, res: Response): Promi
   }
 
   const spaModelId = spa.uhtd_spa_model_id as string;
+  const sanitizationQualifierId = await getSanitizationQualifierId();
+  const spaCtx: SpaContext = {
+    kind: 'ok',
+    spaModelId,
+    sanitizationSystem: (spa.sanitization_system as string) ?? null,
+  };
 
-  // Resolve sanitization_system qualifier id
-  const sanitizationQualifier = await db('qdb_qualifiers')
-    .whereIn('name', ['sanitation_system', 'sanitization_system'])
-    .orderByRaw(`CASE WHEN name = 'sanitation_system' THEN 0 ELSE 1 END`)
-    .select('id')
-    .first();
-
-  const sanitizationQualifierId = sanitizationQualifier?.id as string | undefined;
-
-  // Fetch compatible products per Phase 1 rules:
-  // - tenant_id match
-  // - not hidden
-  // - mapping_status confirmed
-  // - part compatibility confirmed OR part is universal
-  // - qualifiers: for required part qualifiers, spa must match
-  const base = db('pos_products as pp')
+  let query = db('pos_products as pp')
     .join('pcdb_parts as part', 'pp.uhtd_part_id', 'part.id')
     .join('pcdb_categories as cat', 'part.category_id', 'cat.id')
-    .leftJoin('part_spa_compatibility as psc', function () {
-      this.on('part.id', '=', 'psc.part_id')
-        .andOn('psc.spa_model_id', '=', db.raw('?', [spaModelId]))
-        .andOn('psc.status', '=', db.raw('?', ['confirmed']));
-    })
     .where('pp.tenant_id', tenantId)
     .andWhere('pp.is_hidden', false)
     .andWhere('pp.mapping_status', 'confirmed')
     .whereNull('part.deleted_at');
 
-  // Qualifier filtering (minimal Phase 1 implementation):
-  // If a part requires sanitization_system, enforce match to spa_profiles.sanitization_system.
-  // (Other qualifiers can be added similarly later.)
-  let query = base;
-  if (sanitizationQualifierId) {
-    query = query.leftJoin('qdb_part_qualifiers as pq_sani', function () {
-      this.on('part.id', '=', 'pq_sani.part_id')
-        .andOn('pq_sani.qualifier_id', '=', db.raw('?', [sanitizationQualifierId]))
-        .andOn('pq_sani.is_required', '=', db.raw('?', [true]));
-    });
-  }
+  joinPartSpaCompatibility(query, spaCtx);
+  joinRequiredSanitizationQualifier(query, spaCtx, sanitizationQualifierId);
 
-  query = query.andWhere((qb: any) => {
-    qb.where('part.is_universal', true).orWhereNotNull('psc.part_id');
-  });
-
-  if (sanitizationQualifierId) {
-    query = query.andWhere((qb: any) => {
-      qb.whereNull('pq_sani.qualifier_id').orWhereRaw('LOWER(pq_sani.value::text) LIKE ?', [`%${String(spa.sanitization_system).toLowerCase()}%`]);
-    });
-  }
+  applyListCompatibleWhere(query, (spa.sanitization_system as string) ?? null, sanitizationQualifierId);
 
   const { page = '1', pageSize = '25' } = req.query as Record<string, string>;
   const p = Math.max(1, parseInt(page, 10) || 1);
@@ -244,4 +455,3 @@ export async function listCompatibleProducts(req: Request, res: Response): Promi
 
   success(res, rows, undefined, { page: p, pageSize: ps, total, totalPages: Math.ceil(total / ps) });
 }
-

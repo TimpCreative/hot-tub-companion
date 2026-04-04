@@ -13,12 +13,20 @@
 | Area | Status | Notes |
 |------|--------|-------|
 | **Commerce (Shop / cart / checkout)** | ❌ | Still planned in this phase |
+| **Retailer Admin — Products ↔ UHTD mapping** | ✅ Partial | **Shipped:** list enrichment with top suggestion score (tiered % pills), `pcdb_parts` join for mapped part labels, extended list sort (visibility, mapping status, confidence), modal **Product mapping** vs **UHTD Suggestions** with confirm/clear keeping the modal open. See [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md § Retailer Admin: Products and UHTD mapping UX](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#retailer-admin-products-and-uhtd-mapping-ux). **Still open:** performance at very large page sizes (batch/denormalize scores later), optional super-admin deep link to PCdb part. |
 | **Referral program** | ❌ | Still planned in this phase |
 | **Water Care Assistant** | ❌ | Still planned in this phase |
 | **Seasonal maintenance timeline** | ❌ | Still planned in this phase |
 | **Content system** | ✅ Partial | Core universal + retailer content platform is shipped; contextual recommendation/search refinements remain |
 | **Subscription management** | ❌ | Still planned in this phase |
 | **Cross-platform QA** | ⏳ | Ongoing as features ship |
+
+### Next steps (Phase 3 — suggested order)
+
+1. **Commerce backend:** product sync pagination/retry, `order_references` from `orders/create`, Storefront variant GID normalization, read APIs for shop/PDP — [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#recommended-delivery-order).
+2. **Customer app:** read-only Shop, PDP, multi-spa selector, then cart + Checkout Kit, then Home orders card.
+3. **Pilot prep:** TAB catalog QA, webhook/order idempotency extensions if needed, manual checklist (#1–4 in *Manual Steps Required* below).
+4. **Engagement streams:** referrals, water care, seasonal timeline, subscriptions — as capacity after purchasable checkout exists (referrals/bundles ordering per that doc).
 
 ### Content shipped from this phase
 

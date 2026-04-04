@@ -40,6 +40,25 @@ Shopify CLI remains useful for broader app-lifecycle workflows, but the tenant o
 - Internal cron: **`POST /api/v1/internal/cron/sync-shopify-catalog`** (with **`CRON_SECRET`**) every 1–2 minutes for incremental `updated_at_min` pulls; throttled by **`product_sync_interval_minutes`** (1–1440). Catalog webhooks: **`products/create`**, **`products/update`**, **`products/delete`**, **`inventory_levels/update`**.
 - Retailer **full catalog import** and sync APIs moved to **`/api/v1/admin/settings/pos/sync/*`** with **`can_manage_settings`**
 
+### Retailer Admin: Products and UHTD mapping UX
+
+**Implemented (supports pilot checklist: “Confirm sufficient UHTD / POS mapping”):**
+
+- **`uhtdProductSuggestions.service`** — shared scoring pipeline for suggestions and list enrichment; **`getTopSuggestionScore`** for max match after dedupe.
+- **`GET /admin/products`** — left join **`pcdb_parts`** for **`uhtd_part_name`** / **`uhtd_part_number`**; non-confirmed rows enriched with **`top_suggestion_score`** (bounded concurrency); sorts: **`is_hidden_*`**, **`mapping_status_*`**, **`mapping_confidence_*`** (nulls last).
+- **Dashboard `/admin/products`** — tiered % pills (red / orange / yellow) for suggestion or confirmed confidence, sortable column headers in sync with sort dropdown, modal shows **Product mapping** when confirmed (with clear → reload suggestions).
+
+**Follow-ups (optional / later):** batch or denormalized scores if list pages feel slow at high **`pageSize`**; deep link from modal to super-admin part record if/when that route exists.
+
+### Next steps (commerce — after mapping UX)
+
+1. **Milestone 1.1** — Product sync pagination, retry/backoff, archived/reconciliation, large-catalog validation.
+2. **Milestone 1.2–1.3** — Storefront variant normalization; **`order_references`** persistence from **`orders/create`**.
+3. **Milestone 1.4** — Read APIs for customer **`GET /products`**, compatibility, PDP-shaped payloads.
+4. **Milestone 1.5** — Runtime Admin token exchange (if not already fully on this path for all sync operations).
+5. **Milestones 2–4** — Read-only Shop + PDP, cart service, Checkout Kit.
+6. **Milestone 5–6** — Home orders card, pilot QA — see **Recommended Delivery Order** below.
+
 ### Not Yet Started
 
 - Storefront cart and Checkout Kit implementation
