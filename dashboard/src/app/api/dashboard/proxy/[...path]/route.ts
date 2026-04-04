@@ -9,6 +9,11 @@ function getApiBase(): string {
 
 const API_BASE = getApiBase();
 
+/** Allow Railway cold starts + slow queries; Vercel Hobby default is 10s which often surfaces as opaque 502s. */
+export const maxDuration = 60;
+
+const UPSTREAM_FETCH_TIMEOUT_MS = 55_000;
+
 /**
  * Proxies requests to the hot-tub-companion API with the tenant API key
  * resolved from the database by slug. The key never leaves the server.
@@ -89,6 +94,7 @@ async function proxy(
     const fetchOpts: RequestInit = {
       method,
       headers,
+      signal: AbortSignal.timeout(UPSTREAM_FETCH_TIMEOUT_MS),
       ...(body && { body, duplex: 'half' }),
     };
     const res = await fetch(url.toString(), fetchOpts);
@@ -113,16 +119,22 @@ async function proxy(
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    const isTimeout =
+      message.includes('TimeoutError') ||
+      message.includes('timed out') ||
+      (err instanceof Error && err.name === 'TimeoutError');
     console.error('[proxy] Fetch to API failed:', message);
     return NextResponse.json(
       {
         success: false,
         error: {
-          code: 'UPSTREAM_ERROR',
-          message: `Proxy could not reach API: ${message}`,
+          code: isTimeout ? 'UPSTREAM_TIMEOUT' : 'UPSTREAM_ERROR',
+          message: isTimeout
+            ? `API did not respond within ${UPSTREAM_FETCH_TIMEOUT_MS / 1000}s. Check Railway deployment (cold start / sleep) and NEXT_PUBLIC_API_URL.`
+            : `Proxy could not reach API: ${message}`,
         },
       },
-      { status: 502 }
+      { status: isTimeout ? 504 : 502 }
     );
   }
 }

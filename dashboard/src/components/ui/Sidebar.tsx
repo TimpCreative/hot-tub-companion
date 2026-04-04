@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUnsavedChanges } from '@/contexts/UnsavedChangesContext';
@@ -31,10 +31,36 @@ function resolveSidebarHref(itemHref: string, basePath: string): string {
   return `${basePath}/${itemHref}`;
 }
 
+/** True when this href is the most specific nav link matching the pathname (avoids /products matching /products/categories). */
+function isLongestNavMatch(pathname: string, href: string, allResolvedHrefs: string[]): boolean {
+  const candidates = allResolvedHrefs.filter((h) => pathname === h || pathname.startsWith(`${h}/`));
+  if (candidates.length === 0) return false;
+  const longest = candidates.reduce((a, b) => (a.length >= b.length ? a : b));
+  return href === longest;
+}
+
+function collectResolvedHrefs(items: NavItem[], basePath: string): string[] {
+  const out: string[] = [];
+  const walk = (list: NavItem[]) => {
+    for (const item of list) {
+      if (item.href) out.push(resolveSidebarHref(item.href, basePath));
+      if (item.children?.length) walk(item.children);
+    }
+  };
+  walk(items);
+  return out;
+}
+
 export function Sidebar({ navItems, bottomItems, basePath, title }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { confirmNavigate } = useUnsavedChanges();
+
+  const allResolvedHrefs = useMemo(() => {
+    const top = collectResolvedHrefs(navItems, basePath);
+    const bottom = bottomItems?.length ? collectResolvedHrefs(bottomItems, basePath) : [];
+    return [...top, ...bottom];
+  }, [navItems, bottomItems, basePath]);
 
   const linkClass = (isActive: boolean) =>
     `flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors ${
@@ -44,7 +70,7 @@ export function Sidebar({ navItems, bottomItems, basePath, title }: SidebarProps
   const renderLeaf = (item: NavItem, nested?: boolean) => {
     if (!item.href) return null;
     const href = resolveSidebarHref(item.href, basePath);
-    const isActive = pathname === href || pathname.startsWith(`${href}/`);
+    const isActive = isLongestNavMatch(pathname, href, allResolvedHrefs);
     return (
       <Link
         key={href}
@@ -73,7 +99,7 @@ export function Sidebar({ navItems, bottomItems, basePath, title }: SidebarProps
       const groupActive = item.children.some((c) => {
         if (!c.href) return false;
         const h = resolveSidebarHref(c.href, basePath);
-        return pathname === h || pathname.startsWith(`${h}/`);
+        return isLongestNavMatch(pathname, h, allResolvedHrefs);
       });
       return (
         <div key={item.label} className="space-y-0.5">

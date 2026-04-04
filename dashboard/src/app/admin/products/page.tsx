@@ -1,7 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { Menu, MenuButton, MenuHeading, MenuItem, MenuItems, MenuSection, MenuSeparator } from '@headlessui/react';
+import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { createTenantApiClient } from '@/services/api';
 import { Button } from '@/components/ui/Button';
@@ -111,6 +113,8 @@ export default function AdminProductsPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
+  const importPreviewInputRef = useRef<HTMLInputElement>(null);
+  const importApplyInputRef = useRef<HTMLInputElement>(null);
 
   const [selected, setSelected] = useState<PosProductRow | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -548,38 +552,94 @@ export default function AdminProductsPage() {
             </Link>
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap justify-end">
-          <Button variant="secondary" size="sm" onClick={() => void downloadExport()}>
-            Export CSV
-          </Button>
-          <label className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-200 text-gray-900 hover:bg-gray-300 cursor-pointer disabled:opacity-50">
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              className="sr-only"
+        <div className="flex justify-end">
+          <input
+            ref={importPreviewInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="sr-only"
+            tabIndex={-1}
+            disabled={importBusy}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (f) void runImport(f, 'dry_run');
+            }}
+          />
+          <input
+            ref={importApplyInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="sr-only"
+            tabIndex={-1}
+            disabled={importBusy}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (f && confirm('Apply CSV changes to Hot Tub Companion fields for this store?')) void runImport(f, 'apply');
+            }}
+          />
+          <Menu as="div" className="relative inline-block text-left">
+            <MenuButton
               disabled={importBusy}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = '';
-                if (f) void runImport(f, 'dry_run');
-              }}
-            />
-            Import dry-run
-          </label>
-          <label className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-200 text-gray-900 hover:bg-gray-300 cursor-pointer disabled:opacity-50">
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              className="sr-only"
-              disabled={importBusy}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = '';
-                if (f && confirm('Apply CSV changes to HTC fields for this tenant?')) void runImport(f, 'apply');
-              }}
-            />
-            Import apply
-          </label>
+              aria-label="Import and export spreadsheet (CSV)"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-900 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Import / export
+              <ChevronDownIcon className="h-4 w-4 text-gray-600" aria-hidden />
+            </MenuButton>
+            <MenuItems
+              anchor="bottom end"
+              modal={false}
+              className="z-50 mt-1 w-[min(calc(100vw-2rem),18rem)] rounded-xl border border-gray-200 bg-white py-1 shadow-lg ring-1 ring-black/5 outline-none"
+            >
+              <MenuSection>
+                <MenuHeading className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Export
+                </MenuHeading>
+                <MenuItem>
+                  <button
+                    type="button"
+                    className="group flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm data-focus:bg-gray-50"
+                    onClick={() => void downloadExport()}
+                  >
+                    <span className="font-medium text-gray-900">Download CSV</span>
+                    <span className="text-xs text-gray-500">Rows matching your current filters</span>
+                  </button>
+                </MenuItem>
+              </MenuSection>
+              <MenuSeparator className="my-1 h-px bg-gray-100" />
+              <MenuSection>
+                <MenuHeading className="px-3 pt-1 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Import CSV
+                </MenuHeading>
+                <MenuItem>
+                  <button
+                    type="button"
+                    className="group flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm data-focus:bg-gray-50"
+                    onClick={() => {
+                      requestAnimationFrame(() => importPreviewInputRef.current?.click());
+                    }}
+                  >
+                    <span className="font-medium text-gray-900">Preview import</span>
+                    <span className="text-xs text-gray-500">Check the file for errors; nothing is saved</span>
+                  </button>
+                </MenuItem>
+                <MenuItem>
+                  <button
+                    type="button"
+                    className="group flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm data-focus:bg-gray-50"
+                    onClick={() => {
+                      requestAnimationFrame(() => importApplyInputRef.current?.click());
+                    }}
+                  >
+                    <span className="font-medium text-gray-900">Apply import</span>
+                    <span className="text-xs text-gray-500">Updates HTC-editable columns after you confirm</span>
+                  </button>
+                </MenuItem>
+              </MenuSection>
+            </MenuItems>
+          </Menu>
         </div>
       </div>
 
@@ -591,31 +651,44 @@ export default function AdminProductsPage() {
 
       {error && <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700">{error}</div>}
 
-      {(selectedIds.size > 0 || selectionToken) && (
-        <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
-          <span className="text-gray-800">
-            Selected: <strong>{selectedIds.size}</strong> on list
-            {selectionToken ? (
-              <>
-                {' · '}
-                <strong>{selectionCount}</strong> matching filter (token)
-              </>
-            ) : null}
-          </span>
-          <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => void bulkApply('set_hidden', true)}>
-            Hide (token)
-          </Button>
-          <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => void bulkApply('set_hidden', false)}>
-            Show (token)
-          </Button>
-          <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => void bulkApply('clear_mapping')}>
-            Clear mapping (token)
-          </Button>
-          <Button size="sm" variant="secondary" onClick={clearSelection}>
-            Clear selection
-          </Button>
-        </div>
-      )}
+      {/* Always render this strip so selecting checkboxes does not shift the page; empty state matches height/padding */}
+      <div
+        className={`sticky top-0 z-10 mb-4 min-h-[3.25rem] rounded-lg border px-4 py-3 text-sm transition-colors ${
+          selectedIds.size > 0 || selectionToken
+            ? 'border-blue-200 bg-blue-50'
+            : 'border-gray-100 bg-gray-50/80'
+        }`}
+      >
+        {selectedIds.size > 0 || selectionToken ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-gray-800">
+              Selected: <strong>{selectedIds.size}</strong> on list
+              {selectionToken ? (
+                <>
+                  {' · '}
+                  <strong>{selectionCount}</strong> matching filter (token)
+                </>
+              ) : null}
+            </span>
+            <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => void bulkApply('set_hidden', true)}>
+              Hide (token)
+            </Button>
+            <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => void bulkApply('set_hidden', false)}>
+              Show (token)
+            </Button>
+            <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => void bulkApply('clear_mapping')}>
+              Clear mapping (token)
+            </Button>
+            <Button size="sm" variant="secondary" onClick={clearSelection}>
+              Clear selection
+            </Button>
+          </div>
+        ) : (
+          <p className="text-gray-400 leading-snug">
+            Select products with checkboxes to use bulk hide, show, or clear mapping (token actions).
+          </p>
+        )}
+      </div>
 
       <div className="card rounded-lg p-4 mb-4 space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
