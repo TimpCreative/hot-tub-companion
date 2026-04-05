@@ -23,6 +23,7 @@ import * as cronController from '../controllers/cron.controller';
 import * as internalEasController from '../controllers/internalEas.controller';
 import adminRoutes from './admin.routes';
 import productsRoutes from './products.routes';
+import cartRoutes from './cart.routes';
 import spaProfilesRoutes from './spaProfiles.routes';
 import usersRoutes from './users.routes';
 import consumerUhtdSuggestionsRoutes from './consumerUhtdSuggestions.routes';
@@ -86,6 +87,7 @@ router.use('/api/v1', contentRoutes);
 
 // Customer product routes (tenant API key required; some endpoints require auth)
 router.use('/api/v1', productsRoutes);
+router.use('/api/v1', cartRoutes);
 
 // Customer spa profiles (tenant API key + Firebase auth)
 router.use('/api/v1', spaProfilesRoutes);

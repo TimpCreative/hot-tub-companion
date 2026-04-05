@@ -39,7 +39,16 @@ export default function TabLayout() {
       <Tabs.Screen
         name="shop/[id]"
         options={{
-          title: 'Product',
+          title: '',
+          headerTitle: () => null,
+          href: null,
+          headerLeft: buildReplacementBackButton('/(tabs)/shop'),
+        }}
+      />
+      <Tabs.Screen
+        name="shop/cart"
+        options={{
+          title: 'Cart',
           href: null,
           headerLeft: buildReplacementBackButton('/(tabs)/shop'),
         }}

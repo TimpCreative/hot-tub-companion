@@ -17,6 +17,8 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useCart } from '../../contexts/CartContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeroHeader } from '../../components/AppHeroHeader';
 import { FinishSetupBanner } from '../../components/FinishSetupBanner';
@@ -76,6 +78,8 @@ export default function Shop() {
   const router = useRouter();
   const params = useLocalSearchParams<{ productId?: string }>();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const { totalQuantity, refreshCart } = useCart();
   const { colors, typography, spacing } = useTheme();
   const { showNudge, dismiss } = useFinishSetupNudge();
   const primaryHex = colors.primary ?? '#1B4D7A';
@@ -117,6 +121,12 @@ export default function Shop() {
   appliedRef.current = applied;
 
   const panelX = useRef(new Animated.Value(SCREEN_W)).current;
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshCart();
+    }, [refreshCart])
+  );
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 320);
@@ -416,10 +426,50 @@ export default function Shop() {
     );
   };
 
+  const cartHeaderButton = useMemo(
+    () => (
+      <Pressable
+        onPress={() => router.push('/(tabs)/shop/cart')}
+        style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+        accessibilityLabel="Open cart"
+      >
+        <View style={{ position: 'relative' }}>
+          <Ionicons name="bag-outline" size={28} color="#fff" />
+          {user && totalQuantity > 0 ? (
+            <View
+              style={{
+                position: 'absolute',
+                right: -6,
+                top: -4,
+                minWidth: 18,
+                height: 18,
+                borderRadius: 9,
+                backgroundColor: '#f97316',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: 4,
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>
+                {totalQuantity > 99 ? '99+' : totalQuantity}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </Pressable>
+    ),
+    [router, user, totalQuantity]
+  );
+
   const listHeader = useMemo(
     () => (
-      <View>
-        <AppHeroHeader icon="cart-outline" title="Shop" subtitle="Browse products" />
+      <View style={styles.listHeaderWrap}>
+        <AppHeroHeader
+          icon="cart-outline"
+          title="Shop"
+          subtitle="Browse products"
+          trailing={cartHeaderButton}
+        />
         <View style={styles.searchRow}>
           <TextInput
             value={search}
@@ -445,7 +495,7 @@ export default function Shop() {
         {error ? <Text style={{ color: '#b91c1c', marginTop: 8 }}>{error}</Text> : null}
       </View>
     ),
-    [search, colors, openFilters, error]
+    [search, colors, openFilters, error, cartHeaderButton]
   );
 
   const priceBoundsSingle = priceBounds != null && priceBounds.min === priceBounds.max;
@@ -577,6 +627,7 @@ export default function Shop() {
                         snapped
                         minMarkerOverlapDistance={12}
                         sliderLength={Math.max(160, sliderTrackWidth)}
+                        markerOffsetY={1}
                         touchDimensions={{
                           height: 56,
                           width: 56,
@@ -713,6 +764,9 @@ const styles = StyleSheet.create({
   listContent: {
     flexGrow: 1,
     padding: 24,
+  },
+  listHeaderWrap: {
+    paddingBottom: 20,
   },
   searchRow: {
     flexDirection: 'row',

@@ -1,21 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import RenderHtml from 'react-native-render-html';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../../services/api';
 import { formatProductPriceCents } from '../../../lib/formatProductPrice';
 import { fetchProductDetail, type ProductDetail, type ShopCompatibility } from '../../../services/shop';
 import { useTheme } from '../../../theme/ThemeProvider';
+import { useAuth } from '../../../contexts/AuthContext';
+import { useCart } from '../../../contexts/CartContext';
 
 type SpaProfile = { id: string; isPrimary?: boolean };
 
@@ -72,10 +76,14 @@ function htmlStyles(colors: { text: string; textSecondary: string }) {
 export default function ProductDetailScreen() {
   const { colors, typography } = useTheme();
   const { width } = Dimensions.get('window');
+  const router = useRouter();
+  const { user } = useAuth();
+  const { addToCart } = useCart();
   const params = useLocalSearchParams<{ id: string }>();
   const [spaProfileId, setSpaProfileId] = useState<string | undefined>(undefined);
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [addingCart, setAddingCart] = useState(false);
 
   const loadSpa = useCallback(async () => {
     try {
@@ -144,9 +152,44 @@ export default function ProductDetailScreen() {
     Number(product.compare_at_price) > Number(product.price);
   const stock = product.inventory_quantity ?? 0;
 
+  const handleAddToCart = async () => {
+    if (!user) {
+      Alert.alert('Sign in required', 'Please sign in to add items to your cart.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign in', onPress: () => router.push('/auth/login') },
+      ]);
+      return;
+    }
+    if (stock <= 0) {
+      Alert.alert('Out of stock', 'This item is not available right now.');
+      return;
+    }
+    setAddingCart(true);
+    try {
+      await addToCart(product.id, 1);
+      Alert.alert('Added to cart', 'View your cart to check out.', [
+        { text: 'Keep shopping', style: 'cancel' },
+        { text: 'View cart', onPress: () => router.push('/(tabs)/shop/cart') },
+      ]);
+    } catch (e) {
+      Alert.alert('Cart', e instanceof Error ? e.message : 'Could not add to cart.');
+    } finally {
+      setAddingCart(false);
+    }
+  };
+
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={styles.content}>
-      <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior={Platform.OS === 'ios' ? 'never' : undefined}
+    >
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        style={styles.heroCarousel}
+      >
         {images.length > 0 ? (
           images.map((uri) => (
             <Image key={uri} source={{ uri }} style={{ width, height: width * 0.85 }} resizeMode="cover" />
@@ -202,33 +245,78 @@ export default function ProductDetailScreen() {
         />
       ) : null}
 
-      <Pressable
-        style={({ pressed }) => [
-          styles.cta,
-          { backgroundColor: colors.border, opacity: pressed ? 0.9 : 1 },
-        ]}
-        disabled
-      >
-        <Text style={styles.ctaText}>Add to cart — coming soon</Text>
-      </Pressable>
+      <View style={styles.ctaRow}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.cta,
+            styles.ctaHalf,
+            {
+              backgroundColor: 'transparent',
+              borderWidth: 2,
+              borderColor: colors.primary,
+              opacity: pressed ? 0.88 : 1,
+            },
+          ]}
+          disabled
+        >
+          <Text style={[styles.ctaText, { color: colors.primary }]}>Subscribe — coming soon</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [
+            styles.cta,
+            styles.ctaHalf,
+            {
+              backgroundColor: stock > 0 ? colors.primary : colors.border,
+              opacity: pressed ? 0.88 : 1,
+            },
+          ]}
+          disabled={stock <= 0 || addingCart}
+          onPress={() => void handleAddToCart()}
+        >
+          {addingCart ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text
+              style={[
+                styles.ctaText,
+                { color: stock > 0 ? '#fff' : '#6b7280' },
+              ]}
+            >
+              {stock <= 0 ? 'Out of stock' : 'Add to cart'}
+            </Text>
+          )}
+        </Pressable>
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  content: { padding: 16, paddingBottom: 40 },
+  /** Top inset 0 so the hero sits flush under the stack header; horizontal bleed matches body padding. */
+  content: { paddingHorizontal: 16, paddingTop: 0, paddingBottom: 40 },
+  heroCarousel: { marginHorizontal: -16 },
   heroPlaceholder: { height: 280 },
   compatBanner: { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12 },
   title: { fontSize: 24, fontWeight: '800', marginTop: 16, lineHeight: 30 },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, marginTop: 8 },
   price: { fontSize: 22, fontWeight: '800' },
   compare: { fontSize: 16 },
-  cta: {
+  ctaRow: {
+    flexDirection: 'row',
+    gap: 10,
     marginTop: 24,
+  },
+  cta: {
     borderRadius: 14,
     paddingVertical: 14,
+    paddingHorizontal: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  ctaText: { fontSize: 16, fontWeight: '700', color: '#6b7280' },
+  ctaHalf: {
+    flex: 1,
+    minWidth: 0,
+  },
+  ctaText: { fontSize: 14, fontWeight: '700', color: '#6b7280', textAlign: 'center' },
 });
