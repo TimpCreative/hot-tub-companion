@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCart } from '../../../contexts/CartContext';
+import { messageFromApiReject } from '../../../services/cart';
 import { useTheme } from '../../../theme/ThemeProvider';
 
 export default function ShopCartScreen() {
@@ -40,7 +41,7 @@ export default function ShopCartScreen() {
     try {
       await openCheckout();
     } catch (e) {
-      Alert.alert('Checkout', e instanceof Error ? e.message : 'Could not start checkout.');
+      Alert.alert('Checkout', messageFromApiReject(e, 'Could not start checkout.'));
     } finally {
       setCheckoutBusy(false);
     }
@@ -55,7 +56,7 @@ export default function ShopCartScreen() {
         await setLineQuantity(lineId, next);
       }
     } catch (e) {
-      Alert.alert('Cart', e instanceof Error ? e.message : 'Update failed.');
+      Alert.alert('Cart', messageFromApiReject(e, 'Update failed.'));
     } finally {
       setBusyLine(null);
     }

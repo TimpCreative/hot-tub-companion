@@ -6,7 +6,6 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { useShopifyCheckoutSheet } from '@shopify/checkout-sheet-kit';
 import { useAuth } from './AuthContext';
 import * as cartApi from '../services/cart';
 import type { Cart } from '../services/cart';
@@ -19,6 +18,12 @@ function extractErrorMessage(e: unknown): string {
   }
   return 'Something went wrong';
 }
+
+export type CartCheckoutDeps = {
+  presentCheckout: (url: string) => void;
+  /** Register for checkout completed; return unsubscribe. */
+  subscribeCheckoutCompleted: (handler: () => void) => () => void;
+};
 
 type CartContextValue = {
   cart: Cart | null;
@@ -34,9 +39,17 @@ type CartContextValue = {
 
 const CartContext = createContext<CartContextValue | undefined>(undefined);
 
-export function CartProvider({ children }: { children: React.ReactNode }) {
+type CartProviderCoreProps = {
+  children: React.ReactNode;
+  checkout: CartCheckoutDeps;
+};
+
+/**
+ * Cart state + API. Checkout presentation is injected (native sheet vs Linking).
+ */
+export function CartProviderCore({ children, checkout }: CartProviderCoreProps) {
   const { user, loading: authLoading } = useAuth();
-  const checkoutSheet = useShopifyCheckoutSheet();
+  const { presentCheckout, subscribeCheckoutCompleted } = checkout;
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,20 +78,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [refreshCart]);
 
   useEffect(() => {
-    const sub = checkoutSheet.addEventListener('completed', () => {
+    return subscribeCheckoutCompleted(() => {
       void refreshCart();
     });
-    return () => sub?.remove();
-  }, [checkoutSheet, refreshCart]);
+  }, [subscribeCheckoutCompleted, refreshCart]);
 
-  const addToCart = useCallback(
-    async (productId: string, quantity = 1) => {
-      setError(null);
-      const next = await cartApi.addCartItem(productId, quantity);
-      setCart(next);
-    },
-    []
-  );
+  const addToCart = useCallback(async (productId: string, quantity = 1) => {
+    setError(null);
+    const next = await cartApi.addCartItem(productId, quantity);
+    setCart(next);
+  }, []);
 
   const setLineQuantity = useCallback(async (lineId: string, quantity: number) => {
     setError(null);
@@ -95,8 +104,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const openCheckout = useCallback(async () => {
     setError(null);
     const url = await cartApi.fetchCheckoutUrl();
-    checkoutSheet.present(url);
-  }, [checkoutSheet]);
+    presentCheckout(url);
+  }, [presentCheckout]);
 
   const value = useMemo(
     (): CartContextValue => ({

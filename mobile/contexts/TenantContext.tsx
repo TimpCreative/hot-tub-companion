@@ -155,6 +155,11 @@ interface TenantConfig {
   dealerPage?: DealerPageConfig;
   termsUrl?: string | null;
   privacyUrl?: string | null;
+  /** Shop product detail stock messaging (retailer settings). */
+  shop?: {
+    lowStockThreshold: number;
+    showInStockWhenAboveThreshold: boolean;
+  };
 }
 
 interface TenantContextType {

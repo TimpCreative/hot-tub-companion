@@ -53,6 +53,17 @@ export async function getConfig(tenantId: string) {
     termsUrl: (tenant as any).terms_url?.trim() || null,
     privacyUrl: (tenant as any).privacy_url?.trim() || null,
     timezone: (tenant as any).timezone || 'America/Denver',
+    shop: normalizeShopDisplayFromTenant(tenant),
+  };
+}
+
+function normalizeShopDisplayFromTenant(tenant: Record<string, unknown>) {
+  const t = tenant.shop_low_stock_threshold;
+  const threshold =
+    typeof t === 'number' && Number.isFinite(t) ? Math.min(999, Math.max(0, Math.trunc(t))) : 5;
+  return {
+    lowStockThreshold: threshold,
+    showInStockWhenAboveThreshold: (tenant as { shop_show_in_stock_label?: boolean }).shop_show_in_stock_label !== false,
   };
 }
 

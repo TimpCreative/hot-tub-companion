@@ -24,6 +24,11 @@ interface BrandingResponse {
   timezone?: string;
 }
 
+interface ShopDisplayResponse {
+  lowStockThreshold?: number;
+  showInStockWhenAboveThreshold?: boolean;
+}
+
 interface SettingsResponse {
   success?: boolean;
   message?: string;
@@ -31,6 +36,7 @@ interface SettingsResponse {
   data?: {
     branding?: BrandingResponse;
     dealerContact?: DealerContactResponse;
+    shopDisplay?: ShopDisplayResponse;
   };
 }
 
@@ -45,6 +51,7 @@ interface PosSettingsResponse {
     shopifyClientId?: string | null;
     lastProductSyncAt?: string | null;
     shopifyClientSecretConfigured?: boolean;
+    /** Headless Storefront API token (cart / checkout in app). Separate from OAuth client secret. */
     shopifyStorefrontTokenConfigured?: boolean;
     shopifyAdminTokenConfigured?: boolean;
     shopifyWebhookSecretConfigured?: boolean;
@@ -79,9 +86,12 @@ interface SettingsSnapshot {
   posType: string;
   shopifyStoreUrl: string;
   shopifyAdminTokenDraft: string;
-  shopifyStorefrontTokenDraft: string;
+  shopifyClientSecretDraft: string;
+  shopifyStorefrontAccessTokenDraft: string;
   shopifyCatalogSyncEnabled: boolean;
   productSyncIntervalMinutes: number;
+  shopLowStockThreshold: number;
+  shopShowInStockWhenAboveThreshold: boolean;
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -116,13 +126,17 @@ export default function AdminSettingsPage() {
   const [posType, setPosType] = useState<string>('');
   const [shopifyStoreUrl, setShopifyStoreUrl] = useState<string>('');
   const [shopifyAdminTokenDraft, setShopifyAdminTokenDraft] = useState<string>('');
-  const [shopifyStorefrontTokenDraft, setShopifyStorefrontTokenDraft] = useState<string>('');
+  const [shopifyClientSecretDraft, setShopifyClientSecretDraft] = useState<string>('');
+  const [shopifyStorefrontAccessTokenDraft, setShopifyStorefrontAccessTokenDraft] = useState<string>('');
   const [shopifyAdminTokenConfigured, setShopifyAdminTokenConfigured] = useState(false);
+  const [shopifyClientSecretConfigured, setShopifyClientSecretConfigured] = useState(false);
   const [shopifyStorefrontTokenConfigured, setShopifyStorefrontTokenConfigured] = useState(false);
   const [lastProductSyncAt, setLastProductSyncAt] = useState<string | null>(null);
   const [lastCronProductSyncAt, setLastCronProductSyncAt] = useState<string | null>(null);
   const [shopifyCatalogSyncEnabled, setShopifyCatalogSyncEnabled] = useState(false);
   const [productSyncIntervalMinutes, setProductSyncIntervalMinutes] = useState(30);
+  const [shopLowStockThreshold, setShopLowStockThreshold] = useState(5);
+  const [shopShowInStockWhenAboveThreshold, setShopShowInStockWhenAboveThreshold] = useState(true);
 
   const [syncImportOpen, setSyncImportOpen] = useState(false);
   const [syncImportRunning, setSyncImportRunning] = useState(false);
@@ -166,9 +180,12 @@ export default function AdminSettingsPage() {
       posType !== initialSnapshot.posType ||
       shopifyStoreUrl !== initialSnapshot.shopifyStoreUrl ||
       shopifyAdminTokenDraft !== initialSnapshot.shopifyAdminTokenDraft ||
-      shopifyStorefrontTokenDraft !== initialSnapshot.shopifyStorefrontTokenDraft ||
+      shopifyClientSecretDraft !== initialSnapshot.shopifyClientSecretDraft ||
+      shopifyStorefrontAccessTokenDraft !== initialSnapshot.shopifyStorefrontAccessTokenDraft ||
       shopifyCatalogSyncEnabled !== initialSnapshot.shopifyCatalogSyncEnabled ||
-      productSyncIntervalMinutes !== initialSnapshot.productSyncIntervalMinutes;
+      productSyncIntervalMinutes !== initialSnapshot.productSyncIntervalMinutes ||
+      shopLowStockThreshold !== initialSnapshot.shopLowStockThreshold ||
+      shopShowInStockWhenAboveThreshold !== initialSnapshot.shopShowInStockWhenAboveThreshold;
     setUnsavedChanges(dirty);
   }, [
     dealerAddress,
@@ -186,7 +203,10 @@ export default function AdminSettingsPage() {
     shopifyCatalogSyncEnabled,
     productSyncIntervalMinutes,
     shopifyStoreUrl,
-    shopifyStorefrontTokenDraft,
+    shopifyClientSecretDraft,
+    shopifyStorefrontAccessTokenDraft,
+    shopLowStockThreshold,
+    shopShowInStockWhenAboveThreshold,
     timezone,
   ]);
 
@@ -201,6 +221,7 @@ export default function AdminSettingsPage() {
         ]);
         const branding = brandingRes?.data?.branding;
         const dealerContact = brandingRes?.data?.dealerContact;
+        const shopDisplay = brandingRes?.data?.shopDisplay;
         const pos = posRes?.data;
         setPrimaryColor(branding?.primaryColor || '#1B4D7A');
         setSecondaryColor(branding?.secondaryColor || '#E8A832');
@@ -214,11 +235,11 @@ export default function AdminSettingsPage() {
         setPosType(pos?.posType ?? '');
         setShopifyStoreUrl(pos?.shopifyStoreUrl ?? '');
         setShopifyAdminTokenDraft('');
-        setShopifyStorefrontTokenDraft('');
+        setShopifyClientSecretDraft('');
+        setShopifyStorefrontAccessTokenDraft('');
         setShopifyAdminTokenConfigured(!!(pos?.shopifyClientId || pos?.shopifyAdminTokenConfigured));
-        setShopifyStorefrontTokenConfigured(
-          !!(pos?.shopifyClientSecretConfigured || pos?.shopifyStorefrontTokenConfigured)
-        );
+        setShopifyClientSecretConfigured(!!pos?.shopifyClientSecretConfigured);
+        setShopifyStorefrontTokenConfigured(!!pos?.shopifyStorefrontTokenConfigured);
         setLastProductSyncAt(pos?.lastProductSyncAt ?? null);
         setLastCronProductSyncAt(pos?.lastCronProductSyncAt ?? null);
         setPosIntegrationLastActivityAt(pos?.posIntegrationLastActivityAt ?? null);
@@ -226,6 +247,10 @@ export default function AdminSettingsPage() {
         setProductSyncIntervalMinutes(
           typeof pos?.productSyncIntervalMinutes === 'number' ? pos.productSyncIntervalMinutes : 30
         );
+        const lowStock =
+          typeof shopDisplay?.lowStockThreshold === 'number' ? shopDisplay.lowStockThreshold : 5;
+        setShopLowStockThreshold(Math.min(999, Math.max(0, lowStock)));
+        setShopShowInStockWhenAboveThreshold(shopDisplay?.showInStockWhenAboveThreshold !== false);
         setInitialSnapshot({
           primaryColor: branding?.primaryColor || '#1B4D7A',
           secondaryColor: branding?.secondaryColor || '#E8A832',
@@ -239,10 +264,13 @@ export default function AdminSettingsPage() {
           posType: pos?.posType ?? '',
           shopifyStoreUrl: pos?.shopifyStoreUrl ?? '',
           shopifyAdminTokenDraft: '',
-          shopifyStorefrontTokenDraft: '',
+          shopifyClientSecretDraft: '',
+          shopifyStorefrontAccessTokenDraft: '',
           shopifyCatalogSyncEnabled: !!pos?.shopifyCatalogSyncEnabled,
           productSyncIntervalMinutes:
             typeof pos?.productSyncIntervalMinutes === 'number' ? pos.productSyncIntervalMinutes : 30,
+          shopLowStockThreshold: Math.min(999, Math.max(0, lowStock)),
+          shopShowInStockWhenAboveThreshold: shopDisplay?.showInStockWhenAboveThreshold !== false,
         });
       } catch (e: unknown) {
         setError(getErrorMessage(e, 'Failed to load settings'));
@@ -270,6 +298,10 @@ export default function AdminSettingsPage() {
           email: dealerEmail.trim() || null,
           hours: dealerHours.trim() || null,
         },
+        shopDisplay: {
+          lowStockThreshold: Math.min(999, Math.max(0, Math.trunc(shopLowStockThreshold))),
+          showInStockWhenAboveThreshold: shopShowInStockWhenAboveThreshold,
+        },
       }) as SettingsResponse;
 
       if (res?.success) {
@@ -287,6 +319,8 @@ export default function AdminSettingsPage() {
                 dealerAddress,
                 dealerEmail,
                 dealerHours,
+                shopLowStockThreshold: Math.min(999, Math.max(0, Math.trunc(shopLowStockThreshold))),
+                shopShowInStockWhenAboveThreshold,
               }
             : prev
         );
@@ -310,7 +344,10 @@ export default function AdminSettingsPage() {
         shopifyStoreUrl: shopifyStoreUrl.trim() || null,
       };
       if (shopifyAdminTokenDraft.trim()) payload.shopifyClientId = shopifyAdminTokenDraft.trim();
-      if (shopifyStorefrontTokenDraft.trim()) payload.shopifyClientSecret = shopifyStorefrontTokenDraft.trim();
+      if (shopifyClientSecretDraft.trim()) payload.shopifyClientSecret = shopifyClientSecretDraft.trim();
+      if (shopifyStorefrontAccessTokenDraft.trim()) {
+        payload.shopifyStorefrontToken = shopifyStorefrontAccessTokenDraft.trim();
+      }
       if (posType === 'shopify') {
         payload.shopifyCatalogSyncEnabled = shopifyCatalogSyncEnabled;
         payload.productSyncIntervalMinutes = productSyncIntervalMinutes;
@@ -320,13 +357,13 @@ export default function AdminSettingsPage() {
       if (res?.success) {
         setPosSuccess(res.message ?? 'POS configuration saved');
         setShopifyAdminTokenDraft('');
-        setShopifyStorefrontTokenDraft('');
+        setShopifyClientSecretDraft('');
+        setShopifyStorefrontAccessTokenDraft('');
         setShopifyAdminTokenConfigured(
           !!(res.data?.shopifyClientId || res.data?.shopifyAdminTokenConfigured)
         );
-        setShopifyStorefrontTokenConfigured(
-          !!(res.data?.shopifyClientSecretConfigured || res.data?.shopifyStorefrontTokenConfigured)
-        );
+        setShopifyClientSecretConfigured(!!res.data?.shopifyClientSecretConfigured);
+        setShopifyStorefrontTokenConfigured(!!res.data?.shopifyStorefrontTokenConfigured);
         setLastProductSyncAt(res.data?.lastProductSyncAt ?? null);
         setLastCronProductSyncAt(res.data?.lastCronProductSyncAt ?? null);
         setPosIntegrationLastActivityAt(res.data?.posIntegrationLastActivityAt ?? null);
@@ -341,7 +378,8 @@ export default function AdminSettingsPage() {
                 posType: res.data?.posType ?? posType,
                 shopifyStoreUrl: res.data?.shopifyStoreUrl ?? shopifyStoreUrl,
                 shopifyAdminTokenDraft: '',
-                shopifyStorefrontTokenDraft: '',
+                shopifyClientSecretDraft: '',
+                shopifyStorefrontAccessTokenDraft: '',
                 shopifyCatalogSyncEnabled: !!res.data?.shopifyCatalogSyncEnabled,
                 productSyncIntervalMinutes:
                   typeof res.data?.productSyncIntervalMinutes === 'number'
@@ -690,6 +728,56 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
+        <div className="border-t border-gray-100 pt-4 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Shop (mobile app)</h3>
+            <p className="text-xs text-gray-500 mt-1">
+              Product detail screen: when inventory is at or below the threshold, customers see how many are left.
+              Above the threshold, you can show a generic &quot;In stock&quot; line or hide it.
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Show remaining count when quantity is at most…
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={999}
+              className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2"
+              value={shopLowStockThreshold}
+              onChange={(e) => {
+                setUnsavedChanges(true);
+                const raw = e.target.value;
+                if (raw === '') {
+                  setShopLowStockThreshold(5);
+                  return;
+                }
+                const v = parseInt(raw, 10);
+                if (Number.isFinite(v)) setShopLowStockThreshold(Math.min(999, Math.max(0, v)));
+              }}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Default 5: e.g. stock 3 shows &quot;Only 3 left&quot;, stock 10 shows &quot;In stock&quot; (if enabled below).
+              Use 0 to never show the low-stock warning for in-stock items.
+            </p>
+          </div>
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-1 rounded border-gray-300"
+              checked={shopShowInStockWhenAboveThreshold}
+              onChange={(e) => {
+                setUnsavedChanges(true);
+                setShopShowInStockWhenAboveThreshold(e.target.checked);
+              }}
+            />
+            <span className="text-sm text-gray-700">
+              When quantity is above that threshold, show &quot;In stock&quot; (uncheck to show nothing)
+            </span>
+          </label>
+        </div>
+
         <div className="flex items-center gap-3 pt-2">
           <Button type="button" loading={saving} onClick={handleSave}>
             Save Settings
@@ -756,18 +844,41 @@ export default function AdminSettingsPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Shopify Client Secret</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Shopify Client Secret (OAuth)</label>
           <input
             className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
             type="password"
-            value={shopifyStorefrontTokenDraft}
-            onChange={(e) => setShopifyStorefrontTokenDraft(e.target.value)}
+            value={shopifyClientSecretDraft}
+            onChange={(e) => setShopifyClientSecretDraft(e.target.value)}
             disabled={posSaving || posTesting || posType !== 'shopify'}
             placeholder="Paste a new Client Secret to replace the stored value"
             autoComplete="new-password"
           />
           <p className="mt-1 text-xs text-gray-500">
-            {shopifyStorefrontTokenConfigured ? 'Configured.' : 'Not configured.'} This value is write-only after save.
+            {shopifyClientSecretConfigured ? 'Configured.' : 'Not configured.'} Used for Admin API / webhooks (custom
+            app). Write-only after save.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Storefront API access token</label>
+          <input
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
+            type="password"
+            value={shopifyStorefrontAccessTokenDraft}
+            onChange={(e) => setShopifyStorefrontAccessTokenDraft(e.target.value)}
+            disabled={posSaving || posTesting || posType !== 'shopify'}
+            placeholder="From Headless / Storefront API (cart & checkout in the app)"
+            autoComplete="new-password"
+          />
+          <p className="mt-1 text-xs text-gray-600">
+            Required for <strong className="font-medium">Add to cart</strong> and checkout in the mobile app. Create a
+            separate Storefront API token in Shopify Admin (Settings → Apps → Develop apps → your app → API credentials →
+            Storefront API), with scopes for unauthenticated cart (e.g. <code className="text-xs">unauthenticated_write_checkouts</code>
+            , <code className="text-xs">unauthenticated_read_product_listings</code> as needed).
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            {shopifyStorefrontTokenConfigured ? 'Configured.' : 'Not configured.'} Write-only after save.
           </p>
         </div>
 

@@ -17,9 +17,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import api from '../../../services/api';
 import { formatProductPriceCents } from '../../../lib/formatProductPrice';
 import { fetchProductDetail, type ProductDetail, type ShopCompatibility } from '../../../services/shop';
+import { messageFromApiReject } from '../../../services/cart';
 import { useTheme } from '../../../theme/ThemeProvider';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCart } from '../../../contexts/CartContext';
+import { useTenant } from '../../../contexts/TenantContext';
+import { productDetailStockLine } from '../../../lib/formatProductStock';
 
 type SpaProfile = { id: string; isPrimary?: boolean };
 
@@ -78,6 +81,7 @@ export default function ProductDetailScreen() {
   const { width } = Dimensions.get('window');
   const router = useRouter();
   const { user } = useAuth();
+  const { config: tenantConfig } = useTenant();
   const { addToCart } = useCart();
   const params = useLocalSearchParams<{ id: string }>();
   const [spaProfileId, setSpaProfileId] = useState<string | undefined>(undefined);
@@ -151,6 +155,7 @@ export default function ProductDetailScreen() {
     product.compare_at_price != null &&
     Number(product.compare_at_price) > Number(product.price);
   const stock = product.inventory_quantity ?? 0;
+  const stockLine = productDetailStockLine(stock, tenantConfig?.shop ?? null);
 
   const handleAddToCart = async () => {
     if (!user) {
@@ -172,7 +177,7 @@ export default function ProductDetailScreen() {
         { text: 'View cart', onPress: () => router.push('/(tabs)/shop/cart') },
       ]);
     } catch (e) {
-      Alert.alert('Cart', e instanceof Error ? e.message : 'Could not add to cart.');
+      Alert.alert('Cart', messageFromApiReject(e, 'Could not add to cart.'));
     } finally {
       setAddingCart(false);
     }
@@ -232,9 +237,9 @@ export default function ProductDetailScreen() {
         ) : null}
       </View>
 
-      <Text style={{ color: colors.textSecondary, marginBottom: 8 }}>
-        {stock <= 0 ? 'Out of stock' : stock <= 5 ? `Only ${stock} left` : 'In stock'}
-      </Text>
+      {stockLine ? (
+        <Text style={{ color: colors.textSecondary, marginBottom: 8 }}>{stockLine}</Text>
+      ) : null}
 
       {descHtml ? (
         <RenderHtml

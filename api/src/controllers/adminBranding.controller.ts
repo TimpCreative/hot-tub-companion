@@ -34,6 +34,16 @@ function mapDealerContact(row: any) {
   };
 }
 
+/** PDP inventory line: "Only N left" when quantity ≤ threshold; above that optional "In stock". */
+function mapShopDisplay(row: any) {
+  const t = row.shop_low_stock_threshold;
+  const threshold = typeof t === 'number' && Number.isFinite(t) ? Math.min(999, Math.max(0, Math.trunc(t))) : 5;
+  return {
+    lowStockThreshold: threshold,
+    showInStockWhenAboveThreshold: row.shop_show_in_stock_label !== false,
+  };
+}
+
 export async function getBranding(req: Request, res: Response): Promise<void> {
   if (!requireManageSettings(req, res)) return;
   const tenantId = (req as any).tenant?.id as string | undefined;
@@ -48,7 +58,11 @@ export async function getBranding(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  success(res, { branding: mapBranding(tenant), dealerContact: mapDealerContact(tenant) });
+  success(res, {
+    branding: mapBranding(tenant),
+    dealerContact: mapDealerContact(tenant),
+    shopDisplay: mapShopDisplay(tenant),
+  });
 }
 
 export async function updateBranding(req: Request, res: Response): Promise<void> {
@@ -72,6 +86,10 @@ export async function updateBranding(req: Request, res: Response): Promise<void>
       address?: string | null;
       email?: string | null;
       hours?: string | null;
+    };
+    shopDisplay?: {
+      lowStockThreshold?: number;
+      showInStockWhenAboveThreshold?: boolean;
     };
   };
 
@@ -100,12 +118,33 @@ export async function updateBranding(req: Request, res: Response): Promise<void>
       body.dealerContact.hours === null || body.dealerContact.hours === '' ? null : String(body.dealerContact.hours).trim().slice(0, 2000);
   }
 
+  if (body.shopDisplay?.lowStockThreshold !== undefined) {
+    const raw = body.shopDisplay.lowStockThreshold;
+    const n = typeof raw === 'number' ? raw : parseInt(String(raw), 10);
+    if (!Number.isFinite(n) || n < 0 || n > 999) {
+      error(res, 'VALIDATION_ERROR', 'shopDisplay.lowStockThreshold must be an integer from 0 to 999', 400);
+      return;
+    }
+    update.shop_low_stock_threshold = Math.trunc(n);
+  }
+  if (body.shopDisplay?.showInStockWhenAboveThreshold !== undefined) {
+    update.shop_show_in_stock_label = !!body.shopDisplay.showInStockWhenAboveThreshold;
+  }
+
   if (Object.keys(update).length === 0) {
     error(res, 'VALIDATION_ERROR', 'No settings fields provided', 400);
     return;
   }
 
   const [updated] = await db('tenants').where({ id: tenantId }).update(update).returning('*');
-  success(res, { branding: mapBranding(updated), dealerContact: mapDealerContact(updated) }, 'Settings updated');
+  success(
+    res,
+    {
+      branding: mapBranding(updated),
+      dealerContact: mapDealerContact(updated),
+      shopDisplay: mapShopDisplay(updated),
+    },
+    'Settings updated'
+  );
 }
 

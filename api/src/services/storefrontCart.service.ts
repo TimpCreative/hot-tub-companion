@@ -5,6 +5,10 @@ import { toStorefrontVariantGid } from '../utils/storefrontVariantGid';
 
 const STOREFRONT_API_VERSION = '2025-01';
 
+/** Shown when `shopify_storefront_token` or shop URL is missing after decrypt. */
+const MSG_STOREFRONT_NOT_CONFIGURED =
+  'Storefront checkout is not set up for this dealer. In Retailer Admin → Settings → POS Integration, add your Shopify Storefront API access token and save. The token comes from a Custom app (Headless channel) with Cart permissions.';
+
 export class StorefrontCartError extends Error {
   code: 'COMMERCE_UNAVAILABLE' | 'STOREFRONT_ERROR' | 'NOT_FOUND' | 'BAD_REQUEST';
 
@@ -147,14 +151,18 @@ function userErrorsMessage(errors: unknown): string {
     .join('; ');
 }
 
-export async function assertCommerceAvailable(tenantId: string): Promise<void> {
+type StorefrontCreds = NonNullable<Awaited<ReturnType<typeof loadStorefrontCredentials>>>;
+
+async function requireStorefrontCredentials(tenantId: string): Promise<StorefrontCreds> {
   const creds = await loadStorefrontCredentials(tenantId);
   if (!creds) {
-    throw new StorefrontCartError(
-      'COMMERCE_UNAVAILABLE',
-      'Storefront checkout is not configured for this dealer.'
-    );
+    throw new StorefrontCartError('COMMERCE_UNAVAILABLE', MSG_STOREFRONT_NOT_CONFIGURED);
   }
+  return creds;
+}
+
+export async function assertCommerceAvailable(tenantId: string): Promise<void> {
+  await requireStorefrontCredentials(tenantId);
 }
 
 async function getStoredCartId(tenantId: string, userId: string): Promise<string | null> {
@@ -225,10 +233,7 @@ async function createEmptyCart(creds: { shopDomain: string; token: string }): Pr
 export async function getOrCreateCart(tenantId: string, userId: string): Promise<CartDto> {
   const creds = await loadStorefrontCredentials(tenantId);
   if (!creds) {
-    throw new StorefrontCartError(
-      'COMMERCE_UNAVAILABLE',
-      'Storefront checkout is not configured for this dealer.'
-    );
+    throw new StorefrontCartError('COMMERCE_UNAVAILABLE', MSG_STOREFRONT_NOT_CONFIGURED);
   }
 
   const stored = await getStoredCartId(tenantId, userId);
@@ -248,7 +253,7 @@ export async function getCart(tenantId: string, userId: string): Promise<CartDto
   if (!creds) {
     throw new StorefrontCartError(
       'COMMERCE_UNAVAILABLE',
-      'Storefront checkout is not configured for this dealer.'
+      MSG_STOREFRONT_NOT_CONFIGURED
     );
   }
   const stored = await getStoredCartId(tenantId, userId);
@@ -268,10 +273,10 @@ export type ResolvedPosProduct = {
   inventoryQuantity: number;
 };
 
-export async function resolvePurchasableProduct(
+async function requirePurchasablePosProduct(
   tenantId: string,
   posProductId: string
-): Promise<ResolvedPosProduct | null> {
+): Promise<ResolvedPosProduct> {
   const row = (await db('pos_products')
     .select('id', 'title', 'pos_variant_id', 'inventory_quantity', 'is_hidden', 'mapping_status')
     .where({ tenant_id: tenantId, id: posProductId })
@@ -283,12 +288,35 @@ export async function resolvePurchasableProduct(
     is_hidden: boolean;
     mapping_status: string | null;
   } | undefined;
-  if (!row) return null;
-  if (row.is_hidden || row.mapping_status !== 'confirmed') return null;
+  if (!row) {
+    throw new StorefrontCartError('NOT_FOUND', 'This product is not in your shop catalog.');
+  }
+  if (row.is_hidden) {
+    throw new StorefrontCartError(
+      'NOT_FOUND',
+      'This product is hidden from the shop. Unhide it in retailer admin if customers should purchase it.'
+    );
+  }
+  if (row.mapping_status !== 'confirmed') {
+    throw new StorefrontCartError(
+      'NOT_FOUND',
+      `This product is not cleared for checkout (mapping status: ${row.mapping_status || 'unset'}). Confirm mapping in admin or run a catalog sync from POS settings.`
+    );
+  }
   const gid = toStorefrontVariantGid(row.pos_variant_id);
-  if (!gid) return null;
+  if (!gid) {
+    throw new StorefrontCartError(
+      'NOT_FOUND',
+      'This product has no valid Shopify variant ID. Run a catalog sync from Settings → POS, or ensure pos_variant_id is a numeric variant id (or full ProductVariant GID).'
+    );
+  }
   const inv = typeof row.inventory_quantity === 'number' ? row.inventory_quantity : 0;
-  if (inv <= 0) return null;
+  if (inv <= 0) {
+    throw new StorefrontCartError(
+      'NOT_FOUND',
+      'This product has no sellable inventory in the app. Sync inventory from Shopify or update stock in admin.'
+    );
+  }
   return {
     posProductId: row.id,
     title: row.title || 'Product',
@@ -306,17 +334,10 @@ export async function addCartLine(
   if (!Number.isFinite(quantity) || quantity < 1 || quantity > 99) {
     throw new StorefrontCartError('BAD_REQUEST', 'Quantity must be between 1 and 99');
   }
-  const resolved = await resolvePurchasableProduct(tenantId, posProductId);
-  if (!resolved) {
-    throw new StorefrontCartError('NOT_FOUND', 'Product is not available for purchase');
-  }
+  const creds = await requireStorefrontCredentials(tenantId);
+  const resolved = await requirePurchasablePosProduct(tenantId, posProductId);
   if (quantity > resolved.inventoryQuantity) {
     throw new StorefrontCartError('BAD_REQUEST', 'Not enough stock available');
-  }
-
-  const creds = await loadStorefrontCredentials(tenantId);
-  if (!creds) {
-    throw new StorefrontCartError('COMMERCE_UNAVAILABLE', 'Storefront checkout is not configured for this dealer.');
   }
 
   let cart = await getOrCreateCart(tenantId, userId);
@@ -377,7 +398,7 @@ export async function updateCartLineQuantity(
   }
   const creds = await loadStorefrontCredentials(tenantId);
   if (!creds) {
-    throw new StorefrontCartError('COMMERCE_UNAVAILABLE', 'Storefront checkout is not configured for this dealer.');
+    throw new StorefrontCartError('COMMERCE_UNAVAILABLE', MSG_STOREFRONT_NOT_CONFIGURED);
   }
   const stored = await getStoredCartId(tenantId, userId);
   if (!stored) {
@@ -414,7 +435,7 @@ export async function removeCartLine(tenantId: string, userId: string, lineId: s
   }
   const creds = await loadStorefrontCredentials(tenantId);
   if (!creds) {
-    throw new StorefrontCartError('COMMERCE_UNAVAILABLE', 'Storefront checkout is not configured for this dealer.');
+    throw new StorefrontCartError('COMMERCE_UNAVAILABLE', MSG_STOREFRONT_NOT_CONFIGURED);
   }
   const stored = await getStoredCartId(tenantId, userId);
   if (!stored) {
