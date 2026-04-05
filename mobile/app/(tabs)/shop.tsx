@@ -60,13 +60,8 @@ function clamp(n: number, lo: number, hi: number): number {
 
 const PAGE_SIZE = 20;
 const { width: SCREEN_W } = Dimensions.get('window');
-
-type DraftFilters = {
-  includeOtherSpaParts: boolean;
-  includeGeneralStore: boolean;
-  hideOutOfStock: boolean;
-  categoryKey: string | null;
-};
+/** Horizontal inset so thumbs are not flush with the panel edge. */
+const SLIDER_SIDE_GUTTER = 22;
 
 const DEFAULT_APPLIED = {
   includeOtherSpaParts: false,
@@ -108,17 +103,16 @@ export default function Shop() {
 
   const [applied, setApplied] = useState({ ...DEFAULT_APPLIED });
   const [filterOpen, setFilterOpen] = useState(false);
-  const [draft, setDraft] = useState<DraftFilters>(() => ({
-    includeOtherSpaParts: DEFAULT_APPLIED.includeOtherSpaParts,
-    includeGeneralStore: DEFAULT_APPLIED.includeGeneralStore,
-    hideOutOfStock: DEFAULT_APPLIED.hideOutOfStock,
-    categoryKey: DEFAULT_APPLIED.categoryKey,
-  }));
   const [priceBounds, setPriceBounds] = useState<{ min: number; max: number } | null>(null);
   const [boundsLoading, setBoundsLoading] = useState(false);
-  const [draftPriceRange, setDraftPriceRange] = useState<[number, number]>([0, 0]);
+  /** Slider thumbs (updates while dragging; price commits on release). */
+  const [sliderValues, setSliderValues] = useState<[number, number]>([0, 0]);
   const [sliderTrackWidth, setSliderTrackWidth] = useState(280);
+  /** Disable filter sheet scroll while dragging price so the list does not steal the gesture. */
+  const [priceSliderDragging, setPriceSliderDragging] = useState(false);
+  /** First bounds response after opening the panel: preserve/clamp existing price filter. */
   const priceInitPendingRef = useRef(false);
+  const boundsGenerationRef = useRef(0);
   const appliedRef = useRef(applied);
   appliedRef.current = applied;
 
@@ -131,23 +125,19 @@ export default function Shop() {
 
   const openFilters = useCallback(() => {
     priceInitPendingRef.current = true;
-    setDraft({
-      includeOtherSpaParts: applied.includeOtherSpaParts,
-      includeGeneralStore: applied.includeGeneralStore,
-      hideOutOfStock: applied.hideOutOfStock,
-      categoryKey: applied.categoryKey,
-    });
+    setPriceSliderDragging(false);
     setPriceBounds(null);
-    setDraftPriceRange([0, 0]);
+    setSliderValues([0, 0]);
     panelX.setValue(SCREEN_W);
     setFilterOpen(true);
     requestAnimationFrame(() => {
       Animated.spring(panelX, { toValue: 0, useNativeDriver: true, friction: 9 }).start();
     });
-  }, [applied, panelX]);
+  }, [panelX]);
 
   const closeFilters = useCallback(() => {
     priceInitPendingRef.current = false;
+    setPriceSliderDragging(false);
     Animated.timing(panelX, { toValue: SCREEN_W, duration: 220, useNativeDriver: true }).start(() =>
       setFilterOpen(false)
     );
@@ -155,24 +145,25 @@ export default function Shop() {
 
   useEffect(() => {
     if (!filterOpen) return;
+    const gen = ++boundsGenerationRef.current;
     let cancelled = false;
     setBoundsLoading(true);
     (async () => {
       try {
         const res = await fetchShopPriceBounds({
           spaProfileId,
-          includeOtherSpaParts: draft.includeOtherSpaParts,
-          includeGeneralStore: draft.includeGeneralStore,
-          hideOutOfStock: draft.hideOutOfStock,
-          categoryKey: draft.categoryKey,
+          includeOtherSpaParts: applied.includeOtherSpaParts,
+          includeGeneralStore: applied.includeGeneralStore,
+          hideOutOfStock: applied.hideOutOfStock,
+          categoryKey: applied.categoryKey,
           search: debouncedSearch,
         });
-        if (cancelled) return;
+        if (cancelled || gen !== boundsGenerationRef.current) return;
         const minRaw = res.data?.minCents;
         const maxRaw = res.data?.maxCents;
         if (minRaw == null || maxRaw == null) {
           setPriceBounds(null);
-          setDraftPriceRange([0, 0]);
+          setSliderValues([0, 0]);
           priceInitPendingRef.current = false;
           return;
         }
@@ -181,27 +172,47 @@ export default function Shop() {
         setPriceBounds({ min: lo, max: hi });
 
         const appliedSnap = appliedRef.current;
-        const initFromApplied = priceInitPendingRef.current;
-        if (initFromApplied) {
+        const initFromOpen = priceInitPendingRef.current;
+        if (initFromOpen) {
           priceInitPendingRef.current = false;
-          if (appliedSnap.priceMinCents == null && appliedSnap.priceMaxCents == null) {
-            setDraftPriceRange([lo, hi]);
+          let low: number;
+          let high: number;
+          if (lo === hi) {
+            low = lo;
+            high = hi;
+          } else if (appliedSnap.priceMinCents == null && appliedSnap.priceMaxCents == null) {
+            low = lo;
+            high = hi;
           } else {
             const a = clamp(appliedSnap.priceMinCents ?? lo, lo, hi);
             const b = clamp(appliedSnap.priceMaxCents ?? hi, lo, hi);
-            setDraftPriceRange([Math.min(a, b), Math.max(a, b)]);
+            low = Math.min(a, b);
+            high = Math.max(a, b);
           }
+          setSliderValues([low, high]);
+          const coversAll = lo < hi && low <= lo && high >= hi;
+          const clearPrice = lo === hi || coversAll;
+          setApplied((prev) => ({
+            ...prev,
+            priceMinCents: clearPrice ? undefined : low,
+            priceMaxCents: clearPrice ? undefined : high,
+          }));
         } else {
-          setDraftPriceRange([lo, hi]);
+          setSliderValues([lo, hi]);
+          setApplied((prev) => ({
+            ...prev,
+            priceMinCents: undefined,
+            priceMaxCents: undefined,
+          }));
         }
       } catch {
-        if (!cancelled) {
+        if (!cancelled && gen === boundsGenerationRef.current) {
           setPriceBounds(null);
-          setDraftPriceRange([0, 0]);
+          setSliderValues([0, 0]);
           priceInitPendingRef.current = false;
         }
       } finally {
-        if (!cancelled) setBoundsLoading(false);
+        if (!cancelled && gen === boundsGenerationRef.current) setBoundsLoading(false);
       }
     })();
     return () => {
@@ -210,46 +221,40 @@ export default function Shop() {
   }, [
     filterOpen,
     spaProfileId,
-    draft.includeOtherSpaParts,
-    draft.includeGeneralStore,
-    draft.hideOutOfStock,
-    draft.categoryKey,
+    applied.includeOtherSpaParts,
+    applied.includeGeneralStore,
+    applied.hideOutOfStock,
+    applied.categoryKey,
     debouncedSearch,
   ]);
 
-  const applyFilters = useCallback(() => {
-    let priceMinCents: number | undefined;
-    let priceMaxCents: number | undefined;
-    if (priceBounds) {
+  const commitPriceFromSlider = useCallback(
+    (vals: number[]) => {
+      if (!priceBounds) return;
       const { min, max } = priceBounds;
-      const low = Math.min(draftPriceRange[0], draftPriceRange[1]);
-      const high = Math.max(draftPriceRange[0], draftPriceRange[1]);
+      const low = Math.min(vals[0] ?? min, vals[1] ?? max);
+      const high = Math.max(vals[0] ?? min, vals[1] ?? max);
       const coversAll = low <= min && high >= max;
-      if (!coversAll) {
-        priceMinCents = low;
-        priceMaxCents = high;
-      }
-    }
-    setApplied({
-      includeOtherSpaParts: draft.includeOtherSpaParts,
-      includeGeneralStore: draft.includeGeneralStore,
-      hideOutOfStock: draft.hideOutOfStock,
-      priceMinCents,
-      priceMaxCents,
-      categoryKey: draft.categoryKey,
-    });
-    closeFilters();
-  }, [draft, closeFilters, draftPriceRange, priceBounds]);
+      setApplied((prev) => ({
+        ...prev,
+        priceMinCents: coversAll ? undefined : low,
+        priceMaxCents: coversAll ? undefined : high,
+      }));
+    },
+    [priceBounds]
+  );
+
+  const onPriceSliderFinish = useCallback(
+    (vals: number[]) => {
+      setPriceSliderDragging(false);
+      commitPriceFromSlider(vals);
+    },
+    [commitPriceFromSlider]
+  );
 
   const clearAllFilters = useCallback(() => {
     setApplied({ ...DEFAULT_APPLIED });
-    setDraft({
-      includeOtherSpaParts: false,
-      includeGeneralStore: true,
-      hideOutOfStock: true,
-      categoryKey: null,
-    });
-    setDraftPriceRange([0, 0]);
+    setSliderValues([0, 0]);
     closeFilters();
   }, [closeFilters]);
 
@@ -413,8 +418,8 @@ export default function Shop() {
 
   const listHeader = useMemo(
     () => (
-      <View style={{ paddingBottom: spacing.md }}>
-        <AppHeroHeader icon="cart-outline" title="Shop" />
+      <View>
+        <AppHeroHeader icon="cart-outline" title="Shop" subtitle="Browse products" />
         <View style={styles.searchRow}>
           <TextInput
             value={search}
@@ -437,10 +442,10 @@ export default function Shop() {
             <Ionicons name="menu-outline" size={26} color={colors.primary} />
           </Pressable>
         </View>
-        {error ? <Text style={{ color: '#b91c1c', marginTop: 8, paddingHorizontal: 0 }}>{error}</Text> : null}
+        {error ? <Text style={{ color: '#b91c1c', marginTop: 8 }}>{error}</Text> : null}
       </View>
     ),
-    [spacing.md, search, colors, openFilters, error]
+    [search, colors, openFilters, error]
   );
 
   const priceBoundsSingle = priceBounds != null && priceBounds.min === priceBounds.max;
@@ -455,7 +460,7 @@ export default function Shop() {
         keyExtractor={(it) => it.id}
         numColumns={2}
         columnWrapperStyle={{ justifyContent: 'space-between' }}
-        contentContainerStyle={[styles.listContent, { paddingBottom: 32 + insets.bottom }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: 24 + insets.bottom }]}
         ListHeaderComponent={listHeader}
         ListFooterComponent={loadingMore ? <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} /> : null}
         ListEmptyComponent={
@@ -496,21 +501,36 @@ export default function Shop() {
                   <Ionicons name="close" size={28} color={colors.text} />
                 </Pressable>
               </View>
-              <ScrollView style={styles.filterScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <ScrollView
+                style={styles.filterScroll}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={!priceSliderDragging}
+                nestedScrollEnabled
+              >
                 <Text style={[styles.filterSectionLabel, { color: colors.textMuted }]}>Compatibility</Text>
                 <View style={styles.toggleRow}>
                   <Text style={[typography.body, { color: colors.text, flex: 1 }]}>Include parts for other spa models</Text>
-                  <Switch value={draft.includeOtherSpaParts} onValueChange={(v) => setDraft((d) => ({ ...d, includeOtherSpaParts: v }))} />
+                  <Switch
+                    value={applied.includeOtherSpaParts}
+                    onValueChange={(v) => setApplied((prev) => ({ ...prev, includeOtherSpaParts: v }))}
+                  />
                 </View>
                 <View style={styles.toggleRow}>
                   <Text style={[typography.body, { color: colors.text, flex: 1 }]}>Include general store products</Text>
-                  <Switch value={draft.includeGeneralStore} onValueChange={(v) => setDraft((d) => ({ ...d, includeGeneralStore: v }))} />
+                  <Switch
+                    value={applied.includeGeneralStore}
+                    onValueChange={(v) => setApplied((prev) => ({ ...prev, includeGeneralStore: v }))}
+                  />
                 </View>
 
                 <Text style={[styles.filterSectionLabel, { color: colors.textMuted, marginTop: 8 }]}>Inventory</Text>
                 <View style={styles.toggleRow}>
                   <Text style={[typography.body, { color: colors.text, flex: 1 }]}>Hide out of stock</Text>
-                  <Switch value={draft.hideOutOfStock} onValueChange={(v) => setDraft((d) => ({ ...d, hideOutOfStock: v }))} />
+                  <Switch
+                    value={applied.hideOutOfStock}
+                    onValueChange={(v) => setApplied((prev) => ({ ...prev, hideOutOfStock: v }))}
+                  />
                 </View>
 
                 <Text style={[styles.filterSectionLabel, { color: colors.textMuted, marginTop: 8 }]}>Price</Text>
@@ -529,52 +549,100 @@ export default function Shop() {
                     No priced products for this combination of filters.
                   </Text>
                 ) : (
-                  <View
-                    style={styles.sliderBlock}
-                    onLayout={(e) => {
-                      const w = e.nativeEvent.layout.width;
-                      if (w > 40) setSliderTrackWidth(Math.floor(w));
-                    }}
-                  >
-                    <MultiSlider
-                      key={`${priceBounds.min}-${priceBounds.max}`}
-                      values={[draftPriceRange[0], draftPriceRange[1]]}
-                      onValuesChange={(vals) =>
-                        setDraftPriceRange([vals[0] ?? priceBounds.min, vals[1] ?? priceBounds.max])
-                      }
-                      min={priceBounds.min}
-                      max={priceBounds.max}
-                      step={1}
-                      allowOverlap={false}
-                      snapped
-                      minMarkerOverlapDistance={12}
-                      sliderLength={Math.max(160, sliderTrackWidth)}
-                      selectedStyle={{ backgroundColor: colors.primary }}
-                      unselectedStyle={{ backgroundColor: colors.border }}
-                      markerStyle={{
-                        height: 28,
-                        width: 28,
-                        borderRadius: 14,
-                        backgroundColor: '#fff',
-                        borderWidth: 2,
-                        borderColor: colors.primary,
-                      }}
-                      pressedMarkerStyle={{
-                        height: 30,
-                        width: 30,
-                        borderRadius: 15,
-                        backgroundColor: '#fff',
-                        borderWidth: 2,
-                        borderColor: colors.primary,
-                      }}
-                      containerStyle={{ marginBottom: 8 }}
-                    />
-                    <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 4 }]}>
-                      {formatProductPriceCents(Math.min(draftPriceRange[0], draftPriceRange[1]))} —{' '}
-                      {formatProductPriceCents(Math.max(draftPriceRange[0], draftPriceRange[1]))}
+                  <View style={[styles.sliderBlock, { paddingHorizontal: SLIDER_SIDE_GUTTER }]}>
+                    <Text style={[typography.caption, { color: colors.textMuted, marginBottom: 10 }]}>
+                      Available in this set:{' '}
+                      <Text style={{ fontWeight: '600', color: colors.textSecondary }}>
+                        {formatProductPriceCents(priceBounds.min)} — {formatProductPriceCents(priceBounds.max)}
+                      </Text>
                     </Text>
-                    <Text style={[typography.caption, { color: colors.textMuted, marginTop: 4 }]}>
-                      Range is based on everything above (and your search). Drag to narrow prices.
+                    <View
+                      onLayout={(e) => {
+                        const w = e.nativeEvent.layout.width;
+                        if (w > 40) setSliderTrackWidth(Math.floor(w));
+                      }}
+                    >
+                      <MultiSlider
+                        key={`${priceBounds.min}-${priceBounds.max}`}
+                        values={[sliderValues[0], sliderValues[1]]}
+                        onValuesChangeStart={() => setPriceSliderDragging(true)}
+                        onValuesChange={(vals) =>
+                          setSliderValues([vals[0] ?? priceBounds.min, vals[1] ?? priceBounds.max])
+                        }
+                        onValuesChangeFinish={(vals) => onPriceSliderFinish(vals)}
+                        min={priceBounds.min}
+                        max={priceBounds.max}
+                        step={1}
+                        allowOverlap={false}
+                        snapped
+                        minMarkerOverlapDistance={12}
+                        sliderLength={Math.max(160, sliderTrackWidth)}
+                        touchDimensions={{
+                          height: 56,
+                          width: 56,
+                          borderRadius: 28,
+                          slipDisplacement: 280,
+                        }}
+                        trackStyle={{
+                          height: 8,
+                          borderRadius: 4,
+                        }}
+                        selectedStyle={{
+                          backgroundColor: colors.primary,
+                          height: 8,
+                          borderRadius: 4,
+                        }}
+                        unselectedStyle={{
+                          backgroundColor: colors.border,
+                          height: 8,
+                          borderRadius: 4,
+                        }}
+                        markerStyle={{
+                          height: 30,
+                          width: 30,
+                          borderRadius: 15,
+                          backgroundColor: '#fff',
+                          borderWidth: 2,
+                          borderColor: colors.primary,
+                        }}
+                        pressedMarkerStyle={{
+                          height: 32,
+                          width: 32,
+                          borderRadius: 16,
+                          backgroundColor: '#fff',
+                          borderWidth: 2,
+                          borderColor: colors.primary,
+                        }}
+                        containerStyle={{ marginBottom: 4, height: 56, justifyContent: 'center' }}
+                      />
+                    </View>
+                    <View
+                      style={[
+                        styles.priceRangeCallout,
+                        {
+                          backgroundColor: colors.primary + '14',
+                          borderColor: colors.primary + '55',
+                        },
+                      ]}
+                    >
+                      <Text style={[typography.caption, { color: colors.textMuted, marginBottom: 4 }]}>
+                        Selected range
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 22,
+                          fontWeight: '800',
+                          color: colors.primary,
+                          letterSpacing: -0.3,
+                        }}
+                      >
+                        {formatProductPriceCents(Math.min(sliderValues[0], sliderValues[1]))}
+                        <Text style={{ color: colors.textMuted, fontWeight: '600', fontSize: 18 }}> — </Text>
+                        {formatProductPriceCents(Math.max(sliderValues[0], sliderValues[1]))}
+                      </Text>
+                    </View>
+                    <Text style={[typography.caption, { color: colors.textMuted, marginTop: 8 }]}>
+                      Release handles to apply this price range to results.
                     </Text>
                   </View>
                 )}
@@ -582,12 +650,12 @@ export default function Shop() {
                 <Text style={[styles.filterSectionLabel, { color: colors.textMuted, marginTop: 8 }]}>Category</Text>
                 <View style={styles.categoryWrap}>
                   <Pressable
-                    onPress={() => setDraft((d) => ({ ...d, categoryKey: null }))}
+                    onPress={() => setApplied((prev) => ({ ...prev, categoryKey: null }))}
                     style={[
                       styles.pill,
                       {
                         borderColor: colors.border,
-                        backgroundColor: draft.categoryKey === null ? colors.primary + '22' : colors.surface,
+                        backgroundColor: applied.categoryKey === null ? colors.primary + '22' : colors.surface,
                       },
                     ]}
                   >
@@ -595,11 +663,11 @@ export default function Shop() {
                   </Pressable>
                   {categories.map((c) => {
                     const key = c.kind === 'uhtd' ? categoryKeyForUhtdCategory(c.id) : categoryKeyForProductType(c.key);
-                    const sel = draft.categoryKey === key;
+                    const sel = applied.categoryKey === key;
                     return (
                       <Pressable
                         key={`${c.kind}:${c.kind === 'uhtd' ? c.id : c.key}`}
-                        onPress={() => setDraft((d) => ({ ...d, categoryKey: key }))}
+                        onPress={() => setApplied((prev) => ({ ...prev, categoryKey: key }))}
                         style={[
                           styles.pill,
                           {
@@ -621,22 +689,11 @@ export default function Shop() {
                 <Pressable
                   onPress={clearAllFilters}
                   style={({ pressed }) => [
-                    styles.footerBtn,
-                    styles.footerBtnGhost,
+                    styles.footerBtnClear,
                     { borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
                   ]}
                 >
-                  <Text style={[typography.body, { color: colors.text, fontWeight: '600' }]}>Clear</Text>
-                </Pressable>
-                <Pressable
-                  onPress={applyFilters}
-                  style={({ pressed }) => [
-                    styles.footerBtn,
-                    styles.footerBtnPrimary,
-                    { backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1 },
-                  ]}
-                >
-                  <Text style={[typography.body, { color: '#fff', fontWeight: '700' }]}>Apply</Text>
+                  <Text style={[typography.body, { color: colors.text, fontWeight: '600' }]}>Clear all filters</Text>
                 </Pressable>
               </View>
             </Animated.View>
@@ -652,15 +709,16 @@ export default function Shop() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { flex: 1 },
+  /** Match Water Care / Dealer scroll `content` so AppHeroHeader −24 margins align the gradient. */
   listContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
+    padding: 24,
   },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginTop: 4,
+    marginTop: 0,
   },
   search: {
     borderWidth: 1,
@@ -729,7 +787,17 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     gap: 8,
   },
-  sliderBlock: { marginBottom: 8 },
+  sliderBlock: {
+    marginBottom: 8,
+  },
+  priceRangeCallout: {
+    marginTop: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
   categoryWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
   pill: {
     borderWidth: 1,
@@ -739,19 +807,15 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   filterFooter: {
-    flexDirection: 'row',
-    gap: 12,
     paddingHorizontal: 20,
     paddingTop: 14,
     borderTopWidth: 1,
   },
-  footerBtn: {
-    flex: 1,
+  footerBtnClear: {
+    borderWidth: 1,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  footerBtnGhost: { borderWidth: 1 },
-  footerBtnPrimary: {},
 });
