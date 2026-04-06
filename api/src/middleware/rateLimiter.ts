@@ -39,3 +39,12 @@ export const superAdminAnnouncementRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+/** Customer order history reads (abuse-resistant; per IP + tenant still bounded by auth). */
+export const commerceOrdersReadRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many order list requests' } },
+  standardHeaders: true,
+  legacyHeaders: false,
+});

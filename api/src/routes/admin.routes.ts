@@ -67,6 +67,7 @@ router.get('/settings/pos', adminPosController.getPosConfig);
 router.put('/settings/pos', adminPosController.updatePosConfig);
 router.post('/settings/pos/test', adminPosController.testPosConnection);
 router.get('/settings/pos/activity', adminPosController.getPosIntegrationActivity);
+router.get('/settings/pos/health', adminPosController.getPosHealth);
 router.get('/settings/pos/sync/estimate', adminSettingsPosSyncController.getProductSyncEstimate);
 router.post('/settings/pos/sync/batch', adminSettingsPosSyncController.syncProductBatch);
 router.post('/settings/pos/sync/now', adminSettingsPosSyncController.syncCatalogNow);

@@ -109,6 +109,17 @@ export async function fetchShopCategories(params: {
   return res;
 }
 
+export type ProductVariantRow = {
+  id: string;
+  title: string;
+  sku: string | null;
+  price: number;
+  compare_at_price: number | null;
+  inventory_quantity: number;
+  storefrontVariantGid: string | null;
+  isSelected: boolean;
+};
+
 export type ProductDetail = {
   id: string;
   title: string;
@@ -119,6 +130,7 @@ export type ProductDetail = {
   inventory_quantity: number;
   product_type?: string | null;
   shopCompatibility?: ShopCompatibility;
+  variants?: ProductVariantRow[];
   [key: string]: unknown;
 };
 
@@ -126,5 +138,27 @@ export async function fetchProductDetail(productId: string, spaProfileId?: strin
   const res = (await api.get(`/products/${productId}`, {
     params: spaProfileId ? { spaProfileId } : undefined,
   })) as { success?: boolean; data?: ProductDetail };
+  return res;
+}
+
+export async function fetchShopRelatedProducts(
+  productId: string,
+  params: {
+    spaProfileId?: string;
+    limit?: number;
+    includeOtherSpaParts: boolean;
+    includeGeneralStore: boolean;
+    hideOutOfStock: boolean;
+  }
+) {
+  const res = (await api.get(`/products/shop/${productId}/related`, {
+    params: {
+      spaProfileId: params.spaProfileId,
+      limit: params.limit ?? 6,
+      includeOtherSpaParts: params.includeOtherSpaParts,
+      includeGeneralStore: params.includeGeneralStore,
+      hideOutOfStock: params.hideOutOfStock,
+    },
+  })) as { success?: boolean; data?: ShopProductRow[] };
   return res;
 }

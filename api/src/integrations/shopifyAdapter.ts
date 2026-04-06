@@ -12,6 +12,7 @@ import type {
   PosSyncSummary,
   PosSyncError,
 } from '../types/uhtd.types';
+import { fetchWithShopifyTransientRetry } from '../utils/shopifyHttpRetry';
 
 export interface ShopifyProduct {
   id: number;
@@ -95,27 +96,27 @@ async function shopifyFetch(
   const baseUrl = getShopifyBaseUrl(tokenResult.shopDomain);
   const url = `${baseUrl}/admin/api/2025-01${path}`;
 
-  let res = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'X-Shopify-Access-Token': tokenResult.accessToken,
-      'Content-Type': 'application/json',
-    },
-  });
-
-  // Retry once with a forced refresh if the token-exchange path returns stale credentials.
-  if ((res.status === 401 || res.status === 403) && tokenResult.source === 'client_credentials') {
-    const refreshed = await getTenantShopifyAdminAccessToken(tenantId, { forceRefresh: true });
-    res = await fetch(url, {
+  return fetchWithShopifyTransientRetry({ tenantId, label: `GET ${path}` }, async () => {
+    let tr = tokenResult;
+    let res = await fetch(url, {
       method: 'GET',
       headers: {
-        'X-Shopify-Access-Token': refreshed.accessToken,
+        'X-Shopify-Access-Token': tr.accessToken,
         'Content-Type': 'application/json',
       },
     });
-  }
-
-  return res;
+    if ((res.status === 401 || res.status === 403) && tr.source === 'client_credentials') {
+      tr = await getTenantShopifyAdminAccessToken(tenantId, { forceRefresh: true });
+      res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'X-Shopify-Access-Token': tr.accessToken,
+          'Content-Type': 'application/json',
+        },
+      });
+    }
+    return res;
+  });
 }
 
 /**
@@ -142,18 +143,27 @@ export async function shopifyAdminJson(
     init.body = JSON.stringify(body);
   }
 
-  let res = await fetch(url, init);
-  if ((res.status === 401 || res.status === 403) && tokenResult.source === 'client_credentials') {
-    const refreshed = await getTenantShopifyAdminAccessToken(tenantId, { forceRefresh: true });
-    res = await fetch(url, {
+  return fetchWithShopifyTransientRetry({ tenantId, label: `${method} ${path}` }, async () => {
+    let tr = tokenResult;
+    let res = await fetch(url, {
       ...init,
       headers: {
-        'X-Shopify-Access-Token': refreshed.accessToken,
+        'X-Shopify-Access-Token': tr.accessToken,
         'Content-Type': 'application/json',
       },
     });
-  }
-  return res;
+    if ((res.status === 401 || res.status === 403) && tr.source === 'client_credentials') {
+      tr = await getTenantShopifyAdminAccessToken(tenantId, { forceRefresh: true });
+      res = await fetch(url, {
+        ...init,
+        headers: {
+          'X-Shopify-Access-Token': tr.accessToken,
+          'Content-Type': 'application/json',
+        },
+      });
+    }
+    return res;
+  });
 }
 
 /**

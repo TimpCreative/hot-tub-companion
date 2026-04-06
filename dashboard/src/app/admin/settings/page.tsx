@@ -73,6 +73,19 @@ interface PosActivityItem {
   createdAt: string;
 }
 
+interface PosHealthPayload {
+  lastProductSyncAt?: string | null;
+  lastCronProductSyncAt?: string | null;
+  posIntegrationLastActivityAt?: string | null;
+  shopifyCatalogSyncEnabled?: boolean;
+  lastLoggedFailure?: {
+    eventType: string;
+    summary: string;
+    source: string;
+    createdAt: string;
+  } | null;
+}
+
 interface SettingsSnapshot {
   primaryColor: string;
   secondaryColor: string;
@@ -154,6 +167,7 @@ export default function AdminSettingsPage() {
   const [activityTotal, setActivityTotal] = useState(0);
   const [activityPageSize] = useState(15);
   const [activityError, setActivityError] = useState<string | null>(null);
+  const [posHealth, setPosHealth] = useState<PosHealthPayload | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -215,9 +229,12 @@ export default function AdminSettingsPage() {
       setLoading(true);
       setError(null);
       try {
-        const [brandingRes, posRes] = await Promise.all([
+        const [brandingRes, posRes, healthRes] = await Promise.all([
           api.get('/admin/settings/branding') as Promise<SettingsResponse>,
           api.get('/admin/settings/pos') as Promise<PosSettingsResponse>,
+          api.get('/admin/settings/pos/health').catch(() => null) as Promise<
+            { success?: boolean; data?: PosHealthPayload } | null
+          >,
         ]);
         const branding = brandingRes?.data?.branding;
         const dealerContact = brandingRes?.data?.dealerContact;
@@ -243,6 +260,11 @@ export default function AdminSettingsPage() {
         setLastProductSyncAt(pos?.lastProductSyncAt ?? null);
         setLastCronProductSyncAt(pos?.lastCronProductSyncAt ?? null);
         setPosIntegrationLastActivityAt(pos?.posIntegrationLastActivityAt ?? null);
+        if (healthRes?.success && healthRes.data) {
+          setPosHealth(healthRes.data);
+        } else {
+          setPosHealth(null);
+        }
         setShopifyCatalogSyncEnabled(!!pos?.shopifyCatalogSyncEnabled);
         setProductSyncIntervalMinutes(
           typeof pos?.productSyncIntervalMinutes === 'number' ? pos.productSyncIntervalMinutes : 30
@@ -388,6 +410,15 @@ export default function AdminSettingsPage() {
               }
             : prev
         );
+        try {
+          const h = (await api.get('/admin/settings/pos/health')) as {
+            success?: boolean;
+            data?: PosHealthPayload;
+          };
+          if (h?.success && h.data) setPosHealth(h.data);
+        } catch {
+          /* optional snapshot */
+        }
       } else {
         setPosError(res?.error?.message ?? 'Failed to save POS configuration');
       }
@@ -480,6 +511,15 @@ export default function AdminSettingsPage() {
       }
       if (posRes?.data?.posIntegrationLastActivityAt !== undefined) {
         setPosIntegrationLastActivityAt(posRes.data.posIntegrationLastActivityAt ?? null);
+      }
+      try {
+        const h = (await api.get('/admin/settings/pos/health')) as {
+          success?: boolean;
+          data?: PosHealthPayload;
+        };
+        if (h?.success && h.data) setPosHealth(h.data);
+      } catch {
+        /* ignore */
       }
     } catch (err: unknown) {
       failed = true;
@@ -948,6 +988,15 @@ export default function AdminSettingsPage() {
             <p className="text-xs text-gray-500 mt-1">
               Latest webhook, sync, or settings change. Opens a full paginated log.
             </p>
+            {posHealth?.lastLoggedFailure ? (
+              <p className="text-xs text-amber-900 mt-2 rounded-md bg-amber-50 px-2 py-2 border border-amber-200">
+                <span className="font-semibold">Last logged issue</span>{' '}
+                ({new Date(posHealth.lastLoggedFailure.createdAt).toLocaleString()} —{' '}
+                {posHealth.lastLoggedFailure.source}): {posHealth.lastLoggedFailure.summary}
+              </p>
+            ) : posHealth ? (
+              <p className="text-xs text-gray-500 mt-2">No failure-style rows found in the recent activity log.</p>
+            ) : null}
           </div>
         </div>
 

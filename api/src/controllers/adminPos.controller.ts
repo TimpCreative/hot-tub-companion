@@ -60,6 +60,59 @@ export async function getPosIntegrationActivity(req: Request, res: Response): Pr
   });
 }
 
+/** Read-only POS / sync health snapshot for retailer admin dashboards. */
+export async function getPosHealth(req: Request, res: Response): Promise<void> {
+  const tenantId = requireManageSettings(req, res);
+  if (!tenantId) return;
+
+  const t = (await db('tenants')
+    .where({ id: tenantId })
+    .select(
+      'last_product_sync_at',
+      'last_cron_product_sync_at',
+      'pos_integration_last_activity_at',
+      'shopify_catalog_sync_enabled'
+    )
+    .first()) as {
+    last_product_sync_at: Date | string | null;
+    last_cron_product_sync_at: Date | string | null;
+    pos_integration_last_activity_at: Date | string | null;
+    shopify_catalog_sync_enabled: boolean;
+  } | undefined;
+
+  if (!t) {
+    error(res, 'NOT_FOUND', 'Tenant not found', 404);
+    return;
+  }
+
+  const lastFailure = await db('pos_integration_activity')
+    .where({ tenant_id: tenantId })
+    .where((qb) => {
+      qb.whereILike('event_type', '%fail%')
+        .orWhereILike('event_type', '%error%')
+        .orWhereILike('summary', '%fail%')
+        .orWhereILike('summary', '%error%');
+    })
+    .orderBy('created_at', 'desc')
+    .select('event_type', 'summary', 'created_at', 'source')
+    .first();
+
+  success(res, {
+    lastProductSyncAt: t.last_product_sync_at ?? null,
+    lastCronProductSyncAt: t.last_cron_product_sync_at ?? null,
+    posIntegrationLastActivityAt: t.pos_integration_last_activity_at ?? null,
+    shopifyCatalogSyncEnabled: !!t.shopify_catalog_sync_enabled,
+    lastLoggedFailure: lastFailure
+      ? {
+          eventType: lastFailure.event_type as string,
+          summary: lastFailure.summary as string,
+          source: lastFailure.source as string,
+          createdAt: lastFailure.created_at,
+        }
+      : null,
+  });
+}
+
 export async function updatePosConfig(req: Request, res: Response): Promise<void> {
   const tenantId = requireManageSettings(req, res);
   if (!tenantId) return;

@@ -28,7 +28,8 @@ _Updated to match the repository during Phase 3 commerce work._
 - **Shop read APIs** — `GET /products/shop`, `.../shop/categories`, `.../shop/price-bounds` (auth); compatibility via `shopProductCompatibility.service` (incl. rules for parts with no `part_spa_compatibility` rows)
 - **PDP API** — product detail with compatibility for mobile
 - **Cart** — Storefront proxy routes (`cart.routes.ts`, `storefrontCart.service`); variant GID helper; server-persisted cart id per user
-- **Mobile** — Shop (search, filters, list rows + add-to-cart), PDP, cart, **Checkout Kit**
+- **Mobile** — Shop (search, filters, list rows + add-to-cart), PDP (multi-variant + related strip), cart, **Checkout Kit**, **active spa** persistence, checkout lifecycle messaging (webhook SoT)
+- **Orders read API** — `GET /api/v1/orders`, `GET /api/v1/orders/by-shopify/:id` (tenant + user scoped); **Home Recent orders** card
 - **`order_references`** + **`orders/create`** upsert; **webhook idempotency** for orders and catalog via `shopify_webhook_receipts` / `X-Shopify-Webhook-Id`
 - **Push notification** to matched tenant user on order (email match)
 - Dev Dashboard–first tenant onboarding via POS Integration
@@ -52,25 +53,21 @@ _Updated to match the repository during Phase 3 commerce work._
 
 ### Partial
 
-- **Product sync (1.1)** — REST cursor **pagination** (`page_info`) in `shopifyAdapter.ts`; **retry/backoff** and formal large-catalog / archived reconciliation QA still open
-- **PDP** — no **multi-variant** UI; no **related products**
-- **Checkout UX (4.2)** — completion / cancel / fail messaging vs webhook-as-truth can be tightened
-- **Orders (5)** — rows persisted; **no mobile read API** or Home orders card yet
+- **Product sync QA (1.1 / Milestone 6)** — retry/backoff shipped; **execute** large-catalog + archived reconciliation runs using `docs/phase3-catalog-qa-playbook.md` and record results.
 
-### Next steps (remaining commerce)
+### Shipped in this phase (commerce completion)
 
-1. **Orders read path** — authenticated `GET` list/detail from `order_references` + mobile Home “recent orders” card.
-2. **Optional PDP** — multi-variant picker; related products (if catalog needs them).
-3. **Optional multi-spa** — persisted active spa for Home + Shop compatibility context.
-4. **Sync hardening (1.1)** — retry/backoff on 429/transients; large-catalog + archived reconciliation QA.
-5. **Observability (0.6) + pilot QA (6)** — health signals; TAB hardening checklist.
+1. **Orders read path** — `GET` list/detail from `order_references` + mobile Home **Recent orders** card; rate limit on reads.
+2. **PDP** — variant list from API + option picker; **`GET /products/shop/:id/related`** + PDP “You may also need” strip.
+3. **Multi-spa** — persisted active `spaProfileId` (per tenant) + Shop picker modal; PDP/shop use shared context.
+4. **Sync hardening** — `fetchWithShopifyTransientRetry` on Admin REST (`shopifyAdapter`) and Storefront GraphQL (`storefrontCart.service`).
+5. **Observability** — `GET /admin/settings/pos/health`; dashboard shows last logged failure snippet; Storefront cart mutation failures → `pos_integration_activity`.
+6. **Checkout UX** — Checkout Sheet Kit `close` + `error` listeners; cart banner copy aligned with webhook-as-truth.
+7. **Audit artifacts** — `docs/zero-trust-commerce-audit-2026-04-02.md` (checklist); formal **Milestone 6** execution still required for TAB sign-off.
 
 ### Not yet started / still open
 
-- **User-facing order history API** + **Home recent orders** UI (read `order_references`)
-- **Multi-spa selector** on Home + Shop (optional; today primary spa from `/spa-profiles` drives shop)
-- **Milestone 0.6** observability (sync/webhook/cart health in admin)
-- **Milestone 6** formal TAB pilot QA + security review
+- **Milestone 6** — execute full pilot QA matrix in production-like conditions and attach evidence; update sign-off table in the zero-trust doc.
 
 ## Goals
 
@@ -353,7 +350,7 @@ Use Shopify's native checkout surface rather than building our own.
 
 Tie commerce into the rest of the customer experience.
 
-**Status:** **5.3** partially done (push on order when user matched by email). **5.1–5.2** open (no Home orders card backed by `order_references`).
+**Status:** **5.1** done (Recent orders card + read API). **5.3** done (push on order when user matched by email). **5.2** other home cards (warranty, filters, seasonal) remain product/config follow-ups.
 
 ### 5.1 Recent orders card
 
@@ -379,7 +376,7 @@ Tie commerce into the rest of the customer experience.
 
 Before broad rollout, validate against real TAB data and real operating conditions.
 
-**Status:** Not formally closed; run before broad customer rollout.
+**Status:** Code and audit checklist ready; **formal execution** still required before broad customer rollout (see `docs/phase3-catalog-qa-playbook.md` and `docs/zero-trust-commerce-audit-2026-04-02.md`).
 
 ### 6.1 Real catalog QA
 
@@ -413,8 +410,8 @@ Before broad rollout, validate against real TAB data and real operating conditio
 2. ~~Dev Dashboard credential onboarding + runtime token exchange~~ ✓
 3. ~~Order reference persistence~~ ✓; **product sync hardening** (retry/QA) — in progress
 4. ~~Read-only shop + cart + checkout~~ ✓ (PDP variants / related — optional)
-5. **Home/order completion** — orders **read API** + Home card
-6. **TAB pilot QA and hardening**
+5. ~~**Home/order completion**~~ — orders read API + Home card ✓
+6. **TAB pilot QA and hardening** — run scripted matrix + sign zero-trust audit
 
 ## Must-Complete Before TAB Pilot
 
@@ -426,14 +423,14 @@ Before broad rollout, validate against real TAB data and real operating conditio
 - `order_references` persisted from webhook ✓
 - Read-only shop verified against real TAB catalog — **QA (Milestone 6)**
 - Cart and checkout tested with real tenant data — **QA (Milestone 6)**
-- **User-visible order history** — **open** (recommended before calling commerce “done” for customers)
+- **User-visible order history** — **read API + Home card** ✓ (pilot QA still required)
 
 ## Can Ship in Early Internal Beta
 
 - Read-only shop + cart + checkout (current mobile path)
 - PDP (single-variant assumption)
 - Product filtering by compatibility and category
-- Multi-spa selector — **not yet**; primary spa only
+- Multi-spa selector — **persisted active spa** for Shop (see `ActiveSpaProvider`)
 
 ## Should Wait Until Post-Pilot or Later Phase 3
 

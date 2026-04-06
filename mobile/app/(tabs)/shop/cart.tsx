@@ -22,7 +22,16 @@ export default function ShopCartScreen() {
   const insets = useSafeAreaInsets();
   const { colors, typography } = useTheme();
   const { user } = useAuth();
-  const { cart, loading, refreshCart, setLineQuantity, removeLine, openCheckout } = useCart();
+  const {
+    cart,
+    loading,
+    refreshCart,
+    setLineQuantity,
+    removeLine,
+    openCheckout,
+    checkoutSheetNotice,
+    dismissCheckoutSheetNotice,
+  } = useCart();
   const [busyLine, setBusyLine] = useState<string | null>(null);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
 
@@ -88,6 +97,47 @@ export default function ShopCartScreen() {
     >
       {loading && !cart ? (
         <ActivityIndicator style={{ marginTop: 32 }} color={colors.primary} />
+      ) : null}
+
+      {checkoutSheetNotice ? (
+        <View
+          style={[
+            styles.noticeCard,
+            {
+              borderColor:
+                checkoutSheetNotice.kind === 'error'
+                  ? '#fecaca'
+                  : checkoutSheetNotice.kind === 'completed'
+                    ? '#bfdbfe'
+                    : colors.border,
+              backgroundColor:
+                checkoutSheetNotice.kind === 'error'
+                  ? '#fef2f2'
+                  : checkoutSheetNotice.kind === 'completed'
+                    ? '#eff6ff'
+                    : colors.surface,
+            },
+          ]}
+        >
+          <Text style={[typography.body, { color: colors.text, lineHeight: 22 }]}>
+            {checkoutSheetNotice.message}
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 12 }}>
+            {checkoutSheetNotice.kind === 'completed' ? (
+              <Pressable onPress={() => router.push('/(tabs)/home')} hitSlop={8}>
+                <Text style={{ color: colors.primary, fontWeight: '700' }}>Go to Home</Text>
+              </Pressable>
+            ) : null}
+            {checkoutSheetNotice.kind === 'error' ? (
+              <Pressable onPress={() => void onCheckout()} hitSlop={8}>
+                <Text style={{ color: colors.primary, fontWeight: '700' }}>Try checkout again</Text>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={dismissCheckoutSheetNotice} hitSlop={8}>
+              <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Dismiss</Text>
+            </Pressable>
+          </View>
+        </View>
       ) : null}
 
       {!loading && (!cart || cart.lines.length === 0) ? (
@@ -172,6 +222,12 @@ export default function ShopCartScreen() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  noticeCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
   lineCard: {
     borderWidth: 1,
     borderRadius: 12,

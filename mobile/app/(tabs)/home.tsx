@@ -7,6 +7,7 @@ import { FinishSetupBanner } from '../../components/FinishSetupBanner';
 import { StatusBarBar } from '../../components/StatusBarBar';
 import { HomeHeroBubbles } from '../../components/home/HomeHeroBubbles';
 import { HomeWidgetRenderer } from '../../components/home/HomeWidgetRenderer';
+import { RecentOrdersCard } from '../../components/home/RecentOrdersCard';
 import { QuickLinksGrid } from '../../components/home/QuickLinksGrid';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTenant } from '../../contexts/TenantContext';
@@ -162,6 +163,7 @@ export default function Home() {
         {quickLinks.length > 0 ? (
           <QuickLinksGrid links={quickLinks} layout={quickLinksLayout} />
         ) : null}
+        {user ? <RecentOrdersCard /> : null}
         {widgets.map((w) => (
           <HomeWidgetRenderer
             key={w.id}

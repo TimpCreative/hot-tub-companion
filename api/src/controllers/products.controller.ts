@@ -14,6 +14,7 @@ import {
   type SpaContext,
 } from '../services/shopProductCompatibility.service';
 import type { Knex } from 'knex';
+import { toStorefrontVariantGid } from '../utils/storefrontVariantGid';
 
 function getTenantId(req: Request): string | null {
   return ((req as any).tenant?.id as string | undefined) ?? null;
@@ -252,6 +253,36 @@ export async function getProductById(req: Request, res: Response): Promise<void>
     }
   }
 
+  const posProductId = row.pos_product_id as string;
+  const variantRows = await db('pos_products as pp')
+    .where('pp.tenant_id', tenantId)
+    .andWhere('pp.pos_product_id', posProductId)
+    .andWhere('pp.is_hidden', false)
+    .andWhere('pp.mapping_status', 'confirmed')
+    .select(
+      'pp.id',
+      'pp.title',
+      'pp.sku',
+      'pp.price',
+      'pp.compare_at_price',
+      'pp.inventory_quantity',
+      'pp.pos_variant_id'
+    )
+    .orderBy('pp.title', 'asc');
+
+  const variants = variantRows.map((v) => ({
+    id: v.id as string,
+    title: v.title as string,
+    sku: (v.sku as string | null) ?? null,
+    price: v.price as number,
+    compare_at_price: (v.compare_at_price as number | null) ?? null,
+    inventory_quantity: typeof v.inventory_quantity === 'number' ? v.inventory_quantity : 0,
+    storefrontVariantGid: toStorefrontVariantGid(v.pos_variant_id as string | null) ?? null,
+    isSelected: (v.id as string) === id,
+  }));
+
+  (row as Record<string, unknown>).variants = variants;
+
   success(res, row);
 }
 
@@ -336,6 +367,105 @@ export async function listShopProducts(req: Request, res: Response): Promise<voi
     total,
     totalPages: Math.ceil(total / ps),
   });
+}
+
+/** Same-category or same-product_type peers visible in the current shop filters (tenant + spa). */
+export async function listRelatedShopProducts(req: Request, res: Response): Promise<void> {
+  const tenantId = getTenantId(req);
+  if (!tenantId) {
+    error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
+    return;
+  }
+  const userId = getUserId(req);
+  if (!userId) {
+    error(res, 'UNAUTHORIZED', 'Authentication required', 401);
+    return;
+  }
+
+  const { id } = req.params;
+  if (!id?.trim()) {
+    error(res, 'VALIDATION_ERROR', 'Product id is required', 400);
+    return;
+  }
+
+  const spaProfileId = req.query.spaProfileId as string | undefined;
+  const includeOtherSpaParts = parseBoolQuery(req.query.includeOtherSpaParts as string, false);
+  const includeGeneralStore = parseBoolQuery(req.query.includeGeneralStore as string, true);
+  const hideOutOfStock = parseBoolQuery(req.query.hideOutOfStock as string, true);
+  const limitRaw = parseInt(String(req.query.limit ?? '6'), 10);
+  const limit = Math.min(20, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 6));
+
+  const anchor = await db('pos_products as pp')
+    .leftJoin('pcdb_parts as part', 'pp.uhtd_part_id', 'part.id')
+    .leftJoin('pcdb_categories as cat', 'part.category_id', 'cat.id')
+    .where('pp.tenant_id', tenantId)
+    .andWhere('pp.id', id.trim())
+    .whereNull('part.deleted_at')
+    .select('pp.product_type', 'cat.id as category_id')
+    .first();
+
+  if (!anchor) {
+    error(res, 'NOT_FOUND', 'Product not found', 404);
+    return;
+  }
+
+  const categoryId = anchor.category_id as string | null | undefined;
+  const productType =
+    anchor.product_type != null && String(anchor.product_type).trim() !== ''
+      ? String(anchor.product_type).trim()
+      : null;
+
+  if (!categoryId && !productType) {
+    success(res, []);
+    return;
+  }
+
+  const spaCtx = await resolveSpaContext(tenantId, userId, spaProfileId?.trim() || undefined);
+  const qualId = await getSanitizationQualifierId();
+
+  const inner = buildShopInnerQuery(tenantId, spaCtx, qualId, {
+    categoryKey: null,
+    hideOutOfStock,
+    search: undefined,
+  });
+  const sub = inner.as('shop_inner');
+  let outer = db.from(sub);
+  applyShopToggles(outer, includeOtherSpaParts, includeGeneralStore);
+
+  let related = outer
+    .clone()
+    .whereNot('id', id.trim())
+    .andWhere((qb: Knex.QueryBuilder) => {
+      if (categoryId && productType) {
+        qb.where('category_id', categoryId).orWhere('product_type', productType);
+      } else if (categoryId) {
+        qb.where('category_id', categoryId);
+      } else if (productType) {
+        qb.where('product_type', productType);
+      }
+    })
+    .orderByRaw(`CASE shop_compatibility
+      WHEN 'compatible' THEN 0
+      WHEN 'needs_spa' THEN 1
+      WHEN 'general' THEN 2
+      WHEN 'other_model' THEN 3
+      ELSE 4 END`)
+    .orderBy('category_sort', 'asc')
+    .orderBy('part_display_importance', 'asc')
+    .orderBy('title', 'asc')
+    .limit(limit);
+
+  const rows = await related.select(
+    'id',
+    'title',
+    'price',
+    'compare_at_price',
+    'images',
+    'inventory_quantity',
+    'shop_compatibility'
+  );
+
+  success(res, rows);
 }
 
 /** Min/max price in cents for the current shop criteria, excluding any price-range filter. */

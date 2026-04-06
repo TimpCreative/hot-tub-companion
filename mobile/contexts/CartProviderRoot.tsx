@@ -8,6 +8,8 @@ const linkingCheckout = {
     void Linking.openURL(url);
   },
   subscribeCheckoutCompleted: () => () => {},
+  subscribeCheckoutClosed: () => () => {},
+  subscribeCheckoutError: () => () => {},
 };
 
 /**

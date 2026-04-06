@@ -3,6 +3,7 @@ import { decryptTenantSecret } from '../utils/tenantSecrets';
 import { normalizeShopDomain } from './tenantPosConfig.service';
 import { toStorefrontVariantGid } from '../utils/storefrontVariantGid';
 import { ensureStorefrontAccessTokenStored } from './shopifyStorefrontToken.service';
+import { fetchWithShopifyTransientRetry } from '../utils/shopifyHttpRetry';
 
 const STOREFRONT_API_VERSION = '2025-01';
 
@@ -85,20 +86,26 @@ async function loadStorefrontCredentials(
 }
 
 async function storefrontGraphql<T>(
+  tenantId: string,
   shopDomain: string,
   token: string,
   query: string,
-  variables?: Record<string, unknown>
+  variables?: Record<string, unknown>,
+  opLabel = 'graphql'
 ): Promise<T> {
   const url = `https://${shopDomain}/api/${STOREFRONT_API_VERSION}/graphql.json`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Shopify-Storefront-Access-Token': token,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+  const res = await fetchWithShopifyTransientRetry(
+    { tenantId, label: `storefront ${opLabel}` },
+    () =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Storefront-Access-Token': token,
+        },
+        body: JSON.stringify({ query, variables }),
+      })
+  );
   if (!res.ok) {
     const t = await res.text();
     throw new StorefrontCartError('STOREFRONT_ERROR', `Storefront HTTP ${res.status}: ${t.slice(0, 200)}`);
@@ -205,6 +212,7 @@ async function clearStoredCartId(tenantId: string, userId: string): Promise<void
 }
 
 async function fetchCartById(
+  tenantId: string,
   creds: { shopDomain: string; token: string },
   cartId: string
 ): Promise<CartDto | null> {
@@ -215,11 +223,21 @@ async function fetchCartById(
       }
     }
   `;
-  const data = await storefrontGraphql<{ cart: unknown }>(creds.shopDomain, creds.token, q, { cartId });
+  const data = await storefrontGraphql<{ cart: unknown }>(
+    tenantId,
+    creds.shopDomain,
+    creds.token,
+    q,
+    { cartId },
+    'cartById'
+  );
   return parseCart(data.cart);
 }
 
-async function createEmptyCart(creds: { shopDomain: string; token: string }): Promise<CartDto> {
+async function createEmptyCart(
+  tenantId: string,
+  creds: { shopDomain: string; token: string }
+): Promise<CartDto> {
   const m = `
     mutation CartCreate {
       cartCreate(input: { lines: [] }) {
@@ -230,7 +248,7 @@ async function createEmptyCart(creds: { shopDomain: string; token: string }): Pr
   `;
   const data = await storefrontGraphql<{
     cartCreate: { cart: unknown; userErrors: unknown };
-  }>(creds.shopDomain, creds.token, m);
+  }>(tenantId, creds.shopDomain, creds.token, m, undefined, 'cartCreate');
   const errs = data.cartCreate?.userErrors;
   if (Array.isArray(errs) && errs.length > 0) {
     throw new StorefrontCartError('STOREFRONT_ERROR', userErrorsMessage(errs));
@@ -250,12 +268,12 @@ export async function getOrCreateCart(tenantId: string, userId: string): Promise
 
   const stored = await getStoredCartId(tenantId, userId);
   if (stored) {
-    const existing = await fetchCartById(creds, stored);
+    const existing = await fetchCartById(tenantId, creds, stored);
     if (existing) return existing;
     await clearStoredCartId(tenantId, userId);
   }
 
-  const created = await createEmptyCart(creds);
+  const created = await createEmptyCart(tenantId, creds);
   await saveStoredCartId(tenantId, userId, created.cartId);
   return created;
 }
@@ -270,7 +288,7 @@ export async function getCart(tenantId: string, userId: string): Promise<CartDto
   }
   const stored = await getStoredCartId(tenantId, userId);
   if (!stored) return null;
-  const cart = await fetchCartById(creds, stored);
+  const cart = await fetchCartById(tenantId, creds, stored);
   if (!cart) {
     await clearStoredCartId(tenantId, userId);
     return null;
@@ -363,10 +381,10 @@ export async function addCartLine(
   `;
   const data = await storefrontGraphql<{
     cartLinesAdd: { cart: unknown; userErrors: unknown };
-  }>(creds.shopDomain, creds.token, m, {
+  }>(tenantId, creds.shopDomain, creds.token, m, {
     cartId: cart.cartId,
     lines: [{ merchandiseId: resolved.merchandiseId, quantity }],
-  });
+  }, 'cartLinesAdd');
   const errs = data.cartLinesAdd?.userErrors;
   if (Array.isArray(errs) && errs.length > 0) {
     const msg = userErrorsMessage(errs);
@@ -375,10 +393,10 @@ export async function addCartLine(
       cart = await getOrCreateCart(tenantId, userId);
       const retry = await storefrontGraphql<{
         cartLinesAdd: { cart: unknown; userErrors: unknown };
-      }>(creds.shopDomain, creds.token, m, {
+      }>(tenantId, creds.shopDomain, creds.token, m, {
         cartId: cart.cartId,
         lines: [{ merchandiseId: resolved.merchandiseId, quantity }],
-      });
+      }, 'cartLinesAddRetry');
       const e2 = retry.cartLinesAdd?.userErrors;
       if (Array.isArray(e2) && e2.length > 0) {
         throw new StorefrontCartError('STOREFRONT_ERROR', userErrorsMessage(e2));
@@ -427,10 +445,10 @@ export async function updateCartLineQuantity(
   `;
   const data = await storefrontGraphql<{
     cartLinesUpdate: { cart: unknown; userErrors: unknown };
-  }>(creds.shopDomain, creds.token, m, {
+  }>(tenantId, creds.shopDomain, creds.token, m, {
     cartId: stored,
     lines: [{ id: lineId.trim(), quantity }],
-  });
+  }, 'cartLinesUpdate');
   const errs = data.cartLinesUpdate?.userErrors;
   if (Array.isArray(errs) && errs.length > 0) {
     throw new StorefrontCartError('STOREFRONT_ERROR', userErrorsMessage(errs));
@@ -464,10 +482,10 @@ export async function removeCartLine(tenantId: string, userId: string, lineId: s
   `;
   const data = await storefrontGraphql<{
     cartLinesRemove: { cart: unknown; userErrors: unknown };
-  }>(creds.shopDomain, creds.token, m, {
+  }>(tenantId, creds.shopDomain, creds.token, m, {
     cartId: stored,
     lineIds: [lineId.trim()],
-  });
+  }, 'cartLinesRemove');
   const errs = data.cartLinesRemove?.userErrors;
   if (Array.isArray(errs) && errs.length > 0) {
     throw new StorefrontCartError('STOREFRONT_ERROR', userErrorsMessage(errs));

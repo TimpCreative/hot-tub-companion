@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { getTenantApiKeyBySlug } from '@/lib/db';
+import { getTenantApiKeyBySlugSafe } from '@/lib/db';
 
 function getApiBase(): string {
   const raw = (process.env.NEXT_PUBLIC_API_URL || 'https://api.hottubcompanion.com').trim().replace(/\/+$/, '');
@@ -8,6 +8,11 @@ function getApiBase(): string {
 }
 
 const API_BASE = getApiBase();
+
+function safeDetail(msg: string | undefined): string | undefined {
+  if (!msg?.trim()) return undefined;
+  return msg.trim().slice(0, 400);
+}
 
 /** Allow Railway cold starts + slow queries; Vercel Hobby default is 10s which often surfaces as opaque 502s. */
 export const maxDuration = 60;
@@ -65,7 +70,21 @@ async function proxy(
     return NextResponse.json({ error: 'Missing tenant context' }, { status: 400 });
   }
 
-  const apiKey = await getTenantApiKeyBySlug(slug);
+  const { apiKey, dbError } = await getTenantApiKeyBySlugSafe(slug);
+  if (dbError) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'TENANT_DB_ERROR',
+          message:
+            'Could not resolve tenant API key (database error). Set DATABASE_URL on Vercel and allow DB access from Vercel.',
+          details: safeDetail(dbError),
+        },
+      },
+      { status: 503 }
+    );
+  }
   if (!apiKey) {
     return NextResponse.json({ error: 'Tenant not found or inactive' }, { status: 404 });
   }

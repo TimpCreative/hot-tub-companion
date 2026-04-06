@@ -23,9 +23,30 @@ export function CartCheckoutNativeBridge({ children }: { children: React.ReactNo
     [checkoutSheet]
   );
 
+  const subscribeCheckoutClosed = useCallback(
+    (handler: () => void) => {
+      const sub = checkoutSheet.addEventListener('close', handler);
+      return () => sub?.remove();
+    },
+    [checkoutSheet]
+  );
+
+  const subscribeCheckoutError = useCallback(
+    (handler: (err: { message?: string }) => void) => {
+      const sub = checkoutSheet.addEventListener('error', handler);
+      return () => sub?.remove();
+    },
+    [checkoutSheet]
+  );
+
   const checkoutDeps = useMemo(
-    () => ({ presentCheckout, subscribeCheckoutCompleted }),
-    [presentCheckout, subscribeCheckoutCompleted]
+    () => ({
+      presentCheckout,
+      subscribeCheckoutCompleted,
+      subscribeCheckoutClosed,
+      subscribeCheckoutError,
+    }),
+    [presentCheckout, subscribeCheckoutCompleted, subscribeCheckoutClosed, subscribeCheckoutError]
   );
 
   return <CartProviderCore checkout={checkoutDeps}>{children}</CartProviderCore>;

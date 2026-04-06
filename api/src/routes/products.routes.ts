@@ -21,6 +21,7 @@ router.get('/products/compatible/:spaProfileId', authMiddleware, productsControl
 router.get('/products/shop/categories', authMiddleware, productsController.listShopCategories);
 router.get('/products/shop/price-bounds', authMiddleware, productsController.listShopPriceBounds);
 router.get('/products/shop', authMiddleware, productsController.listShopProducts);
+router.get('/products/shop/:id/related', authMiddleware, productsController.listRelatedShopProducts);
 router.get('/products/:id', productDetailAuthIfSpa, productsController.getProductById);
 
 export default router;

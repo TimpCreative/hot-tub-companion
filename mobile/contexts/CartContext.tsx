@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { useAuth } from './AuthContext';
@@ -23,7 +24,16 @@ export type CartCheckoutDeps = {
   presentCheckout: (url: string) => void;
   /** Register for checkout completed; return unsubscribe. */
   subscribeCheckoutCompleted: (handler: () => void) => () => void;
+  /** Sheet closed without a prior completed event in this session (e.g. cancel). */
+  subscribeCheckoutClosed?: (handler: () => void) => () => void;
+  /** Checkout sheet error (network/checkout exception). */
+  subscribeCheckoutError?: (handler: (err: { message?: string }) => void) => () => void;
 };
+
+export type CheckoutSheetNotice =
+  | { kind: 'completed'; message: string }
+  | { kind: 'cancelled'; message: string }
+  | { kind: 'error'; message: string };
 
 type CartContextValue = {
   cart: Cart | null;
@@ -35,6 +45,9 @@ type CartContextValue = {
   removeLine: (lineId: string) => Promise<void>;
   openCheckout: () => Promise<void>;
   totalQuantity: number;
+  /** Ephemeral messaging after native checkout sheet lifecycle (webhook remains SoT for orders). */
+  checkoutSheetNotice: CheckoutSheetNotice | null;
+  dismissCheckoutSheetNotice: () => void;
 };
 
 const CartContext = createContext<CartContextValue | undefined>(undefined);
@@ -49,10 +62,17 @@ type CartProviderCoreProps = {
  */
 export function CartProviderCore({ children, checkout }: CartProviderCoreProps) {
   const { user, loading: authLoading } = useAuth();
-  const { presentCheckout, subscribeCheckoutCompleted } = checkout;
+  const {
+    presentCheckout,
+    subscribeCheckoutCompleted,
+    subscribeCheckoutClosed = () => () => {},
+    subscribeCheckoutError = () => () => {},
+  } = checkout;
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkoutSheetNotice, setCheckoutSheetNotice] = useState<CheckoutSheetNotice | null>(null);
+  const checkoutCompletedRef = useRef(false);
 
   const refreshCart = useCallback(async () => {
     if (!user || authLoading) {
@@ -77,11 +97,41 @@ export function CartProviderCore({ children, checkout }: CartProviderCoreProps) 
     void refreshCart();
   }, [refreshCart]);
 
+  const dismissCheckoutSheetNotice = useCallback(() => setCheckoutSheetNotice(null), []);
+
   useEffect(() => {
-    return subscribeCheckoutCompleted(() => {
+    const unsubDone = subscribeCheckoutCompleted(() => {
+      checkoutCompletedRef.current = true;
       void refreshCart();
+      setCheckoutSheetNotice({
+        kind: 'completed',
+        message:
+          'If you finished payment, your order will appear under Recent orders on Home shortly. The app confirms orders when your store sends them to us — not from this screen alone.',
+      });
     });
-  }, [subscribeCheckoutCompleted, refreshCart]);
+    const unsubClose = subscribeCheckoutClosed(() => {
+      if (!checkoutCompletedRef.current) {
+        setCheckoutSheetNotice({
+          kind: 'cancelled',
+          message: 'Checkout was closed. Your cart is unchanged — tap Check out when you are ready to try again.',
+        });
+      }
+      checkoutCompletedRef.current = false;
+    });
+    const unsubErr = subscribeCheckoutError((err: { message?: string }) => {
+      setCheckoutSheetNotice({
+        kind: 'error',
+        message: err?.message?.trim()
+          ? `Checkout could not complete (${err.message}). Your cart is saved — you can try again.`
+          : 'Checkout hit an error. Your cart is saved — you can try again.',
+      });
+    });
+    return () => {
+      unsubDone?.();
+      unsubClose?.();
+      unsubErr?.();
+    };
+  }, [subscribeCheckoutCompleted, subscribeCheckoutClosed, subscribeCheckoutError, refreshCart]);
 
   const addToCart = useCallback(async (productId: string, quantity = 1) => {
     setError(null);
@@ -118,8 +168,21 @@ export function CartProviderCore({ children, checkout }: CartProviderCoreProps) 
       removeLine,
       openCheckout,
       totalQuantity: cart?.totalQuantity ?? 0,
+      checkoutSheetNotice,
+      dismissCheckoutSheetNotice,
     }),
-    [cart, loading, error, refreshCart, addToCart, setLineQuantity, removeLine, openCheckout]
+    [
+      cart,
+      loading,
+      error,
+      refreshCart,
+      addToCart,
+      setLineQuantity,
+      removeLine,
+      openCheckout,
+      checkoutSheetNotice,
+      dismissCheckoutSheetNotice,
+    ]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

@@ -9,6 +9,7 @@ import {
   StorefrontCartError,
   updateCartLineQuantity,
 } from '../services/storefrontCart.service';
+import { logPosIntegrationActivity } from '../services/posIntegrationActivity.service';
 
 function getTenantId(req: Request): string | null {
   return req.tenant?.id ?? null;
@@ -21,8 +22,15 @@ function getConsumerUserId(req: Request): string | null {
   return id;
 }
 
-function handleCartError(res: Response, err: unknown): void {
+function handleCartError(res: Response, err: unknown, opts?: { tenantId: string | null }): void {
   if (err instanceof StorefrontCartError) {
+    if (opts?.tenantId && err.code === 'STOREFRONT_ERROR') {
+      void logPosIntegrationActivity(opts.tenantId, {
+        eventType: 'storefront_cart_mutation_failed',
+        summary: err.message.slice(0, 500),
+        source: 'system',
+      });
+    }
     const status =
       err.code === 'NOT_FOUND'
         ? 404
@@ -54,7 +62,7 @@ export async function getCartState(req: Request, res: Response): Promise<void> {
     const cart = await getCart(tenantId, userId);
     success(res, { cart });
   } catch (err) {
-    handleCartError(res, err);
+    handleCartError(res, err, { tenantId });
   }
 }
 
@@ -80,7 +88,7 @@ export async function postCartItem(req: Request, res: Response): Promise<void> {
     const cart = await addCartLine(tenantId, userId, productId, quantity);
     success(res, { cart });
   } catch (err) {
-    handleCartError(res, err);
+    handleCartError(res, err, { tenantId });
   }
 }
 
@@ -115,7 +123,7 @@ export async function patchCartLine(req: Request, res: Response): Promise<void> 
     const cart = await updateCartLineQuantity(tenantId, userId, lineId.trim(), quantity);
     success(res, { cart });
   } catch (err) {
-    handleCartError(res, err);
+    handleCartError(res, err, { tenantId });
   }
 }
 
@@ -140,7 +148,7 @@ export async function deleteCartLine(req: Request, res: Response): Promise<void>
     const cart = await removeCartLine(tenantId, userId, lineId);
     success(res, { cart });
   } catch (err) {
-    handleCartError(res, err);
+    handleCartError(res, err, { tenantId });
   }
 }
 
@@ -159,6 +167,6 @@ export async function postCartCheckout(req: Request, res: Response): Promise<voi
     const checkoutUrl = await getCheckoutUrl(tenantId, userId);
     success(res, { checkoutUrl });
   } catch (err) {
-    handleCartError(res, err);
+    handleCartError(res, err, { tenantId });
   }
 }

@@ -14,21 +14,21 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import RenderHtml from 'react-native-render-html';
 import { useFocusEffect } from '@react-navigation/native';
-import api from '../../../services/api';
 import { formatProductPriceCents } from '../../../lib/formatProductPrice';
-import { fetchProductDetail, type ProductDetail, type ShopCompatibility } from '../../../services/shop';
+import {
+  fetchProductDetail,
+  fetchShopRelatedProducts,
+  type ProductDetail,
+  type ShopCompatibility,
+  type ShopProductRow,
+} from '../../../services/shop';
 import { messageFromApiReject } from '../../../services/cart';
 import { useTheme } from '../../../theme/ThemeProvider';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCart } from '../../../contexts/CartContext';
 import { useTenant } from '../../../contexts/TenantContext';
 import { productDetailStockLine } from '../../../lib/formatProductStock';
-
-type SpaProfile = { id: string; isPrimary?: boolean };
-
-function pickPrimary(profiles: SpaProfile[]): SpaProfile | null {
-  return profiles.find((p) => p.isPrimary) ?? profiles[0] ?? null;
-}
+import { useActiveSpa } from '../../../contexts/ActiveSpaContext';
 
 function firstImageUrls(images: unknown): string[] {
   if (!images) return [];
@@ -84,25 +84,17 @@ export default function ProductDetailScreen() {
   const { config: tenantConfig } = useTenant();
   const { addToCart } = useCart();
   const params = useLocalSearchParams<{ id: string }>();
-  const [spaProfileId, setSpaProfileId] = useState<string | undefined>(undefined);
+  const { spaProfileId, refreshSpaProfiles } = useActiveSpa();
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [addingCart, setAddingCart] = useState(false);
-
-  const loadSpa = useCallback(async () => {
-    try {
-      const res = (await api.get('/spa-profiles')) as { data?: { spaProfiles?: SpaProfile[] } };
-      const list = res?.data?.spaProfiles ?? [];
-      setSpaProfileId(pickPrimary(list)?.id);
-    } catch {
-      setSpaProfileId(undefined);
-    }
-  }, []);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const [related, setRelated] = useState<ShopProductRow[]>([]);
 
   useFocusEffect(
     useCallback(() => {
-      void loadSpa();
-    }, [loadSpa])
+      void refreshSpaProfiles();
+    }, [refreshSpaProfiles])
   );
 
   useEffect(() => {
@@ -124,6 +116,37 @@ export default function ProductDetailScreen() {
       cancelled = true;
     };
   }, [params.id, spaProfileId]);
+
+  useEffect(() => {
+    if (!params.id || !product) return;
+    setSelectedVariantId(params.id);
+  }, [params.id, product?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRelated() {
+      if (!params.id || !user) {
+        setRelated([]);
+        return;
+      }
+      try {
+        const res = await fetchShopRelatedProducts(params.id, {
+          spaProfileId,
+          limit: 8,
+          includeOtherSpaParts: false,
+          includeGeneralStore: true,
+          hideOutOfStock: true,
+        });
+        if (!cancelled) setRelated(Array.isArray(res.data) ? res.data : []);
+      } catch {
+        if (!cancelled) setRelated([]);
+      }
+    }
+    void loadRelated();
+    return () => {
+      cancelled = true;
+    };
+  }, [params.id, spaProfileId, user]);
 
   const images = useMemo(() => firstImageUrls(product?.images), [product?.images]);
   const compat = useMemo(() => compatCopy(product?.shopCompatibility), [product?.shopCompatibility]);
@@ -151,10 +174,17 @@ export default function ProductDetailScreen() {
     );
   }
 
+  const variants = Array.isArray(product.variants) ? product.variants : [];
+  const activeVariantId = selectedVariantId ?? product.id;
+  const variantRow =
+    variants.find((v) => v.id === activeVariantId) ??
+    (variants.length ? variants[0] : null);
+  const displayPrice = variantRow?.price ?? product.price;
+  const displayCompare = variantRow?.compare_at_price ?? product.compare_at_price;
+  const stock = variantRow?.inventory_quantity ?? product.inventory_quantity ?? 0;
+
   const compare =
-    product.compare_at_price != null &&
-    Number(product.compare_at_price) > Number(product.price);
-  const stock = product.inventory_quantity ?? 0;
+    displayCompare != null && Number(displayCompare) > Number(displayPrice);
   const stockLine = productDetailStockLine(stock, tenantConfig?.shop ?? null);
 
   const handleAddToCart = async () => {
@@ -169,9 +199,10 @@ export default function ProductDetailScreen() {
       Alert.alert('Out of stock', 'This item is not available right now.');
       return;
     }
+    const lineProductId = activeVariantId;
     setAddingCart(true);
     try {
-      await addToCart(product.id, 1);
+      await addToCart(lineProductId, 1);
       Alert.alert('Added to cart', 'View your cart to check out.', [
         { text: 'Keep shopping', style: 'cancel' },
         { text: 'View cart', onPress: () => router.push('/(tabs)/shop/cart') },
@@ -228,11 +259,49 @@ export default function ProductDetailScreen() {
 
       <Text style={[styles.title, { color: colors.text }]}>{product.title}</Text>
 
+      {variants.length > 1 ? (
+        <View style={{ marginTop: 14 }}>
+          <Text style={[typography.caption, { color: colors.textSecondary, marginBottom: 8, fontWeight: '600' }]}>
+            Choose option
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+            {variants.map((v) => {
+              const sel = v.id === activeVariantId;
+              const oos = (v.inventory_quantity ?? 0) <= 0;
+              const label = (v.sku && v.sku.trim()) || v.title;
+              return (
+                <Pressable
+                  key={v.id}
+                  disabled={oos}
+                  onPress={() => setSelectedVariantId(v.id)}
+                  style={[
+                    styles.variantChip,
+                    {
+                      borderColor: sel ? colors.primary : colors.border,
+                      backgroundColor: sel ? colors.primary + '22' : colors.surface,
+                      opacity: oos ? 0.45 : 1,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[typography.body, { color: colors.text, fontWeight: sel ? '700' : '500', maxWidth: 160 }]}
+                    numberOfLines={2}
+                  >
+                    {label}
+                    {oos ? ' · Out of stock' : ''}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
+
       <View style={styles.priceRow}>
-        <Text style={[styles.price, { color: colors.primary }]}>{formatProductPriceCents(product.price)}</Text>
+        <Text style={[styles.price, { color: colors.primary }]}>{formatProductPriceCents(displayPrice)}</Text>
         {compare ? (
           <Text style={[styles.compare, { color: colors.textSecondary, textDecorationLine: 'line-through' }]}>
-            {formatProductPriceCents(product.compare_at_price)}
+            {formatProductPriceCents(displayCompare ?? 0)}
           </Text>
         ) : null}
       </View>
@@ -248,6 +317,41 @@ export default function ProductDetailScreen() {
           baseStyle={{ color: colors.textSecondary, fontSize: 15, lineHeight: 24 }}
           tagsStyles={htmlStyles(colors).tagsStyles}
         />
+      ) : null}
+
+      {related.length > 0 ? (
+        <View style={{ marginTop: 28 }}>
+          <Text style={[typography.body, { color: colors.text, fontWeight: '800', marginBottom: 12 }]}>
+            You may also need
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+            {related.map((r) => {
+              const img = firstImageUrls(r.images)[0];
+              return (
+                <Pressable
+                  key={r.id}
+                  onPress={() => router.push(`/(tabs)/shop/${r.id}`)}
+                  style={[
+                    styles.relatedCard,
+                    { borderColor: colors.border, backgroundColor: colors.surface, width: 132 },
+                  ]}
+                >
+                  {img ? (
+                    <Image source={{ uri: img }} style={styles.relatedThumb} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.relatedThumb, { backgroundColor: colors.border }]} />
+                  )}
+                  <Text style={[typography.caption, { color: colors.text, fontWeight: '600', marginTop: 8 }]} numberOfLines={2}>
+                    {r.title}
+                  </Text>
+                  <Text style={[typography.caption, { color: colors.primary, marginTop: 4, fontWeight: '700' }]}>
+                    {formatProductPriceCents(r.price)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
       ) : null}
 
       <View style={styles.ctaRow}>
@@ -324,4 +428,22 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   ctaText: { fontSize: 14, fontWeight: '700', color: '#6b7280', textAlign: 'center' },
+  variantChip: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    maxWidth: 200,
+  },
+  relatedCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+  },
+  relatedThumb: {
+    width: '100%',
+    height: 88,
+    borderRadius: 8,
+    backgroundColor: '#e5e7eb',
+  },
 });

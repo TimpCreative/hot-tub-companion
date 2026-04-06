@@ -28,7 +28,6 @@ import { StatusBarBar } from '../../components/StatusBarBar';
 import { useFinishSetupNudge } from '../../hooks/useFinishSetupNudge';
 import { formatProductPriceCents } from '../../lib/formatProductPrice';
 import { useTheme } from '../../theme/ThemeProvider';
-import api from '../../services/api';
 import {
   categoryKeyForProductType,
   categoryKeyForUhtdCategory,
@@ -38,11 +37,16 @@ import {
   type ShopCategory,
   type ShopProductRow,
 } from '../../services/shop';
+import { useActiveSpa, type SpaProfileListItem } from '../../contexts/ActiveSpaContext';
 
-type SpaProfile = { id: string; isPrimary?: boolean };
-
-function pickPrimary(profiles: SpaProfile[]): SpaProfile | null {
-  return profiles.find((p) => p.isPrimary) ?? profiles[0] ?? null;
+function spaProfileLabel(p: SpaProfileListItem | undefined): string {
+  if (!p) return 'Spa';
+  const n = p.nickname?.trim();
+  if (n) return n;
+  const b = p.brand?.trim() || '';
+  const m = p.model?.trim() || '';
+  const both = `${b} ${m}`.trim();
+  return both || 'My spa';
 }
 
 function firstImageUrl(images: unknown): string | null {
@@ -97,7 +101,8 @@ export default function Shop() {
     }
   }, [params.productId, router]);
 
-  const [spaProfileId, setSpaProfileId] = useState<string | undefined>(undefined);
+  const { spaProfileId, setSpaProfileId, spaProfiles, refreshSpaProfiles } = useActiveSpa();
+  const [spaModalOpen, setSpaModalOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categories, setCategories] = useState<ShopCategory[]>([]);
@@ -271,21 +276,10 @@ export default function Shop() {
     closeFilters();
   }, [closeFilters]);
 
-  const loadSpa = useCallback(async () => {
-    try {
-      const res = (await api.get('/spa-profiles')) as { data?: { spaProfiles?: SpaProfile[] } };
-      const list = res?.data?.spaProfiles ?? [];
-      const primary = pickPrimary(list);
-      setSpaProfileId(primary?.id);
-    } catch {
-      setSpaProfileId(undefined);
-    }
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
-      void loadSpa();
-    }, [loadSpa])
+      void refreshSpaProfiles();
+    }, [refreshSpaProfiles])
   );
 
   useEffect(() => {
@@ -540,6 +534,11 @@ export default function Shop() {
     [router, user, totalQuantity]
   );
 
+  const activeSpa = useMemo(
+    () => spaProfiles.find((p) => p.id === spaProfileId) ?? spaProfiles[0],
+    [spaProfiles, spaProfileId]
+  );
+
   const listHeader = useMemo(
     () => (
       <View style={styles.listHeaderWrap}>
@@ -571,10 +570,38 @@ export default function Shop() {
             <Ionicons name="menu-outline" size={26} color={colors.primary} />
           </Pressable>
         </View>
+        {user && spaProfiles.length > 1 ? (
+          <Pressable
+            onPress={() => setSpaModalOpen(true)}
+            style={({ pressed }) => [
+              styles.spaChip,
+              { borderColor: colors.border, backgroundColor: colors.surface, opacity: pressed ? 0.9 : 1 },
+            ]}
+          >
+            <Ionicons name="water-outline" size={18} color={colors.primary} style={{ marginRight: 8 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[typography.caption, { color: colors.textSecondary }]}>Active spa (compatibility)</Text>
+              <Text style={[typography.body, { color: colors.text, fontWeight: '600' }]} numberOfLines={1}>
+                {spaProfileLabel(activeSpa)}
+              </Text>
+            </View>
+            <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+          </Pressable>
+        ) : null}
         {error ? <Text style={{ color: '#b91c1c', marginTop: 8 }}>{error}</Text> : null}
       </View>
     ),
-    [search, colors, openFilters, error, cartHeaderButton]
+    [
+      search,
+      colors,
+      openFilters,
+      error,
+      cartHeaderButton,
+      user,
+      spaProfiles.length,
+      activeSpa,
+      typography,
+    ]
   );
 
   const priceBoundsSingle = priceBounds != null && priceBounds.min === priceBounds.max;
@@ -829,6 +856,50 @@ export default function Shop() {
         </View>
       </Modal>
 
+      <Modal visible={spaModalOpen} animationType="fade" transparent onRequestClose={() => setSpaModalOpen(false)}>
+        <View style={styles.spaModalRoot}>
+          <Pressable style={styles.spaModalBackdrop} onPress={() => setSpaModalOpen(false)} />
+          <View style={[styles.spaModalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[typography.body, { color: colors.text, fontWeight: '700', marginBottom: 12 }]}>
+              Which spa should the shop use?
+            </Text>
+            <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled">
+              {spaProfiles.map((p) => {
+                const sel = p.id === spaProfileId;
+                return (
+                  <Pressable
+                    key={p.id}
+                    onPress={() => {
+                      void setSpaProfileId(p.id);
+                      setSpaModalOpen(false);
+                    }}
+                    style={[
+                      styles.spaModalRow,
+                      {
+                        borderColor: sel ? colors.primary : colors.border,
+                        backgroundColor: sel ? colors.primary + '18' : colors.background,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[typography.body, { color: colors.text, fontWeight: sel ? '700' : '500', flex: 1 }]}
+                      numberOfLines={2}
+                    >
+                      {spaProfileLabel(p)}
+                      {p.isPrimary ? ' · Primary' : ''}
+                    </Text>
+                    {sel ? <Ionicons name="checkmark-circle" size={22} color={colors.primary} /> : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <Pressable onPress={() => setSpaModalOpen(false)} style={{ marginTop: 14, alignSelf: 'flex-end' }}>
+              <Text style={{ color: colors.primary, fontWeight: '600' }}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       {showNudge ? <FinishSetupBanner onContinue={() => router.push('/onboarding')} onDismiss={dismiss} /> : null}
     </View>
   );
@@ -850,6 +921,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     marginTop: 0,
+  },
+  spaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  spaModalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  spaModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  spaModalCard: {
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    maxHeight: '78%',
+  },
+  spaModalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
   },
   search: {
     borderWidth: 1,
