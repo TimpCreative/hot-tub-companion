@@ -492,6 +492,8 @@ After POS credentials and **Shopify Webhook Secret** are saved:
 4. Schedule an external job (Railway cron, GitHub Actions, etc.) to `POST /api/v1/internal/cron/sync-shopify-catalog` every **1–2 minutes** with the **`CRON_SECRET`** header. Per-tenant **incremental sync interval** (default 30 minutes, clamped 1–1440) throttles how often each store is pulled via `updated_at_min` pagination. Webhooks (`products/create`, `products/update`, `products/delete`, `inventory_levels/update`) should handle most catalog changes within seconds; the cron is a safety net.
 5. **Full catalog sync** (all pages) is for onboarding or backfill; run it from **Settings** → **POS Integration**, not from the Products page. Day-to-day inventory freshness should rely on webhooks plus the incremental cron.
 
+**Maintenance reminders (customer app):** Schedule a **daily** job (e.g. Railway Cron) to `POST /api/v1/internal/cron/maintenance-reminders` with the same **`CRON_SECRET`** header used for other internal cron routes. This drives Care schedule push notifications for pending `maintenance_events` when the user has maintenance notifications enabled.
+
 ### 9.6 Important security behavior
 
 - Secrets are stored securely on the server

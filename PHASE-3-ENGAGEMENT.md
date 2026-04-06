@@ -16,7 +16,7 @@
 | **Retailer Admin — Products ↔ UHTD mapping** | ✅ Partial | **Shipped:** list enrichment with top suggestion score (tiered % pills), `pcdb_parts` join for mapped part labels, extended list sort (visibility, mapping status, confidence), modal **Product mapping** vs **UHTD Suggestions** with confirm/clear keeping the modal open. See [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md § Retailer Admin: Products and UHTD mapping UX](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#retailer-admin-products-and-uhtd-mapping-ux). **Still open:** performance at very large page sizes (batch/denormalize scores later), optional super-admin deep link to PCdb part. |
 | **Referral program** | ❌ | Still planned in this phase |
 | **Water Care Assistant** | ❌ | Still planned in this phase |
-| **Seasonal maintenance timeline** | ❌ | Still planned in this phase |
+| **Seasonal maintenance timeline** | ✅ Shipped | **Care schedule** (`maintenance-timeline`), auto schedule + custom tasks, push cron, spa usage months / winter strategy (onboarding + edit), completing tasks updates `spa_profiles` tracking (`last_filter_change`, `last_water_test_at`, `last_drain_refill_at`, `last_cover_check_at`), Home **maintenance_summary** widget, guides surfacing, unit tests in `api` (`npm test`). **Time v1.1:** due dates + cron use **UTC calendar**; tenant/user TZ later. **Ops:** schedule `POST /api/v1/internal/cron/maintenance-reminders` daily with `CRON_SECRET` (same as other internal crons; e.g. Railway Cron). |
 | **Content system** | ✅ Partial | Core universal + retailer content platform is shipped; contextual recommendation/search refinements remain |
 | **Subscription management** | ❌ | Still planned in this phase |
 | **Cross-platform QA** | ⏳ | Ongoing as features ship |
@@ -271,24 +271,31 @@ When regenerating (user changes `usage_months` or `winter_strategy`), delete fut
 
 ### 2.3 Maintenance Timeline Screen
 
-Accessible from My Tub dashboard or a dedicated section:
+Accessible from **Water Care** and the **Care schedule** tab (`maintenance-timeline`).
 
-**Layout:**
-- Overdue section (red): tasks past due date, not completed
-- This Week section: tasks due in next 7 days
-- Upcoming section: next 30 days, grouped by week
-- Each task card: icon by type, title, due date, "Mark Done" button
-- On "Mark Done": 
-  - Mark event completed
-  - If recurring: auto-generate next occurrence
-  - Show "Need supplies?" prompt with linked product category → navigates to Shop filtered to that category
-  - Update spa_profiles tracking fields (last_filter_change, etc.)
+**Layout (implemented):**
+- Overdue section: tasks past due date, not completed
+- This week: tasks due in the next 7 days
+- Upcoming: next 30 days, **grouped by calendar week** (UTC Monday week start)
+- Each task card: **icon by event type**, title, due date, "Mark done"
+- **Custom tasks:** add, edit, delete (custom source only); API `POST/PUT/DELETE /maintenance`
+- **Guides:** up to two items from content categories `maintenance` and `seasonal`, plus link to Guides with `category=maintenance`
+- On "Mark done":
+  - Sets `completed_at`; recurring tasks insert the next row (snapped to in-use months)
+  - Optional Shop prompt when `linked_product_category` is set
+  - Updates **`spa_profiles`** tracking: filter tasks → `last_filter_change`; `water_test` → `last_water_test_at`; `drain_refill` → `last_drain_refill_at`; `cover_check` → `last_cover_check_at` (migration `20260409120000_spa_profiles_maintenance_tracking_at.js`)
+
+**Home dashboard:** Widget type `maintenance_summary` (title + max items) lists pending tasks for the active spa; tenant admins configure it in **App setup** like other home widgets.
+
+**Onboarding:** Catalog spa creation sends optional `usageMonths` and `winterStrategy` so the first schedule matches the customer’s season.
 
 ### 2.4 Notification Cron Job
 
 **Route:** `POST /api/v1/internal/cron/maintenance-reminders` (same `CRON_SECRET` / `cronAuth` as other internal crons). Run daily (e.g. Railway cron).
 
 **Selection (UTC calendar dates, v1):** For each row with `completed_at IS NULL` and `notification_sent = false`, let `notify_date = due_date - notification_days_before` (calendar days). Send when **`today >= notify_date` AND `today <= due_date`** (inclusive). This replaces the earlier pseudo-SQL interval cast, which mixed types incorrectly.
+
+**Timezone note (v1.1):** Cron and due-date comparisons use the server’s UTC calendar day. A future revision may align `due_date` and cron “today” to the user’s or tenant’s timezone.
 
 **Delivery:** `notificationService.sendToUser` with **`prefKey: 'maintenance'`** (maps to `users.notification_pref_maintenance`) and FCM data:
 
@@ -308,12 +315,17 @@ DELETE /api/v1/maintenance/:id  (only custom events)
 
 ### 2.6 Manual QA (post-deploy)
 
-- Run DB migration, then open **Care schedule** with an existing spa (lazy schedule generation) or create/edit a spa (eager regeneration).
+- Run DB migrations (including `maintenance_events`, `winter_strategy`, `last_drain_refill_at` / `last_cover_check_at`), then open **Care schedule** with an existing spa (lazy schedule generation) or create/edit a spa (eager regeneration).
+- **Onboarding:** complete catalog path with custom usage months / winter strategy; confirm first schedule reflects choices.
 - Change **usage months** / **winter strategy** on spa edit: future auto tasks refresh; completed rows stay.
 - `winter_strategy = shutdown` with at least one off-month → **winterize** / **spring_startup** appear; `operate` → they do not.
 - Complete a recurring task → a new pending row appears at the next valid due date (in-use month).
-- Hit maintenance cron with `CRON_SECRET`; with `notification_pref_maintenance` on, device receives push; tap opens **Care schedule** with optional `eventId` highlight.
+- Complete filter / water test / drain / cover tasks → corresponding `spa_profiles` tracking columns update.
+- **Custom task** create → edit → delete → list updates.
+- **Home:** with `maintenance_summary` enabled, widget shows pending tasks and opens Care schedule.
+- Hit **`POST /api/v1/internal/cron/maintenance-reminders`** daily with `CRON_SECRET` (e.g. Railway Cron); with `notification_pref_maintenance` on, device receives push; tap opens **Care schedule** with optional `eventId` highlight.
 - Auth: another user cannot list or complete events for a spa they do not own.
+- API: `npm test` in `/api` runs maintenance schedule helper tests.
 
 ---
 
@@ -1020,10 +1032,10 @@ Before moving to Phase 4, verify:
 - [ ] "All good" state displays when levels are in range
 - [ ] Water test history shows chronological entries with color coding
 - [ ] Trend charts render correctly for 30/60/90 day views
-- [ ] Maintenance timeline auto-generates on spa registration
-- [ ] Seasonal winterize/startup events generate correctly based on usage months
-- [ ] Maintenance notification cron fires and delivers push notifications
-- [ ] Completing a maintenance task generates the next recurring instance
+- [x] Maintenance timeline auto-generates on spa registration
+- [x] Seasonal winterize/startup events generate correctly based on usage months
+- [ ] Maintenance notification cron fires and delivers push notifications *(configure host cron; see §2.4 / CREATING-A-NEW-TENANT §9.5)*
+- [x] Completing a maintenance task generates the next recurring instance
 - [ ] Content displays filtered by spa brand, model, and sanitization system
 - [ ] Retailer content takes priority over universal content
 - [ ] Video content embeds YouTube correctly

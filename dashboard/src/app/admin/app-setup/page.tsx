@@ -23,7 +23,7 @@ interface OnboardingConfig {
   welcomeBlock?: WelcomeBlock;
 }
 
-type WidgetType = 'dealer_card' | 'tips_list' | 'product_strip';
+type WidgetType = 'dealer_card' | 'tips_list' | 'product_strip' | 'maintenance_summary';
 
 interface HomeWidget {
   id: string;
@@ -1050,6 +1050,41 @@ export default function AdminAppSetupPage() {
                             props: { ...x.props, subtitle: e.target.value },
                           }))
                         }
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {w.type === 'maintenance_summary' && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="text-xs text-gray-600">Title</label>
+                      <input
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                        value={String(w.props.title ?? '')}
+                        onChange={(e) =>
+                          updateWidget(w.id, (x) => ({
+                            ...x,
+                            props: { ...x.props, title: e.target.value },
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600">Max tasks shown (1–8)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={8}
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                        value={String(w.props.maxItems ?? 3)}
+                        onChange={(e) => {
+                          const n = parseInt(e.target.value, 10);
+                          updateWidget(w.id, (x) => ({
+                            ...x,
+                            props: { ...x.props, maxItems: Number.isFinite(n) ? n : 3 },
+                          }));
+                        }}
                       />
                     </div>
                   </div>

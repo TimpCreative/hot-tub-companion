@@ -1,6 +1,7 @@
 import React from 'react';
 import type { DealerContact, HomeWidget } from '../../contexts/TenantContext';
 import { DealerCardWidget } from './DealerCardWidget';
+import { MaintenanceSummaryWidget } from './MaintenanceSummaryWidget';
 import { ProductStripWidget } from './ProductStripWidget';
 import { TipsListWidget, type TipItem } from './TipsListWidget';
 
@@ -56,6 +57,14 @@ export function HomeWidgetRenderer({
       const title = str(props.title) || 'Recommended';
       const subtitle = str(props.subtitle) || undefined;
       return <ProductStripWidget title={title} subtitle={subtitle} sanitizationLabel={sanitizationLabel} />;
+    }
+    case 'maintenance_summary': {
+      const title = str(props.title) || 'Care schedule';
+      let maxItems = 3;
+      if (typeof props.maxItems === 'number' && Number.isFinite(props.maxItems)) {
+        maxItems = Math.floor(props.maxItems);
+      }
+      return <MaintenanceSummaryWidget title={title} maxItems={maxItems} />;
     }
     default:
       return null;

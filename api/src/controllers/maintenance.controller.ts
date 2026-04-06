@@ -46,6 +46,29 @@ function utcTodayKey(): string {
   return `${y}-${m}-${d}`;
 }
 
+/** When a maintenance event is completed, sync spa_profiles tracking fields (same transaction). */
+function spaTrackingPatchForCompletedEvent(eventType: string, completedAt: Date): Record<string, unknown> | null {
+  const y = completedAt.getUTCFullYear();
+  const mo = completedAt.getUTCMonth();
+  const day = completedAt.getUTCDate();
+  const dateOnly = new Date(Date.UTC(y, mo, day));
+
+  switch (eventType) {
+    case 'filter_rinse':
+    case 'filter_deep_clean':
+    case 'filter_replace':
+      return { last_filter_change: dateOnly };
+    case 'water_test':
+      return { last_water_test_at: completedAt };
+    case 'drain_refill':
+      return { last_drain_refill_at: completedAt };
+    case 'cover_check':
+      return { last_cover_check_at: completedAt };
+    default:
+      return null;
+  }
+}
+
 async function ensureSpaOwned(
   spaProfileId: string,
   userId: string,
@@ -175,6 +198,13 @@ export async function completeMaintenance(req: Request, res: Response): Promise<
         created_at: trx.fn.now(),
         updated_at: trx.fn.now(),
       });
+    }
+
+    const trackingPatch = spaTrackingPatchForCompletedEvent(String(event.event_type ?? ''), now);
+    if (trackingPatch && Object.keys(trackingPatch).length > 0) {
+      await trx('spa_profiles')
+        .where({ id: event.spa_profile_id as string, user_id: userId, tenant_id: tenantId })
+        .update({ ...trackingPatch, updated_at: trx.fn.now() });
     }
   });
 

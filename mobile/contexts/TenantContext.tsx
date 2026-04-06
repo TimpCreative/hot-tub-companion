@@ -15,7 +15,7 @@ export interface TenantOnboardingConfig {
   welcomeBlock?: WelcomeBlock;
 }
 
-export type HomeWidgetType = 'dealer_card' | 'tips_list' | 'product_strip';
+export type HomeWidgetType = 'dealer_card' | 'tips_list' | 'product_strip' | 'maintenance_summary';
 
 export interface HomeWidget {
   id: string;

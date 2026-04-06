@@ -27,7 +27,7 @@ interface QuickLink {
 
 interface HomeWidget {
   id: string;
-  type: 'dealer_card' | 'tips_list' | 'product_strip';
+  type: 'dealer_card' | 'tips_list' | 'product_strip' | 'maintenance_summary';
   enabled: boolean;
   order: number;
   props: Record<string, unknown>;
@@ -222,6 +222,32 @@ export function HomeDashboardMockup({
                       title="Product"
                     />
                   ))}
+                </div>
+              </div>
+            );
+          }
+          if (w.type === 'maintenance_summary') {
+            const title = String(w.props.title ?? 'Care schedule');
+            const n = Math.min(8, Math.max(1, Math.floor(Number(w.props.maxItems) || 3)));
+            return (
+              <div key={w.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-base font-semibold text-gray-800 break-words">{title}</div>
+                  <span className="text-gray-400 text-sm">›</span>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {Array.from({ length: n }, (_, i) => (
+                    <div key={i} className="flex gap-2 text-sm">
+                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-gray-300" />
+                      <div>
+                        <div className="font-medium text-gray-700">Sample task {i + 1}</div>
+                        <div className="text-xs text-gray-500">Due YYYY-MM-DD</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 text-xs font-medium" style={{ color: primaryColor }}>
+                  Open full schedule ›
                 </div>
               </div>
             );

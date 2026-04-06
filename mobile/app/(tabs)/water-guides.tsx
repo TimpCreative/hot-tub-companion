@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { AppPageHeader } from '../../components/AppPageHeader';
 import api from '../../services/api';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -37,8 +37,17 @@ function getPrimarySpa(spaProfiles: SpaProfile[]): SpaProfile | null {
   return spaProfiles.find((spa) => spa.isPrimary) ?? spaProfiles[0] ?? null;
 }
 
+function normalizeCategoryParam(raw: string | undefined): string {
+  if (raw === 'maintenance' || raw === 'seasonal') return raw;
+  return 'water_care';
+}
+
 export default function WaterGuidesScreen() {
   const router = useRouter();
+  const { category: categoryParam } = useLocalSearchParams<{ category?: string }>();
+  const categoryKey = normalizeCategoryParam(
+    typeof categoryParam === 'string' ? categoryParam : Array.isArray(categoryParam) ? categoryParam[0] : undefined
+  );
   const { colors } = useTheme();
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -54,7 +63,7 @@ export default function WaterGuidesScreen() {
       const contentRes = (await api.get('/content', {
         params: {
           spaProfileId: primarySpa?.id,
-          category: 'water_care',
+          category: categoryKey,
           search: search || undefined,
         },
       })) as { data?: ContentItem[] };
@@ -65,7 +74,7 @@ export default function WaterGuidesScreen() {
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [search, categoryKey]);
 
   useFocusEffect(
     useCallback(() => {
@@ -79,13 +88,25 @@ export default function WaterGuidesScreen() {
     return 'No water care guides have been published for this spa yet.';
   }, [search, spaProfileId]);
 
-  const headerSubtitle = spaProfileId
-    ? 'Contextual water care content for your active spa.'
-    : 'Finish spa setup to unlock personalized water care guides.';
+  const headerSubtitle =
+    categoryKey === 'maintenance'
+      ? spaProfileId
+        ? 'Maintenance how-tos matched to your spa.'
+        : 'Finish spa setup for personalized maintenance guides.'
+      : categoryKey === 'seasonal'
+        ? spaProfileId
+          ? 'Seasonal care topics for your spa.'
+          : 'Finish spa setup for personalized seasonal guides.'
+        : spaProfileId
+          ? 'Contextual water care content for your active spa.'
+          : 'Finish spa setup to unlock personalized water care guides.';
+
+  const pageTitle =
+    categoryKey === 'maintenance' ? 'Maintenance guides' : categoryKey === 'seasonal' ? 'Seasonal guides' : 'Guides & Videos';
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={styles.content}>
-      <AppPageHeader title="Guides & Videos" subtitle={headerSubtitle} />
+      <AppPageHeader title={pageTitle} subtitle={headerSubtitle} />
 
       <TextInput
         value={search}

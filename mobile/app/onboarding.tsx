@@ -36,6 +36,15 @@ type SpaModelHit = {
 
 type OnboardingStepId = 'brand' | 'modelPick' | 'sanitizer';
 
+const SEASON_PRESETS: { key: string; label: string; months: number[] }[] = [
+  { key: 'spring', label: 'Spring', months: [3, 4, 5] },
+  { key: 'summer', label: 'Summer', months: [6, 7, 8] },
+  { key: 'autumn', label: 'Autumn', months: [9, 10, 11] },
+  { key: 'winter', label: 'Winter', months: [12, 1, 2] },
+];
+
+const ALL_USAGE_MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
 function stepEnabled(
   steps: { id: OnboardingStepId; enabled: boolean }[] | undefined,
   id: OnboardingStepId
@@ -82,6 +91,9 @@ export default function OnboardingScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shareWaterTestsWithRetailer, setShareWaterTestsWithRetailer] = useState(true);
+
+  const [usageMonths, setUsageMonths] = useState<number[]>(() => [...ALL_USAGE_MONTHS]);
+  const [winterStrategy, setWinterStrategy] = useState<'shutdown' | 'operate'>('operate');
 
   const sanitizerOptions = useMemo(() => {
     const list = config?.sanitationSystemOptions ?? [];
@@ -177,6 +189,30 @@ export default function OnboardingScreen() {
 
   const canSubmit = modelOk && sanitizerOk && brandOk && !submitting;
 
+  const toggleMonth = (m: number) => {
+    setUsageMonths((prev) =>
+      prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m].sort((a, b) => a - b)
+    );
+  };
+
+  const toggleSeasonMonths = (months: number[]) => {
+    setUsageMonths((prev) => {
+      const allSelected = months.every((x) => prev.includes(x));
+      if (allSelected) {
+        return prev.filter((x) => !months.includes(x)).sort((a, b) => a - b);
+      }
+      return [...new Set([...prev, ...months])].sort((a, b) => a - b);
+    });
+  };
+
+  function payloadUsageMonthsForCreate(): number[] | undefined {
+    if (usageMonths.length === 0) return [...ALL_USAGE_MONTHS];
+    const fullYear =
+      usageMonths.length === 12 && ALL_USAGE_MONTHS.every((m) => usageMonths.includes(m));
+    if (fullYear) return undefined;
+    return usageMonths;
+  }
+
   const screenBg = '#F2F4F8';
   const cardBg = '#FFFFFF';
   const inputWell = '#EEF1F5';
@@ -225,6 +261,8 @@ export default function OnboardingScreen() {
         await api.post('/spa-profiles', {
           uhtdSpaModelId: selectedModel!.id,
           sanitizationSystem: sanitizer!,
+          usageMonths: payloadUsageMonthsForCreate(),
+          winterStrategy,
         });
       }
       await clearSetupSkippedFlag();
@@ -500,6 +538,77 @@ export default function OnboardingScreen() {
                 </>
               )}
             </View>
+          ) : null}
+
+          {!useCustomBrand && !useCustomModel && !useCustomSanitizer ? (
+            <>
+              <View style={styles.field}>
+                <Text style={styles.label}>Usage months</Text>
+                <Text style={styles.helperSmall}>
+                  Tap seasons or letters. Turn off months you do not use your tub so your care schedule matches
+                  your season.
+                </Text>
+                <View style={styles.seasonRow}>
+                  {SEASON_PRESETS.map((s) => {
+                    const active = s.months.every((m) => usageMonths.includes(m));
+                    return (
+                      <TouchableOpacity
+                        key={s.key}
+                        style={[styles.seasonChip, active && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                        onPress={() => toggleSeasonMonths(s.months)}
+                      >
+                        <Text style={[styles.seasonChipText, { color: active ? '#fff' : '#333' }]}>{s.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <View style={styles.monthsRow}>
+                  {ALL_USAGE_MONTHS.map((m) => (
+                    <TouchableOpacity
+                      key={m}
+                      style={[
+                        styles.monthBtn,
+                        usageMonths.includes(m) && { backgroundColor: colors.primary, borderColor: colors.primary },
+                      ]}
+                      onPress={() => toggleMonth(m)}
+                    >
+                      <Text
+                        style={[styles.monthBtnText, { color: usageMonths.includes(m) ? '#fff' : '#333' }]}
+                      >
+                        {['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'][m - 1]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>When you are not using the tub</Text>
+                <Text style={styles.helperSmall}>
+                  Shutdown adds winterize and spring startup reminders when you have off-months.
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.strategyRow,
+                    winterStrategy === 'shutdown' && { borderColor: colors.primary, backgroundColor: `${colors.primary}12` },
+                  ]}
+                  onPress={() => setWinterStrategy('shutdown')}
+                >
+                  <Text style={styles.strategyTitle}>Shut down when not in use</Text>
+                  <Text style={styles.strategySub}>Winterize during off months</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.strategyRow,
+                    winterStrategy === 'operate' && { borderColor: colors.primary, backgroundColor: `${colors.primary}12` },
+                  ]}
+                  onPress={() => setWinterStrategy('operate')}
+                >
+                  <Text style={styles.strategyTitle}>Keep running year-round</Text>
+                  <Text style={styles.strategySub}>No full winterize / startup pair</Text>
+                </TouchableOpacity>
+              </View>
+            </>
           ) : null}
 
           {useCustomBrand || useCustomModel || useCustomSanitizer ? (
@@ -827,4 +936,42 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginBottom: 8,
   },
+  helperSmall: {
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 19,
+    marginBottom: 10,
+  },
+  seasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  seasonChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#fff',
+  },
+  seasonChipText: { fontSize: 14, fontWeight: '600' },
+  monthsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  monthBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthBtnText: { fontSize: 12, fontWeight: '600' },
+  strategyRow: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    backgroundColor: '#fff',
+  },
+  strategyTitle: { fontSize: 16, fontWeight: '600', color: '#111', marginBottom: 4 },
+  strategySub: { fontSize: 13, color: '#64748b', lineHeight: 18 },
 });

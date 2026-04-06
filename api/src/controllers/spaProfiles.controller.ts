@@ -26,6 +26,9 @@ function mapProfile(row: Record<string, unknown>) {
     isPrimary: row.is_primary,
     warrantyExpirationDate: row.warranty_expiration_date ?? null,
     lastFilterChange: row.last_filter_change ?? null,
+    lastWaterTestAt: row.last_water_test_at ?? null,
+    lastDrainRefillAt: row.last_drain_refill_at ?? null,
+    lastCoverCheckAt: row.last_cover_check_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -181,6 +184,9 @@ export async function updateSpaProfile(req: Request, res: Response): Promise<voi
     nickname?: string | null;
     warrantyExpirationDate?: string | null;
     lastFilterChange?: string | null;
+    lastWaterTestAt?: string | null;
+    lastDrainRefillAt?: string | null;
+    lastCoverCheckAt?: string | null;
     winterStrategy?: 'shutdown' | 'operate';
   };
 
@@ -233,6 +239,15 @@ export async function updateSpaProfile(req: Request, res: Response): Promise<voi
     update.last_filter_change = body.lastFilterChange
       ? new Date(body.lastFilterChange)
       : null;
+  }
+  if (body.lastWaterTestAt !== undefined) {
+    update.last_water_test_at = body.lastWaterTestAt ? new Date(body.lastWaterTestAt) : null;
+  }
+  if (body.lastDrainRefillAt !== undefined) {
+    update.last_drain_refill_at = body.lastDrainRefillAt ? new Date(body.lastDrainRefillAt) : null;
+  }
+  if (body.lastCoverCheckAt !== undefined) {
+    update.last_cover_check_at = body.lastCoverCheckAt ? new Date(body.lastCoverCheckAt) : null;
   }
 
   const [row] = await db('spa_profiles')

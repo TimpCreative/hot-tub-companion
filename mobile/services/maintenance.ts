@@ -43,3 +43,32 @@ export async function completeMaintenanceEvent(id: string): Promise<MaintenanceE
   const res = (await api.post(`/maintenance/${id}/complete`)) as CompleteResponse;
   return res?.data?.event ?? null;
 }
+
+type MutateResponse = { success?: boolean; data?: { event: MaintenanceEvent } };
+
+export async function createCustomMaintenanceEvent(body: {
+  spaProfileId: string;
+  title: string;
+  description?: string | null;
+  dueDate: string;
+}): Promise<MaintenanceEvent | null> {
+  const res = (await api.post('/maintenance', body)) as MutateResponse;
+  return res?.data?.event ?? null;
+}
+
+export async function updateCustomMaintenanceEvent(
+  id: string,
+  body: { title?: string; description?: string | null; dueDate?: string }
+): Promise<MaintenanceEvent | null> {
+  const res = (await api.put(`/maintenance/${id}`, body)) as MutateResponse;
+  return res?.data?.event ?? null;
+}
+
+export async function deleteCustomMaintenanceEvent(id: string): Promise<boolean> {
+  try {
+    await api.delete(`/maintenance/${id}`);
+    return true;
+  } catch {
+    return false;
+  }
+}

@@ -125,6 +125,7 @@ export default function EditSpaScreen() {
         serialNumber: serialNumber.trim() || null,
         sanitizationSystem: sanitizationSystem || undefined,
         usageMonths: usageMonths.length > 0 ? usageMonths : undefined,
+        winterStrategy,
         warrantyExpirationDate: warrantyDate ? new Date(warrantyDate).toISOString().slice(0, 10) : null,
       });
       router.back();

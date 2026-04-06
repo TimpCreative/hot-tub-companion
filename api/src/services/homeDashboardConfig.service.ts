@@ -3,7 +3,7 @@
  * Quick Links (icon tiles) are separate from Home Dashboard Widgets (dealer_card, tips_list, product_strip).
  */
 
-export type HomeWidgetType = 'dealer_card' | 'tips_list' | 'product_strip';
+export type HomeWidgetType = 'dealer_card' | 'tips_list' | 'product_strip' | 'maintenance_summary';
 
 export interface HomeWidgetDTO {
   id: string;
@@ -32,7 +32,12 @@ export interface HomeDashboardConfigDTO {
   widgets: HomeWidgetDTO[];
 }
 
-const ALLOWED_WIDGET_TYPES = new Set<HomeWidgetType>(['dealer_card', 'tips_list', 'product_strip']);
+const ALLOWED_WIDGET_TYPES = new Set<HomeWidgetType>([
+  'dealer_card',
+  'tips_list',
+  'product_strip',
+  'maintenance_summary',
+]);
 
 /** Internal routes allowed for link_tile targetRoute (Expo Router paths). */
 export const HOME_DASHBOARD_ALLOWED_ROUTES = new Set<string>([
@@ -42,6 +47,7 @@ export const HOME_DASHBOARD_ALLOWED_ROUTES = new Set<string>([
   '/dealer',
   '/services',
   '/onboarding',
+  '/maintenance-timeline',
 ]);
 
 const MAX_TITLE = 120;
@@ -83,6 +89,16 @@ export const DEFAULT_HOME_DASHBOARD_CONFIG: HomeDashboardConfigDTO = {
   quickLinks: DEFAULT_QUICK_LINKS.map((q) => ({ ...q })),
   quickLinksLayout: 'single',
   widgets: [
+    {
+      id: 'maintenance_summary',
+      type: 'maintenance_summary',
+      enabled: true,
+      order: 2,
+      props: {
+        title: 'Care schedule',
+        maxItems: 3,
+      },
+    },
     {
       id: 'dealer_card',
       type: 'dealer_card',
@@ -169,6 +185,19 @@ function validateProductStripProps(props: Record<string, unknown>): Record<strin
   };
 }
 
+const MAX_MAINT_ITEMS = 8;
+
+function validateMaintenanceSummaryProps(props: Record<string, unknown>): Record<string, unknown> {
+  let maxItems = 3;
+  if (typeof props.maxItems === 'number' && Number.isFinite(props.maxItems)) {
+    maxItems = Math.min(MAX_MAINT_ITEMS, Math.max(1, Math.floor(props.maxItems)));
+  }
+  return {
+    title: clampStr(props.title, MAX_TITLE) || 'Care schedule',
+    maxItems,
+  };
+}
+
 function normalizeWidget(raw: unknown, fallbackOrder: number): HomeWidgetDTO | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
@@ -183,6 +212,7 @@ function normalizeWidget(raw: unknown, fallbackOrder: number): HomeWidgetDTO | n
   if (type === 'dealer_card') props = validateDealerCardProps(props);
   else if (type === 'tips_list') props = validateTipsListProps(props);
   else if (type === 'product_strip') props = validateProductStripProps(props);
+  else if (type === 'maintenance_summary') props = validateMaintenanceSummaryProps(props);
 
   return { id, type, enabled, order, props };
 }

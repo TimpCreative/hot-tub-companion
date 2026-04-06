@@ -14,6 +14,13 @@ export const DEFAULT_HOME_DASHBOARD: HomeDashboardConfig = {
   quickLinksLayout: 'single',
   widgets: [
     {
+      id: 'maintenance_summary',
+      type: 'maintenance_summary',
+      enabled: true,
+      order: 2,
+      props: { title: 'Care schedule', maxItems: 3 },
+    },
+    {
       id: 'dealer_card',
       type: 'dealer_card',
       enabled: true,

@@ -107,7 +107,9 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '3',
-        status: 'not_yet',
+        status: 'partial',
+        notes:
+          'Care schedule, cron reminders, spa seasons, custom tasks, profile tracking on complete, home maintenance_summary widget, onboarding seasons. UTC calendar v1.',
       },
       {
         feature: 'Multi-spa support (basic)',
