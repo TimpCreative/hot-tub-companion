@@ -650,6 +650,19 @@ export default function ReviewQueuePage() {
                   header: 'Submitted details',
                   render: (row: ConsumerSuggestionRow) => {
                     const p = row.payload;
+                    const ce = p.customerEntered;
+                    const customerLines: string[] = [];
+                    if (ce && typeof ce === 'object') {
+                      const o = ce as Record<string, unknown>;
+                      if (typeof o.brand === 'string' && o.brand.trim()) customerLines.push(`Brand: ${o.brand.trim()}`);
+                      if (typeof o.model === 'string' && o.model.trim()) customerLines.push(`Model: ${o.model.trim()}`);
+                      if (typeof o.modelLine === 'string' && o.modelLine.trim())
+                        customerLines.push(`Line: ${o.modelLine.trim()}`);
+                    }
+                    const usageMonths =
+                      Array.isArray(p.usageMonths) && p.usageMonths.every((m) => typeof m === 'number')
+                        ? (p.usageMonths as number[]).join(', ')
+                        : null;
                     return (
                       <div className="text-sm text-gray-800 space-y-0.5 max-w-md">
                         <div>
@@ -662,6 +675,24 @@ export default function ReviewQueuePage() {
                         {p.modelLineName ? (
                           <div>
                             <span className="font-medium">Line:</span> {String(p.modelLineName)}
+                          </div>
+                        ) : null}
+                        {customerLines.length > 0 ? (
+                          <div className="mt-2 pt-2 border-t border-gray-200 text-gray-700">
+                            <div className="font-medium text-gray-900">As typed by customer</div>
+                            {customerLines.map((line, idx) => (
+                              <div key={idx}>{line}</div>
+                            ))}
+                          </div>
+                        ) : null}
+                        {usageMonths ? (
+                          <div>
+                            <span className="font-medium">Usage months:</span> {usageMonths}
+                          </div>
+                        ) : null}
+                        {typeof p.winterStrategy === 'string' && p.winterStrategy ? (
+                          <div>
+                            <span className="font-medium">Winter strategy:</span> {p.winterStrategy}
                           </div>
                         ) : null}
                         <div>

@@ -199,7 +199,7 @@ export default function ProfileScreen() {
                 </View>
               ))}
               <Button
-                title="Add Another Spa"
+                title={spaProfiles.length === 0 ? 'Add a spa' : 'Add another spa'}
                 variant="outline"
                 onPress={() => router.push('/onboarding?returnTo=profile')}
               />

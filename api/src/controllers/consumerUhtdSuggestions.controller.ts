@@ -4,6 +4,21 @@ import { success, error } from '../utils/response';
 import * as scdbService from '../services/scdb.service';
 import * as notificationService from '../services/notification.service';
 import { getSanitationSystemValues, isValidSanitationSystem } from '../services/sanitationSystem.service';
+import * as maintenanceSchedule from '../services/maintenanceSchedule.service';
+
+function sanitizeCustomerEntered(raw: unknown): Record<string, string> | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const out: Record<string, string> = {};
+  for (const key of ['brand', 'model', 'modelLine'] as const) {
+    const v = o[key];
+    if (typeof v === 'string') {
+      const t = v.trim();
+      if (t) out[key] = t.slice(0, 300);
+    }
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
 
 function requireCustomerUser(req: Request, res: Response): string | null {
   if ((req as any).userIsTenantAdminOverride) {
@@ -45,6 +60,9 @@ export async function submitConsumerSuggestion(req: Request, res: Response): Pro
     customSanitizerNote?: string | null;
     serialNumber?: string | null;
     notes?: string | null;
+    usageMonths?: number[] | null;
+    winterStrategy?: 'shutdown' | 'operate';
+    customerEntered?: { brand?: string; model?: string; modelLine?: string };
   };
 
   const modelName = typeof body.modelName === 'string' ? body.modelName.trim() : '';
@@ -98,6 +116,27 @@ export async function submitConsumerSuggestion(req: Request, res: Response): Pro
     }
   }
 
+  const defaultMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  let usageMonthsForProfile = defaultMonths;
+  if (body.usageMonths !== undefined && body.usageMonths !== null) {
+    if (!Array.isArray(body.usageMonths) || body.usageMonths.some((m) => typeof m !== 'number' || m < 1 || m > 12)) {
+      error(res, 'VALIDATION_ERROR', 'usageMonths must be an array of integers 1-12', 400);
+      return;
+    }
+    usageMonthsForProfile = body.usageMonths.length > 0 ? body.usageMonths : defaultMonths;
+  }
+
+  let winterStrategy: 'shutdown' | 'operate' = 'operate';
+  if (body.winterStrategy !== undefined) {
+    if (body.winterStrategy !== 'shutdown' && body.winterStrategy !== 'operate') {
+      error(res, 'VALIDATION_ERROR', 'winterStrategy must be shutdown or operate', 400);
+      return;
+    }
+    winterStrategy = body.winterStrategy;
+  }
+
+  const customerEntered = sanitizeCustomerEntered(body.customerEntered);
+
   const payload = {
     source: 'mobile_onboarding',
     brandId,
@@ -112,6 +151,9 @@ export async function submitConsumerSuggestion(req: Request, res: Response): Pro
         : null,
     serialNumber: typeof body.serialNumber === 'string' ? body.serialNumber.trim() || null : null,
     notes: typeof body.notes === 'string' ? body.notes.trim() || null : null,
+    customerEntered,
+    usageMonths: usageMonthsForProfile,
+    winterStrategy,
   };
 
   const trx = await db.transaction();
@@ -131,7 +173,6 @@ export async function submitConsumerSuggestion(req: Request, res: Response): Pro
       .first();
     const count = parseInt(String((existingCount as any)?.c ?? '0'), 10);
     const isPrimary = count === 0;
-    const defaultMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
     const [profile] = await trx('spa_profiles')
       .insert({
@@ -144,7 +185,8 @@ export async function submitConsumerSuggestion(req: Request, res: Response): Pro
         serial_number: payload.serialNumber ? String(payload.serialNumber).slice(0, 100) : null,
         nickname: null,
         sanitization_system: body.sanitizationSystem,
-        usage_months: defaultMonths,
+        usage_months: usageMonthsForProfile,
+        winter_strategy: winterStrategy,
         uhtd_spa_model_id: null,
         is_primary: isPrimary,
         consumer_suggestion_id: suggestion.id,
@@ -153,6 +195,11 @@ export async function submitConsumerSuggestion(req: Request, res: Response): Pro
       .returning('*');
 
     await trx.commit();
+
+    const spaProfileId = (profile as { id: string }).id;
+    void maintenanceSchedule.regenerateAutoEventsForSpaProfile(spaProfileId).catch((err) => {
+      console.warn('[consumerUhtd] maintenance schedule regenerate failed:', err);
+    });
 
     if (isPrimary) {
       const tenant = (req as any).tenant as { name?: string } | undefined;

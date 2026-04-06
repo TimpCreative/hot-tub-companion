@@ -213,6 +213,19 @@ export default function OnboardingScreen() {
     return usageMonths;
   }
 
+  /** Free-text fields the customer entered (shown in Super Admin review queue as typed). */
+  function buildCustomerEnteredForQueue(): { brand?: string; model?: string; modelLine?: string } | undefined {
+    const out: { brand?: string; model?: string; modelLine?: string } = {};
+    if (useCustomBrand && customBrandName.trim()) {
+      out.brand = customBrandName.trim();
+    }
+    if (useCustomModel) {
+      if (customModelName.trim()) out.model = customModelName.trim();
+      if (customModelLine.trim()) out.modelLine = customModelLine.trim();
+    }
+    return Object.keys(out).length > 0 ? out : undefined;
+  }
+
   const screenBg = '#F2F4F8';
   const cardBg = '#FFFFFF';
   const inputWell = '#EEF1F5';
@@ -256,6 +269,9 @@ export default function OnboardingScreen() {
           year,
           sanitizationSystem: useCustomSanitizer ? 'other' : sanitizer!,
           customSanitizerNote: useCustomSanitizer ? customSanitizerNote.trim() : undefined,
+          usageMonths: payloadUsageMonthsForCreate(),
+          winterStrategy,
+          customerEntered: buildCustomerEnteredForQueue(),
         });
       } else {
         await api.post('/spa-profiles', {
@@ -540,76 +556,70 @@ export default function OnboardingScreen() {
             </View>
           ) : null}
 
-          {!useCustomBrand && !useCustomModel && !useCustomSanitizer ? (
-            <>
-              <View style={styles.field}>
-                <Text style={styles.label}>Usage months</Text>
-                <Text style={styles.helperSmall}>
-                  Tap seasons or letters. Turn off months you do not use your tub so your care schedule matches
-                  your season.
-                </Text>
-                <View style={styles.seasonRow}>
-                  {SEASON_PRESETS.map((s) => {
-                    const active = s.months.every((m) => usageMonths.includes(m));
-                    return (
-                      <TouchableOpacity
-                        key={s.key}
-                        style={[styles.seasonChip, active && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                        onPress={() => toggleSeasonMonths(s.months)}
-                      >
-                        <Text style={[styles.seasonChipText, { color: active ? '#fff' : '#333' }]}>{s.label}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                <View style={styles.monthsRow}>
-                  {ALL_USAGE_MONTHS.map((m) => (
-                    <TouchableOpacity
-                      key={m}
-                      style={[
-                        styles.monthBtn,
-                        usageMonths.includes(m) && { backgroundColor: colors.primary, borderColor: colors.primary },
-                      ]}
-                      onPress={() => toggleMonth(m)}
-                    >
-                      <Text
-                        style={[styles.monthBtnText, { color: usageMonths.includes(m) ? '#fff' : '#333' }]}
-                      >
-                        {['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'][m - 1]}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
+          <View style={styles.field}>
+            <Text style={styles.label}>Usage months</Text>
+            <Text style={styles.helperSmall}>
+              Tap seasons or letters. Turn off months you do not use your tub so your care schedule matches your
+              season.
+            </Text>
+            <View style={styles.seasonRow}>
+              {SEASON_PRESETS.map((s) => {
+                const active = s.months.every((m) => usageMonths.includes(m));
+                return (
+                  <TouchableOpacity
+                    key={s.key}
+                    style={[styles.seasonChip, active && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                    onPress={() => toggleSeasonMonths(s.months)}
+                  >
+                    <Text style={[styles.seasonChipText, { color: active ? '#fff' : '#333' }]}>{s.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.monthsRow}>
+              {ALL_USAGE_MONTHS.map((m) => (
+                <TouchableOpacity
+                  key={m}
+                  style={[
+                    styles.monthBtn,
+                    usageMonths.includes(m) && { backgroundColor: colors.primary, borderColor: colors.primary },
+                  ]}
+                  onPress={() => toggleMonth(m)}
+                >
+                  <Text style={[styles.monthBtnText, { color: usageMonths.includes(m) ? '#fff' : '#333' }]}>
+                    {['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'][m - 1]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
 
-              <View style={styles.field}>
-                <Text style={styles.label}>When you are not using the tub</Text>
-                <Text style={styles.helperSmall}>
-                  Shutdown adds winterize and spring startup reminders when you have off-months.
-                </Text>
-                <TouchableOpacity
-                  style={[
-                    styles.strategyRow,
-                    winterStrategy === 'shutdown' && { borderColor: colors.primary, backgroundColor: `${colors.primary}12` },
-                  ]}
-                  onPress={() => setWinterStrategy('shutdown')}
-                >
-                  <Text style={styles.strategyTitle}>Shut down when not in use</Text>
-                  <Text style={styles.strategySub}>Winterize during off months</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.strategyRow,
-                    winterStrategy === 'operate' && { borderColor: colors.primary, backgroundColor: `${colors.primary}12` },
-                  ]}
-                  onPress={() => setWinterStrategy('operate')}
-                >
-                  <Text style={styles.strategyTitle}>Keep running year-round</Text>
-                  <Text style={styles.strategySub}>No full winterize / startup pair</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          ) : null}
+          <View style={styles.field}>
+            <Text style={styles.label}>When you are not using the tub</Text>
+            <Text style={styles.helperSmall}>
+              Shutdown adds winterize and spring startup reminders when you have off-months.
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.strategyRow,
+                winterStrategy === 'shutdown' && { borderColor: colors.primary, backgroundColor: `${colors.primary}12` },
+              ]}
+              onPress={() => setWinterStrategy('shutdown')}
+            >
+              <Text style={styles.strategyTitle}>Shut down when not in use</Text>
+              <Text style={styles.strategySub}>Winterize during off months</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.strategyRow,
+                winterStrategy === 'operate' && { borderColor: colors.primary, backgroundColor: `${colors.primary}12` },
+              ]}
+              onPress={() => setWinterStrategy('operate')}
+            >
+              <Text style={styles.strategyTitle}>Keep running year-round</Text>
+              <Text style={styles.strategySub}>No full winterize / startup pair</Text>
+            </TouchableOpacity>
+          </View>
 
           {useCustomBrand || useCustomModel || useCustomSanitizer ? (
             <Text style={styles.queueHint}>
