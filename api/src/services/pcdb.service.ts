@@ -528,24 +528,132 @@ export async function deletePart(id: string, userId?: string): Promise<boolean> 
 // Search
 // =============================================================================
 
-export async function searchParts(query: string, limit = 50): Promise<PcdbPart[]> {
-  const rows = await db('pcdb_parts')
+const PART_SEARCH_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export type PartSearchField =
+  | 'all'
+  | 'id'
+  | 'name'
+  | 'part_number'
+  | 'manufacturer'
+  | 'identifiers'
+  | 'notes';
+
+const PART_SEARCH_FIELDS: PartSearchField[] = [
+  'all',
+  'id',
+  'name',
+  'part_number',
+  'manufacturer',
+  'identifiers',
+  'notes',
+];
+
+export function normalizePartSearchField(raw: string | undefined): PartSearchField {
+  const v = (raw || 'all').toLowerCase();
+  return PART_SEARCH_FIELDS.includes(v as PartSearchField) ? (v as PartSearchField) : 'all';
+}
+
+/**
+ * Super-admin part lookup for linking / search UIs.
+ * Uses ILIKE and, where useful, pg_trgm similarity (name, notes).
+ */
+export async function searchParts(
+  query: string,
+  limit = 50,
+  field: PartSearchField = 'all'
+): Promise<PcdbPart[]> {
+  const q = String(query || '').trim();
+  if (!q) return [];
+
+  const lim = Math.min(100, Math.max(1, limit));
+
+  let qb = db('pcdb_parts')
     .select(
       'pcdb_parts.*',
       'pcdb_categories.name as category_name',
       'pcdb_categories.display_name as category_display_name'
     )
     .leftJoin('pcdb_categories', 'pcdb_parts.category_id', 'pcdb_categories.id')
-    .whereNull('pcdb_parts.deleted_at')
-    .where(function () {
-      this.whereRaw('pcdb_parts.name ILIKE ?', [`%${query}%`])
-        .orWhereRaw('pcdb_parts.part_number ILIKE ?', [`%${query}%`])
-        .orWhereRaw('pcdb_parts.upc = ?', [query])
-        .orWhereRaw('pcdb_parts.manufacturer ILIKE ?', [`%${query}%`]);
-    })
+    .whereNull('pcdb_parts.deleted_at');
+
+  switch (field) {
+    case 'id':
+      if (!PART_SEARCH_UUID.test(q)) {
+        return [];
+      }
+      qb = qb.where('pcdb_parts.id', q);
+      break;
+    case 'name':
+      qb = qb.where(function () {
+        this.whereRaw('pcdb_parts.name ILIKE ?', [`%${q}%`]);
+        if (q.length >= 2) {
+          this.orWhereRaw('similarity(pcdb_parts.name, ?) >= 0.12', [q]);
+        }
+      });
+      if (q.length >= 2) {
+        qb = qb.orderByRaw('similarity(pcdb_parts.name, ?) DESC', [q]);
+      }
+      break;
+    case 'part_number':
+      qb = qb.where(function () {
+        this.whereRaw('LOWER(pcdb_parts.part_number) = LOWER(?)', [q])
+          .orWhereRaw('pcdb_parts.part_number ILIKE ?', [`%${q}%`])
+          .orWhereRaw('? = ANY(pcdb_parts.sku_aliases)', [q]);
+      });
+      break;
+    case 'manufacturer':
+      qb = qb.whereRaw('pcdb_parts.manufacturer ILIKE ?', [`%${q}%`]);
+      break;
+    case 'identifiers':
+      qb = qb.where(function () {
+        this.where('pcdb_parts.upc', q)
+          .orWhere('pcdb_parts.ean', q)
+          .orWhereRaw('LOWER(pcdb_parts.part_number) = LOWER(?)', [q])
+          .orWhereRaw('pcdb_parts.manufacturer_sku ILIKE ?', [`%${q}%`])
+          .orWhereRaw('? = ANY(pcdb_parts.sku_aliases)', [q]);
+      });
+      break;
+    case 'notes':
+      qb = qb.where(function () {
+        this.whereRaw('pcdb_parts.notes ILIKE ?', [`%${q}%`]);
+        if (q.length >= 4) {
+          this.orWhereRaw('similarity(COALESCE(pcdb_parts.notes, \'\'), ?) >= 0.08', [q]);
+        }
+      });
+      if (q.length >= 4) {
+        qb = qb.orderByRaw('similarity(COALESCE(pcdb_parts.notes, \'\'), ?) DESC', [q]);
+      }
+      break;
+    case 'all':
+    default:
+      qb = qb.where(function () {
+        this.whereRaw('pcdb_parts.name ILIKE ?', [`%${q}%`])
+          .orWhereRaw('pcdb_parts.part_number ILIKE ?', [`%${q}%`])
+          .orWhereRaw('pcdb_parts.manufacturer_sku ILIKE ?', [`%${q}%`])
+          .orWhereRaw('pcdb_parts.manufacturer ILIKE ?', [`%${q}%`])
+          .orWhereRaw('pcdb_parts.upc = ?', [q])
+          .orWhereRaw('pcdb_parts.ean = ?', [q])
+          .orWhereRaw('pcdb_parts.notes ILIKE ?', [`%${q}%`])
+          .orWhereRaw('? = ANY(pcdb_parts.sku_aliases)', [q]);
+        if (q.length >= 3) {
+          this.orWhereRaw('similarity(pcdb_parts.name, ?) >= 0.12', [q]).orWhereRaw(
+            'similarity(COALESCE(pcdb_parts.notes, \'\'), ?) >= 0.1',
+            [q]
+          );
+        }
+        if (PART_SEARCH_UUID.test(q)) {
+          this.orWhere('pcdb_parts.id', q);
+        }
+      });
+      break;
+  }
+
+  const rows = await qb
     .orderBy('pcdb_parts.display_importance')
     .orderBy('pcdb_parts.name')
-    .limit(limit);
+    .limit(lim);
 
   return rows.map(mapPartFromDb);
 }

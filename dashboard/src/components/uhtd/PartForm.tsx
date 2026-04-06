@@ -16,7 +16,7 @@ interface Category {
   displayName: string;
 }
 
-interface PartFormData {
+export interface PartFormData {
   categoryId: string;
   partNumber: string;
   manufacturerSku: string;
@@ -42,6 +42,8 @@ interface PartFormProps {
   onSubmit: (data: PartFormData, spaIds: string[], qualifierValues?: Record<string, PartQualifierValue>) => Promise<void>;
   submitLabel?: string;
   loading?: boolean;
+  /** Extra classes on the form (e.g. embedded / full-screen modal). */
+  formClassName?: string;
 }
 
 export function PartForm({
@@ -51,6 +53,7 @@ export function PartForm({
   onSubmit,
   submitLabel = 'Save Part',
   loading = false,
+  formClassName = '',
 }: PartFormProps) {
   const fetchWithAuth = useSuperAdminFetch();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -129,8 +132,8 @@ export function PartForm({
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <form onSubmit={handleSubmit} className={formClassName}>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Part Details - Left column */}
         <div className="lg:col-span-1 space-y-6">
           <div className="card rounded-lg p-6 space-y-4">

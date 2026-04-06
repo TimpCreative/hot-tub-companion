@@ -369,13 +369,15 @@ export async function deletePart(req: Request, res: Response) {
 
 export async function searchParts(req: Request, res: Response) {
   try {
-    const { q, limit } = req.query;
+    const { q, limit, field } = req.query;
     if (!q) {
       return error(res, 'VALIDATION_ERROR', 'Query parameter q is required', 400);
     }
+    const searchField = pcdbService.normalizePartSearchField(field as string | undefined);
     const parts = await pcdbService.searchParts(
       q as string,
-      limit ? parseInt(limit as string, 10) : 50
+      limit ? parseInt(limit as string, 10) : 50,
+      searchField
     );
     return success(res, parts);
   } catch (err) {

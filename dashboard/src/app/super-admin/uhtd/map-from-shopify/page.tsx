@@ -6,12 +6,24 @@ import { useSuperAdminFetch } from '@/hooks/useSuperAdminFetch';
 import { Button } from '@/components/ui/Button';
 import { Table } from '@/components/ui/Table';
 import { Pagination } from '@/components/ui/Pagination';
+import { PartForm, type PartFormData } from '@/components/uhtd/PartForm';
+import type { PartQualifierValue } from '@/components/uhtd/PartQualifiersInput';
 
 const REJECT_REASONS = [
   { value: 'non_spa_category', label: 'Non-spa category' },
   { value: 'duplicate', label: 'Duplicate' },
   { value: 'other', label: 'Other' },
 ] as const;
+
+const LINK_SEARCH_FIELDS: { value: string; label: string; hint: string }[] = [
+  { value: 'all', label: 'All fields', hint: 'Name, numbers, UPC/EAN, manufacturer, notes, UUID' },
+  { value: 'id', label: 'Part ID (UUID)', hint: 'Exact database id' },
+  { value: 'name', label: 'Part name', hint: 'Contains match + fuzzy (pg_trgm)' },
+  { value: 'part_number', label: 'Part # / aliases', hint: 'Part number or sku_aliases array' },
+  { value: 'manufacturer', label: 'Manufacturer', hint: 'Brand name contains' },
+  { value: 'identifiers', label: 'UPC · EAN · Mfg SKU', hint: 'Exact barcode or SKU-style ids' },
+  { value: 'notes', label: 'Notes / description', hint: 'Internal notes text + fuzzy' },
+];
 
 type InboxRow = {
   id: string;
@@ -42,6 +54,60 @@ type Suggestion = {
 
 type TenantOpt = { id: string; name: string; slug: string | null };
 
+type PcdbSearchHit = {
+  id: string;
+  name: string;
+  partNumber?: string | null;
+  manufacturer?: string | null;
+};
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function posProductToPartInitial(p: Record<string, unknown>): Partial<PartFormData> {
+  const desc = p.description;
+  let notes = '';
+  if (typeof desc === 'string' && desc) {
+    notes = stripHtml(desc).slice(0, 8000);
+  }
+  return {
+    name: String(p.title ?? ''),
+    manufacturer: p.vendor ? String(p.vendor) : '',
+    partNumber: p.sku ? String(p.sku) : '',
+    upc: p.barcode ? String(p.barcode) : '',
+    notes,
+    dataSource: 'Map from Shopify',
+  };
+}
+
+function partFormToCreatePayload(fd: PartFormData) {
+  const aliases = fd.skuAliases
+    ? fd.skuAliases
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+  return {
+    categoryId: fd.categoryId,
+    partNumber: fd.partNumber?.trim() || undefined,
+    manufacturerSku: fd.manufacturerSku?.trim() || undefined,
+    upc: fd.upc?.trim() || undefined,
+    ean: fd.ean?.trim() || undefined,
+    skuAliases: aliases.length ? aliases : undefined,
+    name: fd.name,
+    manufacturer: fd.manufacturer?.trim() || undefined,
+    isOem: fd.isOem,
+    isUniversal: fd.isUniversal,
+    isDiscontinued: fd.isDiscontinued,
+    displayImportance: fd.displayImportance,
+    imageUrl: fd.imageUrl?.trim() || undefined,
+    specSheetUrl: fd.specSheetUrl?.trim() || undefined,
+    notes: fd.notes?.trim() || undefined,
+    dataSource: fd.dataSource?.trim() || undefined,
+  };
+}
+
 export default function MapFromShopifyPage() {
   const fetchWithAuth = useSuperAdminFetch();
   const [tenants, setTenants] = useState<TenantOpt[]>([]);
@@ -65,12 +131,13 @@ export default function MapFromShopifyPage() {
   const [rejectReason, setRejectReason] = useState<string>(REJECT_REASONS[0].value);
   const [rejectNote, setRejectNote] = useState('');
   const [linkPartId, setLinkPartId] = useState('');
-  const [createCategoryId, setCreateCategoryId] = useState('');
-  const [createName, setCreateName] = useState('');
-  const [createPartNumber, setCreatePartNumber] = useState('');
-  const [createManufacturer, setCreateManufacturer] = useState('');
-  const [createUpc, setCreateUpc] = useState('');
-  const [categories, setCategories] = useState<{ id: string; displayName: string }[]>([]);
+  const [linkPickLabel, setLinkPickLabel] = useState('');
+  const [linkSearchField, setLinkSearchField] = useState('all');
+  const [linkSearchQuery, setLinkSearchQuery] = useState('');
+  const [linkSearchResults, setLinkSearchResults] = useState<PcdbSearchHit[]>([]);
+  const [linkSearchLoading, setLinkSearchLoading] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createModalKey, setCreateModalKey] = useState(0);
 
   const fetchInbox = useCallback(async () => {
     setLoading(true);
@@ -132,24 +199,37 @@ export default function MapFromShopifyPage() {
   }, [fetchWithAuth]);
 
   useEffect(() => {
-    async function loadCats() {
+    const q = linkSearchQuery.trim();
+    if (!q) {
+      setLinkSearchResults([]);
+      setLinkSearchLoading(false);
+      return;
+    }
+    const handle = window.setTimeout(async () => {
+      setLinkSearchLoading(true);
       try {
-        const res = await fetchWithAuth('/api/dashboard/super-admin/pcdb/categories');
+        const params = new URLSearchParams({
+          q,
+          field: linkSearchField,
+          limit: '35',
+        });
+        const res = await fetchWithAuth(
+          `/api/dashboard/super-admin/pcdb/parts/search?${params.toString()}`
+        );
         const data = await res.json();
         if (data.success && Array.isArray(data.data)) {
-          setCategories(
-            data.data.map((c: { id: string; displayName: string; name: string }) => ({
-              id: c.id,
-              displayName: c.displayName || c.name,
-            }))
-          );
+          setLinkSearchResults(data.data as PcdbSearchHit[]);
+        } else {
+          setLinkSearchResults([]);
         }
       } catch {
-        /* ignore */
+        setLinkSearchResults([]);
+      } finally {
+        setLinkSearchLoading(false);
       }
-    }
-    loadCats();
-  }, [fetchWithAuth]);
+    }, 320);
+    return () => window.clearTimeout(handle);
+  }, [linkSearchQuery, linkSearchField, fetchWithAuth]);
 
   const openDetail = async (id: string) => {
     setDetailId(id);
@@ -157,10 +237,11 @@ export default function MapFromShopifyPage() {
     setProduct(null);
     setSuggestions([]);
     setLinkPartId('');
-    setCreateName('');
-    setCreatePartNumber('');
-    setCreateManufacturer('');
-    setCreateUpc('');
+    setLinkPickLabel('');
+    setLinkSearchQuery('');
+    setLinkSearchResults([]);
+    setLinkSearchField('all');
+    setRejectOpen(false);
     setActionError('');
     try {
       const res = await fetchWithAuth(`/api/dashboard/super-admin/uhtd/shopify-map/inbox/${id}`);
@@ -171,9 +252,6 @@ export default function MapFromShopifyPage() {
       }
       setProduct(data.data?.product || null);
       setSuggestions(data.data?.suggestions || []);
-      const p = data.data?.product as { title?: string; vendor?: string | null } | undefined;
-      if (p?.title) setCreateName(String(p.title));
-      if (p?.vendor) setCreateManufacturer(String(p.vendor));
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Failed to load row');
     } finally {
@@ -185,6 +263,12 @@ export default function MapFromShopifyPage() {
     setDetailId(null);
     setProduct(null);
     setSuggestions([]);
+    setCreateModalOpen(false);
+  };
+
+  const openCreateModal = () => {
+    setCreateModalKey((k) => k + 1);
+    setCreateModalOpen(true);
   };
 
   const handleReject = async () => {
@@ -215,9 +299,15 @@ export default function MapFromShopifyPage() {
     }
   };
 
+  const pickLinkPart = (hit: PcdbSearchHit) => {
+    setLinkPartId(hit.id);
+    const pn = hit.partNumber ? ` · #${hit.partNumber}` : '';
+    setLinkPickLabel(`${hit.name}${pn}`);
+  };
+
   const handlePublishLink = async () => {
     if (!detailId || !linkPartId.trim()) {
-      setActionError('Enter a UHTD part UUID to link.');
+      setActionError('Search and select a part to link, or pick a suggestion above.');
       return;
     }
     const sug = suggestions.find((s) => s.partId === linkPartId.trim());
@@ -250,14 +340,16 @@ export default function MapFromShopifyPage() {
     }
   };
 
-  const handlePublishCreate = async () => {
-    if (!detailId || !createCategoryId || !createName.trim()) {
-      setActionError('Category and name are required to create a part.');
-      return;
-    }
+  const handleFullCreateSubmit = async (
+    formData: PartFormData,
+    spaIds: string[],
+    qualifierValues?: Record<string, PartQualifierValue>
+  ) => {
+    if (!detailId) return;
     setActionBusy(true);
     setActionError('');
     try {
+      const part = partFormToCreatePayload(formData);
       const res = await fetchWithAuth(
         `/api/dashboard/super-admin/uhtd/shopify-map/inbox/${detailId}/publish`,
         {
@@ -266,13 +358,7 @@ export default function MapFromShopifyPage() {
           body: JSON.stringify({
             mode: 'create',
             mappingConfidence: suggestions[0]?.score,
-            part: {
-              categoryId: createCategoryId,
-              name: createName.trim(),
-              partNumber: createPartNumber.trim() || undefined,
-              manufacturer: createManufacturer.trim() || undefined,
-              upc: createUpc.trim() || undefined,
-            },
+            part,
           }),
         }
       );
@@ -281,6 +367,35 @@ export default function MapFromShopifyPage() {
         setActionError(data.error?.message || 'Create failed');
         return;
       }
+      const partId = data.data?.partId as string | undefined;
+      if (!partId) {
+        setActionError('Part created but response missing part id');
+        return;
+      }
+
+      if (spaIds.length > 0 && !formData.isUniversal) {
+        await fetchWithAuth('/api/dashboard/super-admin/comps/compatibility/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            partId,
+            spaModelIds: spaIds,
+            status: 'pending',
+          }),
+        });
+      }
+
+      if (qualifierValues && Object.keys(qualifierValues).length > 0) {
+        for (const [qualifierId, { value, isRequired }] of Object.entries(qualifierValues)) {
+          await fetchWithAuth(`/api/dashboard/super-admin/qdb/part-qualifiers/${partId}/${qualifierId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value, isRequired }),
+          });
+        }
+      }
+
+      setCreateModalOpen(false);
       closeDetail();
       fetchInbox();
     } catch (e) {
@@ -303,10 +418,7 @@ export default function MapFromShopifyPage() {
           body: JSON.stringify({
             draftPayload: {
               note: 'Sent from Map from Shopify inbox',
-              proposedCreate: {
-                name: createName,
-                categoryId: createCategoryId || undefined,
-              },
+              shopifyTitle: product?.title,
             },
           }),
         }
@@ -366,6 +478,8 @@ export default function MapFromShopifyPage() {
     if (selectedIds.length === rows.length && rows.length > 0) setSelectedIds([]);
     else setSelectedIds(rows.map((r) => r.id));
   };
+
+  const fieldHint = LINK_SEARCH_FIELDS.find((f) => f.value === linkSearchField)?.hint ?? '';
 
   return (
     <div>
@@ -597,7 +711,11 @@ export default function MapFromShopifyPage() {
                           <button
                             type="button"
                             className="w-full text-left rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50"
-                            onClick={() => setLinkPartId(s.partId)}
+                            onClick={() => {
+                              setLinkPartId(s.partId);
+                              const pn = s.partNumber ? ` · #${s.partNumber}` : '';
+                              setLinkPickLabel(`${s.name}${pn}`);
+                            }}
                           >
                             <div className="text-sm font-medium text-gray-900">{s.name}</div>
                             <div className="text-xs text-gray-500">
@@ -613,12 +731,77 @@ export default function MapFromShopifyPage() {
 
                 <div className="border-t border-gray-100 pt-4 space-y-3">
                   <h3 className="text-sm font-medium text-gray-900">Link existing part</h3>
+                  <p className="text-xs text-gray-500">
+                    Search PCdb by field type, then pick a row. Same engine as super-admin part search (includes
+                    fuzzy name when using Name or All fields).
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-medium text-gray-600">Search in</label>
+                    <select
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      value={linkSearchField}
+                      onChange={(e) => setLinkSearchField(e.target.value)}
+                    >
+                      {LINK_SEARCH_FIELDS.map((f) => (
+                        <option key={f.value} value={f.value}>
+                          {f.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-400">{fieldHint}</p>
+                  </div>
                   <input
+                    type="search"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    placeholder="UHTD part UUID"
-                    value={linkPartId}
-                    onChange={(e) => setLinkPartId(e.target.value)}
+                    placeholder="Type to search…"
+                    value={linkSearchQuery}
+                    onChange={(e) => setLinkSearchQuery(e.target.value)}
                   />
+                  {linkSearchLoading ? (
+                    <p className="text-xs text-gray-500">Searching…</p>
+                  ) : linkSearchQuery.trim() ? (
+                    <ul className="max-h-52 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+                      {linkSearchResults.length === 0 ? (
+                        <li className="px-3 py-2 text-xs text-gray-500">No matches</li>
+                      ) : (
+                        linkSearchResults.map((hit) => (
+                          <li key={hit.id}>
+                            <button
+                              type="button"
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                              onClick={() => pickLinkPart(hit)}
+                            >
+                              <span className="font-medium text-gray-900">{hit.name}</span>
+                              {hit.partNumber ? (
+                                <span className="text-gray-500"> · #{hit.partNumber}</span>
+                              ) : null}
+                              {hit.manufacturer ? (
+                                <span className="text-xs text-gray-500 block">{hit.manufacturer}</span>
+                              ) : null}
+                              <span className="text-[10px] text-gray-400 font-mono block truncate">{hit.id}</span>
+                            </button>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  ) : null}
+                  {linkPartId ? (
+                    <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-sm">
+                      <div className="text-blue-900 font-medium">Selected</div>
+                      <div className="text-blue-800">{linkPickLabel || linkPartId}</div>
+                      <div className="text-xs text-blue-700/80 font-mono break-all">{linkPartId}</div>
+                      <button
+                        type="button"
+                        className="text-xs text-blue-600 underline mt-1"
+                        onClick={() => {
+                          setLinkPartId('');
+                          setLinkPickLabel('');
+                        }}
+                      >
+                        Clear selection
+                      </button>
+                    </div>
+                  ) : null}
                   <Button size="sm" loading={actionBusy} onClick={handlePublishLink}>
                     Save &amp; Publish (link)
                   </Button>
@@ -626,44 +809,11 @@ export default function MapFromShopifyPage() {
 
                 <div className="border-t border-gray-100 pt-4 space-y-3">
                   <h3 className="text-sm font-medium text-gray-900">Create new part</h3>
-                  <select
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    value={createCategoryId}
-                    onChange={(e) => setCreateCategoryId(e.target.value)}
-                  >
-                    <option value="">Category…</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.displayName}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    placeholder="Name *"
-                    value={createName}
-                    onChange={(e) => setCreateName(e.target.value)}
-                  />
-                  <input
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    placeholder="Part number (optional)"
-                    value={createPartNumber}
-                    onChange={(e) => setCreatePartNumber(e.target.value)}
-                  />
-                  <input
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    placeholder="Manufacturer (optional)"
-                    value={createManufacturer}
-                    onChange={(e) => setCreateManufacturer(e.target.value)}
-                  />
-                  <input
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    placeholder="UPC (optional)"
-                    value={createUpc}
-                    onChange={(e) => setCreateUpc(e.target.value)}
-                  />
-                  <Button size="sm" loading={actionBusy} onClick={handlePublishCreate}>
-                    Save &amp; Publish (create)
+                  <p className="text-xs text-gray-500">
+                    Opens the same full form as Add Part: all fields, spa compatibility, comp sidebar, qualifiers.
+                  </p>
+                  <Button size="sm" variant="secondary" onClick={openCreateModal}>
+                    Open full create form…
                   </Button>
                 </div>
 
@@ -676,11 +826,24 @@ export default function MapFromShopifyPage() {
                   </p>
                 </div>
 
-                <div className="border-t border-gray-100 pt-4 flex flex-wrap gap-2">
+                <div className="border-t border-gray-100 pt-4 space-y-2">
                   {!rejectOpen ? (
-                    <Button size="sm" variant="secondary" onClick={() => setRejectOpen(true)}>
-                      Reject…
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setRejectOpen(true)}
+                        title="Exclude this variant from the mapping inbox with a tracked reason"
+                      >
+                        Reject…
+                      </Button>
+                      <p className="text-xs text-gray-500 leading-relaxed pr-1">
+                        Rejecting marks this Shopify variant as intentionally unmapped (for example: not spa-related,
+                        duplicate listing, or other). It leaves the retailer catalog as-is but hides the row from this
+                        inbox and from super-admin triage until you change data in the database. Use a reason code so
+                        the team knows why it was skipped.
+                      </p>
+                    </>
                   ) : (
                     <div className="w-full space-y-2 rounded-lg border border-gray-200 p-3">
                       <select
@@ -719,6 +882,46 @@ export default function MapFromShopifyPage() {
           </div>
         </div>
       )}
+
+      {createModalOpen && detailId && product ? (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 md:p-8"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => !actionBusy && setCreateModalOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-[1600px] rounded-xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-6 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Create part &amp; map to Shopify</h2>
+                <p className="text-sm text-gray-500">
+                  Same workflow as{' '}
+                  <Link href="/super-admin/uhtd/parts/new" className="text-blue-600 hover:underline">
+                    Add Part
+                  </Link>
+                  — submit publishes the mapping when the part is created.
+                </p>
+              </div>
+              <Button variant="secondary" disabled={actionBusy} onClick={() => setCreateModalOpen(false)}>
+                Close
+              </Button>
+            </div>
+            <div className="max-h-[calc(100vh-8rem)] overflow-y-auto px-6 py-6">
+              <PartForm
+                key={createModalKey}
+                initialData={posProductToPartInitial(product)}
+                onSubmit={handleFullCreateSubmit}
+                submitLabel="Save & publish mapping"
+                loading={actionBusy}
+                formClassName="pb-8"
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
