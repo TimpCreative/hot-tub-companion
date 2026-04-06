@@ -147,6 +147,15 @@ export default function WaterCareScreen() {
       border: 'rgba(56,189,248,0.35)',
     },
     {
+      label: 'Care schedule',
+      description: 'Filter, drain, seasonal tasks — not water tests',
+      icon: 'calendar-outline' as const,
+      route: '/maintenance-timeline',
+      accent: '#0d9488',
+      accentSoft: 'rgba(13,148,136,0.10)',
+      border: 'rgba(45,212,191,0.35)',
+    },
+    {
       label: 'Guides & Videos',
       description: 'Step-by-step instructions for care',
       icon: 'play-circle-outline' as const,

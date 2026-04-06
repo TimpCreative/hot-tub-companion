@@ -26,6 +26,7 @@ import productsRoutes from './products.routes';
 import cartRoutes from './cart.routes';
 import ordersRoutes from './orders.routes';
 import spaProfilesRoutes from './spaProfiles.routes';
+import maintenanceRoutes from './maintenance.routes';
 import usersRoutes from './users.routes';
 import consumerUhtdSuggestionsRoutes from './consumerUhtdSuggestions.routes';
 
@@ -46,6 +47,11 @@ router.post(
   '/api/v1/internal/cron/sync-shopify-catalog',
   cronAuth,
   cronController.syncShopifyCatalog
+);
+router.post(
+  '/api/v1/internal/cron/maintenance-reminders',
+  cronAuth,
+  cronController.maintenanceReminders
 );
 
 // EAS build: fetch tenant API key by slug (EAS_BUILD_CONFIG_SECRET required)
@@ -93,6 +99,7 @@ router.use('/api/v1', ordersRoutes);
 
 // Customer spa profiles (tenant API key + Firebase auth)
 router.use('/api/v1', spaProfilesRoutes);
+router.use('/api/v1', maintenanceRoutes);
 
 // Customer user profile (tenant API key + Firebase auth)
 router.use('/api/v1', usersRoutes);

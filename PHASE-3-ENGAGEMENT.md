@@ -216,7 +216,13 @@ GET    /api/v1/admin/water-tests?customerId=X
 
 ## Part 2: Seasonal Maintenance Timeline
 
+> **Note:** The tab **Maintenance Log** in the app is **water test history**. The **mechanical / seasonal schedule** lives on **Care schedule** (`maintenance-timeline` → `GET /maintenance`).
+
 ### 2.1 Database Table
+
+`spa_profiles` includes **`winter_strategy`**: `'shutdown' | 'operate'`, default **`operate`** (no winterize/spring pair until the customer opts into shutdown).
+
+`maintenance_events` includes **`source`**: `'auto' | 'custom'`, default **`auto`**. Regenerating the schedule deletes only future **incomplete** rows where **`source = 'auto'`**; completed history and **custom** rows are kept.
 
 ```sql
 CREATE TABLE maintenance_events (
@@ -233,12 +239,13 @@ CREATE TABLE maintenance_events (
   recurrence_interval_days INTEGER,
   notification_sent BOOLEAN DEFAULT false,
   notification_days_before INTEGER DEFAULT 3,
-  linked_product_category VARCHAR(50),  -- UHTD part category to suggest when completing, e.g. 'filter'
+  linked_product_category VARCHAR(50),  -- e.g. 'filter','cover','chemical' for shop hints
+  source VARCHAR(20) NOT NULL DEFAULT 'auto',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX idx_maint_spa ON maintenance_events(spa_profile_id, due_date);
-CREATE INDEX idx_maint_pending ON maintenance_events(due_date) WHERE completed_at IS NULL;
+CREATE INDEX idx_maint_spa_due ON maintenance_events(spa_profile_id, due_date);
+CREATE INDEX idx_maint_notify_pending ON maintenance_events(due_date) WHERE completed_at IS NULL AND notification_sent = false;
 ```
 
 ### 2.2 Auto-Generated Schedule
@@ -258,7 +265,9 @@ When a spa profile is created or usage_months change, generate 12 months of main
 
 Skip generating events for months the user has marked as off (except winterize/startup events which specifically target those transitions).
 
-When regenerating (user changes usage_months), delete all future uncompleted events and recreate. Keep completed events as historical records.
+When regenerating (user changes `usage_months` or `winter_strategy`), delete future **auto** uncompleted events from **today onward** and recreate. Keep completed events and **custom** tasks.
+
+**Recurring completion:** `POST /maintenance/:id/complete` sets `completed_at` and, when `is_recurring` is true, inserts the next row with `due_date =` completed date + interval, **snapped to the next in-use month** if that date falls in an off-month (UTC calendar v1).
 
 ### 2.3 Maintenance Timeline Screen
 
@@ -277,24 +286,15 @@ Accessible from My Tub dashboard or a dedicated section:
 
 ### 2.4 Notification Cron Job
 
-Daily backend cron (runs at 9 AM in user's timezone, or just UTC morning):
+**Route:** `POST /api/v1/internal/cron/maintenance-reminders` (same `CRON_SECRET` / `cronAuth` as other internal crons). Run daily (e.g. Railway cron).
 
-```typescript
-// Find events needing notification
-const events = await db('maintenance_events')
-  .where('notification_sent', false)
-  .whereNull('completed_at')
-  .whereRaw("due_date - (notification_days_before || ' days')::interval <= CURRENT_DATE")
-  .whereRaw("due_date >= CURRENT_DATE");
+**Selection (UTC calendar dates, v1):** For each row with `completed_at IS NULL` and `notification_sent = false`, let `notify_date = due_date - notification_days_before` (calendar days). Send when **`today >= notify_date` AND `today <= due_date`** (inclusive). This replaces the earlier pseudo-SQL interval cast, which mixed types incorrectly.
 
-for (const event of events) {
-  await sendPushNotification(event.user_id, 
-    `Maintenance Reminder`,
-    `${event.title} is due ${formatRelativeDate(event.due_date)} for your ${spaModel}.`
-  );
-  await db('maintenance_events').where('id', event.id).update({ notification_sent: true });
-}
-```
+**Delivery:** `notificationService.sendToUser` with **`prefKey: 'maintenance'`** (maps to `users.notification_pref_maintenance`) and FCM data:
+
+`{ linkType: 'maintenance_event', linkId: <event id>, spaProfileId: <spa_profile_id> }`
+
+After a successful send, set `notification_sent = true` on that event.
 
 ### 2.5 API Endpoints
 
@@ -305,6 +305,15 @@ POST   /api/v1/maintenance  (create custom event)
 PUT    /api/v1/maintenance/:id
 DELETE /api/v1/maintenance/:id  (only custom events)
 ```
+
+### 2.6 Manual QA (post-deploy)
+
+- Run DB migration, then open **Care schedule** with an existing spa (lazy schedule generation) or create/edit a spa (eager regeneration).
+- Change **usage months** / **winter strategy** on spa edit: future auto tasks refresh; completed rows stay.
+- `winter_strategy = shutdown` with at least one off-month → **winterize** / **spring_startup** appear; `operate` → they do not.
+- Complete a recurring task → a new pending row appears at the next valid due date (in-use month).
+- Hit maintenance cron with `CRON_SECRET`; with `notification_pref_maintenance` on, device receives push; tap opens **Care schedule** with optional `eventId` highlight.
+- Auth: another user cannot list or complete events for a spa they do not own.
 
 ---
 

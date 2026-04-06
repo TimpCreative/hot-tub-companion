@@ -4,6 +4,7 @@ import { success, error } from '../utils/response';
 import * as scdbService from '../services/scdb.service';
 import * as notificationService from '../services/notification.service';
 import { getSanitationSystemValues, isValidSanitationSystem } from '../services/sanitationSystem.service';
+import * as maintenanceSchedule from '../services/maintenanceSchedule.service';
 
 function mapProfile(row: Record<string, unknown>) {
   return {
@@ -18,6 +19,7 @@ function mapProfile(row: Record<string, unknown>) {
     nickname: row.nickname,
     sanitizationSystem: row.sanitization_system,
     usageMonths: row.usage_months,
+    winterStrategy: row.winter_strategy === 'shutdown' ? 'shutdown' : 'operate',
     uhtdSpaModelId: row.uhtd_spa_model_id,
     uhtdVerificationStatus: row.uhtd_verification_status ?? 'linked',
     consumerSuggestionId: row.consumer_suggestion_id ?? null,
@@ -73,6 +75,7 @@ export async function createSpaProfile(req: Request, res: Response): Promise<voi
     serialNumber?: string | null;
     usageMonths?: number[] | null;
     nickname?: string | null;
+    winterStrategy?: 'shutdown' | 'operate';
   };
 
   if (!body.uhtdSpaModelId || typeof body.uhtdSpaModelId !== 'string') {
@@ -116,6 +119,15 @@ export async function createSpaProfile(req: Request, res: Response): Promise<voi
     usageMonths = undefined;
   }
 
+  let winterStrategy: 'shutdown' | 'operate' = 'operate';
+  if (body.winterStrategy !== undefined) {
+    if (body.winterStrategy !== 'shutdown' && body.winterStrategy !== 'operate') {
+      error(res, 'VALIDATION_ERROR', 'winterStrategy must be shutdown or operate', 400);
+      return;
+    }
+    winterStrategy = body.winterStrategy;
+  }
+
   const existingCount = await db('spa_profiles').where({ user_id: userId, tenant_id: tenantId }).count('* as c').first();
   const count = parseInt(String((existingCount as any)?.c ?? '0'), 10);
   const isPrimary = count === 0;
@@ -133,10 +145,15 @@ export async function createSpaProfile(req: Request, res: Response): Promise<voi
       nickname: body.nickname?.trim() || null,
       sanitization_system: body.sanitizationSystem,
       usage_months: usageMonths ?? defaultMonths,
+      winter_strategy: winterStrategy,
       uhtd_spa_model_id: body.uhtdSpaModelId,
       is_primary: isPrimary,
     })
     .returning('*');
+
+  void maintenanceSchedule.regenerateAutoEventsForSpaProfile((row as { id: string }).id).catch((err) => {
+    console.warn('[spaProfiles] maintenance schedule regenerate failed:', err);
+  });
 
   if (isPrimary) {
     const tenant = (req as any).tenant as { name?: string } | undefined;
@@ -164,6 +181,7 @@ export async function updateSpaProfile(req: Request, res: Response): Promise<voi
     nickname?: string | null;
     warrantyExpirationDate?: string | null;
     lastFilterChange?: string | null;
+    winterStrategy?: 'shutdown' | 'operate';
   };
 
   const existing = await db('spa_profiles')
@@ -175,6 +193,7 @@ export async function updateSpaProfile(req: Request, res: Response): Promise<voi
   }
 
   const update: Record<string, unknown> = { updated_at: db.fn.now() };
+  let scheduleNeedsRegen = false;
 
   if (body.sanitizationSystem !== undefined) {
     if (typeof body.sanitizationSystem !== 'string' || !(await isValidSanitationSystem(body.sanitizationSystem))) {
@@ -189,7 +208,19 @@ export async function updateSpaProfile(req: Request, res: Response): Promise<voi
       error(res, 'VALIDATION_ERROR', 'usageMonths must be an array of integers 1-12', 400);
       return;
     }
+    const prev = JSON.stringify([...((existing.usage_months as number[]) ?? [])].sort((a, b) => a - b));
+    const next = JSON.stringify([...body.usageMonths].sort((a, b) => a - b));
+    if (prev !== next) scheduleNeedsRegen = true;
     update.usage_months = body.usageMonths;
+  }
+  if (body.winterStrategy !== undefined) {
+    if (body.winterStrategy !== 'shutdown' && body.winterStrategy !== 'operate') {
+      error(res, 'VALIDATION_ERROR', 'winterStrategy must be shutdown or operate', 400);
+      return;
+    }
+    const prev = existing.winter_strategy === 'shutdown' ? 'shutdown' : 'operate';
+    if (prev !== body.winterStrategy) scheduleNeedsRegen = true;
+    update.winter_strategy = body.winterStrategy;
   }
   if (body.serialNumber !== undefined) update.serial_number = body.serialNumber?.trim() || null;
   if (body.nickname !== undefined) update.nickname = body.nickname?.trim() || null;
@@ -208,6 +239,12 @@ export async function updateSpaProfile(req: Request, res: Response): Promise<voi
     .where({ id })
     .update(update)
     .returning('*');
+
+  if (scheduleNeedsRegen) {
+    void maintenanceSchedule.regenerateAutoEventsForSpaProfile(id).catch((err) => {
+      console.warn('[spaProfiles] maintenance schedule regenerate failed:', err);
+    });
+  }
 
   success(res, { spaProfile: mapProfile(row) }, 'Spa profile updated');
 }

@@ -27,9 +27,17 @@ type SpaProfile = {
   serialNumber?: string | null;
   sanitizationSystem?: string | null;
   usageMonths?: number[] | null;
+  winterStrategy?: 'shutdown' | 'operate';
   warrantyExpirationDate?: string | null;
   lastFilterChange?: string | null;
 };
+
+const SEASON_PRESETS: { key: string; label: string; months: number[] }[] = [
+  { key: 'spring', label: 'Spring', months: [3, 4, 5] },
+  { key: 'summer', label: 'Summer', months: [6, 7, 8] },
+  { key: 'autumn', label: 'Autumn', months: [9, 10, 11] },
+  { key: 'winter', label: 'Winter', months: [12, 1, 2] },
+];
 
 export default function EditSpaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -45,6 +53,7 @@ export default function EditSpaScreen() {
   const [serialNumber, setSerialNumber] = useState('');
   const [sanitizationSystem, setSanitizationSystem] = useState<string>('');
   const [usageMonths, setUsageMonths] = useState<number[]>([]);
+  const [winterStrategy, setWinterStrategy] = useState<'shutdown' | 'operate'>('operate');
   const [warrantyDate, setWarrantyDate] = useState('');
 
   const sanitizerOptions =
@@ -71,6 +80,7 @@ export default function EditSpaScreen() {
         setSerialNumber(found.serialNumber ?? '');
         setSanitizationSystem(found.sanitizationSystem ?? '');
         setUsageMonths(Array.isArray(found.usageMonths) ? [...found.usageMonths] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+        setWinterStrategy(found.winterStrategy === 'shutdown' ? 'shutdown' : 'operate');
         setWarrantyDate(
           found.warrantyExpirationDate
             ? new Date(found.warrantyExpirationDate).toISOString().slice(0, 10)
@@ -94,6 +104,16 @@ export default function EditSpaScreen() {
     setUsageMonths((prev) =>
       prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m].sort((a, b) => a - b)
     );
+  };
+
+  const toggleSeasonMonths = (months: number[]) => {
+    setUsageMonths((prev) => {
+      const allSelected = months.every((m) => prev.includes(m));
+      if (allSelected) {
+        return prev.filter((m) => !months.includes(m)).sort((a, b) => a - b);
+      }
+      return [...new Set([...prev, ...months])].sort((a, b) => a - b);
+    });
   };
 
   const handleSave = async () => {
@@ -184,6 +204,27 @@ export default function EditSpaScreen() {
       <View style={[styles.section, { backgroundColor: colors.contentBackground }]}>
         <Text style={[styles.label, { color: colors.textMuted }]}>Usage months</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
+          Northern seasons (tap to toggle a group). Fine-tune with month letters below.
+        </Text>
+        <View style={styles.seasonRow}>
+          {SEASON_PRESETS.map((s) => {
+            const active = s.months.every((m) => usageMonths.includes(m));
+            return (
+              <TouchableOpacity
+                key={s.key}
+                style={[
+                  styles.seasonChip,
+                  { borderColor: colors.border },
+                  active && { backgroundColor: colors.primary, borderColor: colors.primary },
+                ]}
+                onPress={() => toggleSeasonMonths(s.months)}
+              >
+                <Text style={[styles.seasonChipText, { color: active ? '#fff' : colors.text }]}>{s.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <Text style={[styles.hint, { color: colors.textMuted, marginTop: 12 }]}>
           Which months do you use your tub? Toggle off months you winterize.
         </Text>
         <View style={styles.monthsRow}>
@@ -207,6 +248,37 @@ export default function EditSpaScreen() {
               </Text>
             </TouchableOpacity>
           ))}
+        </View>
+      </View>
+
+      <View style={[styles.section, { backgroundColor: colors.contentBackground }]}>
+        <Text style={[styles.label, { color: colors.textMuted }]}>When you are not using the tub</Text>
+        <Text style={[styles.hint, { color: colors.textMuted }]}>
+          Shutdown adds winterize and spring startup tasks when you have off-months. Operate skips those pairs.
+        </Text>
+        <View style={styles.strategyRow}>
+          <TouchableOpacity
+            style={[
+              styles.strategyOption,
+              { borderColor: colors.border },
+              winterStrategy === 'shutdown' && { borderColor: colors.primary, backgroundColor: `${colors.primary}18` },
+            ]}
+            onPress={() => setWinterStrategy('shutdown')}
+          >
+            <Text style={[styles.strategyTitle, { color: colors.text }]}>Shut down when not in use</Text>
+            <Text style={[styles.strategySub, { color: colors.textMuted }]}>Winterize during off months</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.strategyOption,
+              { borderColor: colors.border },
+              winterStrategy === 'operate' && { borderColor: colors.primary, backgroundColor: `${colors.primary}18` },
+            ]}
+            onPress={() => setWinterStrategy('operate')}
+          >
+            <Text style={[styles.strategyTitle, { color: colors.text }]}>Keep running year-round</Text>
+            <Text style={[styles.strategySub, { color: colors.textMuted }]}>No full winterize / startup pair</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -258,4 +330,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   monthText: { fontSize: 12, fontWeight: '600' },
+  seasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  seasonChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  seasonChipText: { fontSize: 14, fontWeight: '600' },
+  strategyRow: { gap: 10, marginTop: 8 },
+  strategyOption: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+  },
+  strategyTitle: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
+  strategySub: { fontSize: 13, lineHeight: 18 },
 });

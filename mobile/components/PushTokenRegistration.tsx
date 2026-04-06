@@ -56,6 +56,13 @@ function handleNotificationTap(data: Record<string, string> | null, router: Retu
         Linking.openURL(linkId);
       }
       break;
+    case 'maintenance_event':
+      router.push(
+        linkId
+          ? (`/(tabs)/maintenance-timeline?eventId=${encodeURIComponent(linkId)}` as const)
+          : '/(tabs)/maintenance-timeline'
+      );
+      break;
     default:
       break;
   }

@@ -82,7 +82,7 @@ const DEFAULT_APPLIED = {
 
 export default function Shop() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ productId?: string }>();
+  const params = useLocalSearchParams<{ productId?: string; categoryKey?: string | string[] }>();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { totalQuantity, refreshCart, addToCart } = useCart();
@@ -100,6 +100,17 @@ export default function Shop() {
       router.replace(`/(tabs)/shop/${pid}` as Href);
     }
   }, [params.productId, router]);
+
+  useEffect(() => {
+    const raw = params.categoryKey;
+    const ck =
+      typeof raw === 'string'
+        ? raw.trim()
+        : Array.isArray(raw) && typeof raw[0] === 'string'
+          ? raw[0].trim()
+          : '';
+    if (ck) setApplied((prev) => ({ ...prev, categoryKey: ck }));
+  }, [params.categoryKey]);
 
   const { spaProfileId, setSpaProfileId, spaProfiles, refreshSpaProfiles } = useActiveSpa();
   const [spaModalOpen, setSpaModalOpen] = useState(false);

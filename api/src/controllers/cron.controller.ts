@@ -253,3 +253,81 @@ export async function syncShopifyCatalog(req: Request, res: Response): Promise<v
     'Shopify catalog cron complete'
   );
 }
+
+function utcDateKey(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+function addCalendarDaysToDateKey(dateKey: string, deltaDays: number): string {
+  const [y, mo, d] = dateKey.split('-').map((x) => parseInt(x, 10));
+  const dt = new Date(Date.UTC(y, mo - 1, d + deltaDays));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
+}
+
+/** Daily UTC window: notify from (due − lead) through due (inclusive). Respects notification_pref_maintenance. */
+export async function maintenanceReminders(req: Request, res: Response): Promise<void> {
+  const todayKey = utcDateKey(new Date());
+
+  type Row = {
+    id: string;
+    user_id: string;
+    tenant_id: string;
+    spa_profile_id: string;
+    title: string;
+    due_date: Date | string;
+    notification_days_before: number | null;
+    nickname: string | null;
+    model: string | null;
+  };
+
+  const rows = (await db('maintenance_events as e')
+    .join('spa_profiles as s', 'e.spa_profile_id', 's.id')
+    .whereNull('e.completed_at')
+    .where('e.notification_sent', false)
+    .select(
+      'e.id',
+      'e.user_id',
+      'e.tenant_id',
+      'e.spa_profile_id',
+      'e.title',
+      'e.due_date',
+      'e.notification_days_before',
+      's.nickname',
+      's.model'
+    )) as Row[];
+
+  let notified = 0;
+  for (const row of rows) {
+    const dueStr =
+      typeof row.due_date === 'string'
+        ? row.due_date.slice(0, 10)
+        : utcDateKey(new Date(row.due_date));
+    const lead = typeof row.notification_days_before === 'number' ? row.notification_days_before : 3;
+    const notifyStr = addCalendarDaysToDateKey(dueStr, -lead);
+    if (todayKey < notifyStr || todayKey > dueStr) continue;
+
+    const spaLabel = row.nickname?.trim() || row.model?.trim() || 'your spa';
+    const ok = await notificationService.sendToUser(
+      row.user_id,
+      row.tenant_id,
+      'Maintenance reminder',
+      `${row.title} is due soon for ${spaLabel}.`,
+      {
+        linkType: 'maintenance_event',
+        linkId: row.id,
+        spaProfileId: row.spa_profile_id,
+      },
+      'maintenance',
+      { type: 'maintenance_reminder' }
+    );
+    if (ok) {
+      await db('maintenance_events').where({ id: row.id }).update({
+        notification_sent: true,
+        updated_at: db.fn.now(),
+      });
+      notified++;
+    }
+  }
+
+  success(res, { candidates: rows.length, notified }, 'Maintenance reminders complete');
+}
