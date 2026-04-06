@@ -34,7 +34,7 @@ Use this checklist for **TAB-scale** (or staging with representative volume) val
 ## 5. Orphan / mapping edge cases
 
 - [ ] After full import, orphaned POS rows (if any) documented; `pruneOrphanedShopifyPosProductsAfterFullBatchedImport` behavior matches expectation.
-- [ ] Mapping status `confirmed` required for cart add; unmapped rows not purchasable.
+- [ ] Cart / checkout: any visible, in-stock POS product with a valid storefront variant may be added; UHTD mapping does not block checkout (mapping still drives shop compatibility labels and admin workflows).
 
 ## 6. Regression spot checks
 

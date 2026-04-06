@@ -220,9 +220,9 @@ Build a safe backend foundation before exposing customer purchase flows.
 
 - Define the canonical source for Storefront variant GIDs
 - Ensure every purchasable app product has a valid Storefront `merchandiseId`
-- Reject add-to-cart operations for products lacking valid Storefront mapping
+- Reject add-to-cart when **`pos_variant_id` cannot be turned into a Storefront variant GID** (not when UHTD `mapping_status` is unmapped — general-store / billiards SKUs must still checkout)
 
-**Implemented:** `toStorefrontVariantGid` / `storefrontVariantGid.ts`; cart service rejects invalid mapping; POS variant id stored on `pos_products`.
+**Implemented:** `toStorefrontVariantGid` / `storefrontVariantGid.ts`; cart service rejects only missing/invalid Storefront variant id + hidden + zero inventory; customer-facing errors are non-operational copy. POS variant id stored on `pos_products`.
 
 ### 1.3 Persist order references
 
@@ -327,7 +327,7 @@ Add Storefront-backed cart behavior after browsing is stable.
 
 Use Shopify's native checkout surface rather than building our own.
 
-**Status:** Implemented; polish **completion states** (4.2) as needed.
+**Status:** Implemented and **verified (Apr 2026)** — end-to-end test checkout in branded app with native Checkout Sheet; polish **completion states** (4.2) as needed.
 
 ### 4.1 Checkout flow
 
@@ -422,7 +422,7 @@ Before broad rollout, validate against real TAB data and real operating conditio
 - Reliable Storefront variant mapping defined ✓ (GID helper + cart validation)
 - `order_references` persisted from webhook ✓
 - Read-only shop verified against real TAB catalog — **QA (Milestone 6)**
-- Cart and checkout tested with real tenant data — **QA (Milestone 6)**
+- Cart and checkout tested with real tenant data — **verified Apr 2026** (full pilot matrix still Milestone 6)
 - **User-visible order history** — **read API + Home card** ✓ (pilot QA still required)
 
 ## Can Ship in Early Internal Beta
@@ -446,7 +446,7 @@ Commerce is not done until all of the following are true:
 - Customers can browse compatible and browse-all products safely ✓
 - PDPs show accurate **prices, inventory, and compatibility** ✓; **multi-variant accuracy** only if catalog requires it (currently default variant)
 - Cart create/update/remove works against real Shopify Storefront data ✓
-- Checkout launches through Shopify Checkout Kit ✓
+- Checkout launches through Shopify Checkout Kit ✓ **(verified in app, Apr 2026)**
 - Successful orders are reconciled through verified webhook handling ✓ (`order_references` + idempotency)
 - `order_references` persist correctly ✓
 - **Recent orders UI works from authoritative backend data** — **not done** (no read API / Home card)

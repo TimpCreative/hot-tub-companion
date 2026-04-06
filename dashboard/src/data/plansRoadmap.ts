@@ -155,8 +155,8 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '3',
-        status: 'not_yet',
-        notes: 'Checkout Kit + Storefront cart.',
+        status: 'shipped',
+        notes: 'Checkout Kit + Storefront cart. Verified Apr 2026 (test checkout in app).',
       },
       {
         feature: 'Product filtering by spa compatibility',

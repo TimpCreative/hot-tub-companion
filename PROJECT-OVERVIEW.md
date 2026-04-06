@@ -37,7 +37,7 @@ TimpCreative manages a single multi-tenant backend that powers all retailer apps
 | **Retailer Dashboard** | Next.js (React) | Web app at `[retailer].hottubcompanion.com`. Subdomain routing for multi-tenant. |
 | **Super Admin Dashboard** | Next.js (React) | Web app at `admin.hottubcompanion.com`. Shares component library with retailer dashboard. |
 | **POS Integration** | Shopify Storefront API + Admin API (primary), Lightspeed X-Series API | Product sync, cart/checkout, order routing, subscriptions. |
-| **Checkout** | Shopify Checkout Kit for React Native (`@shopify/checkout-sheet-kit`) | Native checkout sheet within the app. Shopify handles all payment processing. TimpCreative never stores card data. |
+| **Checkout** | Shopify Checkout Kit for React Native (`@shopify/checkout-sheet-kit`) | Native checkout sheet within the app. Shopify handles all payment processing. TimpCreative never stores card data. **Verified Apr 2026:** end-to-end test checkout in production app. |
 | **Fuzzy Matching** | Fuse.js | Product-to-UHTD mapping recommendations in admin dashboard. |
 | **Email** | SendGrid | Transactional emails (order confirmations, service request notifications, account management). |
 

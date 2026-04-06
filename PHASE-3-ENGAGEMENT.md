@@ -12,7 +12,7 @@
 
 | Area | Status | Notes |
 |------|--------|-------|
-| **Commerce (Shop / cart / checkout)** | ❌ | Still planned in this phase |
+| **Commerce (Shop / cart / checkout)** | ✅ Partial | **Shipped:** Shop, Storefront cart, native Checkout Kit; **verified Apr 2026** test checkout. Detail: [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md). Subscriptions / bundles still planned. |
 | **Retailer Admin — Products ↔ UHTD mapping** | ✅ Partial | **Shipped:** list enrichment with top suggestion score (tiered % pills), `pcdb_parts` join for mapped part labels, extended list sort (visibility, mapping status, confidence), modal **Product mapping** vs **UHTD Suggestions** with confirm/clear keeping the modal open. See [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md § Retailer Admin: Products and UHTD mapping UX](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#retailer-admin-products-and-uhtd-mapping-ux). **Still open:** performance at very large page sizes (batch/denormalize scores later), optional super-admin deep link to PCdb part. |
 | **Referral program** | ❌ | Still planned in this phase |
 | **Water Care Assistant** | ❌ | Still planned in this phase |
@@ -999,9 +999,9 @@ Before moving to Phase 4, verify:
 - [ ] Category filter pills work correctly
 - [ ] Product search works
 - [ ] Product detail screen shows full info with images, variants, pricing
-- [ ] Add to Cart creates/updates a Shopify cart
+- [x] Add to Cart creates/updates a Shopify cart
 - [ ] Cart screen shows items, allows quantity changes and removal
-- [ ] Checkout via Shopify Checkout Kit works end-to-end (test purchase)
+- [x] Checkout via Shopify Checkout Kit works end-to-end (test purchase) — verified Apr 2026
 - [ ] Order webhook fires and creates a notification (and order reference if applicable)
 - [ ] App works on both iOS and Android (full pass on new surfaces)
 

@@ -7,9 +7,9 @@ import { fetchWithShopifyTransientRetry } from '../utils/shopifyHttpRetry';
 
 const STOREFRONT_API_VERSION = '2025-01';
 
-/** Shown when `shopify_storefront_token` or shop URL is missing after decrypt. */
+/** Customer-safe copy; operational details belong in logs / admin docs only. */
 const MSG_STOREFRONT_NOT_CONFIGURED =
-  'Storefront checkout is not set up for this dealer. In Retailer Admin → Settings → POS Integration, add your Shopify Storefront API access token and save. The token comes from a Custom app (Headless channel) with Cart permissions.';
+  "Checkout isn't available in the app right now. Please contact your dealer if you need help placing an order.";
 
 export class StorefrontCartError extends Error {
   code: 'COMMERCE_UNAVAILABLE' | 'STOREFRONT_ERROR' | 'NOT_FOUND' | 'BAD_REQUEST';
@@ -308,7 +308,7 @@ async function requirePurchasablePosProduct(
   posProductId: string
 ): Promise<ResolvedPosProduct> {
   const row = (await db('pos_products')
-    .select('id', 'title', 'pos_variant_id', 'inventory_quantity', 'is_hidden', 'mapping_status')
+    .select('id', 'title', 'pos_variant_id', 'inventory_quantity', 'is_hidden')
     .where({ tenant_id: tenantId, id: posProductId })
     .first()) as {
     id: string;
@@ -316,36 +316,26 @@ async function requirePurchasablePosProduct(
     pos_variant_id: string | null;
     inventory_quantity: number | null;
     is_hidden: boolean;
-    mapping_status: string | null;
   } | undefined;
   if (!row) {
-    throw new StorefrontCartError('NOT_FOUND', 'This product is not in your shop catalog.');
+    throw new StorefrontCartError('NOT_FOUND', "This product isn't available.");
   }
   if (row.is_hidden) {
-    throw new StorefrontCartError(
-      'NOT_FOUND',
-      'This product is hidden from the shop. Unhide it in retailer admin if customers should purchase it.'
-    );
-  }
-  if (row.mapping_status !== 'confirmed') {
-    throw new StorefrontCartError(
-      'NOT_FOUND',
-      `This product is not cleared for checkout (mapping status: ${row.mapping_status || 'unset'}). Confirm mapping in admin or run a catalog sync from POS settings.`
-    );
+    throw new StorefrontCartError('NOT_FOUND', "This item isn't available right now.");
   }
   const gid = toStorefrontVariantGid(row.pos_variant_id);
   if (!gid) {
+    console.warn(
+      `[storefrontCart] pos_product ${row.id} (tenant ${tenantId}): missing or invalid pos_variant_id; cannot build Storefront GID`
+    );
     throw new StorefrontCartError(
       'NOT_FOUND',
-      'This product has no valid Shopify variant ID. Run a catalog sync from Settings → POS, or ensure pos_variant_id is a numeric variant id (or full ProductVariant GID).'
+      "This item can't be added to your cart right now. Please try again later or choose another product."
     );
   }
   const inv = typeof row.inventory_quantity === 'number' ? row.inventory_quantity : 0;
   if (inv <= 0) {
-    throw new StorefrontCartError(
-      'NOT_FOUND',
-      'This product has no sellable inventory in the app. Sync inventory from Shopify or update stock in admin.'
-    );
+    throw new StorefrontCartError('NOT_FOUND', 'This item is out of stock.');
   }
   return {
     posProductId: row.id,
