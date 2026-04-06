@@ -861,21 +861,24 @@ export default function AdminSettingsPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Storefront API access token</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Storefront API access token <span className="font-normal text-gray-500">(optional)</span>
+          </label>
           <input
             className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
             type="password"
             value={shopifyStorefrontAccessTokenDraft}
             onChange={(e) => setShopifyStorefrontAccessTokenDraft(e.target.value)}
             disabled={posSaving || posTesting || posType !== 'shopify'}
-            placeholder="From Headless / Storefront API (cart & checkout in the app)"
+            placeholder="Leave blank to auto-create from Client ID + Secret (Partner app)"
             autoComplete="new-password"
           />
           <p className="mt-1 text-xs text-gray-600">
-            Required for <strong className="font-medium">Add to cart</strong> and checkout in the mobile app. Create a
-            separate Storefront API token in Shopify Admin (Settings → Apps → Develop apps → your app → API credentials →
-            Storefront API), with scopes for unauthenticated cart (e.g. <code className="text-xs">unauthenticated_write_checkouts</code>
-            , <code className="text-xs">unauthenticated_read_product_listings</code> as needed).
+            For <strong className="font-medium">Add to cart</strong> and checkout, the server usually creates this
+            automatically when you <strong className="font-medium">save</strong> or <strong className="font-medium">test</strong>{' '}
+            POS settings, using Shopify&apos;s Admin API (<code className="text-xs">storefrontAccessTokenCreate</code>). Your
+            Partner app must have <strong className="font-medium">Storefront API</strong> enabled with cart-related scopes.
+            Paste a token here only if you want to override the auto-created one.
           </p>
           <p className="mt-1 text-xs text-gray-500">
             {shopifyStorefrontTokenConfigured ? 'Configured.' : 'Not configured.'} Write-only after save.

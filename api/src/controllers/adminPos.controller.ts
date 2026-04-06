@@ -7,6 +7,7 @@ import {
   updateTenantPosConfig,
 } from '../services/tenantPosConfig.service';
 import { ensureCanonicalShopifyStoreDomain } from '../services/shopifyAuth.service';
+import { ensureStorefrontAccessTokenStored } from '../services/shopifyStorefrontToken.service';
 import { reconcileShopifyCatalogWebhooks } from '../services/shopifyWebhooks.service';
 import {
   listPosIntegrationActivity,
@@ -102,8 +103,20 @@ export async function updatePosConfig(req: Request, res: Response): Promise<void
       shopifyCatalogSyncEnabled,
       productSyncIntervalMinutes,
     });
+    const actor = retailerPosActivityActor(req);
     if (summary.posType === 'shopify') {
       await ensureCanonicalShopifyStoreDomain(tenantId);
+      const storefrontProvision = await ensureStorefrontAccessTokenStored(tenantId);
+      if (!storefrontProvision.ok) {
+        await logPosIntegrationActivity(tenantId, {
+          eventType: 'storefront_token_provision_failed',
+          summary: 'Could not auto-create Storefront API token',
+          metadata: { reason: storefrontProvision.reason },
+          source: 'retailer_admin',
+          actorUserId: actor.actorUserId,
+          actorLabel: actor.actorLabel,
+        });
+      }
     }
     await reconcileShopifyCatalogWebhooks({
       tenantId,
@@ -112,7 +125,6 @@ export async function updatePosConfig(req: Request, res: Response): Promise<void
       isShopify: summary.posType === 'shopify',
       isCatalogSyncEnabled: summary.shopifyCatalogSyncEnabled,
     });
-    const actor = retailerPosActivityActor(req);
     await logPosIntegrationActivity(tenantId, {
       eventType: 'pos_settings_saved',
       summary: 'POS settings saved',
@@ -147,6 +159,12 @@ export async function testPosConnection(req: Request, res: Response): Promise<vo
 
   try {
     const result = await testTenantPosConnection(tenantId);
+    if (result.ok) {
+      const tenant = await db('tenants').where({ id: tenantId }).select('pos_type').first();
+      if (tenant?.pos_type === 'shopify') {
+        await ensureStorefrontAccessTokenStored(tenantId);
+      }
+    }
     if (!result.ok) {
       const code = (result.details as { code?: string } | undefined)?.code;
       if (code === 'DOMAIN_MISMATCH') {

@@ -2,6 +2,7 @@ import { db } from '../config/database';
 import { decryptTenantSecret } from '../utils/tenantSecrets';
 import { normalizeShopDomain } from './tenantPosConfig.service';
 import { toStorefrontVariantGid } from '../utils/storefrontVariantGid';
+import { ensureStorefrontAccessTokenStored } from './shopifyStorefrontToken.service';
 
 const STOREFRONT_API_VERSION = '2025-01';
 
@@ -59,13 +60,24 @@ const CART_FIELDS = `
 async function loadStorefrontCredentials(
   tenantId: string
 ): Promise<{ shopDomain: string; token: string } | null> {
-  const row = (await db('tenants')
+  let row = (await db('tenants')
     .select('shopify_store_url', 'shopify_storefront_token')
     .where({ id: tenantId })
     .first()) as { shopify_store_url: string | null; shopify_storefront_token: string | null } | undefined;
   if (!row?.shopify_store_url?.trim()) return null;
-  const token = row.shopify_storefront_token ? decryptTenantSecret(row.shopify_storefront_token) : null;
-  if (!token?.trim()) return null;
+  let token = row.shopify_storefront_token ? decryptTenantSecret(row.shopify_storefront_token) : null;
+  if (!token?.trim()) {
+    const provisioned = await ensureStorefrontAccessTokenStored(tenantId);
+    if (!provisioned.ok) {
+      return null;
+    }
+    row = (await db('tenants')
+      .select('shopify_store_url', 'shopify_storefront_token')
+      .where({ id: tenantId })
+      .first()) as { shopify_store_url: string | null; shopify_storefront_token: string | null } | undefined;
+    token = row?.shopify_storefront_token ? decryptTenantSecret(row.shopify_storefront_token) : null;
+  }
+  if (!token?.trim() || !row?.shopify_store_url?.trim()) return null;
   return {
     shopDomain: normalizeShopDomain(row.shopify_store_url),
     token: token.trim(),
