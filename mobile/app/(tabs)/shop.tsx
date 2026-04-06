@@ -4,6 +4,7 @@ import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   Image,
@@ -19,6 +20,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { messageFromApiReject } from '../../services/cart';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeroHeader } from '../../components/AppHeroHeader';
 import { FinishSetupBanner } from '../../components/FinishSetupBanner';
@@ -79,7 +81,8 @@ export default function Shop() {
   const params = useLocalSearchParams<{ productId?: string }>();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { totalQuantity, refreshCart } = useCart();
+  const { totalQuantity, refreshCart, addToCart } = useCart();
+  const [addingProductId, setAddingProductId] = useState<string | null>(null);
   const { colors, typography, spacing } = useTheme();
   const { showNudge, dismiss } = useFinishSetupNudge();
   const primaryHex = colors.primary ?? '#1B4D7A';
@@ -378,53 +381,129 @@ export default function Shop() {
     }
   }, [fetchPage, loading, loadingMore, page, totalPages]);
 
-  const renderItem = ({ item }: { item: ShopProductRow }) => {
-    const img = firstImageUrl(item.images);
-    const out = item.inventory_quantity <= 0;
-    const badCompat = item.shop_compatibility === 'other_model';
-    const needsSpa = item.shop_compatibility === 'needs_spa';
-    return (
-      <Pressable
-        style={({ pressed }) => [
-          styles.card,
-          {
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-            opacity: pressed ? 0.92 : 1,
-            flex: 1,
-            maxWidth: '48%',
-            marginBottom: spacing.md,
-          },
-        ]}
-        onPress={() => router.push(`/(tabs)/shop/${item.id}` as Href)}
-      >
-        <View style={styles.cardImageWrap}>
-          {img ? <Image source={{ uri: img }} style={styles.cardImage} resizeMode="cover" /> : <View style={[styles.cardImage, { backgroundColor: colors.border }]} />}
-          {out ? (
-            <View style={styles.outOverlay}>
-              <Text style={styles.outText}>Out of stock</Text>
+  const handleQuickAdd = useCallback(
+    async (item: ShopProductRow) => {
+      if (!user) {
+        Alert.alert('Sign in required', 'Please sign in to add items to your cart.', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign in', onPress: () => router.push('/auth/login') },
+        ]);
+        return;
+      }
+      if (item.inventory_quantity <= 0) {
+        Alert.alert('Out of stock', 'This item is not available right now.');
+        return;
+      }
+      setAddingProductId(item.id);
+      try {
+        await addToCart(item.id, 1);
+      } catch (e) {
+        Alert.alert('Cart', messageFromApiReject(e, 'Could not add to cart.'));
+      } finally {
+        setAddingProductId(null);
+      }
+    },
+    [user, router, addToCart]
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: ShopProductRow }) => {
+      const img = firstImageUrl(item.images);
+      const out = item.inventory_quantity <= 0;
+      const badCompat = item.shop_compatibility === 'other_model';
+      const needsSpa = item.shop_compatibility === 'needs_spa';
+      const adding = addingProductId === item.id;
+      const btnEnabled = !out && !adding;
+
+      const goDetail = () => router.push(`/(tabs)/shop/${item.id}` as Href);
+
+      return (
+        <View
+          style={[
+            styles.rowCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              marginBottom: spacing.md,
+            },
+          ]}
+        >
+          <View style={styles.rowInner}>
+            <Pressable
+              onPress={goDetail}
+              style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1 }]}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.title}, view details`}
+            >
+              <View style={styles.rowThumbWrap}>
+                {img ? (
+                  <Image source={{ uri: img }} style={styles.rowThumb} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.rowThumb, { backgroundColor: colors.border }]} />
+                )}
+                {out ? (
+                  <View style={styles.outOverlay}>
+                    <Text style={styles.outText}>Out of stock</Text>
+                  </View>
+                ) : null}
+              </View>
+            </Pressable>
+
+            <View style={styles.rowBody}>
+              <Pressable onPress={goDetail} style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1 }]}>
+                {badCompat ? (
+                  <Text style={[styles.compatBadge, { color: '#b45309' }]} numberOfLines={2}>
+                    Not compatible with your spa
+                  </Text>
+                ) : null}
+                {needsSpa ? (
+                  <Text style={[styles.compatBadge, { color: colors.textSecondary }]} numberOfLines={2}>
+                    Add spa details to see if this fits your model
+                  </Text>
+                ) : null}
+                <Text numberOfLines={2} style={[typography.body, { color: colors.text, fontWeight: '600', marginTop: badCompat || needsSpa ? 4 : 0 }]}>
+                  {item.title}
+                </Text>
+                <Text style={[typography.body, { color: colors.primary, fontWeight: '800', marginTop: 6 }]}>
+                  {formatProductPriceCents(item.price)}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => void handleQuickAdd(item)}
+                disabled={!btnEnabled}
+                style={({ pressed }) => [
+                  styles.rowAddBtn,
+                  {
+                    backgroundColor: out ? colors.border : colors.primary,
+                    opacity: btnEnabled ? (pressed ? 0.9 : 1) : 1,
+                  },
+                ]}
+                accessibilityLabel={
+                  out ? `${item.title} is out of stock` : user ? `Add ${item.title} to cart` : `Sign in to add ${item.title}`
+                }
+              >
+                {adding ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text
+                    style={[
+                      styles.rowAddBtnText,
+                      { color: out ? colors.textMuted : '#fff' },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {out ? 'Out of stock' : user ? 'Add to cart' : 'Sign in to add'}
+                  </Text>
+                )}
+              </Pressable>
             </View>
-          ) : null}
+          </View>
         </View>
-        {badCompat ? (
-          <Text style={[styles.compatBadge, { color: '#b45309' }]} numberOfLines={2}>
-            Not compatible with your spa
-          </Text>
-        ) : null}
-        {needsSpa ? (
-          <Text style={[styles.compatBadge, { color: colors.textSecondary }]} numberOfLines={2}>
-            Add spa details to see if this fits your model
-          </Text>
-        ) : null}
-        <Text numberOfLines={2} style={[typography.caption, { color: colors.text, marginTop: 6 }]}>
-          {item.title}
-        </Text>
-        <Text style={[typography.body, { color: colors.primary, fontWeight: '700', marginTop: 4 }]}>
-          {formatProductPriceCents(item.price)}
-        </Text>
-      </Pressable>
-    );
-  };
+      );
+    },
+    [addingProductId, colors, handleQuickAdd, router, spacing, typography, user]
+  );
 
   const cartHeaderButton = useMemo(
     () => (
@@ -508,8 +587,6 @@ export default function Shop() {
         style={styles.scroll}
         data={products}
         keyExtractor={(it) => it.id}
-        numColumns={2}
-        columnWrapperStyle={{ justifyContent: 'space-between' }}
         contentContainerStyle={[styles.listContent, { paddingBottom: 24 + insets.bottom }]}
         ListHeaderComponent={listHeader}
         ListFooterComponent={loadingMore ? <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} /> : null}
@@ -787,13 +864,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  card: {
+  rowCard: {
     borderWidth: 1,
     borderRadius: 12,
-    padding: 8,
+    padding: 10,
   },
-  cardImageWrap: { position: 'relative', borderRadius: 8, overflow: 'hidden' },
-  cardImage: { width: '100%', aspectRatio: 1, backgroundColor: '#e5e7eb' },
+  rowInner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  rowThumbWrap: {
+    position: 'relative',
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  /** Fixed size keeps one-column rows predictable on small phones. */
+  rowThumb: {
+    width: 88,
+    height: 88,
+    backgroundColor: '#e5e7eb',
+  },
+  rowBody: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'space-between',
+    minHeight: 88,
+  },
+  rowAddBtn: {
+    marginTop: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+  },
+  rowAddBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   outOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.55)',

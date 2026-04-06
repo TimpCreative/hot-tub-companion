@@ -5,6 +5,7 @@ import * as superAdminConsumerUhtdController from '../controllers/superAdminCons
 import * as superAdminAnnouncementsController from '../controllers/superAdminAnnouncements.controller';
 import * as superAdminJournalController from '../controllers/superAdminJournal.controller';
 import * as platformUsersController from '../controllers/platformUsers.controller';
+import superAdminShopifyMapRoutes from './superAdminShopifyMap.routes';
 import { superAdminAuth } from '../middleware/superAdminAuth';
 import { authRateLimiter, superAdminAnnouncementRateLimiter } from '../middleware/rateLimiter';
 
@@ -32,6 +33,8 @@ router.get('/settings', superAdminController.getSettings);
 
 router.get('/consumer-uhtd-suggestions', superAdminConsumerUhtdController.listConsumerSuggestions);
 router.patch('/consumer-uhtd-suggestions/:id', superAdminConsumerUhtdController.updateConsumerSuggestion);
+
+router.use('/uhtd/shopify-map', superAdminShopifyMapRoutes);
 
 // Global announcements
 router.post(

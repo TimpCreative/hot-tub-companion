@@ -98,9 +98,21 @@ export function shopCompatibilityRaw(
     saniClause = `(pq_sani.qualifier_id IS NULL OR LOWER(pq_sani.value::text) LIKE ?)`;
   }
 
+  /**
+   * "needs_spa" = shopper has not linked an evaluable spa yet, but this listing is spa-scoped in UHTD
+   * (universal part, or at least one confirmed model compatibility row). Parts with zero compatibility
+   * rows and not universal are not "waiting on spa setup" — they are not indexed for any spa → other_model.
+   */
   const needsSpaWhen = spaOk
     ? 'false'
-    : `(pp.mapping_status = 'confirmed' AND pp.uhtd_part_id IS NOT NULL AND part.id IS NOT NULL AND part.deleted_at IS NULL)`;
+    : `(pp.mapping_status = 'confirmed' AND pp.uhtd_part_id IS NOT NULL AND part.id IS NOT NULL AND part.deleted_at IS NULL
+        AND (
+          part.is_universal = true
+          OR EXISTS (
+            SELECT 1 FROM part_spa_compatibility psc_any
+            WHERE psc_any.part_id = part.id AND psc_any.status = 'confirmed'
+          )
+        ))`;
 
   const bindings: string[] = [];
   if (sanitizationQualifierId && spaOk) {

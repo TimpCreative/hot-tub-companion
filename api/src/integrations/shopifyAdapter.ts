@@ -197,6 +197,37 @@ function parseDate(value: string | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+type ListingSnap = { title: string; sku: string | null; barcode: string | null };
+
+function parseListingSnapshot(raw: unknown): ListingSnap | null {
+  if (raw == null) return null;
+  let o: Record<string, unknown>;
+  if (typeof raw === 'string') {
+    try {
+      o = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  } else {
+    o = raw as Record<string, unknown>;
+  }
+  if (!o || typeof o !== 'object') return null;
+  if (typeof o.title !== 'string') return null;
+  const sku = o.sku == null ? null : String(o.sku);
+  const barcode = o.barcode == null ? null : String(o.barcode);
+  return { title: o.title, sku, barcode };
+}
+
+function listingDiffersFromSnapshot(
+  snap: ListingSnap | null,
+  title: string,
+  sku: string | null,
+  barcode: string | null
+): boolean {
+  if (!snap) return false;
+  return snap.title !== title || snap.sku !== sku || snap.barcode !== barcode;
+}
+
 async function upsertVariantRow(
   tenantId: string,
   product: ShopifyProduct,
@@ -265,11 +296,17 @@ async function upsertVariantRow(
   };
 
   if (existing) {
+    const snap = parseListingSnapshot(existing.shopify_listing_snapshot);
+    const needsReverify =
+      existing.mapping_status === 'confirmed' &&
+      listingDiffersFromSnapshot(snap, title, sku, barcode);
+
     await db('pos_products')
       .where({ id: existing.id })
       .update({
         ...baseData,
         updated_at: now,
+        ...(needsReverify ? { uhtd_import_needs_reverify_at: now } : {}),
       });
   } else {
     await db('pos_products').insert({

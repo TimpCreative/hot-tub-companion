@@ -4,6 +4,7 @@
  */
 
 import { db } from '../config/database';
+import type { Knex } from 'knex';
 import {
   PcdbCategory,
   CreateCategoryInput,
@@ -428,6 +429,38 @@ export async function createPart(input: CreatePartInput, userId?: string): Promi
 
   await logAudit('pcdb_parts', row.id, 'INSERT', null, row, userId);
   return (await getPartById(row.id))!;
+}
+
+/** Insert a part row inside an existing transaction (e.g. Map from Shopify publish). */
+export async function insertPartInTransaction(
+  trx: Knex.Transaction,
+  input: CreatePartInput
+): Promise<Record<string, unknown>> {
+  const insertData: Record<string, unknown> = {
+    category_id: input.categoryId,
+    part_number: input.partNumber ?? null,
+    manufacturer_sku: input.manufacturerSku ?? null,
+    upc: input.upc ?? null,
+    ean: input.ean ?? null,
+    sku_aliases: toSkuAliasesArray(input.skuAliases),
+    name: input.name,
+    manufacturer: input.manufacturer ?? null,
+    is_oem: input.isOem ?? false,
+    is_universal: input.isUniversal ?? false,
+    is_discontinued: input.isDiscontinued ?? false,
+    display_importance: input.displayImportance ?? 2,
+    dimensions_json: input.dimensionsJson ? JSON.stringify(input.dimensionsJson) : null,
+    image_url: input.imageUrl ?? null,
+    spec_sheet_url: input.specSheetUrl ?? null,
+    notes: input.notes ?? null,
+    data_source: input.dataSource ?? null,
+  };
+  const interchangeGroupId = input.interchangeGroupId && String(input.interchangeGroupId).trim();
+  if (interchangeGroupId) {
+    insertData.interchange_group_id = interchangeGroupId;
+  }
+  const [row] = await trx('pcdb_parts').insert(insertData).returning('*');
+  return row as Record<string, unknown>;
 }
 
 export async function updatePart(

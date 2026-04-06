@@ -17,21 +17,21 @@ Shopify CLI remains useful for broader app-lifecycle workflows, but the tenant o
 
 ## Status Review
 
+_Updated to match the repository during Phase 3 commerce work._
+
 ### Implemented
 
-- Shopify tenant secrets are encrypted at rest
-- Shopify secrets are decrypted only at point of use in backend integration paths
-- POS config APIs now return non-secret summary/configured-state values instead of raw tokens
-- Shared tenant POS config service exists for secure load/update/test flows
-- Retailer Admin Settings now includes a POS Integration section
-- Super Admin and Retailer Admin both use write-only token replacement UX
-- Stored secrets are no longer revealable in the admin UI
-- Dev Dashboard-first onboarding is now the required model for new tenant Shopify connections
-
-### Partial
-
-- Existing plaintext compatibility is preserved in code paths so current tenants do not break if legacy values exist
-- Product sync pagination/retry hardening for very large catalogs is still outstanding
+- Shopify tenant secrets encrypted at rest; decrypt only at point of use; legacy plaintext read paths still supported
+- POS config APIs return configured-state booleans, not raw secrets; Retailer + Super Admin write-only secret fields; shared `tenantPosConfig` flows
+- **Runtime Admin token** — client credentials exchange + in-memory cache (`shopifyAuth.service`)
+- **Storefront token** — optional in POS; **auto-provision** via Admin `storefrontAccessTokenCreate` when Client ID/Secret work (`shopifyStorefrontToken.service`; POS save / test / lazy cart)
+- **Shop read APIs** — `GET /products/shop`, `.../shop/categories`, `.../shop/price-bounds` (auth); compatibility via `shopProductCompatibility.service` (incl. rules for parts with no `part_spa_compatibility` rows)
+- **PDP API** — product detail with compatibility for mobile
+- **Cart** — Storefront proxy routes (`cart.routes.ts`, `storefrontCart.service`); variant GID helper; server-persisted cart id per user
+- **Mobile** — Shop (search, filters, list rows + add-to-cart), PDP, cart, **Checkout Kit**
+- **`order_references`** + **`orders/create`** upsert; **webhook idempotency** for orders and catalog via `shopify_webhook_receipts` / `X-Shopify-Webhook-Id`
+- **Push notification** to matched tenant user on order (email match)
+- Dev Dashboard–first tenant onboarding via POS Integration
 
 ### Recently added (catalog freshness)
 
@@ -50,23 +50,27 @@ Shopify CLI remains useful for broader app-lifecycle workflows, but the tenant o
 
 **Follow-ups (optional / later):** batch or denormalized scores if list pages feel slow at high **`pageSize`**; deep link from modal to super-admin part record if/when that route exists.
 
-### Next steps (commerce — after mapping UX)
+### Partial
 
-1. **Milestone 1.1** — Product sync pagination, retry/backoff, archived/reconciliation, large-catalog validation.
-2. **Milestone 1.2–1.3** — Storefront variant normalization; **`order_references`** persistence from **`orders/create`**.
-3. **Milestone 1.4** — Read APIs for customer **`GET /products`**, compatibility, PDP-shaped payloads.
-4. **Milestone 1.5** — Runtime Admin token exchange (if not already fully on this path for all sync operations).
-5. **Milestones 2–4** — Read-only Shop + PDP, cart service, Checkout Kit.
-6. **Milestone 5–6** — Home orders card, pilot QA — see **Recommended Delivery Order** below.
+- **Product sync (1.1)** — REST cursor **pagination** (`page_info`) in `shopifyAdapter.ts`; **retry/backoff** and formal large-catalog / archived reconciliation QA still open
+- **PDP** — no **multi-variant** UI; no **related products**
+- **Checkout UX (4.2)** — completion / cancel / fail messaging vs webhook-as-truth can be tightened
+- **Orders (5)** — rows persisted; **no mobile read API** or Home orders card yet
 
-### Not Yet Started
+### Next steps (remaining commerce)
 
-- Storefront cart and Checkout Kit implementation
-- `order_references` persistence
-- Storefront variant GID normalization
-- Read-only Shop experience
-- Home recent orders and commerce cards
-- TAB pilot QA and catalog hardening
+1. **Orders read path** — authenticated `GET` list/detail from `order_references` + mobile Home “recent orders” card.
+2. **Optional PDP** — multi-variant picker; related products (if catalog needs them).
+3. **Optional multi-spa** — persisted active spa for Home + Shop compatibility context.
+4. **Sync hardening (1.1)** — retry/backoff on 429/transients; large-catalog + archived reconciliation QA.
+5. **Observability (0.6) + pilot QA (6)** — health signals; TAB hardening checklist.
+
+### Not yet started / still open
+
+- **User-facing order history API** + **Home recent orders** UI (read `order_references`)
+- **Multi-spa selector** on Home + Shop (optional; today primary spa from `/spa-profiles` drives shop)
+- **Milestone 0.6** observability (sync/webhook/cart health in admin)
+- **Milestone 6** formal TAB pilot QA + security review
 
 ## Goals
 
@@ -89,28 +93,26 @@ Shopify CLI remains useful for broader app-lifecycle workflows, but the tenant o
 
 ### Already in place
 
-- Shopify Admin product sync exists in the backend
-- `orders/create` webhook verification exists with HMAC validation
-- Product compatibility and visibility systems already exist
-- Mobile app has the shell for Shop but not the commerce UI
-- Phase 3 content work is already partially shipped, so commerce is the biggest remaining Phase 3 workstream
-- Secure tenant secret handling and admin POS management foundations are now implemented
-- Current onboarding is Dev Dashboard-first and tenant-scoped through POS Integration in Super Admin/Retailer Admin
+- Shopify Admin product sync with **cursor pagination**; encrypted credentials; runtime token exchange
+- **`orders/create`** and catalog webhooks: HMAC, **idempotency receipts**, `order_references` upsert
+- Storefront cart/checkout proxy, mobile Shop + PDP + cart + Checkout Kit
+- Product compatibility for shop list/detail (`shopProductCompatibility.service`)
+- Secure POS + tenant isolation patterns for commerce routes
+- Dev Dashboard–first onboarding via POS Integration
 
 ### Current gaps and risks
 
-- Webhook handling does not yet persist `order_references`
-- Product sync is still intentionally simple and does not appear production-hardened for large retailer catalogs
-- Storefront cart and Checkout Kit flows are not yet implemented
-- Variant mapping to Storefront GIDs needs to be made explicit and reliable
-- Webhook idempotency and receipt tracking are still not implemented
-- Runtime credential exchange and strict tenant shop-domain validation still need to be completed end-to-end
+- **No user-facing orders list API** or Home “recent orders” (data exists in `order_references`)
+- **Sync** — retry/backoff and production hardening for rate limits / very large catalogs
+- **PDP** — multi-variant and related products not built
+- **Observability** — no consolidated sync/webhook/cart health in admin (Milestone 0.6)
+- **Pilot QA** — Milestone 6 checklist not formally closed
 
 ## Milestone 0: Security Hardening
 
 Commerce build does not proceed until this milestone is complete.
 
-**Status:** Implemented, with follow-up work still open for webhook idempotency and deeper observability.
+**Status:** Largely implemented; **observability (0.6)** and deeper operational polish remain.
 
 ### 0.1 Encrypt Shopify secrets at rest
 
@@ -163,10 +165,7 @@ Commerce build does not proceed until this milestone is complete.
 
 **Implemented:**
 - Webhook verification uses a shared HMAC helper (`verifyShopifyWebhookRequest`) for `orders/create` and catalog topics
-- Catalog webhooks (`products/update`, `inventory_levels/update`) record **`X-Shopify-Webhook-Id`** in **`shopify_webhook_receipts`** to skip duplicates
-
-**Still outstanding:**
-- Extend the same idempotency pattern to **`orders/create`** if duplicate order notifications become an issue
+- **`shopify_webhook_receipts`** + **`X-Shopify-Webhook-Id`** dedupe **catalog** topics and **`orders/create`** (`tryInsertShopifyWebhookReceipt` in `shopifyWebhook.controller` / catalog controller)
 
 ### 0.5 Minimize Shopify scopes
 
@@ -200,11 +199,13 @@ Commerce build does not proceed until this milestone is complete.
 - Cache short-lived tokens server-side with safe expiry buffer
 - Keep all credential handling tenant-scoped and encrypted
 
+**Implemented:** POS fields above; client-credentials path; optional Storefront token + auto-provision for Partner apps.
+
 ## Milestone 1: Commerce Backend Foundation
 
 Build a safe backend foundation before exposing customer purchase flows.
 
-**Status:** Partially implemented.
+**Status:** Mostly implemented; sync hardening and customer **orders read** API remain.
 
 ### 1.1 Harden Shopify product sync
 
@@ -214,20 +215,17 @@ Build a safe backend foundation before exposing customer purchase flows.
 - Preserve mapping state where possible across syncs
 - Validate behavior against a real TAB-sized catalog
 
-**Implemented:**
-- Sync now reads encrypted Admin credentials safely
+**Implemented:** Cursor **`page_info`** pagination and batched import paths in `shopifyAdapter.ts`; encrypted Admin credentials.
 
-**Still outstanding:**
-- pagination
-- retry/backoff
-- reconciliation for archived/removed products
-- large-catalog validation
+**Still outstanding:** **retry/backoff** for throttling/transients; deeper **archived reconciliation** and **large-catalog** validation.
 
 ### 1.2 Normalize Storefront variant identifiers
 
 - Define the canonical source for Storefront variant GIDs
 - Ensure every purchasable app product has a valid Storefront `merchandiseId`
 - Reject add-to-cart operations for products lacking valid Storefront mapping
+
+**Implemented:** `toStorefrontVariantGid` / `storefrontVariantGid.ts`; cart service rejects invalid mapping; POS variant id stored on `pos_products`.
 
 ### 1.3 Persist order references
 
@@ -242,7 +240,7 @@ Build a safe backend foundation before exposing customer purchase flows.
   - source
 - Make webhook-backed `order_references` the authoritative basis for recent orders and later analytics
 
-**Not yet implemented.**
+**Implemented:** Migration `order_references`; `upsertOrderReference` from `orders/create` (email → user match). **Still open:** enrich row with totals/timestamps from payload if needed for UI; **authenticated read API** for the app.
 
 ### 1.4 Finalize read APIs for commerce surfaces
 
@@ -251,7 +249,9 @@ Build a safe backend foundation before exposing customer purchase flows.
 - category metadata endpoint if needed
 - product detail endpoint with variants, inventory, pricing, images, and compatibility context
 
-**Not yet implemented.**
+**Implemented (customer-facing):** `GET /products/shop`, `.../shop/categories`, `.../shop/price-bounds`, product detail fetch used by mobile (compat + spa query). Exact paths differ from original bullet names; behavior is covered.
+
+**Partial:** No dedicated **multi-variant** breakdown on PDP API if Shopify has multiple variants (mobile assumes default purchasable variant).
 
 ### 1.5 Runtime token exchange for Admin API
 
@@ -263,9 +263,13 @@ Build a safe backend foundation before exposing customer purchase flows.
 - Cache tokens per tenant in memory with proactive refresh
 - Ensure sync and connection tests use runtime-exchanged token paths only
 
+**Implemented:** `getTenantShopifyAdminAccessToken` + cache; legacy admin token fallback still supported.
+
 ## Milestone 2: Read-Only Shop Experience
 
 Ship the safest customer-facing commerce slice first.
+
+**Status:** Shipped for browse + buy path; **multi-spa selector** and PDP gaps below remain.
 
 ### 2.1 Shop tab
 
@@ -273,16 +277,16 @@ Ship the safest customer-facing commerce slice first.
 - Browse-all mode
 - Search
 - Category filter pills
-- Paginated or infinite-scroll product grid
+- Paginated or infinite-scroll product list (single-column rows with add-to-cart on mobile)
 
 ### 2.2 Product detail page
 
 - Image carousel
 - Price and compare-at price
-- Variant selection
+- Variant selection — **not implemented** (default purchasable variant)
 - Inventory state
 - Compatibility badge
-- Related products
+- Related products — **not implemented**
 
 ### 2.3 Multi-spa selector
 
@@ -290,9 +294,13 @@ Ship the safest customer-facing commerce slice first.
 - Persist active spa context locally
 - Make Shop results explicitly depend on the active spa
 
+**Not implemented:** Shop uses **primary** spa profile from `/spa-profiles`, not a user-selected active spa persisted on device.
+
 ## Milestone 3: Cart Service
 
 Add Storefront-backed cart behavior after browsing is stable.
+
+**Status:** Implemented (server-side cart id per user + Storefront API proxy).
 
 ### 3.1 Cart abstraction
 
@@ -322,6 +330,8 @@ Add Storefront-backed cart behavior after browsing is stable.
 
 Use Shopify's native checkout surface rather than building our own.
 
+**Status:** Implemented; polish **completion states** (4.2) as needed.
+
 ### 4.1 Checkout flow
 
 - Preload checkout when cart is ready
@@ -343,6 +353,8 @@ Use Shopify's native checkout surface rather than building our own.
 
 Tie commerce into the rest of the customer experience.
 
+**Status:** **5.3** partially done (push on order when user matched by email). **5.1–5.2** open (no Home orders card backed by `order_references`).
+
 ### 5.1 Recent orders card
 
 - Backed by `order_references`
@@ -361,9 +373,13 @@ Tie commerce into the rest of the customer experience.
 - Confirm order messages from verified webhook-backed data
 - Keep notification content simple and trustworthy
 
+**Implemented:** `orders/create` → `upsertOrderReference` → optional **push** to matched `users` row by email (`notification.service`).
+
 ## Milestone 6: TAB Pilot Hardening
 
 Before broad rollout, validate against real TAB data and real operating conditions.
+
+**Status:** Not formally closed; run before broad customer rollout.
 
 ### 6.1 Real catalog QA
 
@@ -393,36 +409,31 @@ Before broad rollout, validate against real TAB data and real operating conditio
 
 ## Recommended Delivery Order
 
-1. Security hardening
-2. Dev Dashboard credential onboarding + runtime token exchange
-3. Product sync hardening and order reference persistence
-4. Read-only shop experience
-5. Cart service
-6. Checkout Kit integration
-7. Home/order completion
-8. TAB pilot QA and hardening
+1. ~~Security hardening~~ ✓ (ongoing: observability)
+2. ~~Dev Dashboard credential onboarding + runtime token exchange~~ ✓
+3. ~~Order reference persistence~~ ✓; **product sync hardening** (retry/QA) — in progress
+4. ~~Read-only shop + cart + checkout~~ ✓ (PDP variants / related — optional)
+5. **Home/order completion** — orders **read API** + Home card
+6. **TAB pilot QA and hardening**
 
 ## Must-Complete Before TAB Pilot
 
-- Shopify secrets encrypted at rest
-- Admin APIs do not expose raw credentials
-- Webhook idempotency implemented
-- Full-catalog sync pagination implemented
-- Reliable Storefront variant mapping defined
-- `order_references` persisted from webhook
-- Read-only shop verified against real TAB catalog
-- Cart and checkout tested with real tenant data
-
-**Completed so far:**
-- Shopify secrets encrypted at rest
-- Admin APIs do not expose raw credentials
+- Shopify secrets encrypted at rest ✓
+- Admin APIs do not expose raw credentials ✓
+- Webhook idempotency implemented ✓ (catalog + `orders/create`)
+- Full-catalog sync pagination implemented ✓ (`page_info` cursors)
+- Reliable Storefront variant mapping defined ✓ (GID helper + cart validation)
+- `order_references` persisted from webhook ✓
+- Read-only shop verified against real TAB catalog — **QA (Milestone 6)**
+- Cart and checkout tested with real tenant data — **QA (Milestone 6)**
+- **User-visible order history** — **open** (recommended before calling commerce “done” for customers)
 
 ## Can Ship in Early Internal Beta
 
-- Read-only shop
-- PDP
-- Multi-spa selector for Home/Shop
+- Read-only shop + cart + checkout (current mobile path)
+- PDP (single-variant assumption)
 - Product filtering by compatibility and category
+- Multi-spa selector — **not yet**; primary spa only
 
 ## Should Wait Until Post-Pilot or Later Phase 3
 
@@ -435,13 +446,13 @@ Before broad rollout, validate against real TAB data and real operating conditio
 
 Commerce is not done until all of the following are true:
 
-- Customers can browse compatible and browse-all products safely
-- PDPs show accurate variants, prices, inventory, and compatibility
-- Cart create/update/remove works against real Shopify Storefront data
-- Checkout launches through Shopify Checkout Kit
-- Successful orders are reconciled through verified webhook handling
-- `order_references` persist correctly
-- Recent orders UI works from authoritative backend data
-- Shopify secrets are encrypted at rest
-- Sync handles full retailer catalog size with pagination and retry behavior
-- Tenant isolation and webhook safety have been explicitly tested
+- Customers can browse compatible and browse-all products safely ✓
+- PDPs show accurate **prices, inventory, and compatibility** ✓; **multi-variant accuracy** only if catalog requires it (currently default variant)
+- Cart create/update/remove works against real Shopify Storefront data ✓
+- Checkout launches through Shopify Checkout Kit ✓
+- Successful orders are reconciled through verified webhook handling ✓ (`order_references` + idempotency)
+- `order_references` persist correctly ✓
+- **Recent orders UI works from authoritative backend data** — **not done** (no read API / Home card)
+- Shopify secrets are encrypted at rest ✓
+- Sync handles full retailer catalog size with **pagination** ✓; **retry behavior** still recommended for production
+- Tenant isolation and webhook safety have been explicitly tested — **Milestone 6**

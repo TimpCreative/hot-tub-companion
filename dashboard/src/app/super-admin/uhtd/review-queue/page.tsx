@@ -42,7 +42,14 @@ type ConsumerSuggestionRow = Record<string, unknown> & {
   tenantName?: string;
 };
 
-type TabType = 'brands' | 'model-lines' | 'spas' | 'parts' | 'compatibility' | 'consumer-spa';
+type TabType =
+  | 'brands'
+  | 'model-lines'
+  | 'spas'
+  | 'parts'
+  | 'compatibility'
+  | 'consumer-spa'
+  | 'shopify-imports';
 
 const TABS: { key: TabType; label: string }[] = [
   { key: 'brands', label: 'Brands' },
@@ -50,8 +57,23 @@ const TABS: { key: TabType; label: string }[] = [
   { key: 'spas', label: 'Spas' },
   { key: 'parts', label: 'Parts' },
   { key: 'compatibility', label: 'Compatibility' },
+  { key: 'shopify-imports', label: 'Shopify part imports' },
   { key: 'consumer-spa', label: 'Consumer spa requests' },
 ];
+
+type ShopifyReviewRow = {
+  id: string;
+  pos_product_id: string;
+  tenant_id: string;
+  draft_payload: Record<string, unknown>;
+  source_super_admin_email: string | null;
+  created_at: string;
+  pos_title: string | null;
+  pos_sku: string | null;
+  pos_barcode: string | null;
+  tenant_name: string | null;
+  tenant_slug: string | null;
+};
 
 function PlaceholderTab({ entityType }: { entityType: string }) {
   return (
@@ -82,8 +104,42 @@ export default function ReviewQueuePage() {
   const [pageSize, setPageSize] = useState(25);
   const [total, setTotal] = useState(0);
   const [processing, setProcessing] = useState(false);
+  const [shopifyItems, setShopifyItems] = useState<ShopifyReviewRow[]>([]);
+  const [shopifyApproveId, setShopifyApproveId] = useState<string | null>(null);
+  const [shopifyApproveMode, setShopifyApproveMode] = useState<'link' | 'create'>('link');
+  const [shopifyLinkPartId, setShopifyLinkPartId] = useState('');
+  const [shopifyCreateCategoryId, setShopifyCreateCategoryId] = useState('');
+  const [shopifyCreateName, setShopifyCreateName] = useState('');
+  const [shopifyCategories, setShopifyCategories] = useState<{ id: string; displayName: string }[]>([]);
 
   async function fetchData() {
+    if (activeTab === 'shopify-imports') {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+        });
+        const res = await fetchWithAuth(
+          `/api/dashboard/super-admin/uhtd/shopify-map/review-queue?${params}`
+        );
+        const data = await res.json();
+        if (data.success && data.data) {
+          setShopifyItems(data.data.rows || []);
+          setTotal(data.data.pagination?.total || 0);
+        } else {
+          setShopifyItems([]);
+          setTotal(0);
+        }
+      } catch (err) {
+        console.error('Error fetching Shopify import review queue:', err);
+        setShopifyItems([]);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (activeTab === 'consumer-spa') {
       setLoading(true);
       try {
@@ -149,6 +205,95 @@ export default function ReviewQueuePage() {
     setSelectedIds([]);
     setPage(1);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'shopify-imports') return;
+    (async () => {
+      try {
+        const res = await fetchWithAuth('/api/dashboard/super-admin/pcdb/categories');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          setShopifyCategories(
+            data.data.map((c: { id: string; displayName: string; name: string }) => ({
+              id: c.id,
+              displayName: c.displayName || c.name,
+            }))
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [activeTab, fetchWithAuth]);
+
+  const openShopifyApprove = (row: ShopifyReviewRow) => {
+    setShopifyApproveId(row.id);
+    setShopifyApproveMode('link');
+    setShopifyLinkPartId('');
+    setShopifyCreateCategoryId('');
+    setShopifyCreateName(row.pos_title || '');
+  };
+
+  const submitShopifyApprove = async () => {
+    if (!shopifyApproveId) return;
+    if (shopifyApproveMode === 'link' && !shopifyLinkPartId.trim()) {
+      alert('Enter part UUID');
+      return;
+    }
+    if (shopifyApproveMode === 'create' && (!shopifyCreateCategoryId || !shopifyCreateName.trim())) {
+      alert('Category and name required');
+      return;
+    }
+    setProcessing(true);
+    try {
+      const body =
+        shopifyApproveMode === 'link'
+          ? { mode: 'link' as const, uhtdPartId: shopifyLinkPartId.trim() }
+          : {
+              mode: 'create' as const,
+              part: {
+                categoryId: shopifyCreateCategoryId,
+                name: shopifyCreateName.trim(),
+              },
+            };
+      const res = await fetchWithAuth(
+        `/api/dashboard/super-admin/uhtd/shopify-map/review-queue/${shopifyApproveId}/approve`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.error?.message || 'Approve failed');
+        return;
+      }
+      setShopifyApproveId(null);
+      fetchData();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Approve failed');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const dismissShopifyReview = async (id: string) => {
+    if (!confirm('Dismiss this item without mapping?')) return;
+    setProcessing(true);
+    try {
+      await fetchWithAuth(`/api/dashboard/super-admin/uhtd/shopify-map/review-queue/${id}/dismiss`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      fetchData();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   const handleSelectAll = () => {
     if (selectedIds.length === items.length) {
@@ -322,7 +467,161 @@ export default function ReviewQueuePage() {
         </nav>
       </div>
 
-      {activeTab === 'consumer-spa' ? (
+      {activeTab === 'shopify-imports' ? (
+        <>
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            Items sent from <strong>Map from Shopify</strong> with <em>Send for review</em>. Approve by linking
+            or creating a part (same as Save &amp; Publish). Dismiss to close without mapping.
+          </div>
+          <div className="rounded-lg card">
+            <Table
+              columns={[
+                {
+                  key: 'tenant',
+                  header: 'Retailer',
+                  render: (row: ShopifyReviewRow) => (
+                    <span className="text-sm text-gray-900">{row.tenant_name || row.tenant_slug || '—'}</span>
+                  ),
+                },
+                {
+                  key: 'product',
+                  header: 'POS product',
+                  render: (row: ShopifyReviewRow) => (
+                    <div className="text-sm">
+                      <div className="font-medium text-gray-900">{row.pos_title || '—'}</div>
+                      <div className="text-xs text-gray-500">
+                        SKU {row.pos_sku || '—'} · {row.pos_barcode || '—'}
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'from',
+                  header: 'Submitted by',
+                  render: (row: ShopifyReviewRow) => (
+                    <span className="text-xs text-gray-600">{row.source_super_admin_email || '—'}</span>
+                  ),
+                },
+                {
+                  key: 'when',
+                  header: 'Queued',
+                  render: (row: ShopifyReviewRow) => (
+                    <span className="text-xs text-gray-500">{new Date(row.created_at).toLocaleString()}</span>
+                  ),
+                },
+                {
+                  key: 'actions',
+                  header: '',
+                  render: (row: ShopifyReviewRow) => (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        loading={processing}
+                        onClick={() => dismissShopifyReview(row.id)}
+                      >
+                        Dismiss
+                      </Button>
+                      <Button size="sm" loading={processing} onClick={() => openShopifyApprove(row)}>
+                        Approve…
+                      </Button>
+                      <Link
+                        href={`/super-admin/uhtd/map-from-shopify`}
+                        className="text-xs text-blue-600 self-center"
+                      >
+                        Inbox
+                      </Link>
+                    </div>
+                  ),
+                },
+              ]}
+              data={shopifyItems}
+              keyField="id"
+              loading={loading}
+              emptyMessage="No open Shopify import review items."
+            />
+            {total > 0 && (
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={total}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setPage(1);
+                }}
+              />
+            )}
+          </div>
+
+          {shopifyApproveId && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900">Approve import</h3>
+                <div className="flex gap-4 text-sm">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      checked={shopifyApproveMode === 'link'}
+                      onChange={() => setShopifyApproveMode('link')}
+                    />
+                    Link part
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      checked={shopifyApproveMode === 'create'}
+                      onChange={() => setShopifyApproveMode('create')}
+                    />
+                    Create part
+                  </label>
+                </div>
+                {shopifyApproveMode === 'link' ? (
+                  <input
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    placeholder="UHTD part UUID"
+                    value={shopifyLinkPartId}
+                    onChange={(e) => setShopifyLinkPartId(e.target.value)}
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    <select
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      value={shopifyCreateCategoryId}
+                      onChange={(e) => setShopifyCreateCategoryId(e.target.value)}
+                    >
+                      <option value="">Category…</option>
+                      {shopifyCategories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.displayName}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      placeholder="Part name"
+                      value={shopifyCreateName}
+                      onChange={(e) => setShopifyCreateName(e.target.value)}
+                    />
+                  </div>
+                )}
+                <div className="flex justify-end gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => setShopifyApproveId(null)}>
+                    Cancel
+                  </Button>
+                  <Button size="sm" loading={processing} onClick={submitShopifyApprove}>
+                    Approve &amp; map
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      ) : activeTab === 'consumer-spa' ? (
         <>
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <strong>Does not add to SCdb.</strong> Approve/reject here is only for workflow tracking. After

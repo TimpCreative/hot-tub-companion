@@ -792,6 +792,14 @@ export interface DbPosProduct {
   sync_hash: string | null;
   created_at: Date;
   updated_at: Date;
+  /** Super-admin Map from Shopify triage */
+  uhtd_import_rejected_at?: Date | null;
+  uhtd_import_reject_reason_code?: string | null;
+  uhtd_import_reject_note?: string | null;
+  uhtd_import_rejected_by?: string | null;
+  shopify_listing_snapshot?: Record<string, unknown> | null;
+  uhtd_import_needs_reverify_at?: Date | null;
+  mapping_actor_email?: string | null;
 }
 
 export interface DbPosShopifyCollection {
