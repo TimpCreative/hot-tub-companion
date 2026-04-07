@@ -45,6 +45,8 @@ const SEASON_PRESETS: { key: string; label: string; months: number[] }[] = [
 
 const ALL_USAGE_MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
+const MONTH_LABELS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 function stepEnabled(
   steps: { id: OnboardingStepId; enabled: boolean }[] | undefined,
   id: OnboardingStepId
@@ -558,10 +560,10 @@ export default function OnboardingScreen() {
           ) : null}
 
           <View style={styles.field}>
-            <Text style={styles.label}>Usage months</Text>
+            <Text style={styles.label}>What months do you use your spa?</Text>
             <Text style={styles.helperSmall}>
-              Tap seasons or letters. Turn off months you do not use your tub so your care schedule matches your
-              season.
+              Tap a season preset or turn off months you do not use so your care schedule matches how you actually
+              use the tub.
             </Text>
             <View style={styles.seasonRow}>
               {SEASON_PRESETS.map((s) => {
@@ -588,7 +590,7 @@ export default function OnboardingScreen() {
                   onPress={() => toggleMonth(m)}
                 >
                   <Text style={[styles.monthBtnText, { color: usageMonths.includes(m) ? '#fff' : '#333' }]}>
-                    {['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'][m - 1]}
+                    {MONTH_LABELS_SHORT[m - 1]}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -965,7 +967,8 @@ const styles = StyleSheet.create({
   seasonChipText: { fontSize: 14, fontWeight: '600' },
   monthsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   monthBtn: {
-    width: 36,
+    minWidth: 48,
+    paddingHorizontal: 8,
     height: 36,
     borderRadius: 8,
     borderWidth: 1,
@@ -974,7 +977,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  monthBtnText: { fontSize: 12, fontWeight: '600' },
+  monthBtnText: { fontSize: 11, fontWeight: '600' },
   strategyRow: {
     borderWidth: 1,
     borderColor: '#e2e8f0',

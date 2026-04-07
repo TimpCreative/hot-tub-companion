@@ -39,6 +39,8 @@ const SEASON_PRESETS: { key: string; label: string; months: number[] }[] = [
   { key: 'winter', label: 'Winter', months: [12, 1, 2] },
 ];
 
+const MONTH_LABELS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 export default function EditSpaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -203,9 +205,9 @@ export default function EditSpaScreen() {
       </View>
 
       <View style={[styles.section, { backgroundColor: colors.contentBackground }]}>
-        <Text style={[styles.label, { color: colors.textMuted }]}>Usage months</Text>
+        <Text style={[styles.label, { color: colors.textMuted }]}>What months do you use your spa?</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Northern seasons (tap to toggle a group). Fine-tune with month letters below.
+          Northern seasons (tap to toggle a group). Fine-tune with individual months below.
         </Text>
         <View style={styles.seasonRow}>
           {SEASON_PRESETS.map((s) => {
@@ -245,7 +247,7 @@ export default function EditSpaScreen() {
                   { color: usageMonths.includes(m) ? '#fff' : colors.text },
                 ]}
               >
-                {['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'][m - 1]}
+                {MONTH_LABELS_SHORT[m - 1]}
               </Text>
             </TouchableOpacity>
           ))}
@@ -323,14 +325,15 @@ const styles = StyleSheet.create({
   optionText: { fontSize: 16 },
   monthsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   monthBtn: {
-    width: 36,
+    minWidth: 48,
+    paddingHorizontal: 8,
     height: 36,
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  monthText: { fontSize: 12, fontWeight: '600' },
+  monthText: { fontSize: 11, fontWeight: '600' },
   seasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
   seasonChip: {
     paddingHorizontal: 14,
