@@ -51,8 +51,6 @@ interface PosSettingsResponse {
     shopifyClientId?: string | null;
     lastProductSyncAt?: string | null;
     shopifyClientSecretConfigured?: boolean;
-    /** Headless Storefront API token (cart / checkout in app). Separate from OAuth client secret. */
-    shopifyStorefrontTokenConfigured?: boolean;
     shopifyAdminTokenConfigured?: boolean;
     shopifyWebhookSecretConfigured?: boolean;
     shopifyCatalogSyncEnabled?: boolean;
@@ -100,7 +98,6 @@ interface SettingsSnapshot {
   shopifyStoreUrl: string;
   shopifyAdminTokenDraft: string;
   shopifyClientSecretDraft: string;
-  shopifyStorefrontAccessTokenDraft: string;
   shopifyCatalogSyncEnabled: boolean;
   productSyncIntervalMinutes: number;
   shopLowStockThreshold: number;
@@ -140,10 +137,8 @@ export default function AdminSettingsPage() {
   const [shopifyStoreUrl, setShopifyStoreUrl] = useState<string>('');
   const [shopifyAdminTokenDraft, setShopifyAdminTokenDraft] = useState<string>('');
   const [shopifyClientSecretDraft, setShopifyClientSecretDraft] = useState<string>('');
-  const [shopifyStorefrontAccessTokenDraft, setShopifyStorefrontAccessTokenDraft] = useState<string>('');
   const [shopifyAdminTokenConfigured, setShopifyAdminTokenConfigured] = useState(false);
   const [shopifyClientSecretConfigured, setShopifyClientSecretConfigured] = useState(false);
-  const [shopifyStorefrontTokenConfigured, setShopifyStorefrontTokenConfigured] = useState(false);
   const [lastProductSyncAt, setLastProductSyncAt] = useState<string | null>(null);
   const [lastCronProductSyncAt, setLastCronProductSyncAt] = useState<string | null>(null);
   const [shopifyCatalogSyncEnabled, setShopifyCatalogSyncEnabled] = useState(false);
@@ -195,7 +190,6 @@ export default function AdminSettingsPage() {
       shopifyStoreUrl !== initialSnapshot.shopifyStoreUrl ||
       shopifyAdminTokenDraft !== initialSnapshot.shopifyAdminTokenDraft ||
       shopifyClientSecretDraft !== initialSnapshot.shopifyClientSecretDraft ||
-      shopifyStorefrontAccessTokenDraft !== initialSnapshot.shopifyStorefrontAccessTokenDraft ||
       shopifyCatalogSyncEnabled !== initialSnapshot.shopifyCatalogSyncEnabled ||
       productSyncIntervalMinutes !== initialSnapshot.productSyncIntervalMinutes ||
       shopLowStockThreshold !== initialSnapshot.shopLowStockThreshold ||
@@ -218,7 +212,6 @@ export default function AdminSettingsPage() {
     productSyncIntervalMinutes,
     shopifyStoreUrl,
     shopifyClientSecretDraft,
-    shopifyStorefrontAccessTokenDraft,
     shopLowStockThreshold,
     shopShowInStockWhenAboveThreshold,
     timezone,
@@ -253,10 +246,8 @@ export default function AdminSettingsPage() {
         setShopifyStoreUrl(pos?.shopifyStoreUrl ?? '');
         setShopifyAdminTokenDraft('');
         setShopifyClientSecretDraft('');
-        setShopifyStorefrontAccessTokenDraft('');
         setShopifyAdminTokenConfigured(!!(pos?.shopifyClientId || pos?.shopifyAdminTokenConfigured));
         setShopifyClientSecretConfigured(!!pos?.shopifyClientSecretConfigured);
-        setShopifyStorefrontTokenConfigured(!!pos?.shopifyStorefrontTokenConfigured);
         setLastProductSyncAt(pos?.lastProductSyncAt ?? null);
         setLastCronProductSyncAt(pos?.lastCronProductSyncAt ?? null);
         setPosIntegrationLastActivityAt(pos?.posIntegrationLastActivityAt ?? null);
@@ -287,7 +278,6 @@ export default function AdminSettingsPage() {
           shopifyStoreUrl: pos?.shopifyStoreUrl ?? '',
           shopifyAdminTokenDraft: '',
           shopifyClientSecretDraft: '',
-          shopifyStorefrontAccessTokenDraft: '',
           shopifyCatalogSyncEnabled: !!pos?.shopifyCatalogSyncEnabled,
           productSyncIntervalMinutes:
             typeof pos?.productSyncIntervalMinutes === 'number' ? pos.productSyncIntervalMinutes : 30,
@@ -367,9 +357,6 @@ export default function AdminSettingsPage() {
       };
       if (shopifyAdminTokenDraft.trim()) payload.shopifyClientId = shopifyAdminTokenDraft.trim();
       if (shopifyClientSecretDraft.trim()) payload.shopifyClientSecret = shopifyClientSecretDraft.trim();
-      if (shopifyStorefrontAccessTokenDraft.trim()) {
-        payload.shopifyStorefrontToken = shopifyStorefrontAccessTokenDraft.trim();
-      }
       if (posType === 'shopify') {
         payload.shopifyCatalogSyncEnabled = shopifyCatalogSyncEnabled;
         payload.productSyncIntervalMinutes = productSyncIntervalMinutes;
@@ -380,12 +367,10 @@ export default function AdminSettingsPage() {
         setPosSuccess(res.message ?? 'POS configuration saved');
         setShopifyAdminTokenDraft('');
         setShopifyClientSecretDraft('');
-        setShopifyStorefrontAccessTokenDraft('');
         setShopifyAdminTokenConfigured(
           !!(res.data?.shopifyClientId || res.data?.shopifyAdminTokenConfigured)
         );
         setShopifyClientSecretConfigured(!!res.data?.shopifyClientSecretConfigured);
-        setShopifyStorefrontTokenConfigured(!!res.data?.shopifyStorefrontTokenConfigured);
         setLastProductSyncAt(res.data?.lastProductSyncAt ?? null);
         setLastCronProductSyncAt(res.data?.lastCronProductSyncAt ?? null);
         setPosIntegrationLastActivityAt(res.data?.posIntegrationLastActivityAt ?? null);
@@ -401,7 +386,6 @@ export default function AdminSettingsPage() {
                 shopifyStoreUrl: res.data?.shopifyStoreUrl ?? shopifyStoreUrl,
                 shopifyAdminTokenDraft: '',
                 shopifyClientSecretDraft: '',
-                shopifyStorefrontAccessTokenDraft: '',
                 shopifyCatalogSyncEnabled: !!res.data?.shopifyCatalogSyncEnabled,
                 productSyncIntervalMinutes:
                   typeof res.data?.productSyncIntervalMinutes === 'number'
@@ -797,10 +781,6 @@ export default function AdminSettingsPage() {
                 if (Number.isFinite(v)) setShopLowStockThreshold(Math.min(999, Math.max(0, v)));
               }}
             />
-            <p className="mt-1 text-xs text-gray-500">
-              Default 5: e.g. stock 3 shows &quot;Only 3 left&quot;, stock 10 shows &quot;In stock&quot; (if enabled below).
-              Use 0 to never show the low-stock warning for in-stock items.
-            </p>
           </div>
           <label className="flex items-start gap-2 cursor-pointer">
             <input
@@ -818,21 +798,18 @@ export default function AdminSettingsPage() {
           </label>
         </div>
 
-        <div className="flex items-center gap-3 pt-2">
+        <div className="pt-2">
           <Button type="button" loading={saving} onClick={handleSave}>
             Save Settings
           </Button>
-          <p className="text-xs text-gray-500">
-            After upload, click Save Settings. Images only. Min 1KB, max 10MB.
-          </p>
         </div>
       </div>
 
-      <div className="card mt-6 space-y-4 rounded-lg p-6">
+      <div className="card mt-6 space-y-5 rounded-lg p-6">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">POS Integration</h3>
-          <p className="text-xs text-gray-500 mt-1">
-            Configure the Shopify connection used for catalog data and future commerce. Stored secrets are never shown again after save. Use automatic sync for day-to-day inventory; run a full import for onboarding or backfill.
+          <p className="text-sm text-gray-600 mt-1">
+            Link Shopify for product sync. Saved secrets are not shown again—paste new values only to add or rotate them.
           </p>
         </div>
 
@@ -853,102 +830,85 @@ export default function AdminSettingsPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Shopify store URL</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Store admin URL</label>
           <input
             className="w-full rounded-lg border border-gray-300 px-3 py-2"
             value={shopifyStoreUrl}
             onChange={(e) => setShopifyStoreUrl(e.target.value)}
             disabled={posSaving || posTesting || posType !== 'shopify'}
-            placeholder="https://your-store.myshopify.com"
+            placeholder="your-store.myshopify.com"
           />
-          <p className="mt-1 text-xs text-gray-600">
-            Use your store’s <strong className="font-medium">*.myshopify.com</strong> admin hostname (shown in the Shopify admin URL), not a public custom domain.
-            Webhooks always identify the shop that way; a mismatch returns HTTP 404 on webhook delivery.
+          <p className="mt-1 text-xs text-gray-500">
+            Use the <span className="font-medium">.myshopify.com</span> hostname from Shopify admin (not your public shop domain).
           </p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Shopify Client ID</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Client ID</label>
           <input
             className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
             type="text"
             value={shopifyAdminTokenDraft}
             onChange={(e) => setShopifyAdminTokenDraft(e.target.value)}
             disabled={posSaving || posTesting || posType !== 'shopify'}
-            placeholder="Paste the Client ID from Shopify Dev Dashboard"
+            placeholder="From your Shopify custom app"
             autoComplete="off"
           />
           <p className="mt-1 text-xs text-gray-500">
-            {shopifyAdminTokenConfigured ? 'Configured.' : 'Not configured.'} This is safe to view in Shopify Dev Dashboard if needed.
+            {shopifyAdminTokenConfigured ? (
+              <span className="text-green-800">On file.</span>
+            ) : (
+              <span>Required for new setup.</span>
+            )}{' '}
+            Leave blank to keep the saved ID.
           </p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Shopify Client Secret (OAuth)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Client secret</label>
           <input
             className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
             type="password"
             value={shopifyClientSecretDraft}
             onChange={(e) => setShopifyClientSecretDraft(e.target.value)}
             disabled={posSaving || posTesting || posType !== 'shopify'}
-            placeholder="Paste a new Client Secret to replace the stored value"
+            placeholder="Paste only when adding or rotating"
             autoComplete="new-password"
           />
           <p className="mt-1 text-xs text-gray-500">
-            {shopifyClientSecretConfigured ? 'Configured.' : 'Not configured.'} Used for Admin API / webhooks (custom
-            app). Write-only after save.
+            {shopifyClientSecretConfigured ? (
+              <span className="text-green-800">On file.</span>
+            ) : (
+              <span>Required for new setup.</span>
+            )}{' '}
+            OAuth / Admin API. Never displayed after save.
           </p>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Storefront API access token <span className="font-normal text-gray-500">(optional)</span>
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+          <label className="flex items-start gap-2 text-sm font-medium text-gray-900 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-0.5 rounded border-gray-300"
+              checked={shopifyCatalogSyncEnabled}
+              onChange={(e) => setShopifyCatalogSyncEnabled(e.target.checked)}
+              disabled={posSaving || posTesting || posType !== 'shopify'}
+            />
+            <span>
+              Keep catalog in sync automatically
+              <span className="block text-xs font-normal text-gray-600 mt-0.5">
+                Webhooks push changes; background job reconciles on the interval below.
+              </span>
+            </span>
           </label>
-          <input
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
-            type="password"
-            value={shopifyStorefrontAccessTokenDraft}
-            onChange={(e) => setShopifyStorefrontAccessTokenDraft(e.target.value)}
-            disabled={posSaving || posTesting || posType !== 'shopify'}
-            placeholder="Leave blank to auto-create from Client ID + Secret (Partner app)"
-            autoComplete="new-password"
-          />
-          <p className="mt-1 text-xs text-gray-600">
-            For <strong className="font-medium">Add to cart</strong> and checkout, the server usually creates this
-            automatically when you <strong className="font-medium">save</strong> or <strong className="font-medium">test</strong>{' '}
-            POS settings, using Shopify&apos;s Admin API (<code className="text-xs">storefrontAccessTokenCreate</code>). Your
-            Partner app must have <strong className="font-medium">Storefront API</strong> enabled with cart-related scopes.
-            Paste a token here only if you want to override the auto-created one.
-          </p>
-          <p className="mt-1 text-xs text-gray-500">
-            {shopifyStorefrontTokenConfigured ? 'Configured.' : 'Not configured.'} Write-only after save.
-          </p>
-        </div>
 
-        <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-4 space-y-3">
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-900">
-              <input
-                type="checkbox"
-                checked={shopifyCatalogSyncEnabled}
-                onChange={(e) => setShopifyCatalogSyncEnabled(e.target.checked)}
-                disabled={posSaving || posTesting || posType !== 'shopify'}
-              />
-              Automatic catalog &amp; inventory sync
-            </label>
-            <p className="text-xs text-gray-600 mt-1 ml-6">
-              When enabled, Shopify sends product create/update/delete and inventory webhooks to Hot Tub Companion, and a periodic incremental pull runs as a safety net (interval below). Save these settings once after deploy to register any new webhook topics.
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Incremental sync interval (minutes)
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sync interval (minutes)</label>
             <input
               type="number"
               min={1}
               max={1440}
-              className="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm"
               value={productSyncIntervalMinutes}
               onChange={(e) => {
                 const n = parseInt(e.target.value, 10);
@@ -956,22 +916,24 @@ export default function AdminSettingsPage() {
               }}
               disabled={posSaving || posTesting || posType !== 'shopify'}
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Default 30. Throttles background incremental sync (1–1440). Call the sync cron every 1–2 minutes so this interval can take effect.
-            </p>
+            <p className="mt-1 text-xs text-gray-500">Default 30. Your server cron should run often enough to honor this.</p>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Last product sync</label>
-            <p className="text-sm text-gray-600">{lastProductSyncAt ? new Date(lastProductSyncAt).toLocaleString() : 'Never'}</p>
+
+          <div className="grid gap-3 sm:grid-cols-2 text-sm">
+            <div>
+              <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Last product sync</div>
+              <div className="text-gray-800">{lastProductSyncAt ? new Date(lastProductSyncAt).toLocaleString() : 'Never'}</div>
+            </div>
+            <div>
+              <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Last cron run</div>
+              <div className="text-gray-800">
+                {lastCronProductSyncAt ? new Date(lastCronProductSyncAt).toLocaleString() : '—'}
+              </div>
+            </div>
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Last incremental cron run</label>
-            <p className="text-sm text-gray-600">
-              {lastCronProductSyncAt ? new Date(lastCronProductSyncAt).toLocaleString() : '—'}
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Last activity</label>
+            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Activity log</div>
             <button
               type="button"
               className="text-sm text-blue-600 hover:text-blue-800 underline underline-offset-2 text-left disabled:opacity-50 disabled:no-underline"
@@ -983,28 +945,20 @@ export default function AdminSettingsPage() {
             >
               {posIntegrationLastActivityAt
                 ? new Date(posIntegrationLastActivityAt).toLocaleString()
-                : 'No activity yet — click to open history'}
+                : 'Open log'}
             </button>
-            <p className="text-xs text-gray-500 mt-1">
-              Latest webhook, sync, or settings change. Opens a full paginated log.
-            </p>
             {posHealth?.lastLoggedFailure ? (
               <p className="text-xs text-amber-900 mt-2 rounded-md bg-amber-50 px-2 py-2 border border-amber-200">
-                <span className="font-semibold">Last logged issue</span>{' '}
-                ({new Date(posHealth.lastLoggedFailure.createdAt).toLocaleString()} —{' '}
-                {posHealth.lastLoggedFailure.source}): {posHealth.lastLoggedFailure.summary}
+                <span className="font-semibold">Recent issue</span>{' '}
+                {new Date(posHealth.lastLoggedFailure.createdAt).toLocaleString()}: {posHealth.lastLoggedFailure.summary}
               </p>
-            ) : posHealth ? (
-              <p className="text-xs text-gray-500 mt-2">No failure-style rows found in the recent activity log.</p>
             ) : null}
           </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Full catalog import</label>
-          <p className="text-xs text-gray-500 mb-2">
-            Imports every product page from Shopify (all variants). Use for initial setup or recovery; automatic sync keeps day-to-day changes fresh.
-          </p>
+          <p className="text-xs text-gray-500 mb-2">One-time pull of all products—use for first setup or a full refresh.</p>
           <Button
             type="button"
             variant="secondary"
@@ -1012,16 +966,16 @@ export default function AdminSettingsPage() {
             disabled={syncImportRunning || posType !== 'shopify' || posSaving || posTesting}
             onClick={() => void runFullCatalogSync()}
           >
-            Run full catalog sync now
+            Run full catalog sync
           </Button>
         </div>
 
-        <div className="flex items-center gap-3 pt-2">
+        <div className="flex flex-wrap items-center gap-3 pt-1">
           <Button type="button" loading={posSaving} onClick={handleSavePos}>
-            Save POS Settings
+            Save POS settings
           </Button>
           <Button type="button" variant="secondary" loading={posTesting} onClick={handleTestPos}>
-            Test Connection
+            Test connection
           </Button>
         </div>
       </div>
