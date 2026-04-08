@@ -125,9 +125,17 @@ export interface WaterCareTip {
   text: string;
 }
 
+export interface WaterCareLegal {
+  policyVersion: string;
+  acknowledgmentTitle: string;
+  acknowledgmentBody: string;
+  fullPolicyUrl: string | null;
+}
+
 export interface WaterCareConfig {
   testingTipsTitle: string;
   testingTips: WaterCareTip[];
+  legal?: WaterCareLegal;
 }
 
 interface TenantConfig {
@@ -151,6 +159,8 @@ interface TenantConfig {
   onboarding?: TenantOnboardingConfig;
   homeDashboard?: HomeDashboardConfig;
   waterCare?: WaterCareConfig;
+  careSchedule?: { version: number; events: Record<string, unknown> };
+  careScheduleReference?: unknown;
   dealerContact?: DealerContact;
   dealerPage?: DealerPageConfig;
   termsUrl?: string | null;

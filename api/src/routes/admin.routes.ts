@@ -7,6 +7,7 @@ import * as adminProductsController from '../controllers/adminProducts.controlle
 import * as adminBrandingController from '../controllers/adminBranding.controller';
 import * as adminBrandingMediaController from '../controllers/adminBrandingMedia.controller';
 import * as adminAppSetupController from '../controllers/adminAppSetup.controller';
+import * as adminWaterCareAnalyticsController from '../controllers/adminWaterCareAnalytics.controller';
 import * as adminPosController from '../controllers/adminPos.controller';
 import * as adminSettingsPosSyncController from '../controllers/adminSettingsPosSync.controller';
 import * as adminNotificationsController from '../controllers/adminNotifications.controller';
@@ -75,6 +76,7 @@ router.post('/settings/pos/sync/now', adminSettingsPosSyncController.syncCatalog
 // App setup (onboarding config, etc.)
 router.get('/settings/app-setup', adminAppSetupController.getAppSetup);
 router.put('/settings/app-setup', adminAppSetupController.updateAppSetup);
+router.get('/settings/water-care-analytics', adminWaterCareAnalyticsController.getWaterCareAnalytics);
 
 // Content library
 router.use('/', adminContentRoutes);

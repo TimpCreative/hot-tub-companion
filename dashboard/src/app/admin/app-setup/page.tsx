@@ -52,9 +52,42 @@ interface HomeDashboardConfig {
   widgets: HomeWidget[];
 }
 
+interface WaterCareLegal {
+  policyVersion: string;
+  acknowledgmentTitle: string;
+  acknowledgmentBody: string;
+  fullPolicyUrl: string | null;
+}
+
 interface WaterCareConfig {
   testingTipsTitle: string;
   testingTips: { text: string }[];
+  legal: WaterCareLegal;
+}
+
+type CareScheduleEventOverride = {
+  enabled?: boolean;
+  intervalDays?: number;
+  notificationDaysBefore?: number;
+  phase?: number;
+};
+
+interface CareScheduleConfig {
+  version: number;
+  events: Record<string, CareScheduleEventOverride>;
+}
+
+interface CareScheduleReference {
+  recurring: Array<{
+    eventType: string;
+    intervalDays: number;
+    phase: number;
+    notificationDaysBefore: number;
+    title: string;
+    description: string;
+  }>;
+  seasonal: { title: string; description: string };
+  phaseNote: string;
 }
 
 interface DealerContact {
@@ -195,12 +228,21 @@ export default function AdminAppSetupPage() {
 
   const markDirty = useCallback(() => setUnsavedChanges(true), [setUnsavedChanges]);
 
-  const [tab, setTab] = useState<'onboarding' | 'home' | 'dealer' | 'waterCare' | 'legal'>('onboarding');
+  const [tab, setTab] = useState<
+    'onboarding' | 'home' | 'dealer' | 'waterCare' | 'careSchedule' | 'legal'
+  >('onboarding');
   const [onboarding, setOnboarding] = useState<OnboardingConfig | null>(null);
   const [homeDashboard, setHomeDashboard] = useState<HomeDashboardConfig | null>(null);
   const [dealerPage, setDealerPage] = useState<DealerPageConfig | null>(null);
   const [dealerContact, setDealerContact] = useState<DealerContact | null>(null);
   const [waterCare, setWaterCare] = useState<WaterCareConfig | null>(null);
+  const [careSchedule, setCareSchedule] = useState<CareScheduleConfig | null>(null);
+  const [careScheduleReference, setCareScheduleReference] = useState<CareScheduleReference | null>(null);
+  const [waterCareAnalytics, setWaterCareAnalytics] = useState<{
+    totalWaterTests: number;
+    testsWithKitSelected: number;
+    testsWithoutKit: number;
+  } | null>(null);
   const [termsUrl, setTermsUrl] = useState('');
   const [privacyUrl, setPrivacyUrl] = useState('');
   const [loading, setLoading] = useState(true);
@@ -220,6 +262,8 @@ export default function AdminAppSetupPage() {
           dealerPage?: DealerPageConfig;
           dealerContact?: DealerContact;
           waterCare?: WaterCareConfig;
+          careSchedule?: CareScheduleConfig;
+          careScheduleReference?: CareScheduleReference;
           legal?: Legal;
         };
       };
@@ -235,7 +279,21 @@ export default function AdminAppSetupPage() {
       }
       if (body?.data?.dealerPage) setDealerPage(body.data.dealerPage);
       if (body?.data?.dealerContact) setDealerContact(body.data.dealerContact);
-      if (body?.data?.waterCare) setWaterCare(body.data.waterCare);
+      if (body?.data?.waterCare) {
+        const wc = body.data.waterCare;
+        setWaterCare({
+          ...wc,
+          legal: wc.legal ?? {
+            policyVersion: '',
+            acknowledgmentTitle: 'Water care information',
+            acknowledgmentBody:
+              'Water chemistry guidance in this app is informational only and does not replace manufacturer instructions or professional service.',
+            fullPolicyUrl: null,
+          },
+        });
+      }
+      setCareSchedule(body.data?.careSchedule ?? { version: 1, events: {} });
+      setCareScheduleReference(body.data?.careScheduleReference ?? null);
       const legal = body?.data?.legal;
       if (legal) {
         setTermsUrl(legal.termsUrl ?? '');
@@ -256,6 +314,20 @@ export default function AdminAppSetupPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (tab !== 'careSchedule') return;
+    void (async () => {
+      try {
+        const body = (await api.get('/admin/settings/water-care-analytics')) as {
+          data?: { totalWaterTests: number; testsWithKitSelected: number; testsWithoutKit: number };
+        };
+        if (body?.data) setWaterCareAnalytics(body.data);
+      } catch {
+        setWaterCareAnalytics(null);
+      }
+    })();
+  }, [tab, api]);
 
   function toggleStep(id: StepId) {
     markDirty();
@@ -496,6 +568,32 @@ export default function AdminAppSetupPage() {
     }
   }
 
+  async function saveCareSchedule() {
+    if (!careSchedule) return;
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const body = (await api.put('/admin/settings/app-setup', { careSchedule })) as {
+        success?: boolean;
+        data?: { careSchedule?: CareScheduleConfig; careScheduleReference?: CareScheduleReference };
+        message?: string;
+      };
+      if (body?.data?.careSchedule) setCareSchedule(body.data.careSchedule);
+      if (body?.data?.careScheduleReference) setCareScheduleReference(body.data.careScheduleReference);
+      setSuccess(body.message ?? 'Saved');
+      setUnsavedChanges(false);
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === 'object' && 'error' in e
+          ? (e as { error?: { message?: string } }).error?.message
+          : 'Failed to save';
+      setError(msg ?? 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveWaterCare() {
     if (!waterCare) return;
     setSaving(true);
@@ -507,7 +605,13 @@ export default function AdminAppSetupPage() {
         data?: { waterCare?: WaterCareConfig };
         message?: string;
       };
-      if (body?.data?.waterCare) setWaterCare(body.data.waterCare);
+      if (body?.data?.waterCare) {
+        const wc = body.data.waterCare;
+        setWaterCare({
+          ...wc,
+          legal: wc.legal ?? waterCare.legal,
+        });
+      }
       setSuccess(body.message ?? 'Saved');
       setUnsavedChanges(false);
     } catch (e: unknown) {
@@ -558,12 +662,12 @@ export default function AdminAppSetupPage() {
     return <div className="flex items-center justify-center py-12">Loading...</div>;
   }
 
-    if (!onboarding || !homeDashboard || !dealerPage || !waterCare) {
+    if (!onboarding || !homeDashboard || !dealerPage || !waterCare || !careSchedule) {
     return <div className="rounded-lg bg-red-50 p-4 text-red-700">{error || 'Could not load app setup.'}</div>;
   }
 
   return (
-    <div className={tab === 'home' || tab === 'dealer' ? 'max-w-6xl' : 'max-w-3xl'}>
+    <div className={tab === 'home' || tab === 'dealer' || tab === 'careSchedule' ? 'max-w-6xl' : 'max-w-3xl'}>
       <h2 className="text-2xl font-semibold text-gray-900 mb-2">App setup</h2>
       <p className="text-gray-600 mb-4">Customer mobile app: onboarding flow, marketing surfaces, and Dealer tab content.</p>
 
@@ -603,6 +707,15 @@ export default function AdminAppSetupPage() {
           }`}
         >
           Water Care
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('careSchedule')}
+          className={`pb-3 px-1 text-sm font-medium border-b-2 ${
+            tab === 'careSchedule' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'
+          }`}
+        >
+          Care schedule
         </button>
         <button
           type="button"
@@ -1741,6 +1854,72 @@ export default function AdminAppSetupPage() {
               </div>
             ))}
           </div>
+
+          <div className="border-t border-gray-100 pt-4 space-y-3">
+            <h4 className="text-xs font-semibold text-gray-900">Water test consent (mobile)</h4>
+            <p className="text-xs text-gray-500">
+              When Policy version is set, customers must accept before logging a test. Increment the version when you
+              change the disclaimer.
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Policy version</label>
+              <input
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={waterCare.legal.policyVersion}
+                onChange={(e) => {
+                  markDirty();
+                  setWaterCare((prev) =>
+                    prev ? { ...prev, legal: { ...prev.legal, policyVersion: e.target.value } } : prev
+                  );
+                }}
+                placeholder="e.g. 2026-04-01 (empty = no gate)"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Acknowledgment title</label>
+              <input
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                value={waterCare.legal.acknowledgmentTitle}
+                onChange={(e) => {
+                  markDirty();
+                  setWaterCare((prev) =>
+                    prev ? { ...prev, legal: { ...prev.legal, acknowledgmentTitle: e.target.value } } : prev
+                  );
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Acknowledgment body</label>
+              <textarea
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm min-h-[100px]"
+                value={waterCare.legal.acknowledgmentBody}
+                onChange={(e) => {
+                  markDirty();
+                  setWaterCare((prev) =>
+                    prev ? { ...prev, legal: { ...prev.legal, acknowledgmentBody: e.target.value } } : prev
+                  );
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Full policy URL (optional)</label>
+              <input
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                type="url"
+                value={waterCare.legal.fullPolicyUrl ?? ''}
+                onChange={(e) => {
+                  markDirty();
+                  setWaterCare((prev) =>
+                    prev
+                      ? { ...prev, legal: { ...prev.legal, fullPolicyUrl: e.target.value.trim() || null } }
+                      : prev
+                  );
+                }}
+                placeholder="https://"
+              />
+            </div>
+          </div>
+
           <div className="flex gap-2">
             <Button
               type="button"
@@ -1758,6 +1937,146 @@ export default function AdminAppSetupPage() {
               Save water care
             </Button>
           </div>
+        </div>
+      )}
+
+      {tab === 'careSchedule' && !careScheduleReference && (
+        <div className="card rounded-lg p-6 text-sm text-gray-600">
+          Care schedule reference is unavailable. Update the API and refresh.
+        </div>
+      )}
+
+      {tab === 'careSchedule' && careScheduleReference && (
+        <div className="space-y-6">
+          <div className="card rounded-lg p-6 space-y-4">
+            <h3 className="text-sm font-semibold text-gray-900">Auto maintenance reference</h3>
+            <p className="text-xs text-gray-500">{careScheduleReference.phaseNote}</p>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="py-2 pr-4 font-medium text-gray-700">Event</th>
+                    <th className="py-2 pr-4 font-medium text-gray-700">Interval (days)</th>
+                    <th className="py-2 pr-4 font-medium text-gray-700">Phase</th>
+                    <th className="py-2 pr-4 font-medium text-gray-700">Notify (days before)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {careScheduleReference.recurring.map((row) => (
+                    <tr key={row.eventType} className="border-b border-gray-100">
+                      <td className="py-2 pr-4">
+                        <div className="font-medium text-gray-900">{row.title}</div>
+                        <div className="text-gray-500">{row.description}</div>
+                      </td>
+                      <td className="py-2 pr-4">{row.intervalDays}</td>
+                      <td className="py-2 pr-4">{row.phase}</td>
+                      <td className="py-2 pr-4">{row.notificationDaysBefore}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="rounded-lg bg-gray-50 p-4 text-xs text-gray-700">
+              <div className="font-semibold text-gray-900">{careScheduleReference.seasonal.title}</div>
+              <p className="mt-1 whitespace-pre-wrap">{careScheduleReference.seasonal.description}</p>
+            </div>
+          </div>
+
+          <div className="card rounded-lg p-6 space-y-4">
+            <h3 className="text-sm font-semibold text-gray-900">Tenant overrides</h3>
+            <p className="text-xs text-gray-500">
+              Merge order: retailer override → spa usage months / winter strategy → platform defaults. Disabled types are
+              not auto-generated for your customers.
+            </p>
+            <div className="space-y-4">
+              {careScheduleReference.recurring.map((row) => {
+                const ev = careSchedule.events[row.eventType] ?? {};
+                const enabled = ev.enabled !== false;
+                return (
+                  <div
+                    key={row.eventType}
+                    className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 border border-gray-100 rounded-lg p-3"
+                  >
+                    <div className="sm:col-span-2">
+                      <div className="text-sm font-medium text-gray-900">{row.title}</div>
+                      <div className="text-xs text-gray-500 font-mono">{row.eventType}</div>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={enabled}
+                        onChange={() => {
+                          markDirty();
+                          setCareSchedule((prev) => {
+                            if (!prev) return prev;
+                            const next = { ...prev.events };
+                            const cur = next[row.eventType] ?? {};
+                            const on = cur.enabled !== false;
+                            next[row.eventType] = { ...cur, enabled: !on };
+                            return { ...prev, events: next };
+                          });
+                        }}
+                      />
+                      Enabled
+                    </label>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Interval days</label>
+                      <input
+                        type="number"
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                        placeholder={`${row.intervalDays}`}
+                        value={ev.intervalDays ?? ''}
+                        onChange={(e) => {
+                          markDirty();
+                          const v = e.target.value === '' ? undefined : Number(e.target.value);
+                          setCareSchedule((prev) => {
+                            if (!prev) return prev;
+                            const next = { ...prev.events };
+                            next[row.eventType] = { ...next[row.eventType], intervalDays: v };
+                            return { ...prev, events: next };
+                          });
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Notify days before</label>
+                      <input
+                        type="number"
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                        placeholder={`${row.notificationDaysBefore}`}
+                        value={ev.notificationDaysBefore ?? ''}
+                        onChange={(e) => {
+                          markDirty();
+                          const v = e.target.value === '' ? undefined : Number(e.target.value);
+                          setCareSchedule((prev) => {
+                            if (!prev) return prev;
+                            const next = { ...prev.events };
+                            next[row.eventType] = { ...next[row.eventType], notificationDaysBefore: v };
+                            return { ...prev, events: next };
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <Button type="button" loading={saving} onClick={() => void saveCareSchedule()}>
+              Save care schedule
+            </Button>
+          </div>
+
+          {waterCareAnalytics ? (
+            <div className="card rounded-lg p-6 space-y-2">
+              <h3 className="text-sm font-semibold text-gray-900">Water care usage (analytics)</h3>
+              <p className="text-xs text-gray-500">Counts across all customers for this retailer.</p>
+              <ul className="text-sm text-gray-800 space-y-1">
+                <li>Total water tests logged: {waterCareAnalytics.totalWaterTests}</li>
+                <li>Tests with a kit selected: {waterCareAnalytics.testsWithKitSelected}</li>
+                <li>Tests without kit: {waterCareAnalytics.testsWithoutKit}</li>
+              </ul>
+            </div>
+          ) : null}
         </div>
       )}
 

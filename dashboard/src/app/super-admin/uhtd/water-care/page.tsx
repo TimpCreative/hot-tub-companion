@@ -51,10 +51,30 @@ const DEFAULT_MEASUREMENT: WaterCareMeasurement = {
   isEnabled: true,
 };
 
+type WaterMetricRow = {
+  id: string;
+  metricKey: string;
+  label: string;
+  unit: string;
+  defaultMinValue: number;
+  defaultMaxValue: number;
+};
+
+type WaterTestKitRow = {
+  id: string;
+  slug: string;
+  title: string;
+  status: string;
+  imageUrl?: string | null;
+};
+
 export default function WaterCareAdminPage() {
   const fetchWithAuth = useSuperAdminFetch();
+  const [wSection, setWSection] = useState<'profiles' | 'metrics' | 'kits'>('profiles');
   const [profiles, setProfiles] = useState<WaterCareProfile[]>([]);
   const [mappings, setMappings] = useState<WaterCareMapping[]>([]);
+  const [waterMetrics, setWaterMetrics] = useState<WaterMetricRow[]>([]);
+  const [testKits, setTestKits] = useState<WaterTestKitRow[]>([]);
   const [brands, setBrands] = useState<OptionRow[]>([]);
   const [modelLines, setModelLines] = useState<OptionRow[]>([]);
   const [spas, setSpas] = useState<OptionRow[]>([]);
@@ -86,26 +106,42 @@ export default function WaterCareAdminPage() {
     setLoading(true);
     setError(null);
     try {
-      const [profilesRes, mappingsRes, brandsRes, modelLinesRes, spasRes, qualifiersRes] = await Promise.all([
-        fetchWithAuth('/api/dashboard/super-admin/water-care/profiles'),
-        fetchWithAuth('/api/dashboard/super-admin/water-care/mappings'),
-        fetchWithAuth('/api/dashboard/super-admin/scdb/brands?page=1&pageSize=500'),
-        fetchWithAuth('/api/dashboard/super-admin/scdb/model-lines'),
-        fetchWithAuth('/api/dashboard/super-admin/scdb/spa-models?page=1&pageSize=500'),
-        fetchWithAuth('/api/dashboard/super-admin/qdb/qualifiers'),
-      ]);
+      const [profilesRes, mappingsRes, brandsRes, modelLinesRes, spasRes, qualifiersRes, metricsRes, kitsRes] =
+        await Promise.all([
+          fetchWithAuth('/api/dashboard/super-admin/water-care/profiles'),
+          fetchWithAuth('/api/dashboard/super-admin/water-care/mappings'),
+          fetchWithAuth('/api/dashboard/super-admin/scdb/brands?page=1&pageSize=500'),
+          fetchWithAuth('/api/dashboard/super-admin/scdb/model-lines'),
+          fetchWithAuth('/api/dashboard/super-admin/scdb/spa-models?page=1&pageSize=500'),
+          fetchWithAuth('/api/dashboard/super-admin/qdb/qualifiers'),
+          fetchWithAuth('/api/dashboard/super-admin/water-care/metrics'),
+          fetchWithAuth('/api/dashboard/super-admin/water-care/test-kits'),
+        ]);
 
-      const [profilesData, mappingsData, brandsData, modelLinesData, spasData, qualifiersData] = await Promise.all([
+      const [
+        profilesData,
+        mappingsData,
+        brandsData,
+        modelLinesData,
+        spasData,
+        qualifiersData,
+        metricsData,
+        kitsData,
+      ] = await Promise.all([
         profilesRes.json(),
         mappingsRes.json(),
         brandsRes.json(),
         modelLinesRes.json(),
         spasRes.json(),
         qualifiersRes.json(),
+        metricsRes.json(),
+        kitsRes.json(),
       ]);
 
       if (profilesData.success) setProfiles(profilesData.data || []);
       if (mappingsData.success) setMappings(mappingsData.data || []);
+      if (metricsData.success) setWaterMetrics(metricsData.data || []);
+      if (kitsData.success) setTestKits(kitsData.data || []);
       if (brandsData.success) setBrands((brandsData.data || []).map((row: OptionRow) => ({ id: row.id, name: row.name })));
       if (modelLinesData.success) setModelLines((modelLinesData.data || []).map((row: OptionRow) => ({ id: row.id, name: row.name })));
       if (spasData.success) {
@@ -312,6 +348,42 @@ export default function WaterCareAdminPage() {
     return profiles.find((profile) => profile.id === profileId)?.name || profileId;
   }
 
+  async function saveMetric(row: WaterMetricRow) {
+    setError(null);
+    try {
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/water-care/metrics/${row.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: row.label,
+          unit: row.unit,
+          defaultMinValue: row.defaultMinValue,
+          defaultMaxValue: row.defaultMaxValue,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error?.message || 'Save failed');
+      await loadAll();
+    } catch (err) {
+      console.error(err);
+      setError('Failed to save metric');
+    }
+  }
+
+  async function deleteKitRow(id: string) {
+    if (!confirm('Delete this test kit?')) return;
+    setError(null);
+    try {
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/water-care/test-kits/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error?.message || 'Delete failed');
+      await loadAll();
+    } catch (err) {
+      console.error(err);
+      setError('Failed to delete kit');
+    }
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center py-12">Loading water care…</div>;
   }
@@ -321,16 +393,116 @@ export default function WaterCareAdminPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Water Care</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage chemistry profiles and profile resolution mappings.</p>
+          <p className="text-sm text-gray-500 mt-1">Profiles, canonical metrics, test kits, and mappings.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={openCreateMapping}>+ Add Mapping</Button>
-          <Button onClick={openCreateProfile}>+ Add Profile</Button>
+          {wSection === 'profiles' ? (
+            <>
+              <Button variant="secondary" onClick={openCreateMapping}>
+                + Add Mapping
+              </Button>
+              <Button onClick={openCreateProfile}>+ Add Profile</Button>
+            </>
+          ) : null}
         </div>
+      </div>
+
+      <div className="flex gap-2 border-b border-gray-200 pb-2">
+        {(['profiles', 'metrics', 'kits'] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setWSection(s)}
+            className={`rounded-full px-3 py-1 text-sm font-medium ${
+              wSection === s ? 'bg-blue-100 text-blue-800' : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            {s === 'profiles' ? 'Profiles & mappings' : s === 'metrics' ? 'Metric library' : 'Test kits'}
+          </button>
+        ))}
       </div>
 
       {error ? <div className="rounded-lg bg-red-50 p-4 text-red-700">{error}</div> : null}
 
+      {wSection === 'metrics' ? (
+        <div className="card rounded-lg p-6 space-y-4">
+          <h2 className="text-lg font-medium text-gray-900">Canonical metrics</h2>
+          <p className="text-sm text-gray-500">Defaults sync into profiles when measurements share the same metric key.</p>
+          <div className="overflow-x-auto space-y-4">
+            {waterMetrics.map((m) => (
+              <div
+                key={m.id}
+                className="grid gap-2 md:grid-cols-6 items-end border border-gray-100 rounded-lg p-3"
+              >
+                <div className="text-xs text-gray-500 md:col-span-1 font-mono">{m.metricKey}</div>
+                <input
+                  className="rounded border border-gray-300 px-2 py-2 text-sm"
+                  value={m.label}
+                  onChange={(e) =>
+                    setWaterMetrics((prev) => prev.map((x) => (x.id === m.id ? { ...x, label: e.target.value } : x)))
+                  }
+                />
+                <input
+                  className="rounded border border-gray-300 px-2 py-2 text-sm"
+                  value={m.unit}
+                  onChange={(e) =>
+                    setWaterMetrics((prev) => prev.map((x) => (x.id === m.id ? { ...x, unit: e.target.value } : x)))
+                  }
+                />
+                <input
+                  type="number"
+                  className="rounded border border-gray-300 px-2 py-2 text-sm"
+                  value={m.defaultMinValue}
+                  onChange={(e) =>
+                    setWaterMetrics((prev) =>
+                      prev.map((x) => (x.id === m.id ? { ...x, defaultMinValue: Number(e.target.value) } : x))
+                    )
+                  }
+                />
+                <input
+                  type="number"
+                  className="rounded border border-gray-300 px-2 py-2 text-sm"
+                  value={m.defaultMaxValue}
+                  onChange={(e) =>
+                    setWaterMetrics((prev) =>
+                      prev.map((x) => (x.id === m.id ? { ...x, defaultMaxValue: Number(e.target.value) } : x))
+                    )
+                  }
+                />
+                <Button size="sm" onClick={() => void saveMetric(m)}>
+                  Save
+                </Button>
+              </div>
+            ))}
+            {waterMetrics.length === 0 ? <div className="text-sm text-gray-500">No metrics yet.</div> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {wSection === 'kits' ? (
+        <div className="card rounded-lg p-6 space-y-4">
+          <h2 className="text-lg font-medium text-gray-900">Water test kits</h2>
+          <p className="text-sm text-gray-500">Published kits appear in the mobile picker. Use the API for bulk edits.</p>
+          <div className="space-y-2">
+            {testKits.map((k) => (
+              <div key={k.id} className="flex items-center justify-between rounded-lg border border-gray-200 p-3">
+                <div>
+                  <div className="font-medium text-gray-900">{k.title}</div>
+                  <div className="text-xs text-gray-500 font-mono">
+                    {k.slug} · {k.status}
+                  </div>
+                </div>
+                <Button size="sm" variant="danger" onClick={() => void deleteKitRow(k.id)}>
+                  Delete
+                </Button>
+              </div>
+            ))}
+            {testKits.length === 0 ? <div className="text-sm text-gray-500">No kits yet.</div> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {wSection === 'profiles' ? (
       <div className="card rounded-lg p-6 space-y-4">
         <div>
           <h2 className="text-lg font-medium text-gray-900">Chemistry Profiles</h2>
@@ -394,6 +566,7 @@ export default function WaterCareAdminPage() {
           {mappings.length === 0 ? <div className="text-sm text-gray-500">No water care mappings yet.</div> : null}
         </div>
       </div>
+      ) : null}
 
       <Modal
         isOpen={profileModalOpen}

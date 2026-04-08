@@ -4,6 +4,12 @@
  */
 
 import { db } from '../config/database';
+import { getEffectiveRecurringCatalog, normalizeCareScheduleConfig } from './careScheduleConfig.service';
+import {
+  MAINTENANCE_EVENT_COPY,
+  MAINTENANCE_RECURRING_CATALOG,
+  type MaintenanceCatalogRecurring,
+} from './maintenanceCatalog';
 
 export type WinterStrategy = 'shutdown' | 'operate';
 
@@ -15,58 +21,6 @@ export type SpaProfileScheduleRow = {
   winter_strategy: WinterStrategy | string | null;
   created_at: Date | string;
 };
-
-type CatalogRecurring = {
-  eventType: string;
-  intervalDays: number;
-  phase: number;
-  notificationDaysBefore: number;
-  linkedProductCategory: string | null;
-};
-
-const EVENT_COPY: Record<string, { title: string; description: string }> = {
-  filter_rinse: {
-    title: 'Rinse the filter',
-    description: 'Quick rinse removes debris and helps flow between deep cleans.',
-  },
-  filter_deep_clean: {
-    title: 'Deep clean the filter',
-    description: 'Soak or spray per manufacturer directions to restore filter media.',
-  },
-  filter_replace: {
-    title: 'Replace the filter cartridge',
-    description: 'Annual replacement keeps water clear and protects the pump.',
-  },
-  drain_refill: {
-    title: 'Drain and refill',
-    description: 'Fresh water resets dissolved solids and improves sanitizer performance.',
-  },
-  cover_check: {
-    title: 'Check the cover',
-    description: 'Inspect vinyl, seams, and locks; treat or replace if waterlogged.',
-  },
-  water_test: {
-    title: 'Test your water',
-    description: 'Log a water test to keep chemistry in range.',
-  },
-  winterize: {
-    title: 'Winterize the spa',
-    description: 'Drain, blow lines, and protect equipment before the off season.',
-  },
-  spring_startup: {
-    title: 'Spring startup',
-    description: 'Refill, balance water, and restart circulation after the off season.',
-  },
-};
-
-const RECURRING_CATALOG: CatalogRecurring[] = [
-  { eventType: 'filter_rinse', intervalDays: 14, phase: 0, notificationDaysBefore: 1, linkedProductCategory: 'filter' },
-  { eventType: 'filter_deep_clean', intervalDays: 90, phase: 3, notificationDaysBefore: 3, linkedProductCategory: 'filter' },
-  { eventType: 'filter_replace', intervalDays: 365, phase: 7, notificationDaysBefore: 7, linkedProductCategory: 'filter' },
-  { eventType: 'drain_refill', intervalDays: 90, phase: 21, notificationDaysBefore: 5, linkedProductCategory: 'chemical' },
-  { eventType: 'cover_check', intervalDays: 180, phase: 10, notificationDaysBefore: 3, linkedProductCategory: 'cover' },
-  { eventType: 'water_test', intervalDays: 7, phase: 0, notificationDaysBefore: 1, linkedProductCategory: 'chemical' },
-];
 
 function utcDateOnly(d: Date | string): Date {
   const x = typeof d === 'string' ? new Date(d) : d;
@@ -200,7 +154,8 @@ function collectRecurringEventRows(
   horizonEnd: Date,
   usageMonths: number[],
   anchor: Date,
-  spa: SpaProfileScheduleRow
+  spa: SpaProfileScheduleRow,
+  recurringCatalog: MaintenanceCatalogRecurring[]
 ): Array<Record<string, unknown>> {
   const usage = new Set(usageMonths);
   const rows: Array<Record<string, unknown>> = [];
@@ -212,10 +167,10 @@ function collectRecurringEventRows(
     const dayIndex = diffUtcDays(anchor, d);
     if (dayIndex < 0) continue;
 
-    for (const spec of RECURRING_CATALOG) {
+    for (const spec of recurringCatalog) {
       if ((dayIndex - spec.phase) % spec.intervalDays !== 0 || dayIndex < spec.phase) continue;
 
-      const copy = EVENT_COPY[spec.eventType];
+      const copy = MAINTENANCE_EVENT_COPY[spec.eventType];
       if (!copy) continue;
 
       rows.push({
@@ -238,7 +193,7 @@ function collectRecurringEventRows(
   }
 
   for (const t of collectTransitionEvents(horizonStart, horizonEnd, usageMonths, parseWinterStrategy(spa.winter_strategy))) {
-    const copy = EVENT_COPY[t.eventType];
+    const copy = MAINTENANCE_EVENT_COPY[t.eventType];
     if (!copy) continue;
     rows.push({
       spa_profile_id: spa.id,
@@ -265,6 +220,12 @@ export async function regenerateAutoEventsForSpaProfile(spaProfileId: string): P
   const spa = (await db('spa_profiles').where({ id: spaProfileId }).first()) as SpaProfileScheduleRow | undefined;
   if (!spa) return;
 
+  const tenantRow = await db('tenants').where({ id: spa.tenant_id }).first();
+  const careSchedule = normalizeCareScheduleConfig(
+    (tenantRow as { care_schedule_config?: unknown } | undefined)?.care_schedule_config
+  );
+  const recurringCatalog = getEffectiveRecurringCatalog(careSchedule);
+
   const usageMonths = parseUsageMonths(spa.usage_months as number[] | string | null);
   const { horizonStart, horizonEnd } = buildHorizon();
   const todayKey = formatDateKey(utcDateOnly(new Date()));
@@ -277,7 +238,7 @@ export async function regenerateAutoEventsForSpaProfile(spaProfileId: string): P
       .where('due_date', '>=', todayKey)
       .del();
 
-    const rows = collectRecurringEventRows(horizonStart, horizonEnd, usageMonths, anchor, spa).map((r) => ({
+    const rows = collectRecurringEventRows(horizonStart, horizonEnd, usageMonths, anchor, spa, recurringCatalog).map((r) => ({
       ...r,
       created_at: trx.fn.now(),
       updated_at: trx.fn.now(),
@@ -290,6 +251,6 @@ export async function regenerateAutoEventsForSpaProfile(spaProfileId: string): P
 }
 
 export function getCatalogIntervalForEventType(eventType: string): number | null {
-  const spec = RECURRING_CATALOG.find((r) => r.eventType === eventType);
+  const spec = MAINTENANCE_RECURRING_CATALOG.find((r) => r.eventType === eventType);
   return spec ? spec.intervalDays : null;
 }

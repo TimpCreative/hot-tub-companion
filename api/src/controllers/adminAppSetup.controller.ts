@@ -16,6 +16,11 @@ import {
   type WaterCareConfigDTO,
 } from '../services/waterCareConfig.service';
 import {
+  normalizeCareScheduleConfig,
+  type CareScheduleConfigDTO,
+} from '../services/careScheduleConfig.service';
+import { buildCareScheduleReferencePayload } from '../services/maintenanceCatalog';
+import {
   normalizeDealerPageConfig,
   type DealerPageConfigDTO,
 } from '../services/dealerPageConfig.service';
@@ -48,6 +53,10 @@ export async function getAppSetup(req: Request, res: Response): Promise<void> {
     onboarding: normalizeOnboardingConfig(tenant.onboarding_config),
     homeDashboard: normalizeHomeDashboardConfig(tenant.home_dashboard_config),
     waterCare: normalizeWaterCareConfig((tenant as { water_care_config?: unknown }).water_care_config),
+    careSchedule: normalizeCareScheduleConfig(
+      (tenant as { care_schedule_config?: unknown }).care_schedule_config
+    ),
+    careScheduleReference: buildCareScheduleReferencePayload(),
     dealerContact: mapDealerContact(tenant),
     dealerPage: normalizeDealerPageConfig((tenant as { dealer_page_config?: unknown }).dealer_page_config),
     legal: {
@@ -75,6 +84,7 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
     onboarding?: OnboardingConfigDTO;
     homeDashboard?: HomeDashboardConfigDTO;
     waterCare?: WaterCareConfigDTO;
+    careSchedule?: CareScheduleConfigDTO;
     dealerContact?: { phone?: string | null; address?: string | null; email?: string | null; hours?: string | null };
     dealerPage?: DealerPageConfigDTO;
     legal?: { termsUrl?: string | null; privacyUrl?: string | null };
@@ -97,10 +107,16 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
     (body.legal.termsUrl !== undefined || body.legal.privacyUrl !== undefined);
 
   const hasWaterCare = body.waterCare && typeof body.waterCare === 'object';
+  const hasCareSchedule = body.careSchedule && typeof body.careSchedule === 'object';
   const hasDealerPage = body.dealerPage && typeof body.dealerPage === 'object';
 
-  if (!hasOnboarding && !hasHome && !hasDealer && !hasLegal && !hasWaterCare && !hasDealerPage) {
-    error(res, 'VALIDATION_ERROR', 'Provide onboarding, homeDashboard, waterCare, dealerContact, dealerPage, and/or legal', 400);
+  if (!hasOnboarding && !hasHome && !hasDealer && !hasLegal && !hasWaterCare && !hasCareSchedule && !hasDealerPage) {
+    error(
+      res,
+      'VALIDATION_ERROR',
+      'Provide onboarding, homeDashboard, waterCare, careSchedule, dealerContact, dealerPage, and/or legal',
+      400
+    );
     return;
   }
 
@@ -115,6 +131,9 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
   }
   if (hasWaterCare) {
     update.water_care_config = normalizeWaterCareConfig(body.waterCare);
+  }
+  if (hasCareSchedule) {
+    update.care_schedule_config = normalizeCareScheduleConfig(body.careSchedule);
   }
   if (hasDealer) {
     const dc = body.dealerContact!;
@@ -158,6 +177,8 @@ export async function updateAppSetup(req: Request, res: Response): Promise<void>
       onboarding: normalizeOnboardingConfig(next!.onboarding_config),
       homeDashboard: normalizeHomeDashboardConfig(next!.home_dashboard_config),
       waterCare: normalizeWaterCareConfig((next as { water_care_config?: unknown }).water_care_config),
+      careSchedule: normalizeCareScheduleConfig((next as { care_schedule_config?: unknown }).care_schedule_config),
+      careScheduleReference: buildCareScheduleReferencePayload(),
       dealerContact: mapDealerContact(next!),
       dealerPage: normalizeDealerPageConfig((next as { dealer_page_config?: unknown }).dealer_page_config),
       legal: {

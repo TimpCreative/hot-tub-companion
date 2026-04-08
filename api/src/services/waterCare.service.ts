@@ -1,5 +1,9 @@
 import { db } from '../config/database';
-import { normalizeWaterCareConfig } from './waterCareConfig.service';
+import { getWaterCareLegalConfig, normalizeWaterCareConfig } from './waterCareConfig.service';
+import * as waterCareConsent from './waterCareConsent.service';
+import { buildRecommendations } from './waterCareRecommendation.service';
+import * as maintenanceSchedule from './maintenanceSchedule.service';
+import * as waterTestKitsService from './waterTestKits.service';
 
 export type WaterCareScopeType = 'global' | 'brand' | 'model_line' | 'spa_model';
 
@@ -39,8 +43,8 @@ interface WaterCareProfileRow {
   updated_at: Date;
 }
 
-interface WaterCareMeasurementRow {
-  id: string;
+interface ProfileMetricJoinRow {
+  join_id: string;
   profile_id: string;
   metric_key: string;
   label: string;
@@ -103,6 +107,8 @@ interface OwnedSpaProfileRow {
   model_line_id: string | null;
   resolved_model_line_id: string | null;
   last_water_test_at: Date | null;
+  water_capacity_gallons: number | null;
+  preferred_water_test_kit_id: string | null;
 }
 
 interface WaterTestRow {
@@ -113,6 +119,7 @@ interface WaterTestRow {
   tested_at: Date;
   shared_with_retailer: boolean;
   notes: string | null;
+  water_test_kit_id: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -136,6 +143,9 @@ export interface CreateWaterTestInput {
   testedAt?: string | null;
   notes?: string | null;
   sharedWithRetailer?: boolean;
+  waterTestKitId?: string | null;
+  /** When tenant legal.policyVersion is set, send matching version to record acceptance in the same request. */
+  policyAcceptanceVersion?: string | null;
   measurements: WaterTestMeasurementInput[];
 }
 
@@ -146,13 +156,17 @@ export interface WaterTestMeasurement {
   unit: string;
 }
 
+export type WaterRecommendationAction = import('./waterCareRecommendation.service').RecommendationAction;
+
 export interface WaterTestRecord {
   id: string;
   spaProfileId: string;
   testedAt: Date;
   sharedWithRetailer: boolean;
   notes: string | null;
+  waterTestKitId: string | null;
   measurements: WaterTestMeasurement[];
+  recommendations?: WaterRecommendationAction[];
   createdAt: Date;
 }
 
@@ -166,9 +180,9 @@ export interface WaterCareComparisonRow {
   status: 'low' | 'in_range' | 'high' | 'missing';
 }
 
-function mapMeasurement(row: WaterCareMeasurementRow) {
+function mapMeasurement(row: ProfileMetricJoinRow) {
   return {
-    id: row.id,
+    id: row.join_id,
     metricKey: row.metric_key,
     label: row.label,
     unit: row.unit,
@@ -179,7 +193,7 @@ function mapMeasurement(row: WaterCareMeasurementRow) {
   };
 }
 
-function mapProfile(row: WaterCareProfileRow, measurements: WaterCareMeasurementRow[]): WaterCareProfile {
+function mapProfile(row: WaterCareProfileRow, measurements: ProfileMetricJoinRow[]): WaterCareProfile {
   return {
     id: row.id,
     name: row.name,
@@ -219,7 +233,8 @@ function mapWaterTestMeasurement(row: WaterTestMeasurementRow): WaterTestMeasure
 
 function mapWaterTest(
   row: WaterTestRow,
-  measurements: WaterTestMeasurementRow[]
+  measurements: WaterTestMeasurementRow[],
+  recommendations?: WaterRecommendationAction[]
 ): WaterTestRecord {
   return {
     id: row.id,
@@ -227,10 +242,12 @@ function mapWaterTest(
     testedAt: row.tested_at,
     sharedWithRetailer: row.shared_with_retailer,
     notes: row.notes,
+    waterTestKitId: row.water_test_kit_id ?? null,
     measurements: measurements
       .filter((measurement) => measurement.water_test_id === row.id)
       .sort((a, b) => a.metric_key.localeCompare(b.metric_key))
       .map(mapWaterTestMeasurement),
+    recommendations,
     createdAt: row.created_at,
   };
 }
@@ -250,8 +267,10 @@ async function getOwnedSpaProfile(
       'sp.sanitization_system',
       'sp.uhtd_spa_model_id',
       'sp.last_water_test_at',
+      'sp.preferred_water_test_kit_id',
       'spa_model.brand_id',
       'spa_model.model_line_id',
+      'spa_model.water_capacity_gallons',
       'ml.id as resolved_model_line_id'
     )
     .where('sp.id', spaProfileId)
@@ -262,27 +281,58 @@ async function getOwnedSpaProfile(
   return (spa as OwnedSpaProfileRow | undefined) ?? null;
 }
 
+async function ensureMetricId(trx: typeof db, measurement: WaterCareMeasurementInput): Promise<string> {
+  const key = measurement.metricKey.trim();
+  const existing = await trx('water_metrics').where({ metric_key: key }).first();
+  if (existing) {
+    await trx('water_metrics')
+      .where({ id: (existing as { id: string }).id })
+      .update({
+        label: measurement.label.trim(),
+        unit: measurement.unit.trim(),
+        updated_at: trx.fn.now(),
+      });
+    return (existing as { id: string }).id;
+  }
+  const [inserted] = await trx('water_metrics')
+    .insert({
+      metric_key: key,
+      label: measurement.label.trim(),
+      unit: measurement.unit.trim(),
+      default_min_value: measurement.minValue,
+      default_max_value: measurement.maxValue,
+      sort_hint: measurement.sortOrder ?? 0,
+      value_type: 'numeric',
+      created_at: trx.fn.now(),
+      updated_at: trx.fn.now(),
+    })
+    .returning('id');
+  const row = inserted as { id: string } | string;
+  return typeof row === 'object' && row && 'id' in row ? row.id : (row as string);
+}
+
 async function replaceMeasurements(
   trx: typeof db,
   profileId: string,
   measurements: WaterCareMeasurementInput[]
 ): Promise<void> {
-  await trx('water_care_profile_measurements').where({ profile_id: profileId }).del();
+  await trx('water_care_profile_metrics').where({ profile_id: profileId }).del();
 
   if (measurements.length === 0) return;
 
-  await trx('water_care_profile_measurements').insert(
-    measurements.map((measurement, index) => ({
+  for (let index = 0; index < measurements.length; index++) {
+    const measurement = measurements[index];
+    const metricId = await ensureMetricId(trx, measurement);
+    await trx('water_care_profile_metrics').insert({
       profile_id: profileId,
-      metric_key: measurement.metricKey.trim(),
-      label: measurement.label.trim(),
-      unit: measurement.unit.trim(),
+      metric_id: metricId,
       min_value: measurement.minValue,
       max_value: measurement.maxValue,
       sort_order: measurement.sortOrder ?? index,
       is_enabled: measurement.isEnabled !== false,
-    }))
-  );
+      created_at: trx.fn.now(),
+    });
+  }
 }
 
 function sanitizeMeasurements(measurements: WaterCareMeasurementInput[]): WaterCareMeasurementInput[] {
@@ -306,24 +356,38 @@ function sanitizeMeasurements(measurements: WaterCareMeasurementInput[]): WaterC
     );
 }
 
-export async function listProfiles(): Promise<WaterCareProfile[]> {
-  const [profiles, measurements] = await Promise.all([
-    db('water_care_profiles').orderBy('name'),
-    db('water_care_profile_measurements').orderBy('sort_order').orderBy('label'),
-  ]);
+async function loadProfileMetricJoins(profileIds: string[]): Promise<ProfileMetricJoinRow[]> {
+  if (profileIds.length === 0) return [];
+  const rows = await db('water_care_profile_metrics as wcpm')
+    .join('water_metrics as wm', 'wcpm.metric_id', 'wm.id')
+    .whereIn('wcpm.profile_id', profileIds)
+    .select(
+      'wcpm.id as join_id',
+      'wcpm.profile_id',
+      'wm.metric_key',
+      'wm.label',
+      'wm.unit',
+      db.raw('COALESCE(wcpm.min_value, wm.default_min_value) as min_value'),
+      db.raw('COALESCE(wcpm.max_value, wm.default_max_value) as max_value'),
+      'wcpm.sort_order',
+      'wcpm.is_enabled'
+    )
+    .orderBy('wcpm.sort_order')
+    .orderBy('wm.label');
+  return rows as ProfileMetricJoinRow[];
+}
 
-  return (profiles as WaterCareProfileRow[]).map((profile) =>
-    mapProfile(profile, measurements as WaterCareMeasurementRow[])
-  );
+export async function listProfiles(): Promise<WaterCareProfile[]> {
+  const profiles = (await db('water_care_profiles').orderBy('name')) as WaterCareProfileRow[];
+  const joins = await loadProfileMetricJoins(profiles.map((p) => p.id));
+  return profiles.map((profile) => mapProfile(profile, joins));
 }
 
 export async function getProfileById(id: string): Promise<WaterCareProfile | null> {
-  const [profile, measurements] = await Promise.all([
-    db('water_care_profiles').where({ id }).first(),
-    db('water_care_profile_measurements').where({ profile_id: id }).orderBy('sort_order').orderBy('label'),
-  ]);
+  const profile = await db('water_care_profiles').where({ id }).first();
   if (!profile) return null;
-  return mapProfile(profile as WaterCareProfileRow, measurements as WaterCareMeasurementRow[]);
+  const joins = await loadProfileMetricJoins([id]);
+  return mapProfile(profile as WaterCareProfileRow, joins);
 }
 
 export async function createProfile(input: WaterCareProfileInput): Promise<WaterCareProfile> {
@@ -480,7 +544,7 @@ export async function listWaterTestsForSpaProfile(
     )
     .orderBy('created_at', 'asc')) as WaterTestMeasurementRow[];
 
-  return tests.map((test) => mapWaterTest(test, measurements));
+  return tests.map((test) => mapWaterTest(test, measurements, undefined));
 }
 
 export async function createWaterTest(
@@ -490,6 +554,23 @@ export async function createWaterTest(
 ): Promise<WaterTestRecord | null> {
   const spa = await getOwnedSpaProfile(input.spaProfileId, tenantId, userId);
   if (!spa) return null;
+
+  const tenant = await db('tenants').where({ id: tenantId }).first();
+  const legal = getWaterCareLegalConfig((tenant as { water_care_config?: unknown } | undefined)?.water_care_config);
+  if (legal.policyVersion.trim()) {
+    const already = await waterCareConsent.hasAcceptedCurrentPolicy(userId, tenantId, legal.policyVersion);
+    const inline = (input.policyAcceptanceVersion ?? '').trim() === legal.policyVersion;
+    if (!already && !inline) {
+      throw new Error('WATER_CARE_CONSENT_REQUIRED');
+    }
+  }
+
+  let kitId: string | null = null;
+  if (input.waterTestKitId) {
+    const kit = await waterTestKitsService.getPublishedKitById(input.waterTestKitId);
+    if (!kit) throw new Error('INVALID_WATER_TEST_KIT');
+    kitId = kit.id;
+  }
 
   const winner = await resolveWinningProfileMapping(spa);
   const profile = winner ? await getProfileById(winner.profile_id) : null;
@@ -516,6 +597,21 @@ export async function createWaterTest(
 
   const trx = await db.transaction();
   try {
+    if (legal.policyVersion.trim() && (input.policyAcceptanceVersion ?? '').trim() === legal.policyVersion) {
+      const dup = await trx('user_water_care_consents')
+        .where({ user_id: userId, tenant_id: tenantId, policy_version: legal.policyVersion })
+        .first();
+      if (!dup) {
+        await trx('user_water_care_consents').insert({
+          user_id: userId,
+          tenant_id: tenantId,
+          policy_version: legal.policyVersion,
+          spa_profile_id: input.spaProfileId,
+          accepted_at: trx.fn.now(),
+        });
+      }
+    }
+
     const [created] = await trx('water_tests')
       .insert({
         user_id: userId,
@@ -524,6 +620,7 @@ export async function createWaterTest(
         tested_at: testedAt,
         shared_with_retailer: input.sharedWithRetailer === true,
         notes: input.notes?.trim() || null,
+        water_test_kit_id: kitId,
       })
       .returning('*');
 
@@ -552,10 +649,39 @@ export async function createWaterTest(
         updated_at: trx.fn.now(),
       });
 
+    if (kitId) {
+      await trx('spa_profiles')
+        .where({ id: input.spaProfileId, tenant_id: tenantId, user_id: userId })
+        .update({
+          preferred_water_test_kit_id: kitId,
+          updated_at: trx.fn.now(),
+        });
+    }
+
     await trx.commit();
 
-    const tests = await listWaterTestsForSpaProfile(input.spaProfileId, tenantId, userId);
-    return tests?.[0] ?? null;
+    const idealByMetric = new Map(
+      (profile?.measurements ?? []).map((m) => [m.metricKey, { min: m.minValue, max: m.maxValue }])
+    );
+    const recommendations = await buildRecommendations({
+      measurements,
+      idealByMetric,
+      volumeGallons: spa.water_capacity_gallons ?? 0,
+      sanitizer: spa.sanitization_system,
+    });
+
+    const allInRange = (profile?.measurements ?? []).every((m) => {
+      const mv = measurements.find((x) => x.metricKey === m.metricKey);
+      if (!mv) return false;
+      return mv.value >= m.minValue && mv.value <= m.maxValue;
+    });
+    if (allInRange) {
+      void maintenanceSchedule.regenerateAutoEventsForSpaProfile(input.spaProfileId).catch(() => undefined);
+    }
+
+    const row = (await db('water_tests').where({ id: created.id }).first()) as WaterTestRow;
+    const mrows = (await db('water_test_measurements').where({ water_test_id: created.id })) as WaterTestMeasurementRow[];
+    return mapWaterTest(row, mrows, recommendations);
   } catch (error) {
     await trx.rollback();
     throw error;
@@ -593,6 +719,8 @@ export async function resolveWaterCareForSpaProfile(
   const waterCareConfig = normalizeWaterCareConfig(
     (tenant as { water_care_config?: unknown } | undefined)?.water_care_config
   );
+  const consent = await waterCareConsent.getConsentStatusForUser(userId, tenantId);
+  const publishedKits = await waterTestKitsService.listPublishedKits();
 
   return {
     spaProfileId,
@@ -612,5 +740,60 @@ export async function resolveWaterCareForSpaProfile(
     latestMeasurements: latestTest?.measurements ?? [],
     comparison,
     testingTips: waterCareConfig,
+    consent: {
+      needsAcceptance: consent.needsAcceptance,
+      policyVersion: consent.policyVersion,
+    },
+    waterTestKits: publishedKits,
+    preferredWaterTestKitId: spa.preferred_water_test_kit_id ?? null,
   };
+}
+
+export async function listWaterMetrics(): Promise<
+  Array<{
+    id: string;
+    metricKey: string;
+    label: string;
+    unit: string;
+    defaultMinValue: number;
+    defaultMaxValue: number;
+    sortHint: number;
+    valueType: string;
+  }>
+> {
+  const rows = await db('water_metrics').orderBy('metric_key');
+  return (rows as Record<string, unknown>[]).map((r) => ({
+    id: r.id as string,
+    metricKey: r.metric_key as string,
+    label: r.label as string,
+    unit: r.unit as string,
+    defaultMinValue: Number(r.default_min_value),
+    defaultMaxValue: Number(r.default_max_value),
+    sortHint: r.sort_hint as number,
+    valueType: (r.value_type as string) || 'numeric',
+  }));
+}
+
+export async function updateWaterMetric(
+  id: string,
+  patch: {
+    label?: string;
+    unit?: string;
+    defaultMinValue?: number;
+    defaultMaxValue?: number;
+    sortHint?: number;
+  }
+): Promise<boolean> {
+  const existing = await db('water_metrics').where({ id }).first();
+  if (!existing) return false;
+  const update: Record<string, unknown> = { updated_at: db.fn.now() };
+  if (patch.label !== undefined) update.label = patch.label.trim().slice(0, 120);
+  if (patch.unit !== undefined) update.unit = patch.unit.trim().slice(0, 40);
+  if (patch.defaultMinValue !== undefined) update.default_min_value = patch.defaultMinValue;
+  if (patch.defaultMaxValue !== undefined) update.default_max_value = patch.defaultMaxValue;
+  if (patch.sortHint !== undefined) update.sort_hint = patch.sortHint;
+  if (Object.keys(update).length > 1) {
+    await db('water_metrics').where({ id }).update(update);
+  }
+  return true;
 }

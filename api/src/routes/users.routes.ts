@@ -8,6 +8,8 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/users/me', usersController.getMe);
+router.get('/users/me/water-care-consent', usersController.getWaterCareConsent);
+router.post('/users/me/water-care-consent', usersController.postWaterCareConsent);
 router.put('/users/me', usersController.putMe);
 router.put('/users/me/fcm-token', fcmTokenRateLimiter, usersController.putFcmToken);
 router.delete('/users/me', usersController.deleteMe);

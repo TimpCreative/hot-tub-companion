@@ -4,6 +4,7 @@ import { error, success } from '../utils/response';
 import * as usersService from '../services/users.service';
 import * as authService from '../services/auth.service';
 import * as notificationSecurityAudit from '../services/notificationSecurityAudit.service';
+import * as waterCareConsent from '../services/waterCareConsent.service';
 
 function requireCustomerUser(req: Request, res: Response): string | null {
   if ((req as any).userIsTenantAdminOverride) {
@@ -115,6 +116,52 @@ export async function putFcmToken(req: Request, res: Response): Promise<void> {
     success(res, { updated: true }, 'FCM token updated');
   } catch (err) {
     throw err;
+  }
+}
+
+export async function getWaterCareConsent(req: Request, res: Response): Promise<void> {
+  const userId = requireCustomerUser(req, res);
+  if (!userId) return;
+  const tenantId = (req as any).tenant?.id as string;
+  try {
+    const status = await waterCareConsent.getConsentStatusForUser(userId, tenantId);
+    success(res, status);
+  } catch (err) {
+    console.error('getWaterCareConsent', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to load consent status', 500);
+  }
+}
+
+export async function postWaterCareConsent(req: Request, res: Response): Promise<void> {
+  const userId = requireCustomerUser(req, res);
+  if (!userId) return;
+  const tenantId = (req as any).tenant?.id as string;
+  const body = (req.body || {}) as { policyVersion?: string; spaProfileId?: string | null };
+  const policyVersion = (body.policyVersion ?? '').trim();
+  if (!policyVersion) {
+    error(res, 'VALIDATION_ERROR', 'policyVersion is required', 400);
+    return;
+  }
+  try {
+    const status = await waterCareConsent.getConsentStatusForUser(userId, tenantId);
+    if (policyVersion !== status.policyVersion) {
+      error(res, 'VALIDATION_ERROR', 'policyVersion does not match the tenant active policy', 400);
+      return;
+    }
+    if (await waterCareConsent.hasAcceptedCurrentPolicy(userId, tenantId, policyVersion)) {
+      success(res, { accepted: true, policyVersion }, 'Consent already recorded');
+      return;
+    }
+    await waterCareConsent.recordConsent({
+      userId,
+      tenantId,
+      policyVersion,
+      spaProfileId: body.spaProfileId ?? null,
+    });
+    success(res, { accepted: true, policyVersion }, 'Consent recorded');
+  } catch (err: unknown) {
+    console.error('postWaterCareConsent', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to record consent', 500);
   }
 }
 

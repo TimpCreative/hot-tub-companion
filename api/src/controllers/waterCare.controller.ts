@@ -102,6 +102,33 @@ export async function updateMapping(req: Request, res: Response) {
   }
 }
 
+export async function listWaterMetrics(_req: Request, res: Response) {
+  try {
+    success(res, await waterCareService.listWaterMetrics());
+  } catch (err) {
+    console.error('Error listing water metrics:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to list water metrics', 500);
+  }
+}
+
+export async function updateWaterMetric(req: Request, res: Response) {
+  try {
+    const { label, unit, defaultMinValue, defaultMaxValue, sortHint } = req.body ?? {};
+    const ok = await waterCareService.updateWaterMetric(req.params.id, {
+      label,
+      unit,
+      defaultMinValue: defaultMinValue !== undefined ? Number(defaultMinValue) : undefined,
+      defaultMaxValue: defaultMaxValue !== undefined ? Number(defaultMaxValue) : undefined,
+      sortHint: sortHint !== undefined ? Number(sortHint) : undefined,
+    });
+    if (!ok) return error(res, 'NOT_FOUND', 'Metric not found', 404);
+    success(res, { id: req.params.id }, 'Metric updated');
+  } catch (err) {
+    console.error('Error updating water metric:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to update water metric', 500);
+  }
+}
+
 export async function deleteMapping(req: Request, res: Response) {
   try {
     const deleted = await waterCareService.deleteMapping(req.params.id);
@@ -136,7 +163,15 @@ export async function createWaterTest(req: Request, res: Response) {
   try {
     const tenantId = (req as Request & { tenant?: { id?: string } }).tenant?.id;
     if (!tenantId) return error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
-    const { spaProfileId, testedAt, notes, sharedWithRetailer, measurements } = req.body ?? {};
+    const {
+      spaProfileId,
+      testedAt,
+      notes,
+      sharedWithRetailer,
+      measurements,
+      waterTestKitId,
+      policyAcceptanceVersion,
+    } = req.body ?? {};
     if (!spaProfileId || !Array.isArray(measurements)) {
       return error(res, 'VALIDATION_ERROR', 'spaProfileId and measurements are required', 400);
     }
@@ -145,6 +180,8 @@ export async function createWaterTest(req: Request, res: Response) {
       testedAt,
       notes,
       sharedWithRetailer,
+      waterTestKitId,
+      policyAcceptanceVersion,
       measurements,
     });
     if (!created) return error(res, 'NOT_FOUND', 'Spa profile not found', 404);
@@ -152,6 +189,12 @@ export async function createWaterTest(req: Request, res: Response) {
     success(res, created, 'Water test logged');
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to log water test';
+    if (message === 'WATER_CARE_CONSENT_REQUIRED') {
+      return error(res, 'CONSENT_REQUIRED', 'Accept the current water care policy before logging a test', 403);
+    }
+    if (message === 'INVALID_WATER_TEST_KIT') {
+      return error(res, 'VALIDATION_ERROR', 'Invalid or unpublished water test kit', 400);
+    }
     if (message === 'At least one valid measurement is required' || message === 'Invalid testedAt') {
       return error(res, 'VALIDATION_ERROR', message, 400);
     }
