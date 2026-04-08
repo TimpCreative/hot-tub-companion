@@ -111,6 +111,40 @@ export async function listWaterMetrics(_req: Request, res: Response) {
   }
 }
 
+export async function createWaterMetric(req: Request, res: Response) {
+  try {
+    const { metricKey, label, unit, defaultMinValue, defaultMaxValue, sortHint } = req.body ?? {};
+    if (metricKey == null || label == null || unit == null || defaultMinValue === undefined || defaultMaxValue === undefined) {
+      return error(
+        res,
+        'VALIDATION_ERROR',
+        'metricKey, label, unit, defaultMinValue, and defaultMaxValue are required',
+        400
+      );
+    }
+    const created = await waterCareService.createWaterMetric({
+      metricKey: String(metricKey),
+      label: String(label),
+      unit: String(unit),
+      defaultMinValue: Number(defaultMinValue),
+      defaultMaxValue: Number(defaultMaxValue),
+      sortHint: sortHint !== undefined ? Number(sortHint) : undefined,
+    });
+    res.status(201);
+    success(res, created, 'Metric created');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '';
+    if (message === 'METRIC_KEY_EXISTS') {
+      return error(res, 'CONFLICT', 'A metric with this key already exists', 409);
+    }
+    if (message === 'METRIC_KEY_REQUIRED' || message === 'METRIC_LABEL_UNIT_REQUIRED') {
+      return error(res, 'VALIDATION_ERROR', message === 'METRIC_KEY_REQUIRED' ? 'metricKey is required' : 'label and unit are required', 400);
+    }
+    console.error('Error creating water metric:', err);
+    error(res, 'INTERNAL_ERROR', 'Failed to create water metric', 500);
+  }
+}
+
 export async function updateWaterMetric(req: Request, res: Response) {
   try {
     const { label, unit, defaultMinValue, defaultMaxValue, sortHint } = req.body ?? {};

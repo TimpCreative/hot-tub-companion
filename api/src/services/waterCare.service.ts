@@ -774,6 +774,62 @@ export async function listWaterMetrics(): Promise<
   }));
 }
 
+export async function createWaterMetric(input: {
+  metricKey: string;
+  label: string;
+  unit: string;
+  defaultMinValue: number;
+  defaultMaxValue: number;
+  sortHint?: number;
+}): Promise<{
+  id: string;
+  metricKey: string;
+  label: string;
+  unit: string;
+  defaultMinValue: number;
+  defaultMaxValue: number;
+  sortHint: number;
+  valueType: string;
+}> {
+  const metricKey = input.metricKey.trim().slice(0, 80);
+  if (!metricKey) {
+    throw new Error('METRIC_KEY_REQUIRED');
+  }
+  const dup = await db('water_metrics').where({ metric_key: metricKey }).first();
+  if (dup) {
+    throw new Error('METRIC_KEY_EXISTS');
+  }
+  const label = input.label.trim().slice(0, 120);
+  const unit = input.unit.trim().slice(0, 40);
+  if (!label || !unit) {
+    throw new Error('METRIC_LABEL_UNIT_REQUIRED');
+  }
+  const [inserted] = await db('water_metrics')
+    .insert({
+      metric_key: metricKey,
+      label,
+      unit,
+      default_min_value: input.defaultMinValue,
+      default_max_value: input.defaultMaxValue,
+      sort_hint: input.sortHint ?? 0,
+      value_type: 'numeric',
+      created_at: db.fn.now(),
+      updated_at: db.fn.now(),
+    })
+    .returning('*');
+  const row = inserted as Record<string, unknown>;
+  return {
+    id: row.id as string,
+    metricKey: row.metric_key as string,
+    label: row.label as string,
+    unit: row.unit as string,
+    defaultMinValue: Number(row.default_min_value),
+    defaultMaxValue: Number(row.default_max_value),
+    sortHint: row.sort_hint as number,
+    valueType: (row.value_type as string) || 'numeric',
+  };
+}
+
 export async function updateWaterMetric(
   id: string,
   patch: {

@@ -13,6 +13,7 @@ adminRoutes.post('/mappings', waterCareController.createMapping);
 adminRoutes.put('/mappings/:id', waterCareController.updateMapping);
 adminRoutes.delete('/mappings/:id', waterCareController.deleteMapping);
 adminRoutes.get('/metrics', waterCareController.listWaterMetrics);
+adminRoutes.post('/metrics', waterCareController.createWaterMetric);
 adminRoutes.put('/metrics/:id', waterCareController.updateWaterMetric);
 adminRoutes.get('/test-kits', waterTestKitsController.listKits);
 adminRoutes.get('/test-kits/:id', waterTestKitsController.getKit);

@@ -38,8 +38,9 @@ export async function getKit(req: Request, res: Response) {
 export async function createKit(req: Request, res: Response) {
   try {
     const body = req.body as KitBody;
-    if (!body?.slug || !body?.title || !Array.isArray(body.metrics)) {
-      return error(res, 'VALIDATION_ERROR', 'slug, title, and metrics[] are required', 400);
+    const metrics = Array.isArray(body.metrics) ? body.metrics : [];
+    if (!body?.slug || !body?.title) {
+      return error(res, 'VALIDATION_ERROR', 'slug and title are required', 400);
     }
     const kit = await waterTestKitsService.createKit({
       slug: body.slug,
@@ -51,7 +52,7 @@ export async function createKit(req: Request, res: Response) {
       reviewStatus: body.reviewStatus,
       sourceNotes: body.sourceNotes,
       manufacturerDocUrl: body.manufacturerDocUrl,
-      metrics: body.metrics,
+      metrics,
     });
     res.status(201);
     success(res, kit, 'Kit created');

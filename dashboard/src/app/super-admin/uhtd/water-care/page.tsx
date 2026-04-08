@@ -60,12 +60,54 @@ type WaterMetricRow = {
   defaultMaxValue: number;
 };
 
+type KitMetricDetail = {
+  id: string;
+  metricKey: string;
+  sortOrder: number;
+  inputMode: string;
+  colorScaleJson: unknown;
+  helpCopy: string | null;
+};
+
 type WaterTestKitRow = {
   id: string;
   slug: string;
   title: string;
   status: string;
   imageUrl?: string | null;
+  manufacturer?: string | null;
+  effectiveFrom?: string | null;
+  reviewStatus?: string | null;
+  sourceNotes?: string | null;
+  manufacturerDocUrl?: string | null;
+  metrics?: KitMetricDetail[];
+};
+
+type KitFormMetric = {
+  metricKey: string;
+  inputMode: 'numeric' | 'color_assist';
+  helpCopy: string;
+  colorScaleJson: string;
+};
+
+type KitFormState = {
+  slug: string;
+  title: string;
+  imageUrl: string;
+  manufacturer: string;
+  status: 'draft' | 'published';
+  effectiveFrom: string;
+  reviewStatus: string;
+  sourceNotes: string;
+  manufacturerDocUrl: string;
+  metrics: KitFormMetric[];
+};
+
+const DEFAULT_KIT_FORM_METRIC: KitFormMetric = {
+  metricKey: '',
+  inputMode: 'numeric',
+  helpCopy: '',
+  colorScaleJson: '',
 };
 
 export default function WaterCareAdminPage() {
@@ -100,6 +142,31 @@ export default function WaterCareAdminPage() {
     sanitationSystemValue: '',
     profileId: '',
     priority: 0,
+  });
+
+  const [metricAddOpen, setMetricAddOpen] = useState(false);
+  const [metricAddForm, setMetricAddForm] = useState({
+    metricKey: '',
+    label: '',
+    unit: '',
+    defaultMinValue: 0,
+    defaultMaxValue: 0,
+  });
+
+  const [kitModalOpen, setKitModalOpen] = useState(false);
+  const [editingKitId, setEditingKitId] = useState<string | null>(null);
+  const [kitSaving, setKitSaving] = useState(false);
+  const [kitForm, setKitForm] = useState<KitFormState>({
+    slug: '',
+    title: '',
+    imageUrl: '',
+    manufacturer: '',
+    status: 'draft',
+    effectiveFrom: '',
+    reviewStatus: 'pending',
+    sourceNotes: '',
+    manufacturerDocUrl: '',
+    metrics: [{ ...DEFAULT_KIT_FORM_METRIC }],
   });
 
   async function loadAll() {
@@ -176,6 +243,17 @@ export default function WaterCareAdminPage() {
     loadAll();
   }, []);
 
+  const sortedLibraryMetrics = useMemo(
+    () => [...waterMetrics].sort((a, b) => a.metricKey.localeCompare(b.metricKey)),
+    [waterMetrics]
+  );
+
+  const metricsByKey = useMemo(() => {
+    const map = new Map<string, WaterMetricRow>();
+    for (const m of waterMetrics) map.set(m.metricKey, m);
+    return map;
+  }, [waterMetrics]);
+
   function openCreateProfile() {
     setEditingProfile(null);
     setProfileForm({
@@ -223,7 +301,31 @@ export default function WaterCareAdminPage() {
     }));
   }
 
+  function selectProfileMetric(index: number, metricKey: string) {
+    setProfileForm((current) => {
+      const next = [...current.measurements];
+      const prev = next[index];
+      const lib = metricsByKey.get(metricKey);
+      if (!metricKey) {
+        next[index] = { ...prev, metricKey: '', label: '', unit: '' };
+      } else if (!lib) {
+        next[index] = { ...prev, metricKey };
+      } else {
+        next[index] = {
+          ...prev,
+          metricKey: lib.metricKey,
+          label: lib.label,
+          unit: lib.unit,
+          minValue: lib.defaultMinValue,
+          maxValue: lib.defaultMaxValue,
+        };
+      }
+      return { ...current, measurements: next };
+    });
+  }
+
   async function saveProfile() {
+    setError(null);
     const measurements = profileForm.measurements
       .map((measurement, index) => ({
         ...measurement,
@@ -231,7 +333,12 @@ export default function WaterCareAdminPage() {
         minValue: Number(measurement.minValue),
         maxValue: Number(measurement.maxValue),
       }))
-      .filter((measurement) => measurement.metricKey && measurement.label && measurement.unit);
+      .filter((measurement) => measurement.metricKey.trim().length > 0);
+
+    if (measurements.length === 0) {
+      setError('Add at least one row and choose a metric from the library for each.');
+      return;
+    }
 
     const payload = {
       name: profileForm.name,
@@ -384,6 +491,180 @@ export default function WaterCareAdminPage() {
     }
   }
 
+  function openCreateKit() {
+    setEditingKitId(null);
+    setKitForm({
+      slug: '',
+      title: '',
+      imageUrl: '',
+      manufacturer: '',
+      status: 'draft',
+      effectiveFrom: '',
+      reviewStatus: 'pending',
+      sourceNotes: '',
+      manufacturerDocUrl: '',
+      metrics: [{ ...DEFAULT_KIT_FORM_METRIC }],
+    });
+    setKitModalOpen(true);
+  }
+
+  function openEditKit(kit: WaterTestKitRow) {
+    setEditingKitId(kit.id);
+    const metrics: KitFormMetric[] =
+      kit.metrics && kit.metrics.length > 0
+        ? kit.metrics.map((m) => {
+            const cs = m.colorScaleJson;
+            let colorScaleJson = '';
+            if (cs != null && cs !== '') {
+              colorScaleJson = typeof cs === 'string' ? cs : JSON.stringify(cs, null, 2);
+            }
+            return {
+              metricKey: m.metricKey,
+              inputMode: m.inputMode === 'color_assist' ? 'color_assist' : 'numeric',
+              helpCopy: m.helpCopy || '',
+              colorScaleJson,
+            };
+          })
+        : [{ ...DEFAULT_KIT_FORM_METRIC }];
+    setKitForm({
+      slug: kit.slug,
+      title: kit.title,
+      imageUrl: kit.imageUrl || '',
+      manufacturer: kit.manufacturer || '',
+      status: kit.status === 'published' ? 'published' : 'draft',
+      effectiveFrom: kit.effectiveFrom ? kit.effectiveFrom.slice(0, 10) : '',
+      reviewStatus: kit.reviewStatus || 'pending',
+      sourceNotes: kit.sourceNotes || '',
+      manufacturerDocUrl: kit.manufacturerDocUrl || '',
+      metrics,
+    });
+    setKitModalOpen(true);
+  }
+
+  function addKitMetricRow() {
+    setKitForm((k) => ({
+      ...k,
+      metrics: [...k.metrics, { ...DEFAULT_KIT_FORM_METRIC }],
+    }));
+  }
+
+  function removeKitMetricRow(index: number) {
+    setKitForm((k) => ({
+      ...k,
+      metrics: k.metrics.filter((_, i) => i !== index),
+    }));
+  }
+
+  function updateKitMetricRow(index: number, patch: Partial<KitFormMetric>) {
+    setKitForm((k) => {
+      const next = [...k.metrics];
+      next[index] = { ...next[index], ...patch };
+      return { ...k, metrics: next };
+    });
+  }
+
+  async function saveKit() {
+    setError(null);
+    const metricsPayload: Array<{
+      metricKey: string;
+      sortOrder: number;
+      inputMode: 'numeric' | 'color_assist';
+      helpCopy: string | null;
+      colorScaleJson: unknown;
+    }> = [];
+    for (let i = 0; i < kitForm.metrics.length; i++) {
+      const m = kitForm.metrics[i];
+      if (!m.metricKey.trim()) continue;
+      const raw = m.colorScaleJson.trim();
+      let colorScaleJson: unknown = null;
+      if (raw) {
+        try {
+          colorScaleJson = JSON.parse(raw);
+        } catch {
+          setError('Color scale JSON is invalid for one of the metrics.');
+          return;
+        }
+      }
+      metricsPayload.push({
+        metricKey: m.metricKey.trim(),
+        sortOrder: metricsPayload.length,
+        inputMode: m.inputMode,
+        helpCopy: m.helpCopy.trim() || null,
+        colorScaleJson,
+      });
+    }
+
+    if (!kitForm.slug.trim() || !kitForm.title.trim()) {
+      setError('Kit slug and title are required.');
+      return;
+    }
+
+    setKitSaving(true);
+    try {
+      const body = {
+        slug: kitForm.slug.trim(),
+        title: kitForm.title.trim(),
+        imageUrl: kitForm.imageUrl.trim() || null,
+        manufacturer: kitForm.manufacturer.trim() || null,
+        status: kitForm.status,
+        effectiveFrom: kitForm.effectiveFrom.trim() || null,
+        reviewStatus: kitForm.reviewStatus.trim() || null,
+        sourceNotes: kitForm.sourceNotes.trim() || null,
+        manufacturerDocUrl: kitForm.manufacturerDocUrl.trim() || null,
+        metrics: metricsPayload,
+      };
+      const url = editingKitId
+        ? `/api/dashboard/super-admin/water-care/test-kits/${editingKitId}`
+        : '/api/dashboard/super-admin/water-care/test-kits';
+      const method = editingKitId ? 'PUT' : 'POST';
+      const res = await fetchWithAuth(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.error?.message || 'Failed to save kit');
+        return;
+      }
+      setKitModalOpen(false);
+      await loadAll();
+    } catch (err) {
+      console.error(err);
+      setError('Failed to save kit');
+    } finally {
+      setKitSaving(false);
+    }
+  }
+
+  async function saveNewLibraryMetric() {
+    setError(null);
+    try {
+      const res = await fetchWithAuth('/api/dashboard/super-admin/water-care/metrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          metricKey: metricAddForm.metricKey.trim(),
+          label: metricAddForm.label.trim(),
+          unit: metricAddForm.unit.trim(),
+          defaultMinValue: Number(metricAddForm.defaultMinValue),
+          defaultMaxValue: Number(metricAddForm.defaultMaxValue),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.error?.message || 'Failed to create metric');
+        return;
+      }
+      setMetricAddOpen(false);
+      setMetricAddForm({ metricKey: '', label: '', unit: '', defaultMinValue: 0, defaultMaxValue: 0 });
+      await loadAll();
+    } catch (err) {
+      console.error(err);
+      setError('Failed to create metric');
+    }
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center py-12">Loading water care…</div>;
   }
@@ -403,7 +684,18 @@ export default function WaterCareAdminPage() {
               </Button>
               <Button onClick={openCreateProfile}>+ Add Profile</Button>
             </>
-          ) : null}
+          ) : wSection === 'metrics' ? (
+            <Button
+              onClick={() => {
+                setMetricAddForm({ metricKey: '', label: '', unit: '', defaultMinValue: 0, defaultMaxValue: 0 });
+                setMetricAddOpen(true);
+              }}
+            >
+              + Add metric
+            </Button>
+          ) : (
+            <Button onClick={openCreateKit}>+ Add kit</Button>
+          )}
         </div>
       </div>
 
@@ -482,19 +774,25 @@ export default function WaterCareAdminPage() {
       {wSection === 'kits' ? (
         <div className="card rounded-lg p-6 space-y-4">
           <h2 className="text-lg font-medium text-gray-900">Water test kits</h2>
-          <p className="text-sm text-gray-500">Published kits appear in the mobile picker. Use the API for bulk edits.</p>
+          <p className="text-sm text-gray-500">Published kits appear in the mobile picker. Draft kits stay hidden on mobile.</p>
           <div className="space-y-2">
             {testKits.map((k) => (
-              <div key={k.id} className="flex items-center justify-between rounded-lg border border-gray-200 p-3">
+              <div key={k.id} className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 p-3">
                 <div>
                   <div className="font-medium text-gray-900">{k.title}</div>
                   <div className="text-xs text-gray-500 font-mono">
                     {k.slug} · {k.status}
+                    {k.metrics?.length != null ? ` · ${k.metrics.length} metric(s)` : ''}
                   </div>
                 </div>
-                <Button size="sm" variant="danger" onClick={() => void deleteKitRow(k.id)}>
-                  Delete
-                </Button>
+                <div className="flex shrink-0 gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => openEditKit(k)}>
+                    Edit
+                  </Button>
+                  <Button size="sm" variant="danger" onClick={() => void deleteKitRow(k.id)}>
+                    Delete
+                  </Button>
+                </div>
               </div>
             ))}
             {testKits.length === 0 ? <div className="text-sm text-gray-500">No kits yet.</div> : null}
@@ -610,46 +908,74 @@ export default function WaterCareAdminPage() {
             />
             Active
           </label>
+          {waterMetrics.length === 0 ? (
+            <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+              Add canonical metrics in the <strong>Metric library</strong> tab before attaching measurements to this profile.
+            </div>
+          ) : null}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="text-sm font-medium text-gray-700">Measurements</div>
-              <Button type="button" size="sm" variant="secondary" onClick={addMeasurement}>+ Add Measurement</Button>
+              <Button type="button" size="sm" variant="secondary" onClick={addMeasurement}>
+                + Add Measurement
+              </Button>
             </div>
+            <p className="text-xs text-gray-500">
+              Pick a library metric for each row. Label and unit come from the library; adjust ideal min/max for this profile.
+            </p>
             {profileForm.measurements.map((measurement, index) => (
-              <div key={`${measurement.metricKey}-${index}`} className="grid gap-3 rounded-lg border border-gray-200 p-3 md:grid-cols-6">
-                <input
-                  value={measurement.metricKey}
-                  onChange={(e) => updateMeasurement(index, 'metricKey', e.target.value)}
-                  placeholder="metric_key"
-                  className="rounded border border-gray-300 px-2 py-2 text-sm"
-                />
-                <input
-                  value={measurement.label}
-                  onChange={(e) => updateMeasurement(index, 'label', e.target.value)}
-                  placeholder="Label"
-                  className="rounded border border-gray-300 px-2 py-2 text-sm"
-                />
-                <input
-                  value={measurement.unit}
-                  onChange={(e) => updateMeasurement(index, 'unit', e.target.value)}
-                  placeholder="Unit"
-                  className="rounded border border-gray-300 px-2 py-2 text-sm"
-                />
-                <input
-                  type="number"
-                  value={measurement.minValue}
-                  onChange={(e) => updateMeasurement(index, 'minValue', Number(e.target.value))}
-                  placeholder="Min"
-                  className="rounded border border-gray-300 px-2 py-2 text-sm"
-                />
-                <input
-                  type="number"
-                  value={measurement.maxValue}
-                  onChange={(e) => updateMeasurement(index, 'maxValue', Number(e.target.value))}
-                  placeholder="Max"
-                  className="rounded border border-gray-300 px-2 py-2 text-sm"
-                />
-                <div className="flex items-center gap-2">
+              <div key={`profile-m-${index}`} className="grid gap-3 rounded-lg border border-gray-200 p-3 md:grid-cols-6">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Metric</label>
+                  <select
+                    value={measurement.metricKey}
+                    onChange={(e) => selectProfileMetric(index, e.target.value)}
+                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm font-mono"
+                  >
+                    <option value="">Select metric…</option>
+                    {measurement.metricKey && !metricsByKey.has(measurement.metricKey) ? (
+                      <option value={measurement.metricKey}>
+                        {measurement.metricKey} (not in library — pick a metric or add it in Metric library)
+                      </option>
+                    ) : null}
+                    {sortedLibraryMetrics.map((m) => (
+                      <option key={m.id} value={m.metricKey}>
+                        {m.metricKey}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-1">
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Label</label>
+                  <div className="rounded border border-gray-100 bg-gray-50 px-2 py-2 text-sm text-gray-800">
+                    {measurement.label || '—'}
+                  </div>
+                </div>
+                <div className="md:col-span-1">
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Unit</label>
+                  <div className="rounded border border-gray-100 bg-gray-50 px-2 py-2 text-sm text-gray-800">
+                    {measurement.unit || '—'}
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Ideal min</label>
+                  <input
+                    type="number"
+                    value={measurement.minValue}
+                    onChange={(e) => updateMeasurement(index, 'minValue', Number(e.target.value))}
+                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Ideal max</label>
+                  <input
+                    type="number"
+                    value={measurement.maxValue}
+                    onChange={(e) => updateMeasurement(index, 'maxValue', Number(e.target.value))}
+                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                  />
+                </div>
+                <div className="flex items-end gap-2 pb-1">
                   <label className="flex items-center gap-2 text-xs text-gray-600">
                     <input
                       type="checkbox"
@@ -750,6 +1076,252 @@ export default function WaterCareAdminPage() {
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setMappingModalOpen(false)}>Cancel</Button>
             <Button onClick={saveMapping}>{editingMapping ? 'Save Mapping' : 'Create Mapping'}</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={metricAddOpen}
+        onClose={() => setMetricAddOpen(false)}
+        title="Add canonical metric"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Metric key</label>
+            <input
+              value={metricAddForm.metricKey}
+              onChange={(e) => setMetricAddForm({ ...metricAddForm, metricKey: e.target.value })}
+              placeholder="e.g. ph, free_chlorine"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
+            />
+            <p className="mt-1 text-xs text-gray-500">Stable identifier; use lowercase with underscores. Must be unique.</p>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Label</label>
+            <input
+              value={metricAddForm.label}
+              onChange={(e) => setMetricAddForm({ ...metricAddForm, label: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Unit</label>
+            <input
+              value={metricAddForm.unit}
+              onChange={(e) => setMetricAddForm({ ...metricAddForm, unit: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Default min</label>
+              <input
+                type="number"
+                value={metricAddForm.defaultMinValue}
+                onChange={(e) =>
+                  setMetricAddForm({ ...metricAddForm, defaultMinValue: Number(e.target.value) })
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Default max</label>
+              <input
+                type="number"
+                value={metricAddForm.defaultMaxValue}
+                onChange={(e) =>
+                  setMetricAddForm({ ...metricAddForm, defaultMaxValue: Number(e.target.value) })
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setMetricAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void saveNewLibraryMetric()}>Create metric</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={kitModalOpen}
+        onClose={() => setKitModalOpen(false)}
+        title={editingKitId ? 'Edit test kit' : 'Add test kit'}
+        size="2xl"
+      >
+        <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Slug</label>
+              <input
+                value={kitForm.slug}
+                onChange={(e) => setKitForm({ ...kitForm, slug: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Title</label>
+              <input
+                value={kitForm.title}
+                onChange={(e) => setKitForm({ ...kitForm, title: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Image URL</label>
+              <input
+                value={kitForm.imageUrl}
+                onChange={(e) => setKitForm({ ...kitForm, imageUrl: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Manufacturer</label>
+              <input
+                value={kitForm.manufacturer}
+                onChange={(e) => setKitForm({ ...kitForm, manufacturer: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
+              <select
+                value={kitForm.status}
+                onChange={(e) =>
+                  setKitForm({ ...kitForm, status: e.target.value === 'published' ? 'published' : 'draft' })
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              >
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Effective from</label>
+              <input
+                type="date"
+                value={kitForm.effectiveFrom}
+                onChange={(e) => setKitForm({ ...kitForm, effectiveFrom: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Review status</label>
+              <input
+                value={kitForm.reviewStatus}
+                onChange={(e) => setKitForm({ ...kitForm, reviewStatus: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Source notes</label>
+              <textarea
+                value={kitForm.sourceNotes}
+                onChange={(e) => setKitForm({ ...kitForm, sourceNotes: e.target.value })}
+                rows={2}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Manufacturer doc URL</label>
+              <input
+                value={kitForm.manufacturerDocUrl}
+                onChange={(e) => setKitForm({ ...kitForm, manufacturerDocUrl: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="border-t border-gray-200 pt-3">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-sm font-medium text-gray-700">Kit metrics</div>
+              <Button type="button" size="sm" variant="secondary" onClick={addKitMetricRow}>
+                + Add metric row
+              </Button>
+            </div>
+            <p className="mb-3 text-xs text-gray-500">
+              Each row maps to a canonical metric. Empty metric rows are ignored on save.
+            </p>
+            <div className="space-y-3">
+              {kitForm.metrics.map((row, index) => (
+                <div key={`kit-m-${index}`} className="rounded-lg border border-gray-200 p-3 space-y-2">
+                  <div className="grid gap-2 md:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-600">Metric</label>
+                      <select
+                        value={row.metricKey}
+                        onChange={(e) => updateKitMetricRow(index, { metricKey: e.target.value })}
+                        className="w-full rounded border border-gray-300 px-2 py-2 text-sm font-mono"
+                      >
+                        <option value="">Select…</option>
+                        {row.metricKey && !metricsByKey.has(row.metricKey) ? (
+                          <option value={row.metricKey}>{row.metricKey} (not in library)</option>
+                        ) : null}
+                        {sortedLibraryMetrics.map((m) => (
+                          <option key={m.id} value={m.metricKey}>
+                            {m.metricKey}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-600">Input mode</label>
+                      <select
+                        value={row.inputMode}
+                        onChange={(e) =>
+                          updateKitMetricRow(index, {
+                            inputMode: e.target.value === 'color_assist' ? 'color_assist' : 'numeric',
+                          })
+                        }
+                        className="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                      >
+                        <option value="numeric">Numeric</option>
+                        <option value="color_assist">Color assist</option>
+                      </select>
+                    </div>
+                    <div className="flex items-end justify-end">
+                      <button
+                        type="button"
+                        className="text-sm text-red-600"
+                        onClick={() => removeKitMetricRow(index)}
+                      >
+                        Remove row
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">Help copy</label>
+                    <textarea
+                      value={row.helpCopy}
+                      onChange={(e) => updateKitMetricRow(index, { helpCopy: e.target.value })}
+                      rows={2}
+                      className="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">Color scale JSON (optional)</label>
+                    <textarea
+                      value={row.colorScaleJson}
+                      onChange={(e) => updateKitMetricRow(index, { colorScaleJson: e.target.value })}
+                      rows={3}
+                      placeholder="{}"
+                      className="w-full rounded border border-gray-300 px-2 py-2 font-mono text-xs"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-gray-100 pt-4">
+            <Button variant="secondary" onClick={() => setKitModalOpen(false)} disabled={kitSaving}>
+              Cancel
+            </Button>
+            <Button onClick={() => void saveKit()} disabled={kitSaving}>
+              {kitSaving ? 'Saving…' : editingKitId ? 'Save kit' : 'Create kit'}
+            </Button>
           </div>
         </div>
       </Modal>
