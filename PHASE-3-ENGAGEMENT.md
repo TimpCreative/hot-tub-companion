@@ -15,7 +15,7 @@
 | **Commerce (Shop / cart / checkout)** | ✅ Partial | **Shipped:** Shop, Storefront cart, native Checkout Kit; **verified Apr 2026** test checkout. Detail: [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md). Subscriptions / bundles still planned. |
 | **Retailer Admin — Products ↔ UHTD mapping** | ✅ Partial | **Shipped:** list enrichment with top suggestion score (tiered % pills), `pcdb_parts` join for mapped part labels, extended list sort (visibility, mapping status, confidence), modal **Product mapping** vs **UHTD Suggestions** with confirm/clear keeping the modal open. See [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md § Retailer Admin: Products and UHTD mapping UX](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#retailer-admin-products-and-uhtd-mapping-ux). **Still open:** performance at very large page sizes (batch/denormalize scores later), optional super-admin deep link to PCdb part. |
 | **Referral program** | ❌ | Still planned in this phase |
-| **Water Care Assistant** | ❌ | Still planned in this phase |
+| **Water Care Assistant** | ✅ Partial | **Shipped (Apr 2026):** Super Admin **Water Care** — canonical metrics (scale min/max, default ideals), chemistry profiles + scope mappings (priority tie-break documented in UI), published **test kits** (per-metric help, numeric vs color-assist, **color scale points** `{ spots: [{ value, color, label? }] }`). **Mobile:** Water Care tab (resolved profile, comparison vs latest test), **log test** with profile-driven measurements, optional kit picker, dosage **recommendations** on save, list/history via **Maintenance log** / water-tests API. **Still open vs Part 1 spec:** fixed pH/slider UI, trend charts, color-assist entry from kit spots on device, recommendation → **Add to cart** product cards, retailer admin for opted-in shared tests, full `chemical_dosage_rules` breadth. |
 | **Seasonal maintenance timeline** | ✅ Shipped | **Care schedule** (`maintenance-timeline`), auto schedule + custom tasks, push cron, spa usage months / winter strategy (onboarding + edit), completing tasks updates `spa_profiles` tracking (`last_filter_change`, `last_water_test_at`, `last_drain_refill_at`, `last_cover_check_at`), Home **maintenance_summary** widget, guides surfacing, unit tests in `api` (`npm test`). **Time v1.1:** due dates + cron use **UTC calendar**; tenant/user TZ later. **Ops:** schedule `POST /api/v1/internal/cron/maintenance-reminders` daily with `CRON_SECRET` (same as other internal crons; e.g. Railway Cron). |
 | **Content system** | ✅ Partial | Core universal + retailer content platform is shipped; contextual recommendation/search refinements remain |
 | **Subscription management** | ❌ | Still planned in this phase |
@@ -26,13 +26,18 @@
 1. **Commerce backend:** product sync pagination/retry, `order_references` from `orders/create`, Storefront variant GID normalization, read APIs for shop/PDP — [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#recommended-delivery-order).
 2. **Customer app:** read-only Shop, PDP, multi-spa selector, then cart + Checkout Kit, then Home orders card.
 3. **Pilot prep:** TAB catalog QA, webhook/order idempotency extensions if needed, manual checklist (#1–4 in *Manual Steps Required* below).
-4. **Engagement streams:** referrals, water care, seasonal timeline, subscriptions — as capacity after purchasable checkout exists (referrals/bundles ordering per that doc).
+4. **Engagement streams:** referrals, **water care polish** (charts, shop links, mobile color-assist), subscriptions — seasonal timeline is shipped; referrals/bundles ordering per commerce doc.
 
 ### Content shipped from this phase
 
 - Super Admin **Content Library** and retailer **Content** management screens are live
 - Universal + retailer-authored content supports targeting, categories, suppression, and publish workflows
 - Mobile app renders content detail and list surfaces from tenant-aware content APIs
+
+### Water Care shipped from this phase (partial — Apr 2026)
+
+- Super Admin **Water Care** (`/super-admin/uhtd/water-care`): metric library with **scale bounds** and default ideals, profiles, mappings (priority tie-break: higher wins among ties), test kits with **color scale points** for color-assist metrics
+- Customer **Water Care** + **Test Water** flows: resolved chemistry profile, comparison row, logging tests, post-save dosage recommendations; kits and legal/disclaimer config from tenant/API
 
 ---
 
@@ -95,6 +100,8 @@ Work is grouped **below** for clarity; later parts of this document retain detai
 ---
 
 ## Part 1: Water Care Assistant
+
+> **Implementation status (Apr 2026):** Runtime uses **profile-linked measurements** and `water_tests` / `water_test_measurements` (not the single-row `ph` / `total_alkalinity` columns shown in the sketch below). Super Admin owns metrics, profiles, mappings, and kits; the mobile app submits dynamic `measurements[]` and receives `recommendations[]`. Treat the SQL in §1.1 as an early shape reference; follow migrations in `api/migrations` for truth.
 
 ### 1.1 Database Tables
 
@@ -1026,11 +1033,11 @@ Before moving to Phase 4, verify:
 
 ### Engagement (existing Phase 3 scope)
 
-- [ ] Customer can log a water test with all parameters
-- [ ] Recommendations engine correctly calculates chemical doses based on spa volume and sanitization system
+- [x] Customer can log a water test (**profile-driven** metrics; not the fixed single-row schema in §1.1)
+- [x] Recommendations engine returns dosage-style guidance for out-of-range metrics (**spa volume + rules**; breadth of rules still expandable)
 - [ ] Recommendations link to actual purchasable products from the retailer
-- [ ] "All good" state displays when levels are in range
-- [ ] Water test history shows chronological entries with color coding
+- [ ] "All good" state displays when levels are in range (polish vs per-parameter rec cards)
+- [x] Water test history lists past tests (**Maintenance log** / water-tests list; color coding + rich history UI optional)
 - [ ] Trend charts render correctly for 30/60/90 day views
 - [x] Maintenance timeline auto-generates on spa registration
 - [x] Seasonal winterize/startup events generate correctly based on usage months

@@ -90,8 +90,9 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '3',
-        status: 'not_yet',
-        notes: 'Water Care Assistant.',
+        status: 'partial',
+        notes:
+          'Log tests from profile-driven metrics; list/history in Maintenance log. Super Admin metrics/profiles/kits. Trends/charts and full spec polish still Phase 3.',
       },
       {
         feature: 'Water care assistant (dosage guidance)',
@@ -99,7 +100,9 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '3',
-        status: 'not_yet',
+        status: 'partial',
+        notes:
+          'Post-save recommendations (oz / capful hints). Shop product links from recs still open. See PHASE-3-ENGAGEMENT.md Part 1.',
       },
       {
         feature: 'Seasonal maintenance timeline',
@@ -591,6 +594,13 @@ export const BUILD_OUT_ITEMS: BuildOutRow[] = [
 ];
 
 export const ENTITLEMENTS_EXTRA: BuildOutRow[] = [
+  {
+    item: 'Water care Super Admin (metrics, profiles, mappings, test kits)',
+    phase: '3',
+    status: 'partial',
+    notes:
+      'Apr 2026: scale bounds, default ideals, mapping priority UX, kit color scale points; mobile log + recs shipped — PHASE-3-ENGAGEMENT.md.',
+  },
   {
     item: 'saas_plan + preset feature flags (Super Admin entitlements API)',
     phase: 'Infra',
