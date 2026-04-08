@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
+import { useRouter } from 'expo-router';
 import { useShopifyCheckoutSheet } from '@shopify/checkout-sheet-kit';
 import { CartProviderCore } from './CartContext';
 
@@ -6,7 +7,12 @@ import { CartProviderCore } from './CartContext';
  * Must render under ShopifyCheckoutSheetProvider. Bridges the kit hook into CartProviderCore.
  */
 export function CartCheckoutNativeBridge({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const checkoutSheet = useShopifyCheckoutSheet();
+
+  const onCheckoutCompleted = useCallback(() => {
+    router.push('/(tabs)/profile/orders/thanks');
+  }, [router]);
 
   const presentCheckout = useCallback(
     (url: string) => {
@@ -45,8 +51,9 @@ export function CartCheckoutNativeBridge({ children }: { children: React.ReactNo
       subscribeCheckoutCompleted,
       subscribeCheckoutClosed,
       subscribeCheckoutError,
+      onCheckoutCompleted,
     }),
-    [presentCheckout, subscribeCheckoutCompleted, subscribeCheckoutClosed, subscribeCheckoutError]
+    [presentCheckout, subscribeCheckoutCompleted, subscribeCheckoutClosed, subscribeCheckoutError, onCheckoutCompleted]
   );
 
   return <CartProviderCore checkout={checkoutDeps}>{children}</CartProviderCore>;

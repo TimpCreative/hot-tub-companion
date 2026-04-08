@@ -7,7 +7,9 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import api from '../../services/api';
+import { formatOrderMoney } from '../../services/orders';
 import { useTheme } from '../../theme/ThemeProvider';
 
 export type RecentOrderItem = {
@@ -15,6 +17,9 @@ export type RecentOrderItem = {
   shopifyOrderId: string;
   shopifyOrderNumber: number | null;
   createdAt: string;
+  orderedAt?: string | null;
+  currency?: string | null;
+  totalCents?: number | null;
 };
 
 type OrdersApiEnvelope = {
@@ -40,7 +45,13 @@ function formatWhen(iso: string): string {
   }
 }
 
+function rowDate(o: RecentOrderItem): string {
+  const iso = o.orderedAt || o.createdAt;
+  return formatWhen(iso);
+}
+
 export function RecentOrdersCard() {
+  const router = useRouter();
   const { colors, typography, spacing } = useTheme();
   const [orders, setOrders] = useState<RecentOrderItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,24 +119,33 @@ export function RecentOrdersCard() {
         Confirmed after checkout; may take a moment to appear.
       </Text>
       {orders.map((o) => (
-        <View
+        <Pressable
           key={o.id}
+          onPress={() => router.push(`/(tabs)/profile/orders/${o.id}`)}
           style={[styles.row, { borderBottomColor: colors.border ?? '#f1f5f9' }]}
         >
           <View style={{ flex: 1 }}>
             <Text style={[typography.body, { color: colors.text, fontWeight: '600' }]}>
               {formatOrderLabel(o)}
             </Text>
-            {formatWhen(o.createdAt) ? (
+            {rowDate(o) ? (
               <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
-                {formatWhen(o.createdAt)}
+                {rowDate(o)}
               </Text>
             ) : null}
           </View>
-        </View>
+          {o.totalCents != null ? (
+            <Text style={[typography.body, { color: colors.text, fontWeight: '700', marginLeft: 12 }]}>
+              {formatOrderMoney(o.totalCents, o.currency ?? null)}
+            </Text>
+          ) : null}
+        </Pressable>
       ))}
       <Pressable onPress={() => void load()} style={{ marginTop: 10 }}>
         <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '600' }}>Refresh</Text>
+      </Pressable>
+      <Pressable onPress={() => router.push('/(tabs)/profile/orders')} style={{ marginTop: 8 }}>
+        <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '600' }}>View all orders</Text>
       </Pressable>
     </View>
   );

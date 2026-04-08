@@ -3,8 +3,12 @@ import { db } from '../config/database';
 import { success } from '../utils/response';
 import * as notificationService from '../services/notification.service';
 import { localToUTC, addDays } from '../utils/timezone';
-import { shopifyAdapter } from '../integrations/shopifyAdapter';
+import { shopifyAdapter, fetchShopifyAdminOrderJson } from '../integrations/shopifyAdapter';
 import { logPosIntegrationActivity } from '../services/posIntegrationActivity.service';
+import {
+  listOrderReferencesMissingSnapshot,
+  mergeOrderSnapshotFromShopifyPayload,
+} from '../services/orderReference.service';
 
 export async function dispatchNotifications(req: Request, res: Response): Promise<void> {
   const now = new Date();
@@ -330,4 +334,39 @@ export async function maintenanceReminders(req: Request, res: Response): Promise
   }
 
   success(res, { candidates: rows.length, notified }, 'Maintenance reminders complete');
+}
+
+/**
+ * Backfill order_references.snapshot from Shopify Admin for rows with user_id but null snapshot.
+ * Query: ?limit=25 (max 100). Throttled for Admin API; run periodically until queue empty.
+ */
+export async function backfillOrderSnapshots(req: Request, res: Response): Promise<void> {
+  const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? '25'), 10) || 25));
+  const rows = await listOrderReferencesMissingSnapshot(limit);
+  let ok = 0;
+  let failed = 0;
+  for (const row of rows) {
+    try {
+      const orderJson = await fetchShopifyAdminOrderJson(row.tenantId, row.shopifyOrderId);
+      if (!orderJson) {
+        failed++;
+        continue;
+      }
+      const merged = await mergeOrderSnapshotFromShopifyPayload(
+        row.tenantId,
+        row.shopifyOrderId,
+        orderJson
+      );
+      if (merged) ok++;
+      else failed++;
+    } catch {
+      failed++;
+    }
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  success(
+    res,
+    { batchSize: rows.length, snapshotsWritten: ok, failed },
+    'Order snapshot backfill batch complete'
+  );
 }

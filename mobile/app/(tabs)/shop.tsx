@@ -39,14 +39,16 @@ import {
 } from '../../services/shop';
 import { useActiveSpa, type SpaProfileListItem } from '../../contexts/ActiveSpaContext';
 
-function spaProfileLabel(p: SpaProfileListItem | undefined): string {
+/** Year · brand · model (falls back to nickname if no structured fields). */
+function spaShoppingForLabel(p: SpaProfileListItem | undefined): string {
   if (!p) return 'Spa';
-  const n = p.nickname?.trim();
-  if (n) return n;
+  const y = p.year != null && Number.isFinite(Number(p.year)) ? String(p.year) : '';
   const b = p.brand?.trim() || '';
-  const m = p.model?.trim() || '';
-  const both = `${b} ${m}`.trim();
-  return both || 'My spa';
+  const m = (p.modelLine?.trim() || p.model?.trim() || '') as string;
+  const structured = [y, b, m].filter(Boolean).join(' ').trim();
+  if (structured) return structured;
+  const n = p.nickname?.trim();
+  return n || 'My spa';
 }
 
 function firstImageUrl(images: unknown): string | null {
@@ -593,7 +595,7 @@ export default function Shop() {
             <View style={{ flex: 1 }}>
               <Text style={[typography.caption, { color: colors.textSecondary }]}>Active spa (compatibility)</Text>
               <Text style={[typography.body, { color: colors.text, fontWeight: '600' }]} numberOfLines={1}>
-                {spaProfileLabel(activeSpa)}
+                {spaShoppingForLabel(activeSpa)}
               </Text>
             </View>
             <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
@@ -674,6 +676,47 @@ export default function Shop() {
                 nestedScrollEnabled
               >
                 <Text style={[styles.filterSectionLabel, { color: colors.textMuted }]}>Compatibility</Text>
+                <Text style={[typography.caption, { color: colors.textSecondary, marginBottom: 6 }]}>
+                  <Text style={{ fontWeight: '700', color: colors.text }}>Shopping for:</Text>{' '}
+                  {spaShoppingForLabel(activeSpa)}
+                </Text>
+                {user && spaProfiles.length > 1 ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={{ marginBottom: 12 }}
+                    contentContainerStyle={{ flexDirection: 'row', gap: 8, paddingRight: 8 }}
+                    nestedScrollEnabled
+                  >
+                    {spaProfiles.map((p) => {
+                      const sel = p.id === spaProfileId;
+                      return (
+                        <Pressable
+                          key={p.id}
+                          onPress={() => setSpaProfileId(p.id)}
+                          style={({ pressed }) => [
+                            styles.filterSpaChip,
+                            {
+                              borderColor: sel ? colors.primary : colors.border,
+                              backgroundColor: sel ? `${colors.primary}22` : colors.surface,
+                              opacity: pressed ? 0.88 : 1,
+                            },
+                          ]}
+                        >
+                          <Text
+                            numberOfLines={1}
+                            style={[
+                              typography.caption,
+                              { color: colors.text, fontWeight: sel ? '700' : '500', maxWidth: 200 },
+                            ]}
+                          >
+                            {spaShoppingForLabel(p)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                ) : null}
                 <View style={styles.toggleRow}>
                   <Text style={[typography.body, { color: colors.text, flex: 1 }]}>Include parts for other spa models</Text>
                   <Switch
@@ -896,7 +939,7 @@ export default function Shop() {
                       style={[typography.body, { color: colors.text, fontWeight: sel ? '700' : '500', flex: 1 }]}
                       numberOfLines={2}
                     >
-                      {spaProfileLabel(p)}
+                      {spaShoppingForLabel(p)}
                       {p.isPrimary ? ' · Primary' : ''}
                     </Text>
                     {sel ? <Ionicons name="checkmark-circle" size={22} color={colors.primary} /> : null}
@@ -941,6 +984,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 12,
     borderWidth: 1,
+  },
+  filterSpaChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    maxWidth: 220,
   },
   spaModalRoot: {
     flex: 1,

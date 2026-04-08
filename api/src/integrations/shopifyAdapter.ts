@@ -88,6 +88,25 @@ function getShopifyBaseUrl(storeUrl: string): string {
   return `https://${trimmed.replace(/\/+$/, '')}`;
 }
 
+/**
+ * Fetch a single order by Shopify numeric id (Admin REST).
+ */
+export async function fetchShopifyAdminOrderJson(
+  tenantId: string,
+  shopifyOrderId: string
+): Promise<Record<string, unknown> | null> {
+  const id = String(shopifyOrderId || '').trim();
+  if (!id || !/^\d+$/.test(id)) return null;
+  const res = await shopifyFetch(tenantId, `/orders/${id}.json`);
+  if (!res.ok) return null;
+  try {
+    const body = (await res.json()) as { order?: Record<string, unknown> };
+    return body.order ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function shopifyFetch(
   tenantId: string,
   path: string
@@ -117,6 +136,37 @@ async function shopifyFetch(
     }
     return res;
   });
+}
+
+/**
+ * List orders for a customer email (Admin REST). Paginate with since_id (orders with id greater than this value).
+ */
+export async function fetchShopifyAdminOrdersByCustomerEmail(
+  tenantId: string,
+  email: string,
+  sinceId?: string
+): Promise<Record<string, unknown>[]> {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!normalized) return [];
+  const params = new URLSearchParams();
+  params.set('status', 'any');
+  params.set('email', normalized);
+  params.set('limit', '50');
+  if (sinceId && /^\d+$/.test(String(sinceId))) {
+    params.set('since_id', String(sinceId));
+  }
+  const res = await shopifyFetch(tenantId, `/orders.json?${params.toString()}`);
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    console.warn('[shopifyAdapter] orders by email failed', res.status, t.slice(0, 200));
+    return [];
+  }
+  try {
+    const body = (await res.json()) as { orders?: Record<string, unknown>[] };
+    return Array.isArray(body.orders) ? body.orders : [];
+  } catch {
+    return [];
+  }
 }
 
 /**

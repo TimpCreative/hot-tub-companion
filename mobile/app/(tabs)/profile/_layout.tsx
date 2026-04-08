@@ -10,14 +10,18 @@ export default function ProfileLayout() {
     <Stack
       screenOptions={{
         ...buildAppStackHeaderOptions(primary),
+        headerBackTitle: 'Profile',
       }}
     >
-      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="index" options={{ headerShown: false, title: 'Profile' }} />
       <Stack.Screen name="account" options={{ title: 'Profile Information' }} />
       <Stack.Screen name="notifications" options={{ title: 'Notification Preferences' }} />
       <Stack.Screen name="privacy" options={{ title: 'Privacy' }} />
       <Stack.Screen name="more" options={{ title: 'Account Actions' }} />
       <Stack.Screen name="spa/edit/[id]" options={{ title: 'Edit Spa' }} />
+      <Stack.Screen name="orders/index" options={{ title: 'Orders' }} />
+      <Stack.Screen name="orders/[id]" options={{ title: 'Order details' }} />
+      <Stack.Screen name="orders/thanks" options={{ title: 'Thank you' }} />
     </Stack>
   );
 }

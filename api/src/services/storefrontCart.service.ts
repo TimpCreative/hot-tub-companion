@@ -21,11 +21,17 @@ export class StorefrontCartError extends Error {
   }
 }
 
+export type CartMoneyAmount = {
+  amount: string;
+  currencyCode: string;
+};
+
 export type CartLineDto = {
   id: string;
   quantity: number;
   productTitle: string;
   variantTitle: string;
+  imageUrl: string | null;
 };
 
 export type CartDto = {
@@ -33,12 +39,18 @@ export type CartDto = {
   checkoutUrl: string | null;
   totalQuantity: number;
   lines: CartLineDto[];
+  subtotalAmount: CartMoneyAmount | null;
+  totalAmount: CartMoneyAmount | null;
 };
 
 const CART_FIELDS = `
   id
   checkoutUrl
   totalQuantity
+  cost {
+    subtotalAmount { amount currencyCode }
+    totalAmount { amount currencyCode }
+  }
   lines(first: 100) {
     edges {
       node {
@@ -48,8 +60,14 @@ const CART_FIELDS = `
           ... on ProductVariant {
             id
             title
+            image {
+              url
+            }
             product {
               title
+              featuredImage {
+                url
+              }
             }
           }
         }
@@ -123,6 +141,15 @@ async function storefrontGraphql<T>(
   return body.data;
 }
 
+function parseMoneyAmount(raw: unknown): CartMoneyAmount | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const amount = typeof o.amount === 'string' ? o.amount.trim() : '';
+  const currencyCode = typeof o.currencyCode === 'string' ? o.currencyCode.trim() : '';
+  if (!amount || !currencyCode) return null;
+  return { amount, currencyCode };
+}
+
 function parseCart(cart: unknown): CartDto | null {
   if (!cart || typeof cart !== 'object') return null;
   const c = cart as Record<string, unknown>;
@@ -130,6 +157,9 @@ function parseCart(cart: unknown): CartDto | null {
   if (!id) return null;
   const checkoutUrl = typeof c.checkoutUrl === 'string' ? c.checkoutUrl : null;
   const totalQuantity = typeof c.totalQuantity === 'number' ? c.totalQuantity : 0;
+  const cost = c.cost as Record<string, unknown> | undefined;
+  const subtotalAmount = cost ? parseMoneyAmount(cost.subtotalAmount) : null;
+  const totalAmount = cost ? parseMoneyAmount(cost.totalAmount) : null;
   const lines: CartLineDto[] = [];
   const linesConn = c.lines as Record<string, unknown> | undefined;
   const edges = linesConn?.edges;
@@ -145,17 +175,28 @@ function parseCart(cart: unknown): CartDto | null {
       const variantTitle = typeof merch?.title === 'string' ? merch.title : '';
       const product = merch?.product as Record<string, unknown> | undefined;
       const productTitle = typeof product?.title === 'string' ? product.title : '';
+      let imageUrl: string | null = null;
+      const vImg = merch?.image as Record<string, unknown> | undefined;
+      if (typeof vImg?.url === 'string' && vImg.url.trim()) {
+        imageUrl = vImg.url.trim();
+      } else {
+        const feat = product?.featuredImage as Record<string, unknown> | undefined;
+        if (typeof feat?.url === 'string' && feat.url.trim()) {
+          imageUrl = feat.url.trim();
+        }
+      }
       if (lineId) {
         lines.push({
           id: lineId,
           quantity: qty,
           productTitle,
           variantTitle,
+          imageUrl,
         });
       }
     }
   }
-  return { cartId: id, checkoutUrl, totalQuantity, lines };
+  return { cartId: id, checkoutUrl, totalQuantity, lines, subtotalAmount, totalAmount };
 }
 
 function userErrorsMessage(errors: unknown): string {

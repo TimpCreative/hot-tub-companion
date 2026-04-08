@@ -157,7 +157,7 @@ export default function ProfileScreen() {
           </View>
         ) : (
           <>
-            {/* Profile info button */}
+            {/* Profile info + account shortcuts */}
             <View style={[styles.section, { backgroundColor: colors.contentBackground }]}>
               {profile && (
                 <View style={styles.summaryRow}>
@@ -170,9 +170,18 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={[styles.menuRow, { borderTopColor: colors.border }]}
                 onPress={() => router.push('/(tabs)/profile/account')}
+                activeOpacity={0.7}
               >
                 <Text style={[styles.menuLabel, { color: colors.text }]}>Profile information</Text>
-                <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+                <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.menuRow, styles.menuRowLast, { borderTopColor: colors.border }]}
+                onPress={() => router.push('/(tabs)/profile/orders')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Orders</Text>
+                <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
 
@@ -209,18 +218,20 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={[styles.section, styles.menuSection, { backgroundColor: colors.contentBackground }]}
               onPress={() => router.push('/(tabs)/profile/notifications')}
+              activeOpacity={0.7}
             >
               <Text style={[styles.menuLabel, { color: colors.text }]}>Notification preferences</Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+              <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
             </TouchableOpacity>
 
             {/* Privacy button */}
             <TouchableOpacity
               style={[styles.section, styles.menuSection, { backgroundColor: colors.contentBackground }]}
               onPress={() => router.push('/(tabs)/profile/privacy')}
+              activeOpacity={0.7}
             >
               <Text style={[styles.menuLabel, { color: colors.text }]}>Privacy</Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+              <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
             </TouchableOpacity>
 
             {/* App Info */}
@@ -243,9 +254,10 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={[styles.section, styles.menuSection, { backgroundColor: colors.contentBackground }]}
               onPress={() => router.push('/(tabs)/profile/more')}
+              activeOpacity={0.7}
             >
               <Text style={[styles.menuLabel, { color: colors.text }]}>Account actions</Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+              <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
             </TouchableOpacity>
           </>
         )}
@@ -267,26 +279,33 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   section: {
     marginBottom: 24,
-    padding: 16,
+    padding: 18,
     borderRadius: 12,
   },
   menuSection: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 56,
   },
   sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
-  summaryRow: { marginBottom: 12 },
+  summaryRow: { marginBottom: 4 },
   summaryName: { fontSize: 18, fontWeight: '600' },
-  summaryEmail: { fontSize: 14 },
+  summaryEmail: { fontSize: 14, marginTop: 4 },
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 12,
+    paddingTop: 16,
+    paddingBottom: 4,
+    minHeight: 52,
     borderTopWidth: 1,
   },
-  menuLabel: { fontSize: 16 },
+  menuRowLast: {
+    paddingBottom: 0,
+    minHeight: 48,
+  },
+  menuLabel: { fontSize: 16, fontWeight: '500' },
   link: { fontSize: 14, marginTop: 8 },
   danger: { color: '#dc2626' },
   spaRow: {

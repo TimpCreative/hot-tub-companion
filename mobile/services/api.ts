@@ -1,6 +1,14 @@
-import axios from 'axios';
+import axios, { AxiosHeaders, isAxiosError } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
+
+/** Only wipe the stored ID token when Firebase actually rejected it — not on every 401. */
+function shouldClearStoredIdTokenOn401(apiBody: unknown): boolean {
+  if (!apiBody || typeof apiBody !== 'object') return false;
+  const err = (apiBody as { error?: { message?: string } }).error;
+  const msg = typeof err?.message === 'string' ? err.message : '';
+  return msg === 'Invalid or expired token';
+}
 
 const extra = Constants.expoConfig?.extra as {
   apiUrl?: string;
@@ -28,18 +36,26 @@ const api = axios.create({
 api.interceptors.request.use(async (config) => {
   const token = await SecureStore.getItemAsync('firebase_token');
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    const headers = AxiosHeaders.from(config.headers ?? {});
+    headers.set('Authorization', `Bearer ${token}`);
+    config.headers = headers;
   }
   return config;
 });
 
 api.interceptors.response.use(
   (response) => response.data,
-  async (error) => {
-    if (error.response?.status === 401) {
-      await SecureStore.deleteItemAsync('firebase_token');
+  async (error: unknown) => {
+    if (isAxiosError(error) && error.response?.status === 401) {
+      const data = error.response.data;
+      if (shouldClearStoredIdTokenOn401(data)) {
+        await SecureStore.deleteItemAsync('firebase_token');
+      }
     }
-    return Promise.reject(error.response?.data || error);
+    if (isAxiosError(error) && error.response?.data !== undefined) {
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
   }
 );
 

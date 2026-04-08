@@ -65,6 +65,14 @@ _Updated to match the repository during Phase 3 commerce work._
 6. **Checkout UX** — Checkout Sheet Kit `close` + `error` listeners; cart banner copy aligned with webhook-as-truth.
 7. **Audit artifacts** — `docs/zero-trust-commerce-audit-2026-04-02.md` (checklist); formal **Milestone 6** execution still required for TAB sign-off.
 
+### Commerce v1 completion (orders snapshot, cart, shop filters, thank-you)
+
+- **Order snapshots** — `order_references.snapshot` (JSON v1), denormalized `ordered_at`, `currency`, `total_cents`, `financial_status`; filled from `orders/create` webhook and optional Admin backfill (`POST /api/v1/internal/cron/backfill-order-snapshots` with `CRON_SECRET`).
+- **Orders API** — `GET /orders` returns list fields for UI (totals, first line, counts); `GET /orders/:referenceId` (UUID) returns full snapshot for the authenticated owner.
+- **Mobile** — Profile **Orders** list + detail; **Recent orders** shows total when available and links into detail; post-checkout **Thank you** via Checkout Kit `completed` → `/(tabs)/profile/orders/thanks`.
+- **Cart** — Storefront cart query includes line images and `cost` (subtotal/total); cart screen shows thumbnails and a sticky footer with totals + checkout.
+- **Shop filters** — Filter sheet shows **Shopping for:** active spa and an in-sheet spa chip row when the user has multiple spas.
+
 ### Not yet started / still open
 
 - **Milestone 6** — execute full pilot QA matrix in production-like conditions and attach evidence; update sign-off table in the zero-trust doc.

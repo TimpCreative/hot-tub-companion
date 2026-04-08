@@ -53,6 +53,11 @@ router.post(
   cronAuth,
   cronController.maintenanceReminders
 );
+router.post(
+  '/api/v1/internal/cron/backfill-order-snapshots',
+  cronAuth,
+  cronController.backfillOrderSnapshots
+);
 
 // EAS build: fetch tenant API key by slug (EAS_BUILD_CONFIG_SECRET required)
 router.get(

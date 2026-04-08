@@ -22,11 +22,18 @@ export function messageFromApiReject(e: unknown, fallback: string): string {
   return fallback;
 }
 
+export type CartMoneyAmount = {
+  amount: string;
+  currencyCode: string;
+};
+
 export type CartLine = {
   id: string;
   quantity: number;
   productTitle: string;
   variantTitle: string;
+  /** Present when API returns Storefront variant / product images. */
+  imageUrl?: string | null;
 };
 
 export type Cart = {
@@ -34,7 +41,20 @@ export type Cart = {
   checkoutUrl: string | null;
   totalQuantity: number;
   lines: CartLine[];
+  subtotalAmount?: CartMoneyAmount | null;
+  totalAmount?: CartMoneyAmount | null;
 };
+
+export function formatCartMoney(m: CartMoneyAmount | null | undefined): string | null {
+  if (!m?.amount?.trim() || !m.currencyCode?.trim()) return null;
+  const n = parseFloat(m.amount);
+  if (!Number.isFinite(n)) return `${m.amount} ${m.currencyCode}`;
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: m.currencyCode }).format(n);
+  } catch {
+    return `${m.amount} ${m.currencyCode}`;
+  }
+}
 
 type ApiEnvelope<T> = { success?: boolean; data?: T; error?: { code?: string; message?: string } };
 

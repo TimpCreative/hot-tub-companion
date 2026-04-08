@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,13 +15,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCart } from '../../../contexts/CartContext';
-import { messageFromApiReject } from '../../../services/cart';
+import { formatCartMoney, messageFromApiReject } from '../../../services/cart';
 import { useTheme } from '../../../theme/ThemeProvider';
 
 export default function ShopCartScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, typography } = useTheme();
+  const footerBg = colors.contentBackground ?? colors.surface;
   const { user } = useAuth();
   const {
     cart,
@@ -90,133 +92,179 @@ export default function ShopCartScreen() {
     );
   }
 
+  const subtotalLabel = cart ? formatCartMoney(cart.subtotalAmount) : null;
+  const totalLabel = cart ? formatCartMoney(cart.totalAmount) : null;
+  const sub = cart?.subtotalAmount;
+  const tot = cart?.totalAmount;
+  const sameSubAndTotal =
+    Boolean(sub && tot && sub.amount === tot.amount && sub.currencyCode === tot.currencyCode);
+
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      contentContainerStyle={{ padding: 16, paddingBottom: 24 + insets.bottom }}
-    >
-      {loading && !cart ? (
-        <ActivityIndicator style={{ marginTop: 32 }} color={colors.primary} />
-      ) : null}
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 16 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {loading && !cart ? (
+          <ActivityIndicator style={{ marginTop: 32 }} color={colors.primary} />
+        ) : null}
 
-      {checkoutSheetNotice ? (
-        <View
-          style={[
-            styles.noticeCard,
-            {
-              borderColor:
-                checkoutSheetNotice.kind === 'error'
-                  ? '#fecaca'
-                  : checkoutSheetNotice.kind === 'completed'
-                    ? '#bfdbfe'
-                    : colors.border,
-              backgroundColor:
-                checkoutSheetNotice.kind === 'error'
-                  ? '#fef2f2'
-                  : checkoutSheetNotice.kind === 'completed'
-                    ? '#eff6ff'
-                    : colors.surface,
-            },
-          ]}
-        >
-          <Text style={[typography.body, { color: colors.text, lineHeight: 22 }]}>
-            {checkoutSheetNotice.message}
-          </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 12 }}>
-            {checkoutSheetNotice.kind === 'completed' ? (
-              <Pressable onPress={() => router.push('/(tabs)/home')} hitSlop={8}>
-                <Text style={{ color: colors.primary, fontWeight: '700' }}>Go to Home</Text>
-              </Pressable>
-            ) : null}
-            {checkoutSheetNotice.kind === 'error' ? (
-              <Pressable onPress={() => void onCheckout()} hitSlop={8}>
-                <Text style={{ color: colors.primary, fontWeight: '700' }}>Try checkout again</Text>
-              </Pressable>
-            ) : null}
-            <Pressable onPress={dismissCheckoutSheetNotice} hitSlop={8}>
-              <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Dismiss</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
-
-      {!loading && (!cart || cart.lines.length === 0) ? (
-        <Text style={[typography.body, { color: colors.textSecondary, marginTop: 24, textAlign: 'center' }]}>
-          Your cart is empty. Browse the shop to add items.
-        </Text>
-      ) : null}
-
-      {cart?.lines.map((line) => (
-        <View
-          key={line.id}
-          style={[styles.lineCard, { borderColor: colors.border, backgroundColor: colors.surface }]}
-        >
-          <Text style={[typography.body, { color: colors.text, fontWeight: '700' }]} numberOfLines={2}>
-            {line.productTitle}
-          </Text>
-          {line.variantTitle ? (
-            <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 4 }]} numberOfLines={2}>
-              {line.variantTitle}
+        {checkoutSheetNotice ? (
+          <View
+            style={[
+              styles.noticeCard,
+              {
+                borderColor: checkoutSheetNotice.kind === 'error' ? '#fecaca' : colors.border,
+                backgroundColor: checkoutSheetNotice.kind === 'error' ? '#fef2f2' : colors.surface,
+              },
+            ]}
+          >
+            <Text style={[typography.body, { color: colors.text, lineHeight: 22 }]}>
+              {checkoutSheetNotice.message}
             </Text>
-          ) : null}
-          <View style={styles.lineActions}>
-            <View style={styles.stepper}>
-              <Pressable
-                onPress={() => adjustQty(line.id, line.quantity - 1)}
-                disabled={busyLine === line.id}
-                style={({ pressed }) => [
-                  styles.stepBtn,
-                  { borderColor: colors.border, opacity: pressed ? 0.75 : 1 },
-                ]}
-              >
-                <Ionicons name="remove" size={20} color={colors.primary} />
-              </Pressable>
-              <Text style={[typography.body, { color: colors.text, minWidth: 28, textAlign: 'center' }]}>
-                {line.quantity}
-              </Text>
-              <Pressable
-                onPress={() => adjustQty(line.id, line.quantity + 1)}
-                disabled={busyLine === line.id}
-                style={({ pressed }) => [
-                  styles.stepBtn,
-                  { borderColor: colors.border, opacity: pressed ? 0.75 : 1 },
-                ]}
-              >
-                <Ionicons name="add" size={20} color={colors.primary} />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 12 }}>
+              {checkoutSheetNotice.kind === 'error' ? (
+                <Pressable onPress={() => void onCheckout()} hitSlop={8}>
+                  <Text style={{ color: colors.primary, fontWeight: '700' }}>Try checkout again</Text>
+                </Pressable>
+              ) : null}
+              <Pressable onPress={dismissCheckoutSheetNotice} hitSlop={8}>
+                <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Dismiss</Text>
               </Pressable>
             </View>
-            <Pressable
-              onPress={() => adjustQty(line.id, 0)}
-              disabled={busyLine === line.id}
-              hitSlop={8}
-            >
-              <Text style={{ color: '#b91c1c', fontWeight: '600' }}>Remove</Text>
-            </Pressable>
           </View>
-        </View>
-      ))}
+        ) : null}
+
+        {!loading && (!cart || cart.lines.length === 0) ? (
+          <Text style={[typography.body, { color: colors.textSecondary, marginTop: 24, textAlign: 'center' }]}>
+            Your cart is empty. Browse the shop to add items.
+          </Text>
+        ) : null}
+
+        {cart?.lines.map((line) => (
+          <View
+            key={line.id}
+            style={[styles.lineCard, { borderColor: colors.border, backgroundColor: colors.surface }]}
+          >
+            <View style={styles.lineTop}>
+              {line.imageUrl ? (
+                <Image source={{ uri: line.imageUrl }} style={styles.lineThumb} />
+              ) : (
+                <View style={[styles.lineThumb, { backgroundColor: colors.border ?? '#e5e7eb' }]} />
+              )}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[typography.body, { color: colors.text, fontWeight: '700' }]} numberOfLines={2}>
+                  {line.productTitle}
+                </Text>
+                {line.variantTitle ? (
+                  <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 4 }]} numberOfLines={2}>
+                    {line.variantTitle}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+            <View style={styles.lineActions}>
+              <View style={styles.stepper}>
+                <Pressable
+                  onPress={() => adjustQty(line.id, line.quantity - 1)}
+                  disabled={busyLine === line.id}
+                  style={({ pressed }) => [
+                    styles.stepBtn,
+                    { borderColor: colors.border, opacity: pressed ? 0.75 : 1 },
+                  ]}
+                >
+                  <Ionicons name="remove" size={20} color={colors.primary} />
+                </Pressable>
+                <Text style={[typography.body, { color: colors.text, minWidth: 28, textAlign: 'center' }]}>
+                  {line.quantity}
+                </Text>
+                <Pressable
+                  onPress={() => adjustQty(line.id, line.quantity + 1)}
+                  disabled={busyLine === line.id}
+                  style={({ pressed }) => [
+                    styles.stepBtn,
+                    { borderColor: colors.border, opacity: pressed ? 0.75 : 1 },
+                  ]}
+                >
+                  <Ionicons name="add" size={20} color={colors.primary} />
+                </Pressable>
+              </View>
+              <Pressable
+                onPress={() => adjustQty(line.id, 0)}
+                disabled={busyLine === line.id}
+                hitSlop={8}
+              >
+                <Text style={{ color: '#b91c1c', fontWeight: '600' }}>Remove</Text>
+              </Pressable>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
 
       {cart && cart.lines.length > 0 ? (
-        <Pressable
-          onPress={() => void onCheckout()}
-          disabled={checkoutBusy}
-          style={({ pressed }) => [
-            styles.primaryBtn,
+        <View
+          style={[
+            styles.cartFooter,
             {
-              backgroundColor: colors.primary,
-              opacity: pressed || checkoutBusy ? 0.88 : 1,
-              marginTop: 20,
+              borderTopColor: colors.border ?? '#e5e7eb',
+              backgroundColor: footerBg,
+              paddingBottom: 12 + insets.bottom,
             },
           ]}
         >
-          {checkoutBusy ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.primaryBtnText}>Check out</Text>
-          )}
-        </Pressable>
+          {totalLabel && (!subtotalLabel || sameSubAndTotal) ? (
+            <View style={styles.footerRow}>
+              <Text style={[typography.body, { color: colors.textSecondary }]}>Total</Text>
+              <Text style={[typography.body, { color: colors.text, fontWeight: '800' }]}>{totalLabel}</Text>
+            </View>
+          ) : null}
+          {subtotalLabel && totalLabel && !sameSubAndTotal ? (
+            <>
+              <View style={styles.footerRow}>
+                <Text style={[typography.body, { color: colors.textSecondary }]}>Subtotal</Text>
+                <Text style={[typography.body, { color: colors.text, fontWeight: '700' }]}>{subtotalLabel}</Text>
+              </View>
+              <View style={styles.footerRow}>
+                <Text style={[typography.body, { color: colors.textSecondary }]}>Total</Text>
+                <Text style={[typography.body, { color: colors.text, fontWeight: '800' }]}>{totalLabel}</Text>
+              </View>
+            </>
+          ) : null}
+          {subtotalLabel && !totalLabel ? (
+            <View style={styles.footerRow}>
+              <Text style={[typography.body, { color: colors.textSecondary }]}>Subtotal</Text>
+              <Text style={[typography.body, { color: colors.text, fontWeight: '700' }]}>{subtotalLabel}</Text>
+            </View>
+          ) : null}
+          <Pressable
+            onPress={() => void onCheckout()}
+            disabled={checkoutBusy}
+            style={({ pressed }) => [
+              styles.primaryBtn,
+              {
+                backgroundColor: colors.primary,
+                opacity: pressed || checkoutBusy ? 0.88 : 1,
+                marginTop: 14,
+              },
+            ]}
+          >
+            {checkoutBusy ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.primaryBtnText}>Check out</Text>
+            )}
+          </Pressable>
+          {subtotalLabel || totalLabel ? (
+            <Text
+              style={[typography.caption, { color: colors.textSecondary, textAlign: 'center', marginTop: 12 }]}
+            >
+              Subtotal {subtotalLabel ?? totalLabel}
+            </Text>
+          ) : null}
+        </View>
       ) : null}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -233,6 +281,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     marginBottom: 12,
+  },
+  lineTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  lineThumb: {
+    width: 64,
+    height: 64,
+    borderRadius: 10,
+  },
+  cartFooter: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
   lineActions: {
     flexDirection: 'row',

@@ -28,10 +28,11 @@ export type CartCheckoutDeps = {
   subscribeCheckoutClosed?: (handler: () => void) => () => void;
   /** Checkout sheet error (network/checkout exception). */
   subscribeCheckoutError?: (handler: (err: { message?: string }) => void) => () => void;
+  /** Optional hook after successful checkout (e.g. navigate to thank-you). */
+  onCheckoutCompleted?: () => void;
 };
 
 export type CheckoutSheetNotice =
-  | { kind: 'completed'; message: string }
   | { kind: 'cancelled'; message: string }
   | { kind: 'error'; message: string };
 
@@ -67,6 +68,7 @@ export function CartProviderCore({ children, checkout }: CartProviderCoreProps) 
     subscribeCheckoutCompleted,
     subscribeCheckoutClosed = () => () => {},
     subscribeCheckoutError = () => () => {},
+    onCheckoutCompleted,
   } = checkout;
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -103,11 +105,7 @@ export function CartProviderCore({ children, checkout }: CartProviderCoreProps) 
     const unsubDone = subscribeCheckoutCompleted(() => {
       checkoutCompletedRef.current = true;
       void refreshCart();
-      setCheckoutSheetNotice({
-        kind: 'completed',
-        message:
-          'If you finished payment, your order will appear under Recent orders on Home shortly. The app confirms orders when your store sends them to us — not from this screen alone.',
-      });
+      onCheckoutCompleted?.();
     });
     const unsubClose = subscribeCheckoutClosed(() => {
       if (!checkoutCompletedRef.current) {
@@ -131,7 +129,7 @@ export function CartProviderCore({ children, checkout }: CartProviderCoreProps) 
       unsubClose?.();
       unsubErr?.();
     };
-  }, [subscribeCheckoutCompleted, subscribeCheckoutClosed, subscribeCheckoutError, refreshCart]);
+  }, [subscribeCheckoutCompleted, subscribeCheckoutClosed, subscribeCheckoutError, refreshCart, onCheckoutCompleted]);
 
   const addToCart = useCallback(async (productId: string, quantity = 1) => {
     setError(null);

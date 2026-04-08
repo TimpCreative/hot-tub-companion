@@ -4,7 +4,7 @@ import { error, success } from '../utils/response';
 import * as notificationService from '../services/notification.service';
 import { verifyShopifyWebhookRequest } from '../utils/shopifyWebhookVerify';
 import { tryInsertShopifyWebhookReceipt } from '../services/shopifyWebhookIngest.service';
-import { upsertOrderReference } from '../services/orderReference.service';
+import { mergeOrderSnapshotFromShopifyPayload, upsertOrderReference } from '../services/orderReference.service';
 
 export async function handleOrdersCreate(req: Request, res: Response): Promise<void> {
   const v = await verifyShopifyWebhookRequest(req, res);
@@ -22,16 +22,18 @@ export async function handleOrdersCreate(req: Request, res: Response): Promise<v
     return;
   }
 
-  const payload = v.payload as { id?: number; order_number?: number; email?: string };
-  const rawId = payload.id;
+  const payload = v.payload as Record<string, unknown>;
+  const rawId = payload.id as number | undefined;
   if (rawId === undefined || rawId === null) {
     success(res, { received: true, noop: true });
     return;
   }
   const shopifyOrderId = String(rawId);
-  const orderNumber = typeof payload.order_number === 'number' ? payload.order_number : null;
+  const orderNumber =
+    typeof payload.order_number === 'number' ? payload.order_number : null;
+  const emailRaw = payload.email;
   const email =
-    payload.email && typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : null;
+    emailRaw && typeof emailRaw === 'string' ? emailRaw.trim().toLowerCase() : null;
 
   let matchedUserId: string | null = null;
   if (email) {
@@ -53,6 +55,17 @@ export async function handleOrdersCreate(req: Request, res: Response): Promise<v
     });
   } catch (err) {
     console.warn('[shopifyWebhook] order_references upsert failed:', err);
+  }
+
+  try {
+    const merged = await mergeOrderSnapshotFromShopifyPayload(v.tenantId, shopifyOrderId, payload);
+    if (!merged) {
+      console.warn('[shopifyWebhook] order snapshot merge skipped (no row or invalid payload)', {
+        shopifyOrderId,
+      });
+    }
+  } catch (err) {
+    console.warn('[shopifyWebhook] order snapshot merge failed:', err);
   }
 
   if (matchedUserId) {

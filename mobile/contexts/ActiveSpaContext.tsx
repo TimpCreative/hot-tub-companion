@@ -16,7 +16,9 @@ export type SpaProfileListItem = {
   isPrimary?: boolean;
   nickname?: string | null;
   brand?: string | null;
+  modelLine?: string | null;
   model?: string | null;
+  year?: number | null;
 };
 
 function pickPrimary(profiles: SpaProfileListItem[]): SpaProfileListItem | null {
