@@ -503,6 +503,7 @@ export default function WaterCareAdminPage() {
       ) : null}
 
       {wSection === 'profiles' ? (
+        <>
       <div className="card rounded-lg p-6 space-y-4">
         <div>
           <h2 className="text-lg font-medium text-gray-900">Chemistry Profiles</h2>
@@ -566,6 +567,7 @@ export default function WaterCareAdminPage() {
           {mappings.length === 0 ? <div className="text-sm text-gray-500">No water care mappings yet.</div> : null}
         </div>
       </div>
+        </>
       ) : null}
 
       <Modal
