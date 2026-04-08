@@ -2,6 +2,24 @@ import { Request, Response } from 'express';
 import { success, error } from '../utils/response';
 import * as waterCareService from '../services/waterCare.service';
 
+function mapWaterCareProfileSaveError(res: Response, err: unknown): boolean {
+  const message = err instanceof Error ? err.message : '';
+  if (message === 'UNKNOWN_METRIC_KEY') {
+    error(res, 'VALIDATION_ERROR', 'One or more metric keys are not in the metric library', 400);
+    return true;
+  }
+  if (message === 'PROFILE_MEASUREMENT_BOUNDS') {
+    error(
+      res,
+      'VALIDATION_ERROR',
+      'Ideal min/max must be within each metric’s allowed range, and ideal min must be ≤ ideal max',
+      400
+    );
+    return true;
+  }
+  return false;
+}
+
 function requireCustomerUser(req: Request, res: Response): string | null {
   if ((req as Request & { userIsTenantAdminOverride?: boolean }).userIsTenantAdminOverride) {
     error(res, 'FORBIDDEN', 'This action requires a customer account', 403);
@@ -34,6 +52,7 @@ export async function createProfile(req: Request, res: Response) {
     res.status(201);
     success(res, profile, 'Water care profile created');
   } catch (err) {
+    if (mapWaterCareProfileSaveError(res, err)) return;
     console.error('Error creating water care profile:', err);
     error(res, 'INTERNAL_ERROR', 'Failed to create water care profile', 500);
   }
@@ -113,12 +132,20 @@ export async function listWaterMetrics(_req: Request, res: Response) {
 
 export async function createWaterMetric(req: Request, res: Response) {
   try {
-    const { metricKey, label, unit, defaultMinValue, defaultMaxValue, sortHint } = req.body ?? {};
-    if (metricKey == null || label == null || unit == null || defaultMinValue === undefined || defaultMaxValue === undefined) {
+    const { metricKey, label, unit, rangeMin, defaultMinValue, defaultMaxValue, rangeMax, sortHint } = req.body ?? {};
+    if (
+      metricKey == null ||
+      label == null ||
+      unit == null ||
+      rangeMin === undefined ||
+      defaultMinValue === undefined ||
+      defaultMaxValue === undefined ||
+      rangeMax === undefined
+    ) {
       return error(
         res,
         'VALIDATION_ERROR',
-        'metricKey, label, unit, defaultMinValue, and defaultMaxValue are required',
+        'metricKey, label, unit, rangeMin, defaultMinValue, defaultMaxValue, and rangeMax are required',
         400
       );
     }
@@ -126,8 +153,10 @@ export async function createWaterMetric(req: Request, res: Response) {
       metricKey: String(metricKey),
       label: String(label),
       unit: String(unit),
+      rangeMin: Number(rangeMin),
       defaultMinValue: Number(defaultMinValue),
       defaultMaxValue: Number(defaultMaxValue),
+      rangeMax: Number(rangeMax),
       sortHint: sortHint !== undefined ? Number(sortHint) : undefined,
     });
     res.status(201);
@@ -140,6 +169,19 @@ export async function createWaterMetric(req: Request, res: Response) {
     if (message === 'METRIC_KEY_REQUIRED' || message === 'METRIC_LABEL_UNIT_REQUIRED') {
       return error(res, 'VALIDATION_ERROR', message === 'METRIC_KEY_REQUIRED' ? 'metricKey is required' : 'label and unit are required', 400);
     }
+    if (
+      message === 'METRIC_VALUES_INVALID' ||
+      message === 'METRIC_RANGE_ORDER' ||
+      message === 'METRIC_DEFAULT_MIN_INVALID' ||
+      message === 'METRIC_DEFAULT_MAX_INVALID'
+    ) {
+      return error(
+        res,
+        'VALIDATION_ERROR',
+        'rangeMin ≤ defaultMinValue ≤ defaultMaxValue ≤ rangeMax is required',
+        400
+      );
+    }
     console.error('Error creating water metric:', err);
     error(res, 'INTERNAL_ERROR', 'Failed to create water metric', 500);
   }
@@ -147,17 +189,33 @@ export async function createWaterMetric(req: Request, res: Response) {
 
 export async function updateWaterMetric(req: Request, res: Response) {
   try {
-    const { label, unit, defaultMinValue, defaultMaxValue, sortHint } = req.body ?? {};
+    const { label, unit, rangeMin, defaultMinValue, defaultMaxValue, rangeMax, sortHint } = req.body ?? {};
     const ok = await waterCareService.updateWaterMetric(req.params.id, {
       label,
       unit,
+      rangeMin: rangeMin !== undefined ? Number(rangeMin) : undefined,
       defaultMinValue: defaultMinValue !== undefined ? Number(defaultMinValue) : undefined,
       defaultMaxValue: defaultMaxValue !== undefined ? Number(defaultMaxValue) : undefined,
+      rangeMax: rangeMax !== undefined ? Number(rangeMax) : undefined,
       sortHint: sortHint !== undefined ? Number(sortHint) : undefined,
     });
     if (!ok) return error(res, 'NOT_FOUND', 'Metric not found', 404);
     success(res, { id: req.params.id }, 'Metric updated');
   } catch (err) {
+    const message = err instanceof Error ? err.message : '';
+    if (
+      message === 'METRIC_VALUES_INVALID' ||
+      message === 'METRIC_RANGE_ORDER' ||
+      message === 'METRIC_DEFAULT_MIN_INVALID' ||
+      message === 'METRIC_DEFAULT_MAX_INVALID'
+    ) {
+      return error(
+        res,
+        'VALIDATION_ERROR',
+        'rangeMin ≤ defaultMinValue ≤ defaultMaxValue ≤ rangeMax is required',
+        400
+      );
+    }
     console.error('Error updating water metric:', err);
     error(res, 'INTERNAL_ERROR', 'Failed to update water metric', 500);
   }

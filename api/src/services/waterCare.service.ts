@@ -51,6 +51,8 @@ interface ProfileMetricJoinRow {
   unit: string;
   min_value: string | number;
   max_value: string | number;
+  range_min: string | number;
+  range_max: string | number;
   sort_order: number;
   is_enabled: boolean;
 }
@@ -79,6 +81,8 @@ export interface WaterCareProfile {
     unit: string;
     minValue: number;
     maxValue: number;
+    rangeMin: number;
+    rangeMax: number;
     sortOrder: number;
     isEnabled: boolean;
   }>;
@@ -188,9 +192,33 @@ function mapMeasurement(row: ProfileMetricJoinRow) {
     unit: row.unit,
     minValue: Number(row.min_value),
     maxValue: Number(row.max_value),
+    rangeMin: Number(row.range_min),
+    rangeMax: Number(row.range_max),
     sortOrder: row.sort_order,
     isEnabled: row.is_enabled,
   };
+}
+
+/** Enforces rangeMin <= defaultMin <= defaultMax <= rangeMax. */
+export function validateWaterMetricDefinition(input: {
+  rangeMin: number;
+  defaultMinValue: number;
+  defaultMaxValue: number;
+  rangeMax: number;
+}): void {
+  const { rangeMin, defaultMinValue, defaultMaxValue, rangeMax } = input;
+  if (![rangeMin, defaultMinValue, defaultMaxValue, rangeMax].every((n) => Number.isFinite(n))) {
+    throw new Error('METRIC_VALUES_INVALID');
+  }
+  if (rangeMin > rangeMax) {
+    throw new Error('METRIC_RANGE_ORDER');
+  }
+  if (defaultMinValue < rangeMin || defaultMinValue > defaultMaxValue) {
+    throw new Error('METRIC_DEFAULT_MIN_INVALID');
+  }
+  if (defaultMaxValue > rangeMax || defaultMaxValue < defaultMinValue) {
+    throw new Error('METRIC_DEFAULT_MAX_INVALID');
+  }
 }
 
 function mapProfile(row: WaterCareProfileRow, measurements: ProfileMetricJoinRow[]): WaterCareProfile {
@@ -301,6 +329,8 @@ async function ensureMetricId(trx: typeof db, measurement: WaterCareMeasurementI
       unit: measurement.unit.trim(),
       default_min_value: measurement.minValue,
       default_max_value: measurement.maxValue,
+      range_min: measurement.minValue,
+      range_max: measurement.maxValue,
       sort_hint: measurement.sortOrder ?? 0,
       value_type: 'numeric',
       created_at: trx.fn.now(),
@@ -311,11 +341,36 @@ async function ensureMetricId(trx: typeof db, measurement: WaterCareMeasurementI
   return typeof row === 'object' && row && 'id' in row ? row.id : (row as string);
 }
 
+async function assertProfileMeasurementsWithinLibrary(
+  trx: typeof db,
+  measurements: WaterCareMeasurementInput[]
+): Promise<void> {
+  for (const m of measurements) {
+    const key = m.metricKey.trim();
+    const wm = (await trx('water_metrics').where({ metric_key: key }).first()) as Record<string, unknown> | undefined;
+    if (!wm) {
+      throw new Error('UNKNOWN_METRIC_KEY');
+    }
+    const rangeMin = Number(wm.range_min);
+    const rangeMax = Number(wm.range_max);
+    const minV = Number(m.minValue);
+    const maxV = Number(m.maxValue);
+    if (!Number.isFinite(minV) || !Number.isFinite(maxV)) {
+      throw new Error('PROFILE_MEASUREMENT_BOUNDS');
+    }
+    if (minV < rangeMin || maxV > rangeMax || minV > maxV) {
+      throw new Error('PROFILE_MEASUREMENT_BOUNDS');
+    }
+  }
+}
+
 async function replaceMeasurements(
   trx: typeof db,
   profileId: string,
   measurements: WaterCareMeasurementInput[]
 ): Promise<void> {
+  await assertProfileMeasurementsWithinLibrary(trx, measurements);
+
   await trx('water_care_profile_metrics').where({ profile_id: profileId }).del();
 
   if (measurements.length === 0) return;
@@ -369,6 +424,8 @@ async function loadProfileMetricJoins(profileIds: string[]): Promise<ProfileMetr
       'wm.unit',
       db.raw('COALESCE(wcpm.min_value, wm.default_min_value) as min_value'),
       db.raw('COALESCE(wcpm.max_value, wm.default_max_value) as max_value'),
+      'wm.range_min',
+      'wm.range_max',
       'wcpm.sort_order',
       'wcpm.is_enabled'
     )
@@ -755,8 +812,10 @@ export async function listWaterMetrics(): Promise<
     metricKey: string;
     label: string;
     unit: string;
+    rangeMin: number;
     defaultMinValue: number;
     defaultMaxValue: number;
+    rangeMax: number;
     sortHint: number;
     valueType: string;
   }>
@@ -767,8 +826,10 @@ export async function listWaterMetrics(): Promise<
     metricKey: r.metric_key as string,
     label: r.label as string,
     unit: r.unit as string,
+    rangeMin: Number(r.range_min),
     defaultMinValue: Number(r.default_min_value),
     defaultMaxValue: Number(r.default_max_value),
+    rangeMax: Number(r.range_max),
     sortHint: r.sort_hint as number,
     valueType: (r.value_type as string) || 'numeric',
   }));
@@ -778,16 +839,20 @@ export async function createWaterMetric(input: {
   metricKey: string;
   label: string;
   unit: string;
+  rangeMin: number;
   defaultMinValue: number;
   defaultMaxValue: number;
+  rangeMax: number;
   sortHint?: number;
 }): Promise<{
   id: string;
   metricKey: string;
   label: string;
   unit: string;
+  rangeMin: number;
   defaultMinValue: number;
   defaultMaxValue: number;
+  rangeMax: number;
   sortHint: number;
   valueType: string;
 }> {
@@ -804,13 +869,21 @@ export async function createWaterMetric(input: {
   if (!label || !unit) {
     throw new Error('METRIC_LABEL_UNIT_REQUIRED');
   }
+  validateWaterMetricDefinition({
+    rangeMin: Number(input.rangeMin),
+    defaultMinValue: Number(input.defaultMinValue),
+    defaultMaxValue: Number(input.defaultMaxValue),
+    rangeMax: Number(input.rangeMax),
+  });
   const [inserted] = await db('water_metrics')
     .insert({
       metric_key: metricKey,
       label,
       unit,
+      range_min: input.rangeMin,
       default_min_value: input.defaultMinValue,
       default_max_value: input.defaultMaxValue,
+      range_max: input.rangeMax,
       sort_hint: input.sortHint ?? 0,
       value_type: 'numeric',
       created_at: db.fn.now(),
@@ -823,8 +896,10 @@ export async function createWaterMetric(input: {
     metricKey: row.metric_key as string,
     label: row.label as string,
     unit: row.unit as string,
+    rangeMin: Number(row.range_min),
     defaultMinValue: Number(row.default_min_value),
     defaultMaxValue: Number(row.default_max_value),
+    rangeMax: Number(row.range_max),
     sortHint: row.sort_hint as number,
     valueType: (row.value_type as string) || 'numeric',
   };
@@ -835,19 +910,45 @@ export async function updateWaterMetric(
   patch: {
     label?: string;
     unit?: string;
+    rangeMin?: number;
     defaultMinValue?: number;
     defaultMaxValue?: number;
+    rangeMax?: number;
     sortHint?: number;
   }
 ): Promise<boolean> {
-  const existing = await db('water_metrics').where({ id }).first();
+  const existing = (await db('water_metrics').where({ id }).first()) as Record<string, unknown> | undefined;
   if (!existing) return false;
   const update: Record<string, unknown> = { updated_at: db.fn.now() };
   if (patch.label !== undefined) update.label = patch.label.trim().slice(0, 120);
   if (patch.unit !== undefined) update.unit = patch.unit.trim().slice(0, 40);
+  if (patch.rangeMin !== undefined) update.range_min = patch.rangeMin;
   if (patch.defaultMinValue !== undefined) update.default_min_value = patch.defaultMinValue;
   if (patch.defaultMaxValue !== undefined) update.default_max_value = patch.defaultMaxValue;
+  if (patch.rangeMax !== undefined) update.range_max = patch.rangeMax;
   if (patch.sortHint !== undefined) update.sort_hint = patch.sortHint;
+
+  const nextRangeMin = update.range_min !== undefined ? Number(update.range_min) : Number(existing.range_min);
+  const nextDefMin =
+    update.default_min_value !== undefined ? Number(update.default_min_value) : Number(existing.default_min_value);
+  const nextDefMax =
+    update.default_max_value !== undefined ? Number(update.default_max_value) : Number(existing.default_max_value);
+  const nextRangeMax = update.range_max !== undefined ? Number(update.range_max) : Number(existing.range_max);
+
+  if (
+    patch.rangeMin !== undefined ||
+    patch.rangeMax !== undefined ||
+    patch.defaultMinValue !== undefined ||
+    patch.defaultMaxValue !== undefined
+  ) {
+    validateWaterMetricDefinition({
+      rangeMin: nextRangeMin,
+      defaultMinValue: nextDefMin,
+      defaultMaxValue: nextDefMax,
+      rangeMax: nextRangeMax,
+    });
+  }
+
   if (Object.keys(update).length > 1) {
     await db('water_metrics').where({ id }).update(update);
   }

@@ -56,9 +56,96 @@ type WaterMetricRow = {
   metricKey: string;
   label: string;
   unit: string;
+  rangeMin: number;
+  rangeMax: number;
   defaultMinValue: number;
   defaultMaxValue: number;
 };
+
+function coerceMetricRanges(m: {
+  rangeMin?: number;
+  rangeMax?: number;
+  defaultMinValue: number;
+  defaultMaxValue: number;
+}): { rangeMin: number; rangeMax: number } {
+  const lo = Math.min(m.defaultMinValue, m.defaultMaxValue);
+  const hi = Math.max(m.defaultMinValue, m.defaultMaxValue);
+  const rangeMin =
+    m.rangeMin !== undefined && Number.isFinite(Number(m.rangeMin)) ? Number(m.rangeMin) : lo;
+  const rangeMax =
+    m.rangeMax !== undefined && Number.isFinite(Number(m.rangeMax)) ? Number(m.rangeMax) : hi;
+  if (rangeMin <= rangeMax) return { rangeMin, rangeMax };
+  return { rangeMin: lo, rangeMax: hi };
+}
+
+/** Clamp profile ideal min/max to metric library bounds; keeps min ≤ max. */
+function clampProfileIdealsToMetric(
+  minValue: number,
+  maxValue: number,
+  rangeMin: number,
+  rangeMax: number
+): { minValue: number; maxValue: number } {
+  let minV = Math.min(minValue, maxValue);
+  let maxV = Math.max(minValue, maxValue);
+  minV = Math.max(rangeMin, Math.min(minV, rangeMax));
+  maxV = Math.min(rangeMax, Math.max(maxV, rangeMin));
+  if (minV > maxV) {
+    const mid = (rangeMin + rangeMax) / 2;
+    return { minValue: mid, maxValue: mid };
+  }
+  return { minValue: minV, maxValue: maxV };
+}
+
+type ColorScaleSpotForm = {
+  value: number | null;
+  color: string;
+  label: string;
+};
+
+function normalizeSpotFromUnknown(raw: unknown): ColorScaleSpotForm | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const value = Number(o.value);
+  if (!Number.isFinite(value)) return null;
+  const color = typeof o.color === 'string' ? o.color.trim() : '';
+  if (!color) return null;
+  const label = typeof o.label === 'string' ? o.label.trim() : '';
+  return { value, color, label };
+}
+
+function parseColorScaleToSpots(cs: unknown): ColorScaleSpotForm[] {
+  if (cs == null || cs === '') return [];
+  let data: unknown = cs;
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return [];
+    }
+  }
+  if (Array.isArray(data)) {
+    return data.map(normalizeSpotFromUnknown).filter(Boolean) as ColorScaleSpotForm[];
+  }
+  if (data && typeof data === 'object' && Array.isArray((data as { spots?: unknown }).spots)) {
+    return ((data as { spots: unknown[] }).spots)
+      .map(normalizeSpotFromUnknown)
+      .filter(Boolean) as ColorScaleSpotForm[];
+  }
+  return [];
+}
+
+function spotsToColorScalePayload(spots: ColorScaleSpotForm[]): unknown | null {
+  const cleaned = spots
+    .filter((s) => s.value != null && Number.isFinite(s.value) && s.color.trim().length > 0)
+    .map((s) => ({
+      value: Number(s.value),
+      color: s.color.trim(),
+      ...(s.label.trim() ? { label: s.label.trim() } : {}),
+    }))
+    .sort((a, b) => a.value - b.value);
+  if (cleaned.length === 0) return null;
+  return { spots: cleaned };
+}
 
 type KitMetricDetail = {
   id: string;
@@ -87,7 +174,7 @@ type KitFormMetric = {
   metricKey: string;
   inputMode: 'numeric' | 'color_assist';
   helpCopy: string;
-  colorScaleJson: string;
+  colorSpots: ColorScaleSpotForm[];
 };
 
 type KitFormState = {
@@ -103,11 +190,17 @@ type KitFormState = {
   metrics: KitFormMetric[];
 };
 
+const DEFAULT_COLOR_SPOT: ColorScaleSpotForm = {
+  value: null,
+  color: '#64748b',
+  label: '',
+};
+
 const DEFAULT_KIT_FORM_METRIC: KitFormMetric = {
   metricKey: '',
   inputMode: 'numeric',
   helpCopy: '',
-  colorScaleJson: '',
+  colorSpots: [],
 };
 
 export default function WaterCareAdminPage() {
@@ -149,8 +242,10 @@ export default function WaterCareAdminPage() {
     metricKey: '',
     label: '',
     unit: '',
-    defaultMinValue: 0,
-    defaultMaxValue: 0,
+    rangeMin: 0,
+    rangeMax: 14,
+    defaultMinValue: 7,
+    defaultMaxValue: 7.6,
   });
 
   const [kitModalOpen, setKitModalOpen] = useState(false);
@@ -207,7 +302,25 @@ export default function WaterCareAdminPage() {
 
       if (profilesData.success) setProfiles(profilesData.data || []);
       if (mappingsData.success) setMappings(mappingsData.data || []);
-      if (metricsData.success) setWaterMetrics(metricsData.data || []);
+      if (metricsData.success) {
+        const raw = (metricsData.data || []) as Record<string, unknown>[];
+        setWaterMetrics(
+          raw.map((row) => {
+            const base: WaterMetricRow = {
+              id: String(row.id ?? ''),
+              metricKey: String(row.metricKey ?? row.metric_key ?? ''),
+              label: String(row.label ?? ''),
+              unit: String(row.unit ?? ''),
+              defaultMinValue: Number(row.defaultMinValue ?? row.default_min_value ?? 0),
+              defaultMaxValue: Number(row.defaultMaxValue ?? row.default_max_value ?? 0),
+              rangeMin: Number(row.rangeMin ?? row.range_min ?? NaN),
+              rangeMax: Number(row.rangeMax ?? row.range_max ?? NaN),
+            };
+            const { rangeMin, rangeMax } = coerceMetricRanges(base);
+            return { ...base, rangeMin, rangeMax };
+          })
+        );
+      }
       if (kitsData.success) setTestKits(kitsData.data || []);
       if (brandsData.success) setBrands((brandsData.data || []).map((row: OptionRow) => ({ id: row.id, name: row.name })));
       if (modelLinesData.success) setModelLines((modelLinesData.data || []).map((row: OptionRow) => ({ id: row.id, name: row.name })));
@@ -279,9 +392,23 @@ export default function WaterCareAdminPage() {
   }
 
   function updateMeasurement(index: number, field: keyof WaterCareMeasurement, value: string | number | boolean) {
-    const next = [...profileForm.measurements];
-    next[index] = { ...next[index], [field]: value };
-    setProfileForm({ ...profileForm, measurements: next });
+    setProfileForm((current) => {
+      const next = [...current.measurements];
+      const prev = next[index];
+      if ((field === 'minValue' || field === 'maxValue') && typeof value === 'number') {
+        const lib = metricsByKey.get(prev.metricKey);
+        if (lib) {
+          const { rangeMin, rangeMax } = coerceMetricRanges(lib);
+          const nextMin = field === 'minValue' ? value : prev.minValue;
+          const nextMax = field === 'maxValue' ? value : prev.maxValue;
+          const c = clampProfileIdealsToMetric(nextMin, nextMax, rangeMin, rangeMax);
+          next[index] = { ...prev, minValue: c.minValue, maxValue: c.maxValue };
+          return { ...current, measurements: next };
+        }
+      }
+      next[index] = { ...prev, [field]: value };
+      return { ...current, measurements: next };
+    });
   }
 
   function addMeasurement() {
@@ -311,13 +438,15 @@ export default function WaterCareAdminPage() {
       } else if (!lib) {
         next[index] = { ...prev, metricKey };
       } else {
+        const { rangeMin, rangeMax } = coerceMetricRanges(lib);
+        const ideals = clampProfileIdealsToMetric(lib.defaultMinValue, lib.defaultMaxValue, rangeMin, rangeMax);
         next[index] = {
           ...prev,
           metricKey: lib.metricKey,
           label: lib.label,
           unit: lib.unit,
-          minValue: lib.defaultMinValue,
-          maxValue: lib.defaultMaxValue,
+          minValue: ideals.minValue,
+          maxValue: ideals.maxValue,
         };
       }
       return { ...current, measurements: next };
@@ -327,12 +456,23 @@ export default function WaterCareAdminPage() {
   async function saveProfile() {
     setError(null);
     const measurements = profileForm.measurements
-      .map((measurement, index) => ({
-        ...measurement,
-        sortOrder: index,
-        minValue: Number(measurement.minValue),
-        maxValue: Number(measurement.maxValue),
-      }))
+      .map((measurement, index) => {
+        const lib = metricsByKey.get(measurement.metricKey);
+        let minValue = Number(measurement.minValue);
+        let maxValue = Number(measurement.maxValue);
+        if (lib) {
+          const { rangeMin, rangeMax } = coerceMetricRanges(lib);
+          const c = clampProfileIdealsToMetric(minValue, maxValue, rangeMin, rangeMax);
+          minValue = c.minValue;
+          maxValue = c.maxValue;
+        }
+        return {
+          ...measurement,
+          sortOrder: index,
+          minValue,
+          maxValue,
+        };
+      })
       .filter((measurement) => measurement.metricKey.trim().length > 0);
 
     if (measurements.length === 0) {
@@ -464,6 +604,8 @@ export default function WaterCareAdminPage() {
         body: JSON.stringify({
           label: row.label,
           unit: row.unit,
+          rangeMin: row.rangeMin,
+          rangeMax: row.rangeMax,
           defaultMinValue: row.defaultMinValue,
           defaultMaxValue: row.defaultMaxValue,
         }),
@@ -512,19 +654,12 @@ export default function WaterCareAdminPage() {
     setEditingKitId(kit.id);
     const metrics: KitFormMetric[] =
       kit.metrics && kit.metrics.length > 0
-        ? kit.metrics.map((m) => {
-            const cs = m.colorScaleJson;
-            let colorScaleJson = '';
-            if (cs != null && cs !== '') {
-              colorScaleJson = typeof cs === 'string' ? cs : JSON.stringify(cs, null, 2);
-            }
-            return {
-              metricKey: m.metricKey,
-              inputMode: m.inputMode === 'color_assist' ? 'color_assist' : 'numeric',
-              helpCopy: m.helpCopy || '',
-              colorScaleJson,
-            };
-          })
+        ? kit.metrics.map((m) => ({
+            metricKey: m.metricKey,
+            inputMode: m.inputMode === 'color_assist' ? 'color_assist' : 'numeric',
+            helpCopy: m.helpCopy || '',
+            colorSpots: parseColorScaleToSpots(m.colorScaleJson),
+          }))
         : [{ ...DEFAULT_KIT_FORM_METRIC }];
     setKitForm({
       slug: kit.slug,
@@ -563,6 +698,38 @@ export default function WaterCareAdminPage() {
     });
   }
 
+  function addKitColorSpot(metricIndex: number) {
+    setKitForm((k) => {
+      const next = [...k.metrics];
+      const row = next[metricIndex];
+      next[metricIndex] = { ...row, colorSpots: [...row.colorSpots, { ...DEFAULT_COLOR_SPOT }] };
+      return { ...k, metrics: next };
+    });
+  }
+
+  function removeKitColorSpot(metricIndex: number, spotIndex: number) {
+    setKitForm((k) => {
+      const next = [...k.metrics];
+      const row = next[metricIndex];
+      next[metricIndex] = {
+        ...row,
+        colorSpots: row.colorSpots.filter((_, j) => j !== spotIndex),
+      };
+      return { ...k, metrics: next };
+    });
+  }
+
+  function patchKitColorSpot(metricIndex: number, spotIndex: number, patch: Partial<ColorScaleSpotForm>) {
+    setKitForm((k) => {
+      const next = [...k.metrics];
+      const row = next[metricIndex];
+      const spots = [...row.colorSpots];
+      spots[spotIndex] = { ...spots[spotIndex], ...patch };
+      next[metricIndex] = { ...row, colorSpots: spots };
+      return { ...k, metrics: next };
+    });
+  }
+
   async function saveKit() {
     setError(null);
     const metricsPayload: Array<{
@@ -575,15 +742,20 @@ export default function WaterCareAdminPage() {
     for (let i = 0; i < kitForm.metrics.length; i++) {
       const m = kitForm.metrics[i];
       if (!m.metricKey.trim()) continue;
-      const raw = m.colorScaleJson.trim();
       let colorScaleJson: unknown = null;
-      if (raw) {
-        try {
-          colorScaleJson = JSON.parse(raw);
-        } catch {
-          setError('Color scale JSON is invalid for one of the metrics.');
-          return;
+      if (m.inputMode === 'color_assist') {
+        const lib = metricsByKey.get(m.metricKey.trim());
+        const { rangeMin, rangeMax } = lib ? coerceMetricRanges(lib) : { rangeMin: -Infinity, rangeMax: Infinity };
+        for (const spot of m.colorSpots) {
+          if (spot.value == null || !Number.isFinite(spot.value) || !spot.color.trim()) continue;
+          if (spot.value < rangeMin || spot.value > rangeMax) {
+            setError(
+              `Color step value ${spot.value} is outside the allowed metric range (${rangeMin}–${rangeMax}) for ${m.metricKey}.`
+            );
+            return;
+          }
         }
+        colorScaleJson = spotsToColorScalePayload(m.colorSpots);
       }
       metricsPayload.push({
         metricKey: m.metricKey.trim(),
@@ -647,6 +819,8 @@ export default function WaterCareAdminPage() {
           metricKey: metricAddForm.metricKey.trim(),
           label: metricAddForm.label.trim(),
           unit: metricAddForm.unit.trim(),
+          rangeMin: Number(metricAddForm.rangeMin),
+          rangeMax: Number(metricAddForm.rangeMax),
           defaultMinValue: Number(metricAddForm.defaultMinValue),
           defaultMaxValue: Number(metricAddForm.defaultMaxValue),
         }),
@@ -657,7 +831,15 @@ export default function WaterCareAdminPage() {
         return;
       }
       setMetricAddOpen(false);
-      setMetricAddForm({ metricKey: '', label: '', unit: '', defaultMinValue: 0, defaultMaxValue: 0 });
+      setMetricAddForm({
+        metricKey: '',
+        label: '',
+        unit: '',
+        rangeMin: 0,
+        rangeMax: 14,
+        defaultMinValue: 7,
+        defaultMaxValue: 7.6,
+      });
       await loadAll();
     } catch (err) {
       console.error(err);
@@ -687,7 +869,15 @@ export default function WaterCareAdminPage() {
           ) : wSection === 'metrics' ? (
             <Button
               onClick={() => {
-                setMetricAddForm({ metricKey: '', label: '', unit: '', defaultMinValue: 0, defaultMaxValue: 0 });
+                setMetricAddForm({
+                  metricKey: '',
+                  label: '',
+                  unit: '',
+                  rangeMin: 0,
+                  rangeMax: 14,
+                  defaultMinValue: 7,
+                  defaultMaxValue: 7.6,
+                });
                 setMetricAddOpen(true);
               }}
             >
@@ -724,46 +914,102 @@ export default function WaterCareAdminPage() {
             {waterMetrics.map((m) => (
               <div
                 key={m.id}
-                className="grid gap-2 md:grid-cols-6 items-end border border-gray-100 rounded-lg p-3"
+                className="grid gap-2 md:grid-cols-12 items-end border border-gray-100 rounded-lg p-3"
               >
-                <div className="text-xs text-gray-500 md:col-span-1 font-mono">{m.metricKey}</div>
-                <input
-                  className="rounded border border-gray-300 px-2 py-2 text-sm"
-                  value={m.label}
-                  onChange={(e) =>
-                    setWaterMetrics((prev) => prev.map((x) => (x.id === m.id ? { ...x, label: e.target.value } : x)))
-                  }
-                />
-                <input
-                  className="rounded border border-gray-300 px-2 py-2 text-sm"
-                  value={m.unit}
-                  onChange={(e) =>
-                    setWaterMetrics((prev) => prev.map((x) => (x.id === m.id ? { ...x, unit: e.target.value } : x)))
-                  }
-                />
-                <input
-                  type="number"
-                  className="rounded border border-gray-300 px-2 py-2 text-sm"
-                  value={m.defaultMinValue}
-                  onChange={(e) =>
-                    setWaterMetrics((prev) =>
-                      prev.map((x) => (x.id === m.id ? { ...x, defaultMinValue: Number(e.target.value) } : x))
-                    )
-                  }
-                />
-                <input
-                  type="number"
-                  className="rounded border border-gray-300 px-2 py-2 text-sm"
-                  value={m.defaultMaxValue}
-                  onChange={(e) =>
-                    setWaterMetrics((prev) =>
-                      prev.map((x) => (x.id === m.id ? { ...x, defaultMaxValue: Number(e.target.value) } : x))
-                    )
-                  }
-                />
-                <Button size="sm" onClick={() => void saveMetric(m)}>
-                  Save
-                </Button>
+                <div className="text-xs text-gray-500 md:col-span-2 font-mono break-all">{m.metricKey}</div>
+                <div className="md:col-span-2">
+                  <label className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                    Label
+                  </label>
+                  <input
+                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                    value={m.label}
+                    onChange={(e) =>
+                      setWaterMetrics((prev) => prev.map((x) => (x.id === m.id ? { ...x, label: e.target.value } : x)))
+                    }
+                  />
+                </div>
+                <div className="md:col-span-1">
+                  <label className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                    Unit
+                  </label>
+                  <input
+                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                    value={m.unit}
+                    onChange={(e) =>
+                      setWaterMetrics((prev) => prev.map((x) => (x.id === m.id ? { ...x, unit: e.target.value } : x)))
+                    }
+                  />
+                </div>
+                <div className="md:col-span-1">
+                  <label className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                    Scale min
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                    value={m.rangeMin}
+                    onChange={(e) =>
+                      setWaterMetrics((prev) =>
+                        prev.map((x) => (x.id === m.id ? { ...x, rangeMin: Number(e.target.value) } : x))
+                      )
+                    }
+                  />
+                </div>
+                <div className="md:col-span-1">
+                  <label className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                    Scale max
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                    value={m.rangeMax}
+                    onChange={(e) =>
+                      setWaterMetrics((prev) =>
+                        prev.map((x) => (x.id === m.id ? { ...x, rangeMax: Number(e.target.value) } : x))
+                      )
+                    }
+                  />
+                </div>
+                <div className="md:col-span-1">
+                  <label className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                    Default min
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                    value={m.defaultMinValue}
+                    onChange={(e) =>
+                      setWaterMetrics((prev) =>
+                        prev.map((x) => (x.id === m.id ? { ...x, defaultMinValue: Number(e.target.value) } : x))
+                      )
+                    }
+                  />
+                </div>
+                <div className="md:col-span-1">
+                  <label className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                    Default max
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                    value={m.defaultMaxValue}
+                    onChange={(e) =>
+                      setWaterMetrics((prev) =>
+                        prev.map((x) => (x.id === m.id ? { ...x, defaultMaxValue: Number(e.target.value) } : x))
+                      )
+                    }
+                  />
+                </div>
+                <div className="md:col-span-2 flex justify-end">
+                  <Button size="sm" onClick={() => void saveMetric(m)}>
+                    Save
+                  </Button>
+                </div>
               </div>
             ))}
             {waterMetrics.length === 0 ? <div className="text-sm text-gray-500">No metrics yet.</div> : null}
@@ -923,73 +1169,86 @@ export default function WaterCareAdminPage() {
             <p className="text-xs text-gray-500">
               Pick a library metric for each row. Label and unit come from the library; adjust ideal min/max for this profile.
             </p>
-            {profileForm.measurements.map((measurement, index) => (
-              <div key={`profile-m-${index}`} className="grid gap-3 rounded-lg border border-gray-200 p-3 md:grid-cols-6">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Metric</label>
-                  <select
-                    value={measurement.metricKey}
-                    onChange={(e) => selectProfileMetric(index, e.target.value)}
-                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm font-mono"
-                  >
-                    <option value="">Select metric…</option>
-                    {measurement.metricKey && !metricsByKey.has(measurement.metricKey) ? (
-                      <option value={measurement.metricKey}>
-                        {measurement.metricKey} (not in library — pick a metric or add it in Metric library)
-                      </option>
-                    ) : null}
-                    {sortedLibraryMetrics.map((m) => (
-                      <option key={m.id} value={m.metricKey}>
-                        {m.metricKey}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="md:col-span-1">
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Label</label>
-                  <div className="rounded border border-gray-100 bg-gray-50 px-2 py-2 text-sm text-gray-800">
-                    {measurement.label || '—'}
+            {profileForm.measurements.map((measurement, index) => {
+              const lib = metricsByKey.get(measurement.metricKey);
+              const bounds = lib ? coerceMetricRanges(lib) : null;
+              return (
+                <div key={`profile-m-${index}`} className="space-y-2 rounded-lg border border-gray-200 p-3">
+                  <div className="grid gap-3 md:grid-cols-6">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-600">Metric</label>
+                      <select
+                        value={measurement.metricKey}
+                        onChange={(e) => selectProfileMetric(index, e.target.value)}
+                        className="w-full rounded border border-gray-300 px-2 py-2 text-sm font-mono"
+                      >
+                        <option value="">Select metric…</option>
+                        {measurement.metricKey && !metricsByKey.has(measurement.metricKey) ? (
+                          <option value={measurement.metricKey}>
+                            {measurement.metricKey} (not in library — pick a metric or add it in Metric library)
+                          </option>
+                        ) : null}
+                        {sortedLibraryMetrics.map((m) => (
+                          <option key={m.id} value={m.metricKey}>
+                            {m.metricKey}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="md:col-span-1">
+                      <label className="mb-1 block text-xs font-medium text-gray-600">Label</label>
+                      <div className="rounded border border-gray-100 bg-gray-50 px-2 py-2 text-sm text-gray-800">
+                        {measurement.label || '—'}
+                      </div>
+                    </div>
+                    <div className="md:col-span-1">
+                      <label className="mb-1 block text-xs font-medium text-gray-600">Unit</label>
+                      <div className="rounded border border-gray-100 bg-gray-50 px-2 py-2 text-sm text-gray-800">
+                        {measurement.unit || '—'}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-600">Ideal min</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={measurement.minValue}
+                        onChange={(e) => updateMeasurement(index, 'minValue', Number(e.target.value))}
+                        className="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-600">Ideal max</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={measurement.maxValue}
+                        onChange={(e) => updateMeasurement(index, 'maxValue', Number(e.target.value))}
+                        className="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                      />
+                    </div>
+                    <div className="flex items-end gap-2 pb-1">
+                      <label className="flex items-center gap-2 text-xs text-gray-600">
+                        <input
+                          type="checkbox"
+                          checked={measurement.isEnabled}
+                          onChange={(e) => updateMeasurement(index, 'isEnabled', e.target.checked)}
+                        />
+                        Enabled
+                      </label>
+                      <button type="button" className="text-sm text-red-600" onClick={() => removeMeasurement(index)}>
+                        Remove
+                      </button>
+                    </div>
                   </div>
+                  {bounds ? (
+                    <p className="text-xs text-gray-500">
+                      Metric scale (ideals stay within): {bounds.rangeMin}–{bounds.rangeMax}
+                    </p>
+                  ) : null}
                 </div>
-                <div className="md:col-span-1">
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Unit</label>
-                  <div className="rounded border border-gray-100 bg-gray-50 px-2 py-2 text-sm text-gray-800">
-                    {measurement.unit || '—'}
-                  </div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Ideal min</label>
-                  <input
-                    type="number"
-                    value={measurement.minValue}
-                    onChange={(e) => updateMeasurement(index, 'minValue', Number(e.target.value))}
-                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Ideal max</label>
-                  <input
-                    type="number"
-                    value={measurement.maxValue}
-                    onChange={(e) => updateMeasurement(index, 'maxValue', Number(e.target.value))}
-                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm"
-                  />
-                </div>
-                <div className="flex items-end gap-2 pb-1">
-                  <label className="flex items-center gap-2 text-xs text-gray-600">
-                    <input
-                      type="checkbox"
-                      checked={measurement.isEnabled}
-                      onChange={(e) => updateMeasurement(index, 'isEnabled', e.target.checked)}
-                    />
-                    Enabled
-                  </label>
-                  <button type="button" className="text-sm text-red-600" onClick={() => removeMeasurement(index)}>
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setProfileModalOpen(false)}>Cancel</Button>
@@ -1114,9 +1373,33 @@ export default function WaterCareAdminPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Scale min</label>
+              <input
+                type="number"
+                step="any"
+                value={metricAddForm.rangeMin}
+                onChange={(e) => setMetricAddForm({ ...metricAddForm, rangeMin: Number(e.target.value) })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+              <p className="mt-1 text-xs text-gray-500">Hard min for readings and color steps.</p>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Scale max</label>
+              <input
+                type="number"
+                step="any"
+                value={metricAddForm.rangeMax}
+                onChange={(e) => setMetricAddForm({ ...metricAddForm, rangeMax: Number(e.target.value) })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Default min</label>
               <input
                 type="number"
+                step="any"
                 value={metricAddForm.defaultMinValue}
                 onChange={(e) =>
                   setMetricAddForm({ ...metricAddForm, defaultMinValue: Number(e.target.value) })
@@ -1128,6 +1411,7 @@ export default function WaterCareAdminPage() {
               <label className="mb-1 block text-sm font-medium text-gray-700">Default max</label>
               <input
                 type="number"
+                step="any"
                 value={metricAddForm.defaultMaxValue}
                 onChange={(e) =>
                   setMetricAddForm({ ...metricAddForm, defaultMaxValue: Number(e.target.value) })
@@ -1136,6 +1420,9 @@ export default function WaterCareAdminPage() {
               />
             </div>
           </div>
+          <p className="text-xs text-gray-500">
+            Require scale min ≤ default min ≤ default max ≤ scale max (same rule as the API).
+          </p>
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setMetricAddOpen(false)}>
               Cancel
@@ -1245,7 +1532,10 @@ export default function WaterCareAdminPage() {
               Each row maps to a canonical metric. Empty metric rows are ignored on save.
             </p>
             <div className="space-y-3">
-              {kitForm.metrics.map((row, index) => (
+              {kitForm.metrics.map((row, index) => {
+                const kitMetricLib = row.metricKey ? metricsByKey.get(row.metricKey) : undefined;
+                const kitBounds = kitMetricLib ? coerceMetricRanges(kitMetricLib) : null;
+                return (
                 <div key={`kit-m-${index}`} className="rounded-lg border border-gray-200 p-3 space-y-2">
                   <div className="grid gap-2 md:grid-cols-3">
                     <div>
@@ -1300,18 +1590,98 @@ export default function WaterCareAdminPage() {
                       className="w-full rounded border border-gray-300 px-2 py-2 text-sm"
                     />
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">Color scale JSON (optional)</label>
-                    <textarea
-                      value={row.colorScaleJson}
-                      onChange={(e) => updateKitMetricRow(index, { colorScaleJson: e.target.value })}
-                      rows={3}
-                      placeholder="{}"
-                      className="w-full rounded border border-gray-300 px-2 py-2 font-mono text-xs"
-                    />
-                  </div>
+                  {row.inputMode === 'color_assist' ? (
+                    <div className="rounded border border-dashed border-gray-200 bg-gray-50/80 p-3 space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="text-xs font-medium text-gray-700">Color scale points</div>
+                          <p className="text-xs text-gray-500">
+                            Comparator / strip readings: one row per color step (value on the metric scale).
+                          </p>
+                        </div>
+                        <Button type="button" size="sm" variant="secondary" onClick={() => addKitColorSpot(index)}>
+                          + Add color step
+                        </Button>
+                      </div>
+                      {kitBounds && row.metricKey ? (
+                        <p className="text-xs text-gray-600">
+                          Allowed values for <span className="font-mono">{row.metricKey}</span>:{' '}
+                          {kitBounds.rangeMin}–{kitBounds.rangeMax}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-amber-800">
+                          Pick a metric to validate step values against its scale min/max.
+                        </p>
+                      )}
+                      {row.colorSpots.length === 0 ? (
+                        <p className="text-xs text-gray-500">No steps yet — add one for each pad color on the kit.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {row.colorSpots.map((spot, si) => (
+                            <div
+                              key={`ks-${index}-${si}`}
+                              className="flex flex-wrap items-end gap-2 rounded border border-gray-200 bg-white p-2"
+                            >
+                              <div className="min-w-[6rem] flex-1">
+                                <label className="mb-0.5 block text-[10px] font-medium text-gray-500">Value</label>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  value={spot.value == null || !Number.isFinite(spot.value) ? '' : spot.value}
+                                  onChange={(e) => {
+                                    const v = e.target.value.trim();
+                                    patchKitColorSpot(index, si, {
+                                      value: v === '' ? null : Number(v),
+                                    });
+                                  }}
+                                  className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+                                />
+                              </div>
+                              <div className="flex items-end gap-2">
+                                <label className="mb-0.5 block text-[10px] font-medium text-gray-500 sr-only">
+                                  Color
+                                </label>
+                                <input
+                                  type="color"
+                                  value={/^#[0-9A-Fa-f]{6}$/.test(spot.color) ? spot.color : '#64748b'}
+                                  onChange={(e) => patchKitColorSpot(index, si, { color: e.target.value })}
+                                  className="h-9 w-12 cursor-pointer rounded border border-gray-300 bg-white p-0.5"
+                                  title="Color"
+                                />
+                                <input
+                                  value={spot.color}
+                                  onChange={(e) => patchKitColorSpot(index, si, { color: e.target.value })}
+                                  placeholder="#hex"
+                                  className="w-28 rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                                />
+                              </div>
+                              <div className="min-w-[8rem] flex-[2]">
+                                <label className="mb-0.5 block text-[10px] font-medium text-gray-500">
+                                  Label (optional)
+                                </label>
+                                <input
+                                  value={spot.label}
+                                  onChange={(e) => patchKitColorSpot(index, si, { label: e.target.value })}
+                                  placeholder="e.g. Low / OK"
+                                  className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                className="mb-0.5 text-sm text-red-600"
+                                onClick={() => removeKitColorSpot(index, si)}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
