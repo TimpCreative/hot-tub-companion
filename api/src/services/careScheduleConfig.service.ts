@@ -5,7 +5,6 @@ export type CareScheduleEventOverride = {
   enabled?: boolean;
   intervalDays?: number;
   notificationDaysBefore?: number;
-  phase?: number;
 };
 
 export type CareScheduleConfigDTO = {
@@ -35,16 +34,13 @@ export function normalizeCareScheduleConfig(raw: unknown): CareScheduleConfigDTO
       if (typeof o.notificationDaysBefore === 'number' && Number.isFinite(o.notificationDaysBefore)) {
         entry.notificationDaysBefore = Math.min(30, Math.max(0, Math.trunc(o.notificationDaysBefore)));
       }
-      if (typeof o.phase === 'number' && Number.isFinite(o.phase)) {
-        entry.phase = Math.min(365, Math.max(0, Math.trunc(o.phase)));
-      }
       if (Object.keys(entry).length > 0) events[k.slice(0, 50)] = entry;
     }
   }
   return { version, events };
 }
 
-/** Merge order: tenant override → platform catalog defaults (WC-7b). */
+/** Merge order: retailer care_schedule_config → platform catalog defaults (WC-7b). */
 export function getEffectiveRecurringCatalog(careSchedule: CareScheduleConfigDTO): MaintenanceCatalogRecurring[] {
   const out: MaintenanceCatalogRecurring[] = [];
   for (const base of MAINTENANCE_RECURRING_CATALOG) {
@@ -53,7 +49,6 @@ export function getEffectiveRecurringCatalog(careSchedule: CareScheduleConfigDTO
     out.push({
       eventType: base.eventType,
       intervalDays: o?.intervalDays ?? base.intervalDays,
-      phase: o?.phase ?? base.phase,
       notificationDaysBefore: o?.notificationDaysBefore ?? base.notificationDaysBefore,
       linkedProductCategory: base.linkedProductCategory,
     });

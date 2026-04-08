@@ -5,9 +5,11 @@
 
 import { db } from '../config/database';
 import { getEffectiveRecurringCatalog, normalizeCareScheduleConfig } from './careScheduleConfig.service';
+import { planFilterMaintenanceEvents, type LastCompletedMap } from './filterMaintenancePlanner';
+import { addUtcDays, diffUtcDays, formatDateKey, utcDateOnly } from './maintenanceDateUtils';
 import {
+  FILTER_CHAIN_EVENT_TYPES,
   MAINTENANCE_EVENT_COPY,
-  MAINTENANCE_RECURRING_CATALOG,
   type MaintenanceCatalogRecurring,
 } from './maintenanceCatalog';
 
@@ -22,27 +24,7 @@ export type SpaProfileScheduleRow = {
   created_at: Date | string;
 };
 
-function utcDateOnly(d: Date | string): Date {
-  const x = typeof d === 'string' ? new Date(d) : d;
-  return new Date(Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate()));
-}
-
-function formatDateKey(d: Date): string {
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function diffUtcDays(anchor: Date, d: Date): number {
-  const a = Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate());
-  const b = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-  return Math.floor((b - a) / 86400000);
-}
-
-function addUtcDays(d: Date, n: number): Date {
-  return new Date(d.getTime() + n * 86400000);
-}
+export { computeNextRecurringDueDate, snapToNextUsageMonthStart } from './maintenanceDateUtils';
 
 function utcStartOfMonthFromDate(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -74,30 +56,6 @@ export function parseUsageMonths(raw: number[] | string | null | undefined): num
 function parseWinterStrategy(raw: string | null | undefined): WinterStrategy {
   if (raw === 'shutdown') return 'shutdown';
   return 'operate';
-}
-
-/** First calendar day on or after `from` that falls in an in-use month (UTC). */
-export function snapToNextUsageMonthStart(from: Date, usageMonths: number[]): Date {
-  const set = new Set(usageMonths);
-  if (set.size === 0) return utcDateOnly(from);
-  let cur = utcDateOnly(from);
-  for (let i = 0; i < 400; i++) {
-    if (set.has(cur.getUTCMonth() + 1)) return cur;
-    const y = cur.getUTCFullYear();
-    const m = cur.getUTCMonth();
-    cur = new Date(Date.UTC(y, m + 1, 1));
-  }
-  return utcDateOnly(from);
-}
-
-/** Next recurring due: completed date + interval, snapped into an in-use month. */
-export function computeNextRecurringDueDate(
-  completedAtUtc: Date,
-  intervalDays: number,
-  usageMonths: number[]
-): Date {
-  const base = addUtcDays(utcDateOnly(completedAtUtc), intervalDays);
-  return snapToNextUsageMonthStart(base, usageMonths);
 }
 
 function buildHorizon(now: Date = new Date()): { horizonStart: Date; horizonEnd: Date } {
@@ -149,7 +107,9 @@ function collectTransitionEvents(
   return out;
 }
 
-function collectRecurringEventRows(
+const FILTER_TYPE_SET = new Set<string>(FILTER_CHAIN_EVENT_TYPES);
+
+function collectSimpleRecurringEventRows(
   horizonStart: Date,
   horizonEnd: Date,
   usageMonths: number[],
@@ -159,6 +119,7 @@ function collectRecurringEventRows(
 ): Array<Record<string, unknown>> {
   const usage = new Set(usageMonths);
   const rows: Array<Record<string, unknown>> = [];
+  const simpleCatalog = recurringCatalog.filter((s) => !FILTER_TYPE_SET.has(s.eventType));
 
   for (let d = new Date(horizonStart.getTime()); d <= horizonEnd; d = addUtcDays(d, 1)) {
     const month = d.getUTCMonth() + 1;
@@ -167,8 +128,8 @@ function collectRecurringEventRows(
     const dayIndex = diffUtcDays(anchor, d);
     if (dayIndex < 0) continue;
 
-    for (const spec of recurringCatalog) {
-      if ((dayIndex - spec.phase) % spec.intervalDays !== 0 || dayIndex < spec.phase) continue;
+    for (const spec of simpleCatalog) {
+      if (dayIndex % spec.intervalDays !== 0) continue;
 
       const copy = MAINTENANCE_EVENT_COPY[spec.eventType];
       if (!copy) continue;
@@ -216,6 +177,60 @@ function collectRecurringEventRows(
   return rows;
 }
 
+function filterRowsFromPlanner(
+  spa: SpaProfileScheduleRow,
+  planned: ReturnType<typeof planFilterMaintenanceEvents>
+): Array<Record<string, unknown>> {
+  return planned.map((p) => {
+    const copy = MAINTENANCE_EVENT_COPY[p.eventType];
+    return {
+      spa_profile_id: spa.id,
+      user_id: spa.user_id,
+      tenant_id: spa.tenant_id,
+      event_type: p.eventType,
+      title: copy?.title ?? p.eventType,
+      description: copy?.description ?? '',
+      due_date: formatDateKey(p.due),
+      completed_at: null,
+      is_recurring: true,
+      recurrence_interval_days: p.intervalDays,
+      notification_sent: false,
+      notification_days_before: p.notificationDaysBefore,
+      linked_product_category: p.linkedProductCategory,
+      source: 'auto',
+    };
+  });
+}
+
+async function loadFilterLastCompletions(spaProfileId: string): Promise<LastCompletedMap> {
+  const rows = (await db('maintenance_events')
+    .where({ spa_profile_id: spaProfileId })
+    .whereIn('event_type', [...FILTER_CHAIN_EVENT_TYPES])
+    .whereNotNull('completed_at')
+    .groupBy('event_type')
+    .select('event_type', db.raw('max(completed_at) as last_completed'))) as {
+    event_type: string;
+    last_completed: Date | string;
+  }[];
+
+  const map: LastCompletedMap = {};
+  for (const r of rows) {
+    if (r.event_type === 'filter_rinse' || r.event_type === 'filter_deep_clean' || r.event_type === 'filter_replace') {
+      map[r.event_type] = new Date(r.last_completed);
+    }
+  }
+  return map;
+}
+
+async function hasOverdueIncompleteReplace(spaProfileId: string, todayKey: string): Promise<boolean> {
+  const row = await db('maintenance_events')
+    .where({ spa_profile_id: spaProfileId, event_type: 'filter_replace' })
+    .whereNull('completed_at')
+    .where('due_date', '<', todayKey)
+    .first();
+  return row != null;
+}
+
 export async function regenerateAutoEventsForSpaProfile(spaProfileId: string): Promise<void> {
   const spa = (await db('spa_profiles').where({ id: spaProfileId }).first()) as SpaProfileScheduleRow | undefined;
   if (!spa) return;
@@ -231,6 +246,47 @@ export async function regenerateAutoEventsForSpaProfile(spaProfileId: string): P
   const todayKey = formatDateKey(utcDateOnly(new Date()));
   const anchor = utcDateOnly(spa.created_at);
 
+  const lastCompleted = await loadFilterLastCompletions(spaProfileId);
+  const overdueReplace = await hasOverdueIncompleteReplace(spaProfileId, todayKey);
+  const applyPreReplaceRinseSuppression = !overdueReplace;
+
+  const rinseSpec = recurringCatalog.find((e) => e.eventType === 'filter_rinse');
+  const deepSpec = recurringCatalog.find((e) => e.eventType === 'filter_deep_clean');
+  const replaceSpec = recurringCatalog.find((e) => e.eventType === 'filter_replace');
+
+  const plannedFilter =
+    rinseSpec || deepSpec || replaceSpec
+      ? planFilterMaintenanceEvents({
+          horizonStart,
+          horizonEnd,
+          usageMonths,
+          spaCreatedAt: anchor,
+          lastCompleted,
+          rinse: rinseSpec
+            ? {
+                intervalDays: rinseSpec.intervalDays,
+                notificationDaysBefore: rinseSpec.notificationDaysBefore,
+                linkedProductCategory: rinseSpec.linkedProductCategory,
+              }
+            : undefined,
+          deep: deepSpec
+            ? {
+                intervalDays: deepSpec.intervalDays,
+                notificationDaysBefore: deepSpec.notificationDaysBefore,
+                linkedProductCategory: deepSpec.linkedProductCategory,
+              }
+            : undefined,
+          replace: replaceSpec
+            ? {
+                intervalDays: replaceSpec.intervalDays,
+                notificationDaysBefore: replaceSpec.notificationDaysBefore,
+                linkedProductCategory: replaceSpec.linkedProductCategory,
+              }
+            : undefined,
+          applyPreReplaceRinseSuppression,
+        })
+      : [];
+
   await db.transaction(async (trx) => {
     await trx('maintenance_events')
       .where({ spa_profile_id: spaProfileId, source: 'auto' })
@@ -238,19 +294,26 @@ export async function regenerateAutoEventsForSpaProfile(spaProfileId: string): P
       .where('due_date', '>=', todayKey)
       .del();
 
-    const rows = collectRecurringEventRows(horizonStart, horizonEnd, usageMonths, anchor, spa, recurringCatalog).map((r) => ({
+    const simpleRows = collectSimpleRecurringEventRows(horizonStart, horizonEnd, usageMonths, anchor, spa, recurringCatalog);
+    const filterRows = filterRowsFromPlanner(spa, plannedFilter);
+
+    const seen = new Set<string>();
+    const merged: Array<Record<string, unknown>> = [];
+    for (const r of [...filterRows, ...simpleRows]) {
+      const key = `${r.event_type as string}|${r.due_date as string}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(r);
+    }
+
+    const stamped = merged.map((r) => ({
       ...r,
       created_at: trx.fn.now(),
       updated_at: trx.fn.now(),
     }));
 
-    if (rows.length > 0) {
-      await trx('maintenance_events').insert(rows);
+    if (stamped.length > 0) {
+      await trx('maintenance_events').insert(stamped);
     }
   });
-}
-
-export function getCatalogIntervalForEventType(eventType: string): number | null {
-  const spec = MAINTENANCE_RECURRING_CATALOG.find((r) => r.eventType === eventType);
-  return spec ? spec.intervalDays : null;
 }

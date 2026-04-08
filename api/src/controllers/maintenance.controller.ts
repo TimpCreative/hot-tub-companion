@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../config/database';
 import { success, error } from '../utils/response';
 import * as maintenanceSchedule from '../services/maintenanceSchedule.service';
+import { FILTER_CHAIN_EVENT_TYPES } from '../services/maintenanceCatalog';
 
 function requireCustomerUser(req: Request, res: Response): string | null {
   if ((req as any).userIsTenantAdminOverride) {
@@ -166,6 +167,9 @@ export async function completeMaintenance(req: Request, res: Response): Promise<
   const usageMonths = maintenanceSchedule.parseUsageMonths(spa.usage_months as number[] | string | null);
 
   const now = new Date();
+  const eventTypeStr = String(event.event_type ?? '');
+  const isFilterChain = (FILTER_CHAIN_EVENT_TYPES as readonly string[]).includes(eventTypeStr);
+
   await db.transaction(async (trx) => {
     await trx('maintenance_events').where({ id }).update({
       completed_at: now,
@@ -175,7 +179,7 @@ export async function completeMaintenance(req: Request, res: Response): Promise<
     const isRecurring = event.is_recurring === true;
     const interval =
       typeof event.recurrence_interval_days === 'number' ? event.recurrence_interval_days : null;
-    if (isRecurring && interval && interval > 0) {
+    if (isRecurring && interval && interval > 0 && !isFilterChain) {
       const nextDue = maintenanceSchedule.computeNextRecurringDueDate(now, interval, usageMonths);
       const nextKey = `${nextDue.getUTCFullYear()}-${String(nextDue.getUTCMonth() + 1).padStart(2, '0')}-${String(nextDue.getUTCDate()).padStart(2, '0')}`;
 
@@ -207,6 +211,12 @@ export async function completeMaintenance(req: Request, res: Response): Promise<
         .update({ ...trackingPatch, updated_at: trx.fn.now() });
     }
   });
+
+  if (isFilterChain) {
+    void maintenanceSchedule.regenerateAutoEventsForSpaProfile(event.spa_profile_id as string).catch((err) => {
+      console.error('regenerateAutoEventsForSpaProfile after filter complete', err);
+    });
+  }
 
   const updated = await db('maintenance_events').where({ id }).first();
   success(res, { event: mapEvent(updated as Record<string, unknown>) }, 'Marked complete');

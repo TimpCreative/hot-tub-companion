@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { diffUtcDays } from '../services/maintenanceDateUtils';
 import {
   parseUsageMonths,
   computeNextRecurringDueDate,
@@ -48,5 +49,15 @@ describe('computeNextRecurringDueDate', () => {
     assert.equal(out.getUTCFullYear(), 2026);
     assert.equal(out.getUTCMonth(), 5);
     assert.equal(out.getUTCDate(), 1);
+  });
+});
+
+describe('simple recurring alignment (no phase)', () => {
+  it('fires when dayIndex is divisible by intervalDays from anchor', () => {
+    const anchor = new Date(Date.UTC(2026, 0, 1));
+    const d = new Date(Date.UTC(2026, 0, 15));
+    const dayIndex = diffUtcDays(anchor, d);
+    assert.equal(dayIndex, 14);
+    assert.equal(dayIndex % 14, 0);
   });
 });

@@ -69,7 +69,6 @@ type CareScheduleEventOverride = {
   enabled?: boolean;
   intervalDays?: number;
   notificationDaysBefore?: number;
-  phase?: number;
 };
 
 interface CareScheduleConfig {
@@ -81,13 +80,12 @@ interface CareScheduleReference {
   recurring: Array<{
     eventType: string;
     intervalDays: number;
-    phase: number;
     notificationDaysBefore: number;
     title: string;
     description: string;
   }>;
   seasonal: { title: string; description: string };
-  phaseNote: string;
+  scheduleNote: string;
 }
 
 interface DealerContact {
@@ -715,7 +713,7 @@ export default function AdminAppSetupPage() {
             tab === 'careSchedule' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'
           }`}
         >
-          Care schedule
+          Care Schedule
         </button>
         <button
           type="button"
@@ -1942,7 +1940,7 @@ export default function AdminAppSetupPage() {
 
       {tab === 'careSchedule' && !careScheduleReference && (
         <div className="card rounded-lg p-6 text-sm text-gray-600">
-          Care schedule reference is unavailable. Update the API and refresh.
+          Care Schedule reference is unavailable. Update the API and refresh.
         </div>
       )}
 
@@ -1950,14 +1948,13 @@ export default function AdminAppSetupPage() {
         <div className="space-y-6">
           <div className="card rounded-lg p-6 space-y-4">
             <h3 className="text-sm font-semibold text-gray-900">Auto maintenance reference</h3>
-            <p className="text-xs text-gray-500">{careScheduleReference.phaseNote}</p>
+            <p className="text-xs text-gray-500">{careScheduleReference.scheduleNote}</p>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-gray-200">
                     <th className="py-2 pr-4 font-medium text-gray-700">Event</th>
                     <th className="py-2 pr-4 font-medium text-gray-700">Interval (days)</th>
-                    <th className="py-2 pr-4 font-medium text-gray-700">Phase</th>
                     <th className="py-2 pr-4 font-medium text-gray-700">Notify (days before)</th>
                   </tr>
                 </thead>
@@ -1969,7 +1966,6 @@ export default function AdminAppSetupPage() {
                         <div className="text-gray-500">{row.description}</div>
                       </td>
                       <td className="py-2 pr-4">{row.intervalDays}</td>
-                      <td className="py-2 pr-4">{row.phase}</td>
                       <td className="py-2 pr-4">{row.notificationDaysBefore}</td>
                     </tr>
                   ))}
@@ -1983,7 +1979,7 @@ export default function AdminAppSetupPage() {
           </div>
 
           <div className="card rounded-lg p-6 space-y-4">
-            <h3 className="text-sm font-semibold text-gray-900">Tenant overrides</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Retailer override</h3>
             <p className="text-xs text-gray-500">
               Merge order: retailer override → spa usage months / winter strategy → platform defaults. Disabled types are
               not auto-generated for your customers.
@@ -2062,7 +2058,7 @@ export default function AdminAppSetupPage() {
               })}
             </div>
             <Button type="button" loading={saving} onClick={() => void saveCareSchedule()}>
-              Save care schedule
+              Save Care Schedule
             </Button>
           </div>
 
