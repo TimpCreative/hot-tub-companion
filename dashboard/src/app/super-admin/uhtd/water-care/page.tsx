@@ -975,7 +975,7 @@ export default function WaterCareAdminPage() {
                 </div>
                 <div className="md:col-span-1">
                   <label className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500">
-                    Default min
+                    Default ideal min
                   </label>
                   <input
                     type="number"
@@ -991,7 +991,7 @@ export default function WaterCareAdminPage() {
                 </div>
                 <div className="md:col-span-1">
                   <label className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500">
-                    Default max
+                    Default ideal max
                   </label>
                   <input
                     type="number"
@@ -1324,13 +1324,23 @@ export default function WaterCareAdminPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+            <label
+              className="block text-sm font-medium text-gray-700 mb-1 cursor-help"
+              title="Same scope level and same sanitation rule? The mapping with the larger priority number is chosen. Zero is fine for most rules; use 10, 20, … only when you need a clear order. Any whole number is allowed—there is no cap."
+            >
+              Priority
+            </label>
             <input
               type="number"
+              step={1}
               value={mappingForm.priority}
               onChange={(e) => setMappingForm({ ...mappingForm, priority: Number(e.target.value) })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
+            <p className="mt-1 text-xs text-gray-500">
+              Tie-breaker when two mappings match equally:{' '}
+              <span className="font-medium text-gray-700">higher number wins</span>. Start at 0.
+            </p>
           </div>
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setMappingModalOpen(false)}>Cancel</Button>
@@ -1349,7 +1359,12 @@ export default function WaterCareAdminPage() {
             <label className="mb-1 block text-sm font-medium text-gray-700">Metric key</label>
             <input
               value={metricAddForm.metricKey}
-              onChange={(e) => setMetricAddForm({ ...metricAddForm, metricKey: e.target.value })}
+              onChange={(e) =>
+                setMetricAddForm({
+                  ...metricAddForm,
+                  metricKey: e.target.value.replace(/\s+/g, '_'),
+                })
+              }
               placeholder="e.g. ph, free_chlorine"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
             />
@@ -1360,6 +1375,7 @@ export default function WaterCareAdminPage() {
             <input
               value={metricAddForm.label}
               onChange={(e) => setMetricAddForm({ ...metricAddForm, label: e.target.value })}
+              placeholder="e.g. pH, Free chlorine"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
           </div>
@@ -1368,12 +1384,18 @@ export default function WaterCareAdminPage() {
             <input
               value={metricAddForm.unit}
               onChange={(e) => setMetricAddForm({ ...metricAddForm, unit: e.target.value })}
+              placeholder="e.g. ppm, pH"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Scale min</label>
+              <label
+                className="mb-1 block text-sm font-medium text-gray-700 cursor-help"
+                title="Lowest value this metric can take anywhere in the app (typed readings, test-kit color steps, and profile ideals must stay inside scale min → scale max)."
+              >
+                Scale min
+              </label>
               <input
                 type="number"
                 step="any"
@@ -1381,10 +1403,14 @@ export default function WaterCareAdminPage() {
                 onChange={(e) => setMetricAddForm({ ...metricAddForm, rangeMin: Number(e.target.value) })}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               />
-              <p className="mt-1 text-xs text-gray-500">Hard min for readings and color steps.</p>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Scale max</label>
+              <label
+                className="mb-1 block text-sm font-medium text-gray-700 cursor-help"
+                title="Highest value this metric can take anywhere in the app (typed readings, test-kit color steps, and profile ideals must stay inside scale min → scale max)."
+              >
+                Scale max
+              </label>
               <input
                 type="number"
                 step="any"
@@ -1394,9 +1420,17 @@ export default function WaterCareAdminPage() {
               />
             </div>
           </div>
+          <p className="text-xs text-gray-500">
+            <span
+              className="cursor-help border-b border-dotted border-gray-400"
+              title="Scale min and scale max are the outer limits for this metric. Default ideal min and max must fall between them, with ideal min ≤ ideal max. The API rejects saves that break that order."
+            >
+              How scale and defaults relate
+            </span>
+          </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Default min</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Default ideal min</label>
               <input
                 type="number"
                 step="any"
@@ -1408,7 +1442,7 @@ export default function WaterCareAdminPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Default max</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Default ideal max</label>
               <input
                 type="number"
                 step="any"
@@ -1420,9 +1454,6 @@ export default function WaterCareAdminPage() {
               />
             </div>
           </div>
-          <p className="text-xs text-gray-500">
-            Require scale min ≤ default min ≤ default max ≤ scale max (same rule as the API).
-          </p>
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setMetricAddOpen(false)}>
               Cancel
