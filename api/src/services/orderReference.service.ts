@@ -296,10 +296,11 @@ export async function syncOrderReferencesFromShopifyForUser(
   return out;
 }
 
-function normalizeConfirmation(v: unknown): string {
+function normalizeLookupValue(v: unknown): string {
   return String(v || '')
     .trim()
     .toLowerCase()
+    .replace(/^#+/, '')
     .replace(/\s+/g, '');
 }
 
@@ -311,11 +312,11 @@ export async function claimOrderFromShopifyByEmailAndConfirmation(
   tenantId: string,
   userId: string,
   orderEmail: string,
-  confirmationNumber: string
+  confirmationOrOrderNumber: string
 ): Promise<ManualClaimOrderResult> {
   const normalizedEmail = String(orderEmail || '').trim().toLowerCase();
-  const normalizedConfirmation = normalizeConfirmation(confirmationNumber);
-  if (!normalizedEmail || !normalizedConfirmation) {
+  const normalizedLookup = normalizeLookupValue(confirmationOrOrderNumber);
+  if (!normalizedEmail || !normalizedLookup) {
     return { ok: false, reason: 'NOT_FOUND' };
   }
 
@@ -329,17 +330,19 @@ export async function claimOrderFromShopifyByEmailAndConfirmation(
       const rawId = order.id as string | number | undefined;
       if (rawId == null) continue;
       const shopifyOrderId = String(rawId);
-      const orderConf = normalizeConfirmation((order as Record<string, unknown>).confirmation_number);
-      if (!orderConf) continue;
-      if (orderConf !== normalizedConfirmation) continue;
+      const o = order as Record<string, unknown>;
+      const candidates = [
+        normalizeLookupValue(o.confirmation_number),
+        normalizeLookupValue(o.name),
+        normalizeLookupValue(o.order_number),
+      ].filter(Boolean);
+      if (!candidates.includes(normalizedLookup)) continue;
 
-      const emailRaw = (order as Record<string, unknown>).email;
+      const emailRaw = o.email;
       const customerEmail =
         typeof emailRaw === 'string' && emailRaw.trim() ? emailRaw.trim().toLowerCase() : normalizedEmail;
       const orderNumber =
-        typeof (order as Record<string, unknown>).order_number === 'number'
-          ? ((order as Record<string, unknown>).order_number as number)
-          : null;
+        typeof o.order_number === 'number' ? (o.order_number as number) : null;
 
       await upsertOrderReference({
         tenantId,

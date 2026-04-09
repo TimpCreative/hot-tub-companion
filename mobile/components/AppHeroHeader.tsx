@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ComponentProps, type ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { shiftHueSaturateHex } from '../lib/colorUtils';
 import { useTheme } from '../theme/ThemeProvider';
@@ -14,9 +14,11 @@ interface AppHeroHeaderProps {
   icon?: IoniconName;
   /** e.g. cart icon with badge (shop header). */
   trailing?: ReactNode;
+  /** When set, shows Back above the title row (for screens with `headerShown: false`). */
+  onBackPress?: () => void;
 }
 
-export function AppHeroHeader({ title, subtitle, icon, trailing }: AppHeroHeaderProps) {
+export function AppHeroHeader({ title, subtitle, icon, trailing, onBackPress }: AppHeroHeaderProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
 
@@ -30,6 +32,18 @@ export function AppHeroHeader({ title, subtitle, icon, trailing }: AppHeroHeader
       end={{ x: 1, y: 1 }}
       style={[styles.hero, { paddingTop: insets.top + 20 }]}
     >
+      {onBackPress ? (
+        <Pressable
+          onPress={onBackPress}
+          hitSlop={12}
+          style={({ pressed }) => [styles.backRow, { opacity: pressed ? 0.85 : 1 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+        >
+          <Ionicons name="chevron-back" size={22} color="#fff" />
+          <Text style={styles.backLabel}>Back</Text>
+        </Pressable>
+      ) : null}
       {icon || title || trailing ? (
         <View style={styles.titleRow}>
           {icon ? <Ionicons name={icon} size={28} color="#fff" /> : null}
@@ -53,6 +67,18 @@ const styles = StyleSheet.create({
     marginHorizontal: -24,
     marginTop: -24,
     marginBottom: 18,
+  },
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+  backLabel: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '600',
   },
   titleRow: {
     flexDirection: 'row',

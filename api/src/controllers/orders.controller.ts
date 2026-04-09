@@ -214,7 +214,7 @@ export async function claimMyOrderByEmailAndConfirmation(req: Request, res: Resp
   const confirmationNumber =
     typeof body.confirmationNumber === 'string' ? body.confirmationNumber.trim() : '';
   if (!orderEmail || !confirmationNumber) {
-    error(res, 'VALIDATION_ERROR', 'orderEmail and confirmationNumber are required', 400);
+    error(res, 'VALIDATION_ERROR', 'orderEmail and confirmation/order number are required', 400);
     return;
   }
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -231,7 +231,7 @@ export async function claimMyOrderByEmailAndConfirmation(req: Request, res: Resp
       confirmationNumber
     );
     if (!result.ok) {
-      error(res, 'NOT_FOUND', 'Order not found for that email and confirmation number', 404);
+      error(res, 'NOT_FOUND', 'Order not found for that email and confirmation/order number', 404);
       return;
     }
     success(res, result);

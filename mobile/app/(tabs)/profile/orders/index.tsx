@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   TextInput,
   Pressable,
   RefreshControl,
@@ -49,6 +50,7 @@ export default function OrdersListScreen() {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [claimModalOpen, setClaimModalOpen] = useState(false);
   const [claimEmail, setClaimEmail] = useState('');
   const [claimConfirmation, setClaimConfirmation] = useState('');
 
@@ -121,6 +123,7 @@ export default function OrdersListScreen() {
     try {
       const claimed = await claimMyOrderByEmailAndConfirmation(orderEmail, confirmationNumber);
       setClaimConfirmation('');
+      setClaimModalOpen(false);
       Alert.alert('Order loaded', 'We found your order and added it to your history.');
       await load(1, false);
       if (claimed.orderReferenceId) {
@@ -189,20 +192,18 @@ export default function OrdersListScreen() {
   }
 
   const listHeader = (
-    <View style={{ paddingBottom: 8 }}>
-      <Text style={[typography.caption, { color: colors.textSecondary, lineHeight: 18, marginBottom: 10 }]}>
-        Missing older orders? We match your app email to Shopify. Sync pulls past orders from the store.
-      </Text>
+    <View style={{ paddingBottom: 12, gap: 10 }}>
       <Pressable
         onPress={() => void onSyncFromStore()}
         disabled={syncing || loading}
         style={({ pressed }) => ({
-          alignSelf: 'flex-start',
           paddingVertical: 12,
           paddingHorizontal: 16,
           borderRadius: 10,
           borderWidth: 1,
           borderColor: colors.primary,
+          alignItems: 'center',
+          justifyContent: 'center',
           opacity: pressed || syncing ? 0.75 : 1,
         })}
       >
@@ -212,77 +213,108 @@ export default function OrdersListScreen() {
           <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 15 }}>Sync from store</Text>
         )}
       </Pressable>
-      <View
-        style={{
-          marginTop: 14,
+      <Pressable
+        onPress={() => setClaimModalOpen(true)}
+        disabled={loading}
+        style={({ pressed }) => ({
+          paddingVertical: 12,
+          paddingHorizontal: 16,
+          borderRadius: 10,
           borderWidth: 1,
           borderColor: colors.border ?? '#e5e7eb',
-          borderRadius: 12,
-          padding: 12,
-        }}
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.surface,
+          opacity: pressed ? 0.8 : 1,
+        })}
       >
-        <Text style={[typography.body, { color: colors.text, fontWeight: '700' }]}>
-          Load a specific order
+        <Text style={{ color: colors.text, fontWeight: '600', fontSize: 15 }}>Load specific order</Text>
+      </Pressable>
+      <Modal visible={claimModalOpen} transparent animationType="fade" onRequestClose={() => setClaimModalOpen(false)}>
+        <View style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: 'rgba(0,0,0,0.45)' }}>
+          <View style={{ borderRadius: 14, padding: 14, backgroundColor: colors.contentBackground }}>
+            <Text style={[typography.body, { color: colors.text, fontWeight: '700' }]}>Load a specific order</Text>
+            <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 4, lineHeight: 18 }]}>
+              Enter the order email and confirmation or order number from your checkout email.
+            </Text>
+            <TextInput
+              value={claimEmail}
+              onChangeText={setClaimEmail}
+              placeholder="Order email"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              style={{
+                marginTop: 10,
+                borderWidth: 1,
+                borderColor: colors.border ?? '#e5e7eb',
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                color: colors.text,
+                backgroundColor: colors.surface,
+              }}
+              placeholderTextColor={colors.textMuted}
+            />
+            <TextInput
+              value={claimConfirmation}
+              onChangeText={setClaimConfirmation}
+              placeholder="Confirmation or Order number"
+              autoCapitalize="characters"
+              style={{
+                marginTop: 8,
+                borderWidth: 1,
+                borderColor: colors.border ?? '#e5e7eb',
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                color: colors.text,
+                backgroundColor: colors.surface,
+              }}
+              placeholderTextColor={colors.textMuted}
+            />
+            <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
+              <Pressable
+                onPress={() => setClaimModalOpen(false)}
+                disabled={claiming}
+                style={{
+                  flex: 1,
+                  paddingVertical: 11,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: colors.border ?? '#e5e7eb',
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void onManualClaim()}
+                disabled={claiming || syncing || loading}
+                style={({ pressed }) => ({
+                  flex: 1,
+                  paddingVertical: 11,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: colors.primary,
+                  alignItems: 'center',
+                  opacity: pressed || claiming ? 0.75 : 1,
+                })}
+              >
+                {claiming ? (
+                  <ActivityIndicator color={colors.primary} size="small" />
+                ) : (
+                  <Text style={{ color: colors.primary, fontWeight: '700' }}>Load order</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      {orders.length === 0 ? (
+        <Text style={[typography.caption, { color: colors.textSecondary, textAlign: 'center', lineHeight: 18 }]}>
+          New checkouts usually appear in about a minute.
         </Text>
-        <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 4, lineHeight: 18 }]}>
-          Enter the order email and confirmation number from your checkout email.
-        </Text>
-        <TextInput
-          value={claimEmail}
-          onChangeText={setClaimEmail}
-          placeholder="Order email"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          style={{
-            marginTop: 10,
-            borderWidth: 1,
-            borderColor: colors.border ?? '#e5e7eb',
-            borderRadius: 10,
-            paddingHorizontal: 12,
-            paddingVertical: 10,
-            color: colors.text,
-            backgroundColor: colors.surface,
-          }}
-          placeholderTextColor={colors.textMuted}
-        />
-        <TextInput
-          value={claimConfirmation}
-          onChangeText={setClaimConfirmation}
-          placeholder="Confirmation number"
-          autoCapitalize="characters"
-          style={{
-            marginTop: 8,
-            borderWidth: 1,
-            borderColor: colors.border ?? '#e5e7eb',
-            borderRadius: 10,
-            paddingHorizontal: 12,
-            paddingVertical: 10,
-            color: colors.text,
-            backgroundColor: colors.surface,
-          }}
-          placeholderTextColor={colors.textMuted}
-        />
-        <Pressable
-          onPress={() => void onManualClaim()}
-          disabled={claiming || syncing || loading}
-          style={({ pressed }) => ({
-            marginTop: 10,
-            alignSelf: 'flex-start',
-            paddingVertical: 10,
-            paddingHorizontal: 14,
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: colors.primary,
-            opacity: pressed || claiming ? 0.75 : 1,
-          })}
-        >
-          {claiming ? (
-            <ActivityIndicator color={colors.primary} size="small" />
-          ) : (
-            <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }}>Load this order</Text>
-          )}
-        </Pressable>
-      </View>
+      ) : null}
     </View>
   );
 
@@ -307,8 +339,7 @@ export default function OrdersListScreen() {
           ListEmptyComponent={
             !loading ? (
               <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center', marginTop: 24 }]}>
-                No orders yet. Tap “Sync from store” to load past orders, or check out — new orders appear after the store
-                confirms them.
+                No orders yet.
               </Text>
             ) : null
           }

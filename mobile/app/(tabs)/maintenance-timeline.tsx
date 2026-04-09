@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, type ComponentProps } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
+  Animated,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
@@ -11,8 +12,8 @@ import {
   Pressable,
   TextInput,
 } from 'react-native';
-import { Ionicons, type IoniconsProps } from '@expo/vector-icons';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeroHeader } from '../../components/AppHeroHeader';
 import { StatusBarBar } from '../../components/StatusBarBar';
@@ -72,6 +73,32 @@ function formatWeekHeading(weekStartKey: string): string {
   return `Week of ${label}`;
 }
 
+/** API may return `YYYY-MM-DD` or full ISO; normalize to a UTC calendar date string. */
+function dueDateToYyyyMmDd(raw: string): string | null {
+  const t = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const prefix = t.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (prefix) return prefix[1];
+  const d = new Date(t);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+/** Task card line: weekday, month, day — no time or year (uses UTC like the rest of this screen). */
+function formatDueDateForCard(raw: string): string {
+  const key = dueDateToYyyyMmDd(raw);
+  if (!key) return raw.trim();
+  const [y, mo, day] = key.split('-').map((x) => parseInt(x, 10));
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(day)) return raw.trim();
+  const dt = new Date(Date.UTC(y, mo - 1, day));
+  return dt.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
 type UpcomingWeekGroup = { weekStart: string; label: string; events: MaintenanceEvent[] };
 
 function partitionEvents(events: MaintenanceEvent[]) {
@@ -79,14 +106,17 @@ function partitionEvents(events: MaintenanceEvent[]) {
   const weekEnd = addDaysKey(today, 7);
   const monthEnd = addDaysKey(today, 30);
 
+  const dueKey = (e: MaintenanceEvent): string =>
+    dueDateToYyyyMmDd(e.dueDate) ?? (e.dueDate.length >= 10 ? e.dueDate.slice(0, 10) : e.dueDate);
+
   const open = events.filter((e) => !e.completedAt);
-  const overdue = open.filter((e) => e.dueDate < today);
-  const thisWeek = open.filter((e) => e.dueDate >= today && e.dueDate <= weekEnd);
-  const upcomingFlat = open.filter((e) => e.dueDate > weekEnd && e.dueDate <= monthEnd);
+  const overdue = open.filter((e) => dueKey(e) < today);
+  const thisWeek = open.filter((e) => dueKey(e) >= today && dueKey(e) <= weekEnd);
+  const upcomingFlat = open.filter((e) => dueKey(e) > weekEnd && dueKey(e) <= monthEnd);
 
   const byWeek = new Map<string, MaintenanceEvent[]>();
   for (const ev of upcomingFlat) {
-    const ws = utcWeekStartMondayKey(ev.dueDate);
+    const ws = utcWeekStartMondayKey(dueKey(ev));
     if (!byWeek.has(ws)) byWeek.set(ws, []);
     byWeek.get(ws)!.push(ev);
   }
@@ -94,13 +124,13 @@ function partitionEvents(events: MaintenanceEvent[]) {
   const upcomingWeeks: UpcomingWeekGroup[] = weekStarts.map((weekStart) => ({
     weekStart,
     label: formatWeekHeading(weekStart),
-    events: (byWeek.get(weekStart) ?? []).sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
+    events: (byWeek.get(weekStart) ?? []).sort((a, b) => dueKey(a).localeCompare(dueKey(b))),
   }));
 
   return { overdue, thisWeek, upcomingWeeks };
 }
 
-function iconForEventType(eventType: string | undefined): IoniconsProps['name'] {
+function iconForEventType(eventType: string | undefined): ComponentProps<typeof Ionicons>['name'] {
   switch (eventType) {
     case 'filter_rinse':
       return 'water-outline';
@@ -145,6 +175,7 @@ export default function MaintenanceTimelineScreen() {
   const { colors } = useTheme();
   const { spaProfileId, setSpaProfileId, spaProfiles, refreshSpaProfiles } = useActiveSpa();
   const primaryHex = colors.primary ?? '#1B4D7A';
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<MaintenanceEvent[]>([]);
@@ -247,6 +278,10 @@ export default function MaintenanceTimelineScreen() {
 
   const highlightId = typeof params.eventId === 'string' ? params.eventId : undefined;
 
+  const goBackToWaterCare = useCallback(() => {
+    router.replace('/(tabs)/water-care' as Href);
+  }, [router]);
+
   const openAddTask = () => {
     setEditingTaskId(null);
     setTaskTitle('');
@@ -257,7 +292,7 @@ export default function MaintenanceTimelineScreen() {
   const openEditTask = (ev: MaintenanceEvent) => {
     setEditingTaskId(ev.id);
     setTaskTitle(ev.title);
-    setTaskDue(ev.dueDate);
+    setTaskDue(dueDateToYyyyMmDd(ev.dueDate) ?? (ev.dueDate.length >= 10 ? ev.dueDate.slice(0, 10) : ev.dueDate));
     setTaskModalOpen(true);
   };
 
@@ -346,7 +381,7 @@ export default function MaintenanceTimelineScreen() {
                 {ev.description}
               </Text>
             ) : null}
-            <Text style={[styles.due, { color: colors.textMuted }]}>Due {ev.dueDate}</Text>
+            <Text style={[styles.due, { color: colors.textMuted }]}>Due {formatDueDateForCard(ev.dueDate)}</Text>
           </View>
           {isCustom ? (
             <TouchableOpacity onPress={() => openCustomTaskMenu(ev)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -401,12 +436,20 @@ export default function MaintenanceTimelineScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBarBar primaryColor={primaryHex} />
-      <ScrollView
+      <StatusBarBar primaryColor={primaryHex} scrollY={scrollY} />
+      <Animated.ScrollView
+        style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+        scrollEventThrottle={16}
       >
-        <AppHeroHeader icon="construct-outline" title="Care schedule" subtitle="Mechanical & seasonal tasks" />
+        <AppHeroHeader
+          onBackPress={goBackToWaterCare}
+          icon="construct-outline"
+          title="Care Schedule"
+          subtitle="Mechanical & seasonal tasks"
+        />
 
         {!spaProfileId ? (
           <View style={[styles.empty, { borderColor: colors.border, backgroundColor: colors.contentBackground }]}>
@@ -498,7 +541,7 @@ export default function MaintenanceTimelineScreen() {
             )}
           </>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
       <Modal visible={taskModalOpen} transparent animationType="fade" onRequestClose={() => setTaskModalOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => !savingTask && setTaskModalOpen(false)}>
@@ -568,6 +611,7 @@ export default function MaintenanceTimelineScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  scroll: { flex: 1 },
   content: { padding: 24 },
   spaRow: {
     flexDirection: 'row',

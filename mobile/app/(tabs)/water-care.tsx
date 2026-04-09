@@ -147,7 +147,7 @@ export default function WaterCareScreen() {
       border: 'rgba(56,189,248,0.35)',
     },
     {
-      label: 'Care schedule',
+      label: 'Care Schedule',
       description: 'Filter, drain, seasonal tasks — not water tests',
       icon: 'calendar-outline' as const,
       route: '/maintenance-timeline',
@@ -157,7 +157,7 @@ export default function WaterCareScreen() {
     },
     {
       label: 'Guides & Videos',
-      description: 'Step-by-step instructions for care',
+      description: 'Water care, maintenance & seasonal articles and videos',
       icon: 'play-circle-outline' as const,
       route: '/water-guides',
       accent: '#7c3aed',
@@ -236,23 +236,6 @@ export default function WaterCareScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-
-            <TouchableOpacity
-              style={[
-                styles.inlineGuideLink,
-                { backgroundColor: colors.contentBackground, borderColor: colors.border },
-              ]}
-              onPress={() => router.push({ pathname: '/(tabs)/water-guides', params: { category: 'maintenance' } })}
-            >
-              <Ionicons name="book-outline" size={22} color={primaryHex} />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={[styles.inlineGuideTitle, { color: colors.text }]}>Maintenance & seasonal guides</Text>
-                <Text style={[styles.inlineGuideSub, { color: colors.textSecondary }]}>
-                  Articles and videos for filters, draining, and season changes
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={primaryHex} />
-            </TouchableOpacity>
 
             <View style={[styles.card, styles.sectionCard, { backgroundColor: colors.contentBackground, borderColor: colors.border }]}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>Ideal Water Chemistry</Text>
@@ -350,16 +333,6 @@ const styles = StyleSheet.create({
     gap: 16,
     marginBottom: 24,
   },
-  inlineGuideLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 24,
-  },
-  inlineGuideTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  inlineGuideSub: { fontSize: 14, lineHeight: 20 },
   actionCard: {
     borderWidth: 1,
     borderRadius: 18,

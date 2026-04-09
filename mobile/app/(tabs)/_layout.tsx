@@ -105,17 +105,17 @@ export default function TabLayout() {
       <Tabs.Screen
         name="maintenance-timeline"
         options={{
-          title: 'Care schedule',
+          title: 'Care Schedule',
+          headerShown: false,
           href: null,
-          headerLeft: buildReplacementBackButton('/(tabs)/water-care'),
         }}
       />
       <Tabs.Screen
         name="water-guides"
         options={{
           title: 'Guides & Videos',
+          headerShown: false,
           href: null,
-          headerLeft: buildReplacementBackButton('/(tabs)/water-care'),
         }}
       />
       <Tabs.Screen
