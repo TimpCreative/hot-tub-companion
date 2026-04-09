@@ -12,6 +12,12 @@ router.post(
   authMiddleware,
   ordersController.syncMyOrdersFromShopify
 );
+router.post(
+  '/orders/claim',
+  commerceOrdersReadRateLimiter,
+  authMiddleware,
+  ordersController.claimMyOrderByEmailAndConfirmation
+);
 router.get(
   '/orders/by-shopify/:shopifyOrderId',
   commerceOrdersReadRateLimiter,

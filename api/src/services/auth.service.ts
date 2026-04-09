@@ -66,6 +66,9 @@ export async function register(tenantId: string, body: RegisterBody) {
 export async function verifyToken(token: string, tenantId?: string, options?: VerifyTokenOptions) {
   const auth = getFirebaseAuth();
   const decoded = await auth.verifyIdToken(token);
+  if (decoded.email_verified !== true) {
+    throw new ValidationError('Please verify your email address before continuing');
+  }
   const tenantIdToUse = tenantId;
   if (!tenantIdToUse) {
     throw new NotFoundError('Tenant context required');

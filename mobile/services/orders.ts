@@ -120,3 +120,26 @@ export async function syncMyOrdersFromShopify(): Promise<SyncOrdersResult> {
   }
   return raw.data;
 }
+
+export type ManualClaimOrderResult = {
+  orderReferenceId: string;
+  shopifyOrderId: string;
+};
+
+type ClaimEnvelope = {
+  success?: boolean;
+  data?: ManualClaimOrderResult;
+  error?: { message?: string; code?: string };
+};
+
+export async function claimMyOrderByEmailAndConfirmation(
+  orderEmail: string,
+  confirmationNumber: string
+): Promise<ManualClaimOrderResult> {
+  const raw = (await api.post('/orders/claim', { orderEmail, confirmationNumber })) as ClaimEnvelope;
+  if (!raw?.success || raw.data === undefined) {
+    const msg = raw?.error?.message || 'Order lookup failed';
+    throw new Error(msg);
+  }
+  return raw.data;
+}

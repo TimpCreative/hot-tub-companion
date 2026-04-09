@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
@@ -43,6 +44,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
         return;
       }
+      if (!firebaseUser.emailVerified) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
       try {
         const token = await firebaseUser.getIdToken();
         await SecureStore.setItemAsync('firebase_token', token);
@@ -59,6 +65,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const cred = await signInWithEmailAndPassword(auth, email, password);
+    if (!cred.user.emailVerified) {
+      await sendEmailVerification(cred.user);
+      await firebaseSignOut(auth);
+      await SecureStore.deleteItemAsync('firebase_token');
+      throw new Error('Please verify your email first. We sent a new verification link.');
+    }
     const token = await cred.user.getIdToken();
     await SecureStore.setItemAsync('firebase_token', token);
     const res = await api.post('/auth/verify') as { data?: { user?: AuthUser }; success?: boolean };
@@ -83,7 +95,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (data?.token) {
       const { signInWithCustomToken } = await import('@firebase/auth');
       await signInWithCustomToken(auth, data.token);
-      setUser(data.user ?? null);
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await sendEmailVerification(currentUser);
+      }
+      await firebaseSignOut(auth);
+      await SecureStore.deleteItemAsync('firebase_token');
+      setUser(null);
     }
   };
 

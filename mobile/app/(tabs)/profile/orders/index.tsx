@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  TextInput,
   Pressable,
   RefreshControl,
   Text,
@@ -14,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../../../contexts/AuthContext';
 import {
   fetchMyOrders,
+  claimMyOrderByEmailAndConfirmation,
   formatOrderMoney,
   orderTitle,
   syncMyOrdersFromShopify,
@@ -46,6 +48,9 @@ export default function OrdersListScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [claimEmail, setClaimEmail] = useState('');
+  const [claimConfirmation, setClaimConfirmation] = useState('');
 
   const load = useCallback(async (p: number, append: boolean) => {
     if (append) setLoadingMore(true);
@@ -104,6 +109,29 @@ export default function OrdersListScreen() {
       setSyncing(false);
     }
   }, [load]);
+
+  const onManualClaim = useCallback(async () => {
+    const orderEmail = claimEmail.trim().toLowerCase();
+    const confirmationNumber = claimConfirmation.trim();
+    if (!orderEmail || !confirmationNumber) {
+      Alert.alert('Missing fields', 'Enter both the order email and confirmation number.');
+      return;
+    }
+    setClaiming(true);
+    try {
+      const claimed = await claimMyOrderByEmailAndConfirmation(orderEmail, confirmationNumber);
+      setClaimConfirmation('');
+      Alert.alert('Order loaded', 'We found your order and added it to your history.');
+      await load(1, false);
+      if (claimed.orderReferenceId) {
+        router.push(`/(tabs)/profile/orders/${claimed.orderReferenceId}`);
+      }
+    } catch (e) {
+      Alert.alert('Could not load order', getApiErrorMessage(e));
+    } finally {
+      setClaiming(false);
+    }
+  }, [claimEmail, claimConfirmation, load, router]);
 
   const renderItem = useCallback(
     ({ item }: { item: OrderListItem }) => {
@@ -184,6 +212,77 @@ export default function OrdersListScreen() {
           <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 15 }}>Sync from store</Text>
         )}
       </Pressable>
+      <View
+        style={{
+          marginTop: 14,
+          borderWidth: 1,
+          borderColor: colors.border ?? '#e5e7eb',
+          borderRadius: 12,
+          padding: 12,
+        }}
+      >
+        <Text style={[typography.body, { color: colors.text, fontWeight: '700' }]}>
+          Load a specific order
+        </Text>
+        <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 4, lineHeight: 18 }]}>
+          Enter the order email and confirmation number from your checkout email.
+        </Text>
+        <TextInput
+          value={claimEmail}
+          onChangeText={setClaimEmail}
+          placeholder="Order email"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          style={{
+            marginTop: 10,
+            borderWidth: 1,
+            borderColor: colors.border ?? '#e5e7eb',
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            color: colors.text,
+            backgroundColor: colors.surface,
+          }}
+          placeholderTextColor={colors.textMuted}
+        />
+        <TextInput
+          value={claimConfirmation}
+          onChangeText={setClaimConfirmation}
+          placeholder="Confirmation number"
+          autoCapitalize="characters"
+          style={{
+            marginTop: 8,
+            borderWidth: 1,
+            borderColor: colors.border ?? '#e5e7eb',
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            color: colors.text,
+            backgroundColor: colors.surface,
+          }}
+          placeholderTextColor={colors.textMuted}
+        />
+        <Pressable
+          onPress={() => void onManualClaim()}
+          disabled={claiming || syncing || loading}
+          style={({ pressed }) => ({
+            marginTop: 10,
+            alignSelf: 'flex-start',
+            paddingVertical: 10,
+            paddingHorizontal: 14,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: colors.primary,
+            opacity: pressed || claiming ? 0.75 : 1,
+          })}
+        >
+          {claiming ? (
+            <ActivityIndicator color={colors.primary} size="small" />
+          ) : (
+            <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }}>Load this order</Text>
+          )}
+        </Pressable>
+      </View>
     </View>
   );
 

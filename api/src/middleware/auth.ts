@@ -30,6 +30,10 @@ export async function authMiddleware(
 
   try {
     const decoded = await auth.verifyIdToken(token);
+    if (decoded.email_verified !== true) {
+      error(res, 'EMAIL_NOT_VERIFIED', 'Please verify your email before using the app', 403);
+      return;
+    }
     const tenantId = (req as Request & { tenant?: { id: string } }).tenant?.id;
     if (!tenantId) {
       error(res, 'UNAUTHORIZED', 'Tenant context required', 401);

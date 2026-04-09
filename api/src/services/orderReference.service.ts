@@ -212,6 +212,10 @@ export type SyncOrdersFromShopifyResult = {
   errors: number;
 };
 
+export type ManualClaimOrderResult =
+  | { ok: true; orderReferenceId: string; shopifyOrderId: string }
+  | { ok: false; reason: 'NOT_FOUND' | 'MISSING_CONFIRMATION' };
+
 /**
  * Pull orders from Shopify Admin for this email, upsert references for this user, and merge snapshots.
  * Use for past orders before webhooks or when email matching failed on create.
@@ -290,4 +294,79 @@ export async function syncOrderReferencesFromShopifyForUser(
   }
 
   return out;
+}
+
+function normalizeConfirmation(v: unknown): string {
+  return String(v || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '');
+}
+
+/**
+ * Manual claim flow: find an order by customer email + confirmation number,
+ * then attach it to this user and persist snapshot data.
+ */
+export async function claimOrderFromShopifyByEmailAndConfirmation(
+  tenantId: string,
+  userId: string,
+  orderEmail: string,
+  confirmationNumber: string
+): Promise<ManualClaimOrderResult> {
+  const normalizedEmail = String(orderEmail || '').trim().toLowerCase();
+  const normalizedConfirmation = normalizeConfirmation(confirmationNumber);
+  if (!normalizedEmail || !normalizedConfirmation) {
+    return { ok: false, reason: 'NOT_FOUND' };
+  }
+
+  const maxPages = 20;
+  let sinceId: string | undefined;
+  for (let i = 0; i < maxPages; i++) {
+    const page = await fetchShopifyAdminOrdersByCustomerEmail(tenantId, normalizedEmail, sinceId);
+    if (!page.length) break;
+
+    for (const order of page) {
+      const rawId = order.id as string | number | undefined;
+      if (rawId == null) continue;
+      const shopifyOrderId = String(rawId);
+      const orderConf = normalizeConfirmation((order as Record<string, unknown>).confirmation_number);
+      if (!orderConf) continue;
+      if (orderConf !== normalizedConfirmation) continue;
+
+      const emailRaw = (order as Record<string, unknown>).email;
+      const customerEmail =
+        typeof emailRaw === 'string' && emailRaw.trim() ? emailRaw.trim().toLowerCase() : normalizedEmail;
+      const orderNumber =
+        typeof (order as Record<string, unknown>).order_number === 'number'
+          ? ((order as Record<string, unknown>).order_number as number)
+          : null;
+
+      await upsertOrderReference({
+        tenantId,
+        shopifyOrderId,
+        shopifyOrderNumber: orderNumber,
+        userId,
+        customerEmail,
+      });
+      let merged = await mergeOrderSnapshotFromShopifyPayload(tenantId, shopifyOrderId, order);
+      if (!merged) {
+        const full = await fetchShopifyAdminOrderJson(tenantId, shopifyOrderId);
+        if (!full) return { ok: false, reason: 'MISSING_CONFIRMATION' };
+        merged = await mergeOrderSnapshotFromShopifyPayload(tenantId, shopifyOrderId, full);
+      }
+      const row = await db('order_references')
+        .select('id')
+        .where({ tenant_id: tenantId, shopify_order_id: shopifyOrderId, user_id: userId })
+        .first();
+      return { ok: true, orderReferenceId: String((row as { id?: string } | undefined)?.id || ''), shopifyOrderId };
+    }
+
+    if (page.length < 50) break;
+    const lastId = page[page.length - 1]?.id;
+    sinceId = lastId != null ? String(lastId) : undefined;
+    if (!sinceId) break;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+
+  return { ok: false, reason: 'NOT_FOUND' };
 }

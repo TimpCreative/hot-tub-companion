@@ -60,6 +60,13 @@ export async function login(req: Request, res: Response): Promise<void> {
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'NOT_FOUND') {
       error(res, 'NOT_FOUND', err instanceof Error ? err.message : String(err), 404);
+    } else if (
+      err &&
+      typeof err === 'object' &&
+      'code' in err &&
+      (err as { code: string }).code === 'VALIDATION_ERROR'
+    ) {
+      error(res, 'EMAIL_NOT_VERIFIED', err instanceof Error ? err.message : String(err), 403);
     } else {
       throw err;
     }
@@ -94,6 +101,13 @@ export async function verify(req: Request, res: Response): Promise<void> {
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'NOT_FOUND') {
       error(res, 'NOT_FOUND', err instanceof Error ? err.message : String(err), 404);
+    } else if (
+      err &&
+      typeof err === 'object' &&
+      'code' in err &&
+      (err as { code: string }).code === 'VALIDATION_ERROR'
+    ) {
+      error(res, 'EMAIL_NOT_VERIFIED', err instanceof Error ? err.message : String(err), 403);
     } else {
       throw err;
     }
