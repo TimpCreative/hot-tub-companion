@@ -11,13 +11,23 @@ function dueDateStr(v: unknown): string {
   return String(v).slice(0, 10);
 }
 
+function utcTodayKey(): string {
+  const n = new Date();
+  const y = n.getUTCFullYear();
+  const m = String(n.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(n.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 /**
- * For each auto event_type, keep a single pending row (latest due_date). Deletes older duplicates and logs superseded.
+ * For each auto event_type, keep a single pending row (next due if available; otherwise latest overdue).
+ * Deletes others and logs superseded.
  */
 export async function dedupePendingAutoEventsByEventType(
   spaProfileId: string,
   trx: Knex | Knex.Transaction = db
 ): Promise<number> {
+  const todayKey = utcTodayKey();
   const pending = (await trx('maintenance_events')
     .where({
       spa_profile_id: spaProfileId,
@@ -45,7 +55,8 @@ export async function dedupePendingAutoEventsByEventType(
   for (const [, rows] of byType) {
     if (rows.length <= 1) continue;
     const sorted = [...rows].sort((a, b) => dueDateStr(a.due_date).localeCompare(dueDateStr(b.due_date)));
-    const keep = sorted[sorted.length - 1];
+    const firstUpcoming = sorted.find((r) => dueDateStr(r.due_date) >= todayKey);
+    const keep = firstUpcoming ?? sorted[sorted.length - 1];
     for (const r of sorted) {
       if (r.id === keep.id) continue;
       await insertMaintenanceActivity(
