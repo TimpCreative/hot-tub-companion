@@ -54,6 +54,11 @@ router.post(
   cronController.maintenanceReminders
 );
 router.post(
+  '/api/v1/internal/cron/regenerate-maintenance-schedules',
+  cronAuth,
+  cronController.regenerateMaintenanceSchedules
+);
+router.post(
   '/api/v1/internal/cron/backfill-order-snapshots',
   cronAuth,
   cronController.backfillOrderSnapshots

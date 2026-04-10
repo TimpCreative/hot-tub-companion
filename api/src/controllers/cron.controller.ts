@@ -9,6 +9,7 @@ import {
   listOrderReferencesMissingSnapshot,
   mergeOrderSnapshotFromShopifyPayload,
 } from '../services/orderReference.service';
+import * as maintenanceSchedule from '../services/maintenanceSchedule.service';
 
 export async function dispatchNotifications(req: Request, res: Response): Promise<void> {
   const now = new Date();
@@ -268,7 +269,11 @@ function addCalendarDaysToDateKey(dateKey: string, deltaDays: number): string {
   return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
 }
 
-/** Daily UTC window: notify from (due − lead) through due (inclusive). Respects notification_pref_maintenance. */
+/**
+ * Daily UTC: (1) notify from (due − lead) through due (inclusive);
+ * (2) one-time overdue nudge if still pending and notification_sent is still false (e.g. missed pre-due window).
+ * Respects notification_pref_maintenance.
+ */
 export async function maintenanceReminders(req: Request, res: Response): Promise<void> {
   const todayKey = utcDateKey(new Date());
 
@@ -305,6 +310,8 @@ export async function maintenanceReminders(req: Request, res: Response): Promise
     )) as Row[];
 
   let notified = 0;
+  let notifiedLeadUp = 0;
+  let notifiedOverdue = 0;
   for (const row of rows) {
     const dueStr =
       typeof row.due_date === 'string'
@@ -312,14 +319,19 @@ export async function maintenanceReminders(req: Request, res: Response): Promise
         : utcDateKey(new Date(row.due_date));
     const lead = typeof row.notification_days_before === 'number' ? row.notification_days_before : 3;
     const notifyStr = addCalendarDaysToDateKey(dueStr, -lead);
-    if (todayKey < notifyStr || todayKey > dueStr) continue;
+    if (todayKey < notifyStr) continue;
 
     const spaLabel = row.nickname?.trim() || row.model?.trim() || 'your spa';
+    const inLeadUpWindow = todayKey <= dueStr;
+    const body = inLeadUpWindow
+      ? `${row.title} is due soon for ${spaLabel}.`
+      : `${row.title} is overdue for ${spaLabel}.`;
+
     const ok = await notificationService.sendToUser(
       row.user_id,
       row.tenant_id,
       'Maintenance reminder',
-      `${row.title} is due soon for ${spaLabel}.`,
+      body,
       {
         linkType: 'maintenance_event',
         linkId: row.id,
@@ -334,10 +346,47 @@ export async function maintenanceReminders(req: Request, res: Response): Promise
         updated_at: db.fn.now(),
       });
       notified++;
+      if (inLeadUpWindow) notifiedLeadUp++;
+      else notifiedOverdue++;
     }
   }
 
-  success(res, { candidates: rows.length, notified }, 'Maintenance reminders complete');
+  success(
+    res,
+    { candidates: rows.length, notified, notifiedLeadUp, notifiedOverdue },
+    'Maintenance reminders complete'
+  );
+}
+
+/**
+ * Rebuild auto-generated maintenance rows (12-month horizon + dedupe). Secured with CRON_SECRET.
+ * Query: ?spaProfileId=<uuid> for one spa; omit to process all spa profiles.
+ */
+export async function regenerateMaintenanceSchedules(req: Request, res: Response): Promise<void> {
+  const spaProfileIdRaw = req.query.spaProfileId;
+  const spaProfileId =
+    typeof spaProfileIdRaw === 'string' && spaProfileIdRaw.trim() ? spaProfileIdRaw.trim() : '';
+
+  const ids: string[] = spaProfileId
+    ? [spaProfileId]
+    : ((await db('spa_profiles').select('id')) as { id: string }[]).map((r) => r.id);
+
+  let processed = 0;
+  const failures: Array<{ spaProfileId: string; message: string }> = [];
+
+  for (const id of ids) {
+    try {
+      await maintenanceSchedule.regenerateAutoEventsForSpaProfile(id);
+      processed++;
+    } catch (err) {
+      failures.push({
+        spaProfileId: id,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  success(res, { processed, total: ids.length, failures }, 'Maintenance schedule regeneration complete');
 }
 
 /**
