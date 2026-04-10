@@ -287,6 +287,10 @@ export async function maintenanceReminders(req: Request, res: Response): Promise
   const rows = (await db('maintenance_events as e')
     .join('spa_profiles as s', 'e.spa_profile_id', 's.id')
     .whereNull('e.completed_at')
+    .whereNull('e.deleted_at')
+    .where((b) => {
+      b.whereNull('e.snoozed_until').orWhereRaw('e.snoozed_until <= CURRENT_TIMESTAMP');
+    })
     .where('e.notification_sent', false)
     .select(
       'e.id',

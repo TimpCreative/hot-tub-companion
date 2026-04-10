@@ -111,6 +111,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="maintenance-history"
+        options={{
+          title: 'Task history',
+          headerShown: false,
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="water-guides"
         options={{
           title: 'Guides & Videos',

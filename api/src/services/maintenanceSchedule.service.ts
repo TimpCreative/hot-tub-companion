@@ -6,6 +6,7 @@
 import { db } from '../config/database';
 import { getEffectiveRecurringCatalog, normalizeCareScheduleConfig } from './careScheduleConfig.service';
 import { planFilterMaintenanceEvents, type LastCompletedMap } from './filterMaintenancePlanner';
+import { dedupePendingAutoEventsByEventType } from './maintenanceDedupe.service';
 import { addUtcDays, diffUtcDays, formatDateKey, utcDateOnly } from './maintenanceDateUtils';
 import {
   FILTER_CHAIN_EVENT_TYPES,
@@ -226,6 +227,7 @@ async function hasOverdueIncompleteReplace(spaProfileId: string, todayKey: strin
   const row = await db('maintenance_events')
     .where({ spa_profile_id: spaProfileId, event_type: 'filter_replace' })
     .whereNull('completed_at')
+    .whereNull('deleted_at')
     .where('due_date', '<', todayKey)
     .first();
   return row != null;
@@ -291,6 +293,7 @@ export async function regenerateAutoEventsForSpaProfile(spaProfileId: string): P
     await trx('maintenance_events')
       .where({ spa_profile_id: spaProfileId, source: 'auto' })
       .whereNull('completed_at')
+      .whereNull('deleted_at')
       .where('due_date', '>=', todayKey)
       .del();
 
@@ -315,5 +318,7 @@ export async function regenerateAutoEventsForSpaProfile(spaProfileId: string): P
     if (stamped.length > 0) {
       await trx('maintenance_events').insert(stamped);
     }
+
+    await dedupePendingAutoEventsByEventType(spaProfileId, trx);
   });
 }

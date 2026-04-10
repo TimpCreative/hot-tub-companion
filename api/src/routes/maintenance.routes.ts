@@ -7,8 +7,11 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/maintenance', maintenanceController.listMaintenance);
+router.get('/maintenance/activity', maintenanceController.listMaintenanceActivityFeed);
 router.post('/maintenance', maintenanceController.createCustomMaintenance);
 router.post('/maintenance/:id/complete', maintenanceController.completeMaintenance);
+router.post('/maintenance/:id/snooze', maintenanceController.snoozeMaintenance);
+router.post('/maintenance/:id/reschedule', maintenanceController.rescheduleMaintenance);
 router.put('/maintenance/:id', maintenanceController.updateCustomMaintenance);
 router.delete('/maintenance/:id', maintenanceController.deleteCustomMaintenance);
 

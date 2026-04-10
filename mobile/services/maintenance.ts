@@ -12,6 +12,7 @@ export type MaintenanceEvent = {
   recurrenceIntervalDays?: number | null;
   linkedProductCategory?: string | null;
   source?: string;
+  snoozedUntil?: string | null;
 };
 
 type ListResponse = {
@@ -71,4 +72,65 @@ export async function deleteCustomMaintenanceEvent(id: string): Promise<boolean>
   } catch {
     return false;
   }
+}
+
+type MutateOneResponse = { success?: boolean; data?: { event: MaintenanceEvent } };
+
+export async function snoozeMaintenanceEvent(
+  id: string,
+  body: { preset: '1h' | '1d' | '7d' | 'custom'; customUntil?: string }
+): Promise<MaintenanceEvent | null> {
+  const res = (await api.post(`/maintenance/${id}/snooze`, body)) as MutateOneResponse;
+  return res?.data?.event ?? null;
+}
+
+export async function rescheduleMaintenanceEvent(
+  id: string,
+  body: { preset: '1d' | '7d' | 'custom'; dueDate?: string }
+): Promise<MaintenanceEvent | null> {
+  const res = (await api.post(`/maintenance/${id}/reschedule`, body)) as MutateOneResponse;
+  return res?.data?.event ?? null;
+}
+
+export type MaintenanceActivityItem = {
+  id: string;
+  spaProfileId: string;
+  userId: string;
+  tenantId: string;
+  maintenanceEventId: string | null;
+  action: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+};
+
+type ActivityListResponse = {
+  success?: boolean;
+  data?: {
+    items: MaintenanceActivityItem[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  };
+};
+
+export async function listMaintenanceActivity(
+  spaProfileId: string,
+  opts?: { page?: number; pageSize?: number }
+): Promise<{ items: MaintenanceActivityItem[]; total: number; page: number; pageSize: number; totalPages: number }> {
+  const res = (await api.get('/maintenance/activity', {
+    params: {
+      spaProfileId,
+      page: opts?.page ?? 1,
+      pageSize: opts?.pageSize ?? 50,
+    },
+  })) as ActivityListResponse;
+  const d = res?.data;
+  return {
+    items: d?.items ?? [],
+    total: d?.total ?? 0,
+    page: d?.page ?? 1,
+    pageSize: d?.pageSize ?? 50,
+    totalPages: d?.totalPages ?? 1,
+  };
 }

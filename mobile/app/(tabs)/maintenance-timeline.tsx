@@ -188,6 +188,13 @@ export default function MaintenanceTimelineScreen() {
   const [savingTask, setSavingTask] = useState(false);
   const [guideItems, setGuideItems] = useState<ContentGuideItem[]>([]);
   const [guidesLoading, setGuidesLoading] = useState(false);
+  const [snoozeModalForId, setSnoozeModalForId] = useState<string | null>(null);
+  const [snoozeCustomIso, setSnoozeCustomIso] = useState('');
+  const [showSnoozeCustom, setShowSnoozeCustom] = useState(false);
+  const [rescheduleModalForId, setRescheduleModalForId] = useState<string | null>(null);
+  const [rescheduleCustomDate, setRescheduleCustomDate] = useState('');
+  const [showRescheduleCustom, setShowRescheduleCustom] = useState(false);
+  const [mutatingTaskId, setMutatingTaskId] = useState<string | null>(null);
 
   const activeSpa = useMemo(
     () => spaProfiles.find((p) => p.id === spaProfileId) ?? spaProfiles[0],
@@ -303,7 +310,7 @@ export default function MaintenanceTimelineScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: () => {
-          Alert.alert('Delete this task?', 'This cannot be undone.', [
+          Alert.alert('Delete this task?', 'It will be removed from your schedule. You can still see it in History.', [
             { text: 'Cancel', style: 'cancel' },
             {
               text: 'Delete',
@@ -357,10 +364,81 @@ export default function MaintenanceTimelineScreen() {
     })();
   };
 
-  const renderEventCard = (ev: MaintenanceEvent) => {
+  const openSnoozeModal = (id: string) => {
+    setShowSnoozeCustom(false);
+    setSnoozeCustomIso(new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString());
+    setSnoozeModalForId(id);
+  };
+
+  const openRescheduleModal = (id: string) => {
+    setShowRescheduleCustom(false);
+    setRescheduleCustomDate(addDaysKey(utcTodayKey(), 1));
+    setRescheduleModalForId(id);
+  };
+
+  const closeSnoozeModal = () => {
+    setSnoozeModalForId(null);
+    setShowSnoozeCustom(false);
+  };
+
+  const closeRescheduleModal = () => {
+    setRescheduleModalForId(null);
+    setShowRescheduleCustom(false);
+  };
+
+  const applySnooze = async (preset: '1h' | '1d' | '7d' | 'custom') => {
+    if (!snoozeModalForId) return;
+    setMutatingTaskId(snoozeModalForId);
+    try {
+      const body =
+        preset === 'custom'
+          ? { preset: 'custom' as const, customUntil: snoozeCustomIso.trim() }
+          : { preset };
+      const ev = await maintenanceApi.snoozeMaintenanceEvent(snoozeModalForId, body);
+      if (!ev) throw new Error('Snooze failed');
+      closeSnoozeModal();
+      await load();
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'error' in err
+          ? String((err as { error?: { message?: string } }).error?.message ?? 'Failed')
+          : 'Could not snooze';
+      Alert.alert('Error', msg);
+    } finally {
+      setMutatingTaskId(null);
+    }
+  };
+
+  const applyReschedule = async (preset: '1d' | '7d' | 'custom') => {
+    if (!rescheduleModalForId) return;
+    setMutatingTaskId(rescheduleModalForId);
+    try {
+      const body =
+        preset === 'custom'
+          ? { preset: 'custom' as const, dueDate: rescheduleCustomDate.trim() }
+          : { preset };
+      const ev = await maintenanceApi.rescheduleMaintenanceEvent(rescheduleModalForId, body);
+      if (!ev) throw new Error('Reschedule failed');
+      closeRescheduleModal();
+      await load();
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'error' in err
+          ? String((err as { error?: { message?: string } }).error?.message ?? 'Failed')
+          : 'Could not reschedule';
+      Alert.alert('Error', msg);
+    } finally {
+      setMutatingTaskId(null);
+    }
+  };
+
+  type CardMode = 'overdue' | 'scheduled';
+
+  const renderEventCard = (ev: MaintenanceEvent, cardMode: CardMode) => {
     const hi = highlightId === ev.id;
     const iconName = iconForEventType(ev.eventType);
     const isCustom = ev.source === 'custom';
+    const busy = completingId === ev.id || mutatingTaskId === ev.id;
     return (
       <View
         key={ev.id}
@@ -389,22 +467,55 @@ export default function MaintenanceTimelineScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
-        <TouchableOpacity
-          style={[styles.doneBtn, { backgroundColor: colors.primary }]}
-          disabled={completingId === ev.id}
-          onPress={() => handleComplete(ev)}
-        >
-          {completingId === ev.id ? (
-            <ActivityIndicator color="#fff" />
+        <View style={styles.cardActionsRow}>
+          <TouchableOpacity
+            style={[styles.doneBtn, styles.cardActionBtn, { backgroundColor: colors.primary }]}
+            disabled={busy}
+            onPress={() => handleComplete(ev)}
+          >
+            {completingId === ev.id ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.doneBtnText}>Mark done</Text>
+            )}
+          </TouchableOpacity>
+          {cardMode === 'overdue' ? (
+            <TouchableOpacity
+              style={[
+                styles.secondaryBtn,
+                styles.cardActionBtn,
+                { borderColor: colors.primary, opacity: busy ? 0.5 : 1 },
+              ]}
+              disabled={busy}
+              onPress={() => openSnoozeModal(ev.id)}
+            >
+              <Text style={[styles.secondaryBtnText, { color: colors.primary }]}>Snooze</Text>
+            </TouchableOpacity>
           ) : (
-            <Text style={styles.doneBtnText}>Mark done</Text>
+            <TouchableOpacity
+              style={[
+                styles.secondaryBtn,
+                styles.cardActionBtn,
+                { borderColor: colors.primary, opacity: busy ? 0.5 : 1 },
+              ]}
+              disabled={busy}
+              onPress={() => openRescheduleModal(ev.id)}
+            >
+              <Text style={[styles.secondaryBtnText, { color: colors.primary }]}>Reschedule</Text>
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
+        </View>
       </View>
     );
   };
 
-  const renderSection = (title: string, subtitle: string, list: MaintenanceEvent[], tone: 'danger' | 'default' | 'muted') => {
+  const renderSection = (
+    title: string,
+    subtitle: string,
+    list: MaintenanceEvent[],
+    tone: 'danger' | 'default' | 'muted',
+    cardMode: CardMode
+  ) => {
     if (list.length === 0) return null;
     const border =
       tone === 'danger' ? 'rgba(248,113,113,0.45)' : tone === 'muted' ? colors.border : 'rgba(148,163,184,0.35)';
@@ -412,7 +523,7 @@ export default function MaintenanceTimelineScreen() {
       <View style={[styles.section, { borderColor: border, backgroundColor: colors.contentBackground }]}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
         <Text style={[styles.sectionSub, { color: colors.textMuted }]}>{subtitle}</Text>
-        {list.map((ev) => renderEventCard(ev))}
+        {list.map((ev) => renderEventCard(ev, cardMode))}
       </View>
     );
   };
@@ -427,7 +538,7 @@ export default function MaintenanceTimelineScreen() {
         {upcomingWeeks.map((group) => (
           <View key={group.weekStart} style={styles.weekBlock}>
             <Text style={[styles.weekLabel, { color: colors.textSecondary }]}>{group.label}</Text>
-            {group.events.map((ev) => renderEventCard(ev))}
+            {group.events.map((ev) => renderEventCard(ev, 'scheduled'))}
           </View>
         ))}
       </View>
@@ -449,6 +560,23 @@ export default function MaintenanceTimelineScreen() {
           icon="construct-outline"
           title="Care Schedule"
           subtitle="Mechanical & seasonal tasks"
+          trailing={
+            spaProfileId ? (
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/(tabs)/maintenance-history',
+                    params: { spaProfileId },
+                  })
+                }
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Task history"
+              >
+                <Ionicons name="time-outline" size={26} color="#fff" />
+              </Pressable>
+            ) : null
+          }
         />
 
         {!spaProfileId ? (
@@ -531,8 +659,8 @@ export default function MaintenanceTimelineScreen() {
               <ActivityIndicator style={{ marginTop: 24 }} size="large" color={colors.primary} />
             ) : (
               <>
-                {renderSection('Overdue', 'Past due — complete when you can', overdue, 'danger')}
-                {renderSection('This week', 'Due in the next 7 days', thisWeek, 'default')}
+                {renderSection('Overdue', 'Past due — complete when you can', overdue, 'danger', 'overdue')}
+                {renderSection('This week', 'Due in the next 7 days', thisWeek, 'default', 'scheduled')}
                 {renderUpcomingByWeek()}
                 {!overdue.length && !thisWeek.length && upcomingWeeks.length === 0 ? (
                   <Text style={[styles.allClear, { color: colors.textSecondary }]}>{"You're all caught up on pending tasks."}</Text>
@@ -602,6 +730,124 @@ export default function MaintenanceTimelineScreen() {
                 {p.id === spaProfileId ? <Ionicons name="checkmark-circle" size={22} color={colors.primary} /> : null}
               </TouchableOpacity>
             ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={!!snoozeModalForId} transparent animationType="fade" onRequestClose={closeSnoozeModal}>
+        <Pressable style={styles.modalBackdrop} onPress={() => !mutatingTaskId && closeSnoozeModal()}>
+          <Pressable style={[styles.modalCard, { backgroundColor: colors.contentBackground }]} onPress={(e) => e.stopPropagation()}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Snooze task</Text>
+            <Text style={[styles.modalHint, { color: colors.textSecondary }]}>
+              Hide this overdue task until you are ready. Your due date does not change.
+            </Text>
+            {[
+              { label: '1 hour', preset: '1h' as const },
+              { label: '1 day', preset: '1d' as const },
+              { label: '7 days', preset: '7d' as const },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.preset}
+                style={[styles.choiceRow, { borderColor: colors.border }]}
+                disabled={!!mutatingTaskId}
+                onPress={() => void applySnooze(opt.preset)}
+              >
+                <Text style={{ color: colors.text, fontWeight: '600' }}>{opt.label}</Text>
+                {mutatingTaskId === snoozeModalForId ? <ActivityIndicator color={colors.primary} /> : null}
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={[styles.choiceRow, { borderColor: colors.border }]}
+              disabled={!!mutatingTaskId}
+              onPress={() => setShowSnoozeCustom((v) => !v)}
+            >
+              <Text style={{ color: colors.text, fontWeight: '600' }}>Custom (date & time)</Text>
+            </TouchableOpacity>
+            {showSnoozeCustom ? (
+              <>
+                <Text style={[styles.modalFieldLabel, { color: colors.textMuted }]}>ISO time (UTC)</Text>
+                <TextInput
+                  value={snoozeCustomIso}
+                  onChangeText={setSnoozeCustomIso}
+                  placeholder="2026-04-15T18:00:00.000Z"
+                  placeholderTextColor={colors.textMuted}
+                  style={[styles.taskInput, { color: colors.text, borderColor: colors.border }]}
+                  autoCapitalize="none"
+                />
+                <TouchableOpacity
+                  style={[styles.taskModalBtn, { backgroundColor: colors.primary, alignSelf: 'stretch', marginTop: 12 }]}
+                  disabled={!!mutatingTaskId}
+                  onPress={() => void applySnooze('custom')}
+                >
+                  {mutatingTaskId === snoozeModalForId ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.taskModalBtnPrimaryText}>Apply custom snooze</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            ) : null}
+            <TouchableOpacity style={{ marginTop: 16 }} onPress={closeSnoozeModal} disabled={!!mutatingTaskId}>
+              <Text style={{ color: colors.textMuted, textAlign: 'center' }}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={!!rescheduleModalForId} transparent animationType="fade" onRequestClose={closeRescheduleModal}>
+        <Pressable style={styles.modalBackdrop} onPress={() => !mutatingTaskId && closeRescheduleModal()}>
+          <Pressable style={[styles.modalCard, { backgroundColor: colors.contentBackground }]} onPress={(e) => e.stopPropagation()}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Reschedule</Text>
+            <Text style={[styles.modalHint, { color: colors.textSecondary }]}>
+              Move this task to a later day (UTC calendar).
+            </Text>
+            {[
+              { label: '+1 day', preset: '1d' as const },
+              { label: '+7 days', preset: '7d' as const },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.preset}
+                style={[styles.choiceRow, { borderColor: colors.border }]}
+                disabled={!!mutatingTaskId}
+                onPress={() => void applyReschedule(opt.preset)}
+              >
+                <Text style={{ color: colors.text, fontWeight: '600' }}>{opt.label}</Text>
+                {mutatingTaskId === rescheduleModalForId ? <ActivityIndicator color={colors.primary} /> : null}
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={[styles.choiceRow, { borderColor: colors.border }]}
+              disabled={!!mutatingTaskId}
+              onPress={() => setShowRescheduleCustom((v) => !v)}
+            >
+              <Text style={{ color: colors.text, fontWeight: '600' }}>Custom date</Text>
+            </TouchableOpacity>
+            {showRescheduleCustom ? (
+              <>
+                <Text style={[styles.modalFieldLabel, { color: colors.textMuted }]}>New due date (YYYY-MM-DD)</Text>
+                <TextInput
+                  value={rescheduleCustomDate}
+                  onChangeText={setRescheduleCustomDate}
+                  placeholder="2026-05-01"
+                  placeholderTextColor={colors.textMuted}
+                  style={[styles.taskInput, { color: colors.text, borderColor: colors.border }]}
+                />
+                <TouchableOpacity
+                  style={[styles.taskModalBtn, { backgroundColor: colors.primary, alignSelf: 'stretch', marginTop: 12 }]}
+                  disabled={!!mutatingTaskId}
+                  onPress={() => void applyReschedule('custom')}
+                >
+                  {mutatingTaskId === rescheduleModalForId ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.taskModalBtnPrimaryText}>Apply</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            ) : null}
+            <TouchableOpacity style={{ marginTop: 16 }} onPress={closeRescheduleModal} disabled={!!mutatingTaskId}>
+              <Text style={{ color: colors.textMuted, textAlign: 'center' }}>Cancel</Text>
+            </TouchableOpacity>
           </Pressable>
         </Pressable>
       </Modal>
@@ -691,12 +937,40 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: '600' },
   cardDesc: { fontSize: 14, marginTop: 4, lineHeight: 20 },
   due: { fontSize: 13, marginTop: 6 },
+  cardActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  cardActionBtn: {
+    flex: 1,
+    minWidth: 0,
+  },
   doneBtn: {
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
   },
   doneBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  secondaryBtn: {
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  secondaryBtnText: { fontWeight: '700', fontSize: 15 },
+  choiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 10,
+  },
+  modalHint: { fontSize: 14, lineHeight: 20, marginTop: 6, marginBottom: 4 },
   empty: {
     borderWidth: 1,
     borderRadius: 18,

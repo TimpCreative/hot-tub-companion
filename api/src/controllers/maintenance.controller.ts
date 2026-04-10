@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { db } from '../config/database';
 import { success, error } from '../utils/response';
+import { healAutoDuplicatesIfNeeded } from '../services/maintenanceDedupe.service';
+import { addUtcDays, formatDateKey, utcDateOnly } from '../services/maintenanceDateUtils';
+import { insertMaintenanceActivity, listMaintenanceActivity } from '../services/maintenanceActivity.service';
 import * as maintenanceSchedule from '../services/maintenanceSchedule.service';
 import { FILTER_CHAIN_EVENT_TYPES } from '../services/maintenanceCatalog';
 
@@ -15,6 +18,14 @@ function requireCustomerUser(req: Request, res: Response): string | null {
     return null;
   }
   return id;
+}
+
+function rowDueKey(row: Record<string, unknown>): string {
+  const d = row.due_date;
+  if (d instanceof Date) {
+    return formatDateKey(d);
+  }
+  return String(d ?? '').slice(0, 10);
 }
 
 function mapEvent(row: Record<string, unknown>) {
@@ -34,9 +45,16 @@ function mapEvent(row: Record<string, unknown>) {
     notificationDaysBefore: row.notification_days_before,
     linkedProductCategory: row.linked_product_category,
     source: row.source,
+    snoozedUntil: row.snoozed_until ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function applyNotSnoozedPending(q: import('knex').Knex.QueryBuilder) {
+  return q.where((b: import('knex').Knex.QueryBuilder) => {
+    b.whereNull('snoozed_until').orWhereRaw('snoozed_until <= CURRENT_TIMESTAMP');
+  });
 }
 
 function utcTodayKey(): string {
@@ -108,16 +126,31 @@ export async function listMaintenance(req: Request, res: Response): Promise<void
   }
 
   await ensureScheduleIfEmpty(spaProfileId);
+  await healAutoDuplicatesIfNeeded(spaProfileId);
 
   const today = utcTodayKey();
-  let q = db('maintenance_events').where({ spa_profile_id: spaProfileId, user_id: userId, tenant_id: tenantId });
+  let q = db('maintenance_events')
+    .where({ spa_profile_id: spaProfileId, user_id: userId, tenant_id: tenantId })
+    .whereNull('deleted_at');
 
   if (status === 'pending') {
     q = q.whereNull('completed_at');
+    q = applyNotSnoozedPending(q);
   } else if (status === 'completed') {
     q = q.whereNotNull('completed_at');
   } else if (status === 'overdue') {
     q = q.whereNull('completed_at').where('due_date', '<', today);
+    q = applyNotSnoozedPending(q);
+  } else {
+    q = q.where((outer) => {
+      outer
+        .whereNotNull('completed_at')
+        .orWhere((inner) => {
+          inner.whereNull('completed_at').where((s) => {
+            s.whereNull('snoozed_until').orWhereRaw('snoozed_until <= CURRENT_TIMESTAMP');
+          });
+        });
+    });
   }
 
   const countRow = await q.clone().count('* as c').first();
@@ -145,6 +178,7 @@ export async function completeMaintenance(req: Request, res: Response): Promise<
 
   const event = (await db('maintenance_events')
     .where({ id, user_id: userId, tenant_id: tenantId })
+    .whereNull('deleted_at')
     .first()) as Record<string, unknown> | undefined;
 
   if (!event) {
@@ -175,6 +209,23 @@ export async function completeMaintenance(req: Request, res: Response): Promise<
       completed_at: now,
       updated_at: trx.fn.now(),
     });
+
+    await insertMaintenanceActivity(
+      {
+        spaProfileId: event.spa_profile_id as string,
+        userId,
+        tenantId,
+        maintenanceEventId: id,
+        action: 'completed',
+        payload: {
+          title: event.title,
+          eventType: event.event_type,
+          dueDate: rowDueKey(event),
+          completedAt: now.toISOString(),
+        },
+      },
+      trx
+    );
 
     const isRecurring = event.is_recurring === true;
     const interval =
@@ -274,8 +325,18 @@ export async function createCustomMaintenance(req: Request, res: Response): Prom
     })
     .returning('*');
 
+  const mapped = mapEvent(row as Record<string, unknown>);
+  await insertMaintenanceActivity({
+    spaProfileId: body.spaProfileId,
+    userId,
+    tenantId,
+    maintenanceEventId: mapped.id as string,
+    action: 'created',
+    payload: { title: mapped.title, dueDate: body.dueDate },
+  });
+
   res.status(201);
-  success(res, { event: mapEvent(row as Record<string, unknown>) }, 'Created');
+  success(res, { event: mapped }, 'Created');
 }
 
 export async function updateCustomMaintenance(req: Request, res: Response): Promise<void> {
@@ -288,6 +349,7 @@ export async function updateCustomMaintenance(req: Request, res: Response): Prom
 
   const existing = (await db('maintenance_events')
     .where({ id, user_id: userId, tenant_id: tenantId })
+    .whereNull('deleted_at')
     .first()) as Record<string, unknown> | undefined;
 
   if (!existing) {
@@ -299,6 +361,7 @@ export async function updateCustomMaintenance(req: Request, res: Response): Prom
     return;
   }
 
+  const priorDue = rowDueKey(existing);
   const update: Record<string, unknown> = { updated_at: db.fn.now() };
   if (body.title !== undefined) {
     if (typeof body.title !== 'string' || !body.title.trim()) {
@@ -322,6 +385,17 @@ export async function updateCustomMaintenance(req: Request, res: Response): Prom
     error(res, 'NOT_FOUND', 'Maintenance event not found', 404);
     return;
   }
+  const newDue = rowDueKey(row);
+  if (body.dueDate !== undefined && newDue !== priorDue) {
+    await insertMaintenanceActivity({
+      spaProfileId: row.spa_profile_id as string,
+      userId,
+      tenantId,
+      maintenanceEventId: id,
+      action: 'rescheduled',
+      payload: { title: row.title, fromDueDate: priorDue, toDueDate: newDue, via: 'edit' },
+    });
+  }
   success(res, { event: mapEvent(row) }, 'Updated');
 }
 
@@ -334,6 +408,7 @@ export async function deleteCustomMaintenance(req: Request, res: Response): Prom
 
   const existing = (await db('maintenance_events')
     .where({ id, user_id: userId, tenant_id: tenantId })
+    .whereNull('deleted_at')
     .first()) as Record<string, unknown> | undefined;
 
   if (!existing) {
@@ -345,6 +420,216 @@ export async function deleteCustomMaintenance(req: Request, res: Response): Prom
     return;
   }
 
-  await db('maintenance_events').where({ id }).del();
+  await insertMaintenanceActivity({
+    spaProfileId: existing.spa_profile_id as string,
+    userId,
+    tenantId,
+    maintenanceEventId: id,
+    action: 'deleted',
+    payload: {
+      title: existing.title,
+      eventType: existing.event_type,
+      dueDate: rowDueKey(existing),
+    },
+  });
+
+  await db('maintenance_events').where({ id }).update({
+    deleted_at: db.fn.now(),
+    updated_at: db.fn.now(),
+  });
   success(res, { deleted: true });
+}
+
+const MAX_RESCHEDULE_DAYS_AHEAD = 366;
+
+export async function listMaintenanceActivityFeed(req: Request, res: Response): Promise<void> {
+  const userId = requireCustomerUser(req, res);
+  if (!userId) return;
+
+  const tenantId = (req as any).tenant?.id as string;
+  const spaProfileId = req.query.spaProfileId as string | undefined;
+  const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize ?? '50'), 10) || 50));
+
+  if (!spaProfileId || typeof spaProfileId !== 'string') {
+    error(res, 'VALIDATION_ERROR', 'spaProfileId is required', 400);
+    return;
+  }
+
+  const spa = await ensureSpaOwned(spaProfileId, userId, tenantId);
+  if (!spa) {
+    error(res, 'NOT_FOUND', 'Spa profile not found', 404);
+    return;
+  }
+
+  const result = await listMaintenanceActivity({ spaProfileId, userId, tenantId, page, pageSize });
+  success(res, result);
+}
+
+export async function snoozeMaintenance(req: Request, res: Response): Promise<void> {
+  const userId = requireCustomerUser(req, res);
+  if (!userId) return;
+
+  const tenantId = (req as any).tenant?.id as string;
+  const id = req.params.id as string;
+  const body = req.body as { preset?: string; customUntil?: string };
+
+  const event = (await db('maintenance_events')
+    .where({ id, user_id: userId, tenant_id: tenantId })
+    .whereNull('deleted_at')
+    .first()) as Record<string, unknown> | undefined;
+
+  if (!event) {
+    error(res, 'NOT_FOUND', 'Maintenance event not found', 404);
+    return;
+  }
+  if (event.completed_at) {
+    error(res, 'VALIDATION_ERROR', 'Cannot snooze a completed event', 400);
+    return;
+  }
+
+  const today = utcTodayKey();
+  const dk = rowDueKey(event);
+  if (dk >= today) {
+    error(res, 'VALIDATION_ERROR', 'Snooze is only for overdue tasks', 400);
+    return;
+  }
+
+  const preset = typeof body.preset === 'string' ? body.preset : '';
+  let snoozedUntil: Date;
+  const nowMs = Date.now();
+
+  if (preset === '1h') {
+    snoozedUntil = new Date(nowMs + 60 * 60 * 1000);
+  } else if (preset === '1d') {
+    snoozedUntil = new Date(nowMs + 24 * 60 * 60 * 1000);
+  } else if (preset === '7d') {
+    snoozedUntil = new Date(nowMs + 7 * 24 * 60 * 60 * 1000);
+  } else if (preset === 'custom') {
+    if (!body.customUntil || typeof body.customUntil !== 'string') {
+      error(res, 'VALIDATION_ERROR', 'customUntil ISO timestamp is required for custom snooze', 400);
+      return;
+    }
+    snoozedUntil = new Date(body.customUntil);
+    if (Number.isNaN(snoozedUntil.getTime()) || snoozedUntil.getTime() <= nowMs) {
+      error(res, 'VALIDATION_ERROR', 'customUntil must be a future time', 400);
+      return;
+    }
+  } else {
+    error(res, 'VALIDATION_ERROR', 'preset must be 1h, 1d, 7d, or custom', 400);
+    return;
+  }
+
+  await db('maintenance_events').where({ id }).update({
+    snoozed_until: snoozedUntil,
+    notification_sent: false,
+    updated_at: db.fn.now(),
+  });
+
+  await insertMaintenanceActivity({
+    spaProfileId: event.spa_profile_id as string,
+    userId,
+    tenantId,
+    maintenanceEventId: id,
+    action: 'snoozed',
+    payload: {
+      title: event.title,
+      eventType: event.event_type,
+      dueDate: dk,
+      preset: preset || null,
+      snoozedUntil: snoozedUntil.toISOString(),
+    },
+  });
+
+  const updated = await db('maintenance_events').where({ id }).first();
+  success(res, { event: mapEvent(updated as Record<string, unknown>) }, 'Snoozed');
+}
+
+export async function rescheduleMaintenance(req: Request, res: Response): Promise<void> {
+  const userId = requireCustomerUser(req, res);
+  if (!userId) return;
+
+  const tenantId = (req as any).tenant?.id as string;
+  const id = req.params.id as string;
+  const body = req.body as { preset?: string; dueDate?: string };
+
+  const event = (await db('maintenance_events')
+    .where({ id, user_id: userId, tenant_id: tenantId })
+    .whereNull('deleted_at')
+    .first()) as Record<string, unknown> | undefined;
+
+  if (!event) {
+    error(res, 'NOT_FOUND', 'Maintenance event not found', 404);
+    return;
+  }
+  if (event.completed_at) {
+    error(res, 'VALIDATION_ERROR', 'Cannot reschedule a completed event', 400);
+    return;
+  }
+
+  const today = utcTodayKey();
+  const priorDue = rowDueKey(event);
+  if (priorDue < today) {
+    error(res, 'VALIDATION_ERROR', 'Reschedule applies to tasks that are not overdue', 400);
+    return;
+  }
+
+  const preset = typeof body.preset === 'string' ? body.preset : '';
+  let newKey: string;
+
+  const baseDate = utcDateOnly(`${priorDue}T12:00:00.000Z`);
+
+  if (preset === '1d') {
+    newKey = formatDateKey(addUtcDays(baseDate, 1));
+  } else if (preset === '7d') {
+    newKey = formatDateKey(addUtcDays(baseDate, 7));
+  } else if (preset === 'custom') {
+    if (!body.dueDate || typeof body.dueDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.dueDate)) {
+      error(res, 'VALIDATION_ERROR', 'dueDate must be YYYY-MM-DD for custom reschedule', 400);
+      return;
+    }
+    newKey = body.dueDate;
+    if (newKey < today) {
+      error(res, 'VALIDATION_ERROR', 'New due date cannot be before today (UTC)', 400);
+      return;
+    }
+    const maxKey = formatDateKey(addUtcDays(utcDateOnly(`${today}T12:00:00.000Z`), MAX_RESCHEDULE_DAYS_AHEAD));
+    if (newKey > maxKey) {
+      error(res, 'VALIDATION_ERROR', `dueDate cannot be more than ${MAX_RESCHEDULE_DAYS_AHEAD} days out`, 400);
+      return;
+    }
+  } else {
+    error(res, 'VALIDATION_ERROR', 'preset must be 1d, 7d, or custom', 400);
+    return;
+  }
+
+  if (newKey === priorDue) {
+    error(res, 'VALIDATION_ERROR', 'Due date unchanged', 400);
+    return;
+  }
+
+  await db('maintenance_events').where({ id }).update({
+    due_date: newKey,
+    snoozed_until: null,
+    notification_sent: false,
+    updated_at: db.fn.now(),
+  });
+
+  await insertMaintenanceActivity({
+    spaProfileId: event.spa_profile_id as string,
+    userId,
+    tenantId,
+    maintenanceEventId: id,
+    action: 'rescheduled',
+    payload: {
+      title: event.title,
+      eventType: event.event_type,
+      fromDueDate: priorDue,
+      toDueDate: newKey,
+      preset,
+    },
+  });
+
+  const updated = await db('maintenance_events').where({ id }).first();
+  success(res, { event: mapEvent(updated as Record<string, unknown>) }, 'Rescheduled');
 }
