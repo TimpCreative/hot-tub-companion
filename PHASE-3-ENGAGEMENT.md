@@ -16,7 +16,7 @@
 | **Retailer Admin — Products ↔ UHTD mapping** | ✅ Partial | **Shipped:** list enrichment with top suggestion score (tiered % pills), `pcdb_parts` join for mapped part labels, extended list sort (visibility, mapping status, confidence), modal **Product mapping** vs **UHTD Suggestions** with confirm/clear keeping the modal open. See [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md § Retailer Admin: Products and UHTD mapping UX](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#retailer-admin-products-and-uhtd-mapping-ux). **Still open:** performance at very large page sizes (batch/denormalize scores later), optional super-admin deep link to PCdb part. |
 | **Referral program** | ❌ | Still planned in this phase |
 | **Water Care Assistant** | ✅ Partial | **Shipped (Apr 2026):** Super Admin **Water Care** — canonical metrics (scale min/max, default ideals), chemistry profiles + scope mappings (priority tie-break documented in UI), published **test kits** (per-metric help, numeric vs color-assist, **color scale points** `{ spots: [{ value, color, label? }] }`). **Mobile:** Water Care tab (resolved profile, comparison vs latest test), **log test** with profile-driven measurements, optional kit picker, dosage **recommendations** on save, list/history via **Maintenance log** / water-tests API. **Still open vs Part 1 spec:** fixed pH/slider UI, trend charts, color-assist entry from kit spots on device, recommendation → **Add to cart** product cards, retailer admin for opted-in shared tests, full `chemical_dosage_rules` breadth. |
-| **Seasonal maintenance timeline** | ✅ Shipped | **Care schedule** (`maintenance-timeline`), auto schedule + custom tasks, push cron, spa usage months / winter strategy (onboarding + edit), completing tasks updates `spa_profiles` tracking (`last_filter_change`, `last_water_test_at`, `last_drain_refill_at`, `last_cover_check_at`), Home **maintenance_summary** widget, guides surfacing, unit tests in `api` (`npm test`). **Time v1.1:** due dates + cron use **UTC calendar**; tenant/user TZ later. **Ops:** schedule `POST /api/v1/internal/cron/maintenance-reminders` daily with `CRON_SECRET` (same as other internal crons; e.g. Railway Cron). |
+| **Seasonal maintenance timeline** | ✅ Shipped (Apr 2026+) | **Care schedule** (`maintenance-timeline`): auto schedule + custom tasks; **Overdue / This week / Upcoming (30d by week) / Later (beyond 30d)** — compact **Later** rows (title + due, tap → reschedule modal). **Actions:** Mark done, **Snooze** (overdue), **Reschedule** (not overdue); **Task history** screen + activity API. **Backend:** `snoozed_until`, soft **`deleted_at`** for custom, **`maintenance_activity`** audit log; **dedupe** pending auto tasks per `event_type` (keep **nearest upcoming** due, else latest overdue); `POST …/snooze`, `POST …/reschedule`, `GET …/maintenance/activity`. **Cron:** `maintenance-reminders` (lead-up window **and** one-time overdue nudge if `notification_sent` still false); **`POST …/internal/cron/regenerate-maintenance-schedules`** (all spas or `?spaProfileId=`) for ops. **Tracking / guides / widget / UTC v1** unchanged; **tenant/user TZ** still v1.1. **Ops:** daily `maintenance-reminders` + optional periodic or on-demand **regenerate** with `CRON_SECRET`. |
 | **Content system** | ✅ Partial | Core universal + retailer content platform is shipped; contextual recommendation/search refinements remain |
 | **Subscription management** | ❌ | Still planned in this phase |
 | **Cross-platform QA** | ⏳ | Ongoing as features ship |
@@ -26,7 +26,15 @@
 1. **Commerce backend:** product sync pagination/retry, `order_references` from `orders/create`, Storefront variant GID normalization, read APIs for shop/PDP — [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#recommended-delivery-order).
 2. **Customer app:** read-only Shop, PDP, multi-spa selector, then cart + Checkout Kit, then Home orders card.
 3. **Pilot prep:** TAB catalog QA, webhook/order idempotency extensions if needed, manual checklist (#1–4 in *Manual Steps Required* below).
-4. **Engagement streams:** referrals, **water care polish** (charts, shop links, mobile color-assist), subscriptions — seasonal timeline is shipped; referrals/bundles ordering per commerce doc.
+4. **Engagement streams:** referrals, **water care polish** (charts, shop links, mobile color-assist), subscriptions — care schedule core + history/snooze/reschedule shipped; referrals/bundles ordering per commerce doc.
+
+### Care schedule — still open (nice-to-have / v1.1)
+
+- **Timezone-aware due dates and cron “today”** (still UTC calendar v1).
+- **Optional `includeSnoozed`** on list API + in-app “Snoozed” section if product wants visibility while hidden.
+- **Repeat overdue reminders** (current design: one lead-up window + one overdue nudge per row while `notification_sent` is false).
+- **History backfill** from legacy rows (optional migration of `completed` activity from historical `completed_at`).
+- **Deeper QA:** very large `pageSize` / pagination if pending lists grow past mobile fetch cap.
 
 ### Content shipped from this phase
 
@@ -86,7 +94,7 @@ Work is grouped **below** for clarity; later parts of this document retain detai
    Test logging, recommendations, purchasable product links.
 
 4. **Seasonal Maintenance Timeline**  
-   Push triggers, recurring tasks.
+   Push triggers, recurring tasks, snooze/reschedule, dedupe, activity history, **Later** horizon UI, ops regenerate cron — see **Part 2** (shipped Apr 2026+).
 
 5. **Content system**  
    Core content management is already live (universal + retailer content, targeting, categories, suppression, mobile rendering). Remaining work in this phase is search/recommendation depth and contextual placement refinement.
@@ -229,7 +237,7 @@ GET    /api/v1/admin/water-tests?customerId=X
 
 `spa_profiles` includes **`winter_strategy`**: `'shutdown' | 'operate'`, default **`operate`** (no winterize/spring pair until the customer opts into shutdown).
 
-`maintenance_events` includes **`source`**: `'auto' | 'custom'`, default **`auto`**. Regenerating the schedule deletes only future **incomplete** rows where **`source = 'auto'`**; completed history and **custom** rows are kept.
+`maintenance_events` includes **`source`**: `'auto' | 'custom'`, default **`auto`**. Regenerating the schedule deletes only future **incomplete** rows where **`source = 'auto'`** (and `deleted_at` null); completed history and **custom** rows are kept. **Shipped migrations** also add **`snoozed_until`** (hide from pending list and reminders until elapsed), **`deleted_at`** (soft delete for **custom** only), and append-only **`maintenance_activity`** (completed, snoozed, rescheduled, deleted, superseded, created).
 
 ```sql
 CREATE TABLE maintenance_events (
@@ -248,6 +256,7 @@ CREATE TABLE maintenance_events (
   notification_days_before INTEGER DEFAULT 3,
   linked_product_category VARCHAR(50),  -- e.g. 'filter','cover','chemical' for shop hints
   source VARCHAR(20) NOT NULL DEFAULT 'auto',
+  -- Plus: snoozed_until, deleted_at (see migrations; not in sketch below)
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -272,7 +281,7 @@ When a spa profile is created or usage_months change, generate 12 months of main
 
 Skip generating events for months the user has marked as off (except winterize/startup events which specifically target those transitions).
 
-When regenerating (user changes `usage_months` or `winter_strategy`), delete future **auto** uncompleted events from **today onward** and recreate. Keep completed events and **custom** tasks.
+When regenerating (user changes `usage_months` or `winter_strategy`), delete future **auto** uncompleted events from **today onward** and recreate. Keep completed events and **custom** tasks. **Dedupe:** after insert, pending **auto** rows are collapsed to **one per `event_type`**, keeping the **nearest upcoming** due date (or latest overdue if all pending for that type are overdue); superseded rows are removed and logged in **`maintenance_activity`**.
 
 **Recurring completion:** `POST /maintenance/:id/complete` sets `completed_at` and, when `is_recurring` is true, inserts the next row with `due_date =` completed date + interval, **snapped to the next in-use month** if that date falls in an off-month (UTC calendar v1).
 
@@ -281,11 +290,12 @@ When regenerating (user changes `usage_months` or `winter_strategy`), delete fut
 Accessible from **Water Care** and the **Care schedule** tab (`maintenance-timeline`).
 
 **Layout (implemented):**
-- Overdue section: tasks past due date, not completed
-- This week: tasks due in the next 7 days
-- Upcoming: next 30 days, **grouped by calendar week** (UTC Monday week start)
-- Each task card: **icon by event type**, title, due date, "Mark done"
-- **Custom tasks:** add, edit, delete (custom source only); API `POST/PUT/DELETE /maintenance`
+- **Overdue:** tasks with due date **before today (UTC)**, not completed, not actively snoozed (same as API pending filter)
+- **This week:** due in the next 7 days — card: icon, title, due, **Mark done** + **Reschedule**
+- **Upcoming:** next 30 days, **grouped by calendar week** (UTC Monday week start) — same card actions
+- **Later:** due **after** 30 days — **compact row** (title + due date with year); **tap** opens **reschedule** modal (same presets/custom as full cards); no inline Mark done / Reschedule buttons on the row
+- **Snooze** (overdue only): defers visibility without changing `due_date`; **History** (hero icon): activity feed (completions, snoozes, reschedules, deletes, dedupe supersede, etc.)
+- **Custom tasks:** add, edit, delete (soft delete + activity); API `POST/PUT/DELETE /maintenance`
 - **Guides:** up to two items from content categories `maintenance` and `seasonal`, plus link to Guides with `category=maintenance`
 - On "Mark done":
   - Sets `completed_at`; recurring tasks insert the next row (snapped to in-use months)
@@ -300,7 +310,12 @@ Accessible from **Water Care** and the **Care schedule** tab (`maintenance-timel
 
 **Route:** `POST /api/v1/internal/cron/maintenance-reminders` (same `CRON_SECRET` / `cronAuth` as other internal crons). Run daily (e.g. Railway cron).
 
-**Selection (UTC calendar dates, v1):** For each row with `completed_at IS NULL` and `notification_sent = false`, let `notify_date = due_date - notification_days_before` (calendar days). Send when **`today >= notify_date` AND `today <= due_date`** (inclusive). This replaces the earlier pseudo-SQL interval cast, which mixed types incorrectly.
+**Selection (UTC calendar dates, v1):** Candidates: `completed_at` null, `deleted_at` null, not actively **snoozed**, `notification_sent = false`. For each row, let `notify_date = due_date - notification_days_before` (calendar days).
+
+1. **Lead-up:** send when **`today >= notify_date` AND `today <= due_date`** (inclusive). Body: due soon.
+2. **One-time overdue nudge:** if **`today > due_date`** (still pending, not yet notified), send an **overdue** body once; then set `notification_sent = true` (avoids daily spam; recurring tasks get a fresh row after complete).
+
+**Regenerate (ops):** `POST /api/v1/internal/cron/regenerate-maintenance-schedules` with `CRON_SECRET`. Optional query `spaProfileId`; omit to rebuild auto horizon for **all** spa profiles. Use after deploy or data fixes.
 
 **Timezone note (v1.1):** Cron and due-date comparisons use the server’s UTC calendar day. A future revision may align `due_date` and cron “today” to the user’s or tenant’s timezone.
 
@@ -308,16 +323,19 @@ Accessible from **Water Care** and the **Care schedule** tab (`maintenance-timel
 
 `{ linkType: 'maintenance_event', linkId: <event id>, spaProfileId: <spa_profile_id> }`
 
-After a successful send, set `notification_sent = true` on that event.
+After a successful send, set `notification_sent = true` on that event. Response may include **`notifiedLeadUp`** / **`notifiedOverdue`** counts for observability.
 
 ### 2.5 API Endpoints
 
 ```
 GET    /api/v1/maintenance?spaProfileId=X&status=pending|completed|overdue&page=1
+GET    /api/v1/maintenance/activity?spaProfileId=X&page=1&pageSize=50
 POST   /api/v1/maintenance/:id/complete
+POST   /api/v1/maintenance/:id/snooze   (overdue only; body: preset 1h|1d|7d|custom + optional customUntil)
+POST   /api/v1/maintenance/:id/reschedule  (not overdue; body: preset 1d|7d|custom + optional dueDate)
 POST   /api/v1/maintenance  (create custom event)
 PUT    /api/v1/maintenance/:id
-DELETE /api/v1/maintenance/:id  (only custom events)
+DELETE /api/v1/maintenance/:id  (custom only; soft delete + activity)
 ```
 
 ### 2.6 Manual QA (post-deploy)
@@ -330,7 +348,8 @@ DELETE /api/v1/maintenance/:id  (only custom events)
 - Complete filter / water test / drain / cover tasks → corresponding `spa_profiles` tracking columns update.
 - **Custom task** create → edit → delete → list updates.
 - **Home:** with `maintenance_summary` enabled, widget shows pending tasks and opens Care schedule.
-- Hit **`POST /api/v1/internal/cron/maintenance-reminders`** daily with `CRON_SECRET` (e.g. Railway Cron); with `notification_pref_maintenance` on, device receives push; tap opens **Care schedule** with optional `eventId` highlight.
+- Hit **`POST /api/v1/internal/cron/maintenance-reminders`** daily with `CRON_SECRET` (e.g. Railway Cron); with `notification_pref_maintenance` on, device receives push; tap opens **Care schedule** with optional `eventId` highlight. Optionally run **`POST …/regenerate-maintenance-schedules`** once after deploy or catalog/config changes.
+- **Snooze** an overdue task → hidden until `snoozed_until`; **Reschedule** a non-overdue task → moves sections; **History** shows activity; **Later** shows far-future tasks compactly.
 - Auth: another user cannot list or complete events for a spa they do not own.
 - API: `npm test` in `/api` runs maintenance schedule helper tests.
 
@@ -1041,8 +1060,9 @@ Before moving to Phase 4, verify:
 - [ ] Trend charts render correctly for 30/60/90 day views
 - [x] Maintenance timeline auto-generates on spa registration
 - [x] Seasonal winterize/startup events generate correctly based on usage months
-- [ ] Maintenance notification cron fires and delivers push notifications *(configure host cron; see §2.4 / CREATING-A-NEW-TENANT §9.5)*
+- [ ] Maintenance notification cron fires and delivers push notifications *(configure host cron; see §2.4 / CREATING-A-NEW-TENANT §9.5)* — **lead-up + one-time overdue nudge** implemented
 - [x] Completing a maintenance task generates the next recurring instance
+- [x] Care schedule: snooze (overdue), reschedule (not overdue), dedupe auto duplicates, activity/history, **Later** compact section, ops **regenerate-maintenance-schedules** cron
 - [ ] Content displays filtered by spa brand, model, and sanitization system
 - [ ] Retailer content takes priority over universal content
 - [ ] Video content embeds YouTube correctly
