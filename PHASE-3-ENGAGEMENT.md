@@ -12,13 +12,13 @@
 
 | Area | Status | Notes |
 |------|--------|-------|
-| **Commerce (Shop / cart / checkout)** | ✅ Partial | **Shipped:** Shop, Storefront cart, native Checkout Kit; **verified Apr 2026** test checkout. Detail: [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md). Subscriptions / bundles still planned. |
+| **Commerce (Shop / cart / checkout)** | ✅ Partial | **Shipped:** Shop, Storefront cart, native Checkout Kit; **verified Apr 2026** test checkout. Detail: [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md). **Subscriptions:** architecture locked in [Part 4](#part-4-subscriptions--recurring-commerce); implementation pending. |
 | **Retailer Admin — Products ↔ UHTD mapping** | ✅ Partial | **Shipped:** list enrichment with top suggestion score (tiered % pills), `pcdb_parts` join for mapped part labels, extended list sort (visibility, mapping status, confidence), modal **Product mapping** vs **UHTD Suggestions** with confirm/clear keeping the modal open. See [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md § Retailer Admin: Products and UHTD mapping UX](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#retailer-admin-products-and-uhtd-mapping-ux). **Still open:** performance at very large page sizes (batch/denormalize scores later), optional super-admin deep link to PCdb part. |
 | **Referral program** | ❌ | Still planned in this phase |
 | **Water Care Assistant** | ✅ Partial | **Shipped (Apr 2026):** Super Admin **Water Care** — canonical metrics (scale min/max, default ideals), chemistry profiles + scope mappings (priority tie-break documented in UI), published **test kits** (per-metric help, numeric vs color-assist, **color scale points** `{ spots: [{ value, color, label? }] }`). **Mobile:** Water Care tab (resolved profile, comparison vs latest test), **log test** with profile-driven measurements, optional kit picker, dosage **recommendations** on save, list/history via **Maintenance log** / water-tests API. **Still open vs Part 1 spec:** fixed pH/slider UI, trend charts, color-assist entry from kit spots on device, recommendation → **Add to cart** product cards, retailer admin for opted-in shared tests, full `chemical_dosage_rules` breadth. |
 | **Seasonal maintenance timeline** | ✅ Shipped (Apr 2026+) | **Care schedule** (`maintenance-timeline`): auto schedule + custom tasks; **Overdue / This week / Upcoming (30d by week) / Later (beyond 30d)** — compact **Later** rows (title + due, tap → reschedule modal). **Actions:** Mark done, **Snooze** (overdue), **Reschedule** (not overdue); **Task history** screen + activity API. **Backend:** `snoozed_until`, soft **`deleted_at`** for custom, **`maintenance_activity`** audit log; **dedupe** pending auto tasks per `event_type` (keep **nearest upcoming** due, else latest overdue); `POST …/snooze`, `POST …/reschedule`, `GET …/maintenance/activity`. **Cron:** `maintenance-reminders` (lead-up window **and** one-time overdue nudge if `notification_sent` still false); **`POST …/internal/cron/regenerate-maintenance-schedules`** (all spas or `?spaProfileId=`) for ops. **Tracking / guides / widget / UTC v1** unchanged; **tenant/user TZ** still v1.1. **Ops:** daily `maintenance-reminders` + optional periodic or on-demand **regenerate** with `CRON_SECRET`. |
 | **Content system** | ✅ Partial | Core universal + retailer content platform is shipped; contextual recommendation/search refinements remain |
-| **Subscription management** | ❌ | Still planned in this phase |
+| **Subscription management** | ❌ | Spec in [Part 4](#part-4-subscriptions--recurring-commerce): Stripe Connect + tenant CNAME web checkout + Shopify (or TAB/POS) fulfillment; Chewy-style self-service MVP. |
 | **Cross-platform QA** | ⏳ | Ongoing as features ship |
 
 ### Next steps (Phase 3 — suggested order)
@@ -67,9 +67,9 @@
 
 6. **Gather chemical dosage data.** Dosage tables for pH, alkalinity, sanitizer, calcium — per gallon per unit; source from manufacturer labels.
 
-7. **Confirm TAB's subscription preferences.** Shopify Subscriptions (Recharge/Bold, etc.) vs internal subscription engine.
+7. **Stripe Connect (platform).** Platform account approved for Connect; test **Express** (or chosen account type) onboarding flow; retailer agreement template (retailer is seller; disputes; application fee). **Per tenant:** no subscription sales until **Connect `charges_enabled`** **or** tenant is onboarded as **white-label** with fulfillment routed through TAB.
 
-8. **Design preset bundles with TAB.** 3–5 presets: New Owner Starter Kit, Monthly Bromine/Chlorine packs, Winterization, Spring Startup, etc.
+8. **Subscription bundles with TAB (pilot).** Use retailer admin **subscription bundle builder** (Part 4): 3–5 presets (e.g. New Owner Starter, monthly sanitizer packs, winterization, spring startup); map components to real Shopify variants for order explosion; confirm Stripe Prices on connected account match bundle pricing (retailer-owned).
 
 **Referrals (all tiers)**
 
@@ -100,7 +100,7 @@ Work is grouped **below** for clarity; later parts of this document retain detai
    Core content management is already live (universal + retailer content, targeting, categories, suppression, mobile rendering). Remaining work in this phase is search/recommendation depth and contextual placement refinement.
 
 6. **Subscription management (Chewy-style)**  
-   Internal engine, bundles, deliveries — as specified in Part 4 of this doc.
+   **Stripe Connect** (retailer = seller), **tenant CNAME** subscription web checkout, **Shopify orders** (or TAB / POS) for fulfillment per tenant — full spec [Part 4](#part-4-subscriptions--recurring-commerce).
 
 7. **Cross-platform QA**  
    Android verification alongside iOS for new surfaces.
@@ -595,174 +595,129 @@ DELETE /api/v1/super-admin/content/:id
 
 ---
 
-## Part 4: Subscription Management
+## Part 4: Subscriptions & recurring commerce
 
-### 4.1 Two Modes
+> **Strategic summary:** One-off purchases stay **in-app → Shopify Checkout Kit** (existing commerce). **Subscriptions** are sold and billed on **Hot Tub Companion–hosted web** at the tenant’s **existing CNAME** (e.g. `takeabreak.hottubcompanion.com/subscriptions`), with **Stripe Connect** so the **retailer is the seller** (not HTC). **Hot Tub Companion** is the **platform** (application fee % on subscription revenue). This supports retailers **without Shopify** (subscriptions still work; fulfillment routes to **TAB white-label** or their **POS**). We do **not** rely on Seal, Shopify Selling Plans, or Recharge/Bold as the primary subscription stack.
 
-**Mode A — Shopify-backed:** Retailer has Shopify with subscription capability. We create/manage subscriptions via Shopify's Selling Plan API or partner app API. Billing handled entirely by Shopify.
+### 4.1 Non-negotiables (product & policy)
 
-**Mode B — Internal engine:** We manage the schedule. On each delivery date, we programmatically create a Shopify cart with the subscription items, generate a checkout URL, and either auto-charge (if the retailer's Shopify supports draft orders) or notify the customer to complete checkout. This is more complex but keeps us out of payment processing.
+- **Physical goods only** in commerce positioning: subscription programs are **shipped / fulfilled physical** offers. **No digital goods** sold through the app or subscription web flows.
+- **App Store posture:** Do not steer users with **“cheaper on web”** or other copy that undermines store rules; keep pricing messaging neutral.
+- **Merchant of record for subscription charges:** **Retailer** (via **Stripe connected account**). HTC does **not** “own” the subscription sale; retailer agreement and Stripe Connect configuration must reflect that.
+- **Gate to live subscription sales:** A tenant may **not** sell subscriptions until **Stripe Connect** is fully onboarded (`charges_enabled` / equivalent) **or** the tenant is explicitly onboarded as **white-label** with fulfillment passed through **TAB** (or another agreed path). No half-enabled billing.
 
-Store mode per tenant: `tenants.subscription_mode = 'shopify' | 'internal'`
+### 4.2 Customer journeys (two rails)
 
-### 4.2 Database Tables
+| Intent | Where it runs | Payment / vault |
+|--------|----------------|-----------------|
+| **Single purchase** | In-app → **Checkout Kit** (native sheet) or equivalent web presentation of **Shopify** checkout | **Shopify** / retailer gateway |
+| **Subscribe** (new or manage payment) | In-app opens **tenant CNAME** in in-app browser / SFSafariViewController (pop-up web context) | **Stripe** on retailer’s **connected account** |
 
-```sql
-CREATE TABLE subscriptions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  spa_profile_id UUID REFERENCES spa_profiles(id),
+- **Subscribe as hero (category-level):** Retailer or platform config can elevate **Subscribe** visually for categories where subscription is the primary offer (e.g. recurring chemicals); elsewhere **Checkout** remains the default primary CTA.
+- **Product detail (PDP):** When a SKU or bundle supports subscription, show **two** actions: **Checkout** (one-time cart → Shopify) and **Subscribe** (distinct color / hierarchy per category rules). Hide **Subscribe** when the offer is not subscribable.
+- **Handoff:** App passes a **short-lived signed token** (or session exchange) so the web property knows the **user + tenant** without redundant login where possible.
+- **Return to app:** Success / cancel URLs use **deep links** or universal links so the customer lands back in the app after checkout.
 
-  -- Management
-  managed_by VARCHAR(20) NOT NULL DEFAULT 'internal',  -- 'shopify' | 'internal'
-  shopify_subscription_id VARCHAR(255),  -- if managed by Shopify
+### 4.3 Retailer admin: subscription bundle builder
 
-  -- Schedule
-  frequency_days INTEGER NOT NULL,  -- 30, 60, 90
-  next_delivery_date DATE NOT NULL,
-  last_delivery_date DATE,
+- **Bundle builder** (retailer admin): Retailers define **subscription-first bundles** that may also be **purchasable one-time** in the shop experience.
+- Each bundle has **components**: line items that map to **real inventory** (e.g. Shopify `variant_id` / internal SKU references). **Source of truth** for “what’s in the box” lives in **HTC**, not only in Stripe or Shopify alone.
+- **Stripe:** Subscription is typically **one Price per bundle** (MVP) on the **connected account**; retailer sets **all** list prices — HTC does not set retail prices.
+- **Shopify fulfillment (when tenant has Shopify):** On each successful subscription billing cycle, create **one Shopify order** that **does not** take payment through Shopify: order appears as a **normal order** with **external / manual / non–Shopify Payments** payment representation (exact gateway label per Shopify API + shop settings). **Explode** the bundle into **component line items** so **inventory** and picking match reality.
+- **Validation:** On bundle save, validate every component variant exists and is sellable; block publish if mapping is broken (avoids “Stripe charged but Shopify order create failed”).
 
-  -- Items
-  items JSONB NOT NULL DEFAULT '[]',
-  -- Format: [{ posProductId, posVariantId, title, quantity, priceAtCreation }]
+### 4.4 Fulfillment, inventory, and OOS (Shopify tenants)
 
-  -- Status
-  status VARCHAR(20) NOT NULL DEFAULT 'active',  -- 'active','paused','cancelled'
-  paused_at TIMESTAMPTZ,
-  pause_until DATE,  -- auto-resume date (for seasonal pausing)
-  cancelled_at TIMESTAMPTZ,
-  cancel_reason TEXT,
+- **One order per billing cycle** in Shopify for that cycle’s shipment (not multiple ghost checkouts per delivery).
+- **Pre-fulfillment (~1 week before ship):** Run an **inventory check** and optionally a **draft order** workflow. **Shopify draft-order / reservation behavior varies by plan and API** — **spike required** on a pilot shop to confirm whether drafts **reserve** stock as desired. If Shopify does not reserve, fall back to **availability API checks** before charging or before finalizing fulfillment.
+- **Out of stock before ship:** Notify customer; offer choices: **substitution**, **ship what’s available**, **skip this cycle** (business rules implemented in HTC; Stripe subscription schedule / credits / skips coordinated in backend).
+- **Multi-location:** Not v1-critical; when needed, set **fulfillment location** / routing on created orders per tenant rules.
 
-  -- Pricing
-  discount_percentage DECIMAL(5,2) DEFAULT 0,  -- e.g., 10.00 for 10% off
+### 4.5 Retailers without Shopify
 
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX idx_subs_user ON subscriptions(user_id);
-CREATE INDEX idx_subs_tenant ON subscriptions(tenant_id);
-CREATE INDEX idx_subs_next ON subscriptions(next_delivery_date) WHERE status = 'active';
+- **Why own engine:** Subscriptions must work for retailers **without** ecommerce; Stripe Connect + HTC web checkout is the universal path.
+- **Fulfillment:** No Shopify order — route to **preferred POS**, **export**, or **TAB white-label** operations per tenant configuration (same Connect billing; different fulfillment sink).
 
-CREATE TABLE subscription_deliveries (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
-  scheduled_date DATE NOT NULL,
-  status VARCHAR(20) NOT NULL DEFAULT 'pending',  -- 'pending','processing','completed','failed','skipped'
-  shopify_order_id VARCHAR(255),
-  checkout_url TEXT,  -- for internal mode: customer completes this checkout
-  error_message TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX idx_deliveries_sub ON subscription_deliveries(subscription_id);
-CREATE INDEX idx_deliveries_pending ON subscription_deliveries(scheduled_date) WHERE status = 'pending';
-```
+### 4.6 Tax
 
-### 4.3 Subscription Customer Experience (Chewy-style)
+- **One-offs:** Tax via **Shopify** checkout.
+- **Subscriptions:** Tax via **Stripe Tax** (or equivalent) on subscription checkout, configured for **connected accounts** as appropriate for jurisdictions.
+- **Expectation:** Line-level tax may **differ** between Shopify and Stripe engines; document for support; not a blocker unless legal requires parity.
 
-**Subscribe from product detail page:**
-- On compatible products, show "Subscribe & Save" option below "Add to Cart"
-- Select frequency: Every 30 / 60 / 90 days
-- If retailer offers discount: "Save [X]% with subscription"
-- Creates subscription record
+### 4.7 Chargebacks, disputes, refunds
 
-**Subscription management screen (accessible from Profile or My Tub):**
-- List of active subscriptions with next delivery date
-- For each subscription:
-  - **View items:** Product names, quantities, prices
-  - **Edit items:** Change quantities, swap products (search for compatible alternatives), add/remove items
-  - **Change frequency:** 30 / 60 / 90 day selector
-  - **Skip next delivery:** Pushes next_delivery_date by one frequency interval
-  - **Pause:** Pause indefinitely or until a specific date. For seasonal users: "Pause until [first on-month]" preset button
-  - **Resume:** Reactivate a paused subscription, set next delivery date
-  - **Cancel:** Confirmation dialog with optional reason. "Are you sure? You'll lose your [X]% subscriber discount."
+- **Primary owner:** **Retailer** responds to **card disputes** on their connected account (Stripe **Express** dashboard or equivalent).
+- **HTC:** Webhooks (`charge.dispute.*`, etc.) → **notify retailer** (email + retail admin); optional internal queue; **playbook** for evidence (delivery proof, terms acceptance, timestamps). Refunds that touch **both** Stripe and **Shopify order** state must follow a defined **reconciliation** procedure (**Section 4.9**).
 
-**Seasonal intelligence:**
-- If the user's spa has off-months and they have an active chemical subscription, proactively suggest pausing:
-  - Push notification 2 weeks before first off-month: "Winterizing soon? Pause your [Subscription Name] while your tub is closed. [Pause] [Keep Active]"
-- Similarly, suggest resuming before the first on-month
+### 4.8 Identity across rails
 
-### 4.4 Internal Subscription Engine (Cron)
+- **Canonical:** App account **email** (verified). **Prefill** that email on **Shopify** checkout (cart attributes / buyer identity as supported) and on **Stripe Customer** for the connected account.
+- **Linking in DB:** `user_id` ↔ `tenant_id` ↔ `stripe_customer_id` (per connected account) ↔ `shopify_customer_id` when learnable from orders/webhooks. Strong cryptographic proof that “same human” clicked both flows is unnecessary if **one login** drives both CTAs.
 
-For tenants with `subscription_mode = 'internal'`:
+### 4.9 Reliability & reconciliation (mandatory)
 
-Daily cron job:
-1. Find subscriptions where `status = 'active'` AND `next_delivery_date <= today`
-2. For each:
-   a. Create a `subscription_deliveries` record with status 'processing'
-   b. Create a Shopify cart via Storefront API with the subscription items (apply discount if applicable)
-   c. Get the checkoutUrl
-   d. Send push notification: "Your [Subscription Name] delivery is ready! Complete your order → [deep link to checkout]"
-   e. Store checkoutUrl in the delivery record
-   f. Update subscription `next_delivery_date += frequency_days`
-3. If cart creation fails (product out of stock, etc.), set delivery status to 'failed' and notify customer
+- **Stripe webhooks** (`checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.*`, `account.updated` for Connect status, disputes): **verify signatures**, **idempotent** processing (`event.id` dedupe).
+- **Fulfillment state machine** (illustrative states): e.g. `stripe_paid` → `shopify_order_created` (or `fulfillment_routed`) → terminal success; `fulfillment_exception` for OOS / API failure with **human queue**.
+- **Retries** with backoff; **dead-letter** for poison events; **admin tool**: “retry Shopify order create for invoice X.”
+- **Never** assume a single webhook delivery.
 
-**Auto-resume for date-paused subscriptions:**
-Daily cron also checks:
-```sql
-UPDATE subscriptions SET status = 'active', paused_at = NULL
-WHERE status = 'paused' AND pause_until IS NOT NULL AND pause_until <= CURRENT_DATE;
-```
+### 4.10 Platform fee
 
-### 4.5 Subscription Bundles (Presets)
+- HTC takes an **application fee** (**percentage**, configurable per agreement) on subscription charges via **Connect**; disclose in retailer agreement and surface in **retail admin** reporting.
 
-```sql
-CREATE TABLE subscription_bundles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,  -- NULL = TimpCreative preset
-  name VARCHAR(255) NOT NULL,
-  description TEXT,
-  image_url TEXT,
-  items JSONB NOT NULL,  -- [{ uhtdPartCategory, genericPartName, defaultQuantity }]
-  target_sanitization_systems TEXT[],  -- which systems this bundle is for
-  suggested_frequency_days INTEGER DEFAULT 30,
-  is_active BOOLEAN DEFAULT true,
-  sort_order INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
+### 4.11 MVP customer experience (Chewy-style) — in app
 
-Bundles are templates. When a customer selects a bundle, the app resolves the generic items to actual products from the retailer's mapped inventory and creates a subscription.
+**Must ship for subscriptions MVP:**
 
-**Bundle screen in app:**
-- Shown during onboarding ("Set up automatic deliveries?") and on the Subscriptions page
-- Cards for each bundle: name, description, image, estimated monthly cost, "Subscribe" button
-- On subscribe: app maps bundle items to retailer products, shows the specific products + prices, customer confirms
+- List active subscriptions, **next ship / next charge** date, line items and prices.
+- **Edit** quantities / swap products / add-remove lines (within retailer rules).
+- **Change frequency** where product allows.
+- **Skip next cycle**, **pause** (indefinite or until date — including seasonal presets), **resume**, **cancel** (with confirm + optional reason).
+- **Payment method update** path (Stripe Customer Portal and/or hosted flow on tenant CNAME).
+- **OOS / substitution** comms tied to **Section 4.4**.
+- **Seasonal nudges:** e.g. push before off-months suggesting pause; suggest resume before on-month (unchanged intent from prior spec).
 
-### 4.6 API Endpoints
+Implementation backs UI with **HTC APIs** that call **Stripe** and update **local subscription state**; app does **not** hold Stripe secrets.
+
+### 4.12 Database (illustrative — align migrations to implementation)
+
+Replace legacy `managed_by shopify|internal` and “cron builds cart for customer to pay” models with something like:
+
+- **`stripe_connected_accounts`:** `tenant_id`, `stripe_account_id`, onboarding status flags, `charges_enabled`, `payouts_enabled`, timestamps.
+- **`subscription_bundle_definitions`** (or equivalent): tenant-owned bundles, component JSON (variant refs, qty), Stripe Price id(s) on connected account, one-time eligibility flags, category/display for “hero Subscribe” placement.
+- **`customer_subscriptions`:** `user_id`, `tenant_id`, `spa_profile_id` optional, `stripe_subscription_id`, `stripe_customer_id` (scoped to connected account), status mirrors, `current_period_end`, cancel/pause metadata, audit fields.
+- **`subscription_fulfillment_cycles`** (or `subscription_invoices`): link **Stripe invoice / period** → **Shopify order id** (if any) → internal status for **Section 4.9**.
+
+Exact columns follow API design; **truth for billing** remains **Stripe**; **truth for fulfillment** is **Shopify or POS/TAB** per tenant.
+
+### 4.13 API surface (illustrative)
 
 ```
-# Subscriptions
+# Customer (session auth)
 GET    /api/v1/subscriptions
-POST   /api/v1/subscriptions
-  Body: { spaProfileId, items[], frequencyDays, discountPercentage? }
-PUT    /api/v1/subscriptions/:id
-  Body: { items?, frequencyDays? }
-POST   /api/v1/subscriptions/:id/pause
-  Body: { pauseUntil? }  -- null = indefinite
-POST   /api/v1/subscriptions/:id/resume
-POST   /api/v1/subscriptions/:id/skip-next
-POST   /api/v1/subscriptions/:id/cancel
-  Body: { reason? }
+GET    /api/v1/subscriptions/:id
+POST   /api/v1/subscriptions/app-handoff   → returns one-time URL or token for tenant subscription web
+POST   /api/v1/subscriptions/:id/pause | resume | skip-next | cancel
+PUT    /api/v1/subscriptions/:id          → items, frequency (validated against Stripe + bundle rules)
+GET    /api/v1/subscription-bundles?spaProfileId=&category=
+# ... substitution / OOS choice endpoints as needed
 
-# Subscription Bundles
-GET    /api/v1/subscription-bundles?sanitizationSystem=bromine
-GET    /api/v1/subscription-bundles/:id/resolve?spaProfileId=X
-  → Resolves bundle template to actual retailer products for this spa
+# Stripe webhooks (no session; signed)
+POST   /api/v1/webhooks/stripe
 
-# Deliveries
-GET    /api/v1/subscriptions/:id/deliveries
-
-# Admin
-GET    /api/v1/admin/subscriptions?customerId=X&status=active
-GET    /api/v1/admin/subscription-bundles
-POST   /api/v1/admin/subscription-bundles
-PUT    /api/v1/admin/subscription-bundles/:id
-DELETE /api/v1/admin/subscription-bundles/:id
-PUT    /api/v1/admin/subscriptions/:id/discount
-  Body: { discountPercentage }
+# Retailer admin
+POST   /api/v1/admin/billing/connect/onboarding-link
+GET    /api/v1/admin/billing/connect/status
+CRUD   /api/v1/admin/subscription-bundles (bundle builder)
+GET    /api/v1/admin/subscriptions?customerId=&status=
+# Platform fee reporting read endpoints as needed
 ```
+
+### 4.14 Explicitly out of scope for this architecture (do not implement as primary path)
+
+- **Seal Subscriptions** (or any **third-party Shopify subscription app**) as the **required** billing engine — optional later compatibility only if a retailer demands it; not the default plan.
+- **Shopify Selling Plans / Shopify Subscriptions API** as the **system of record** for subscription **billing** (still use Shopify **only** for **one-off checkout** and, when applicable, **order / inventory** for fulfillment).
+- **Internal cron that emails “complete this cart to pay”** per delivery as the **primary** charge mechanism — replaced by **Stripe subscription billing** + fulfillment order creation.
 
 ---
 
@@ -808,7 +763,8 @@ When tapping a product card, navigate to a full product detail screen:
 - Product description (rendered from HTML/markdown if applicable)
 - Variant selector (if product has variants — e.g., size options for chemicals)
 - Quantity selector (default 1, increment/decrement)
-- "Add to Cart" button (full width, retailer primary color)
+- "Add to Cart" button (full width, retailer primary color) → continues to **Shopify** cart / Checkout Kit for **one-time** purchase
+- When the product (or bundle) supports subscription: **Subscribe** CTA (distinct styling; **hero** placement for category-configured cases) opens **tenant CNAME** subscription web with signed handoff — see [Part 4, Section 4.2](#42-customer-journeys-two-rails)
 - Compatibility badge: "✓ Compatible with your [Model]" or "ℹ️ General product — check compatibility"
 - Related products section at bottom (other compatible products in same category)
 
@@ -1067,10 +1023,13 @@ Before moving to Phase 4, verify:
 - [ ] Retailer content takes priority over universal content
 - [ ] Video content embeds YouTube correctly
 - [ ] Admin can create, edit, delete, and publish content
-- [ ] Subscriptions can be created with product selection and frequency
-- [ ] Subscriptions can be paused, resumed, skipped, and cancelled
-- [ ] Items within a subscription can be swapped or quantity-adjusted
-- [ ] Seasonal pause suggestion notification fires at correct time
-- [ ] Internal subscription engine creates Shopify carts on delivery dates
-- [ ] Subscription bundles resolve to actual retailer products
-- [ ] Retailer admin can view subscriptions and configure bundles and discounts
+- [ ] **Stripe Connect:** retailer can complete onboarding; tenant gated until `charges_enabled` or white-label TAB path
+- [ ] **Subscribe** flow: app handoff → tenant CNAME web → Stripe Checkout (connected account) → deep link return
+- [ ] Subscriptions listable in app; **pause, resume, skip, cancel**, item edits, frequency change (per Part 4 MVP)
+- [ ] **Seasonal** pause suggestion notifications fire at correct time
+- [ ] **Invoice paid** (webhook) → **one Shopify order** per cycle with **external payment** + **component line items** (Shopify tenants); or fulfillment routed to **POS / TAB** (non-Shopify)
+- [ ] **OOS path:** pre-ship check; customer choice — substitute, partial ship, or skip month (per Part 4)
+- [ ] **Reconciliation:** idempotent webhooks; failed Shopify order create → retry / admin recover
+- [ ] Retailer admin: **bundle builder**, bundle ↔ variant validation, view subscriptions, **application fee** visible in reporting
+- [ ] **Tax:** Stripe Tax (or chosen) on sub checkout; Shopify tax on one-offs — documented variance acceptable
+- [ ] **Disputes:** retailer notified; playbook for evidence; refunds coordinated Stripe ↔ Shopify order state

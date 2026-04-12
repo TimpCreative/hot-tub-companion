@@ -91,7 +91,7 @@ async function replaceKitMetrics(trx: typeof db, kitId: string, metrics: KitMetr
   await trx('water_test_kit_metrics').insert(
     metrics.map((m, i) => ({
       kit_id: kitId,
-      metric_key: m.metricKey.trim(),
+      metric_key: m.metricKey.trim().toLowerCase(),
       sort_order: m.sortOrder ?? i,
       input_mode: m.inputMode === 'color_assist' ? 'color_assist' : 'numeric',
       color_scale_json: m.colorScaleJson != null ? m.colorScaleJson : null,

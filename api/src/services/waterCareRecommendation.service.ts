@@ -70,7 +70,8 @@ export async function buildRecommendations(input: {
   const out: RecommendationAction[] = [];
 
   for (const m of input.measurements) {
-    const ideal = input.idealByMetric.get(m.metricKey);
+    const metricKey = m.metricKey.trim().toLowerCase();
+    const ideal = input.idealByMetric.get(metricKey);
     if (!ideal) continue;
 
     const { min: lo, max: hi } = ideal;
@@ -80,15 +81,15 @@ export async function buildRecommendations(input: {
     else if (m.value > hi) status = 'high';
 
     if (status === 'in_range') {
-      out.push({ metricKey: m.metricKey, status, messages: ['Reading is within the ideal range.'] });
+      out.push({ metricKey, status, messages: ['Reading is within the ideal range.'] });
       continue;
     }
 
     const direction = status === 'low' ? 'raise' : 'lower';
-    const rule = pickRule(m.metricKey, direction, input.sanitizer, rules);
+    const rule = pickRule(metricKey, direction, input.sanitizer, rules);
     if (!rule) {
       out.push({
-        metricKey: m.metricKey,
+        metricKey,
         status,
         messages: ['No automated recommendation is configured for this reading. Consult your dealer.'],
       });
@@ -104,7 +105,7 @@ export async function buildRecommendations(input: {
     }
 
     let amountOz = deltaUnits * coeff * (vol / 100);
-    const cap = pickCap(m.metricKey, input.sanitizer, caps);
+    const cap = pickCap(metricKey, input.sanitizer, caps);
     let capped = false;
     const messages: string[] = [];
 
@@ -119,7 +120,7 @@ export async function buildRecommendations(input: {
 
     if (coeff === 0 || deltaUnits === 0) {
       out.push({
-        metricKey: m.metricKey,
+        metricKey,
         status,
         suggestedChemical: rule.suggested_chemical,
         messages: [
@@ -138,7 +139,7 @@ export async function buildRecommendations(input: {
     if (rule.safety_note?.trim()) messages.push(rule.safety_note.trim());
 
     out.push({
-      metricKey: m.metricKey,
+      metricKey,
       status,
       suggestedChemical: rule.suggested_chemical,
       amountOz: Math.round(amountOz * 1000) / 1000,

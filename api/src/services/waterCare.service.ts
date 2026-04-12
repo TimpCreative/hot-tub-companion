@@ -309,8 +309,12 @@ async function getOwnedSpaProfile(
   return (spa as OwnedSpaProfileRow | undefined) ?? null;
 }
 
+function normalizeMetricKey(raw: string): string {
+  return raw.trim().toLowerCase();
+}
+
 async function ensureMetricId(trx: typeof db, measurement: WaterCareMeasurementInput): Promise<string> {
-  const key = measurement.metricKey.trim();
+  const key = normalizeMetricKey(measurement.metricKey);
   const existing = await trx('water_metrics').where({ metric_key: key }).first();
   if (existing) {
     await trx('water_metrics')
@@ -346,7 +350,7 @@ async function assertProfileMeasurementsWithinLibrary(
   measurements: WaterCareMeasurementInput[]
 ): Promise<void> {
   for (const m of measurements) {
-    const key = m.metricKey.trim();
+    const key = normalizeMetricKey(m.metricKey);
     const wm = (await trx('water_metrics').where({ metric_key: key }).first()) as Record<string, unknown> | undefined;
     if (!wm) {
       throw new Error('UNKNOWN_METRIC_KEY');
@@ -393,7 +397,7 @@ async function replaceMeasurements(
 function sanitizeMeasurements(measurements: WaterCareMeasurementInput[]): WaterCareMeasurementInput[] {
   return measurements
     .map((measurement, index) => ({
-      metricKey: measurement.metricKey?.trim() ?? '',
+      metricKey: normalizeMetricKey(measurement.metricKey ?? ''),
       label: measurement.label?.trim() ?? '',
       unit: measurement.unit?.trim() ?? '',
       minValue: Number(measurement.minValue),
@@ -632,12 +636,15 @@ export async function createWaterTest(
   const winner = await resolveWinningProfileMapping(spa);
   const profile = winner ? await getProfileById(winner.profile_id) : null;
   const allowedMetrics = new Map(
-    (profile?.measurements ?? []).map((measurement) => [measurement.metricKey, measurement])
+    (profile?.measurements ?? []).map((measurement) => [
+      normalizeMetricKey(measurement.metricKey),
+      measurement,
+    ])
   );
 
   const measurements = input.measurements
     .map((measurement) => ({
-      metricKey: measurement.metricKey?.trim() ?? '',
+      metricKey: normalizeMetricKey(measurement.metricKey ?? ''),
       value: Number(measurement.value),
     }))
     .filter((measurement) => measurement.metricKey && Number.isFinite(measurement.value))
@@ -718,7 +725,10 @@ export async function createWaterTest(
     await trx.commit();
 
     const idealByMetric = new Map(
-      (profile?.measurements ?? []).map((m) => [m.metricKey, { min: m.minValue, max: m.maxValue }])
+      (profile?.measurements ?? []).map((m) => [
+        normalizeMetricKey(m.metricKey),
+        { min: m.minValue, max: m.maxValue },
+      ])
     );
     const recommendations = await buildRecommendations({
       measurements,
@@ -728,7 +738,7 @@ export async function createWaterTest(
     });
 
     const allInRange = (profile?.measurements ?? []).every((m) => {
-      const mv = measurements.find((x) => x.metricKey === m.metricKey);
+      const mv = measurements.find((x) => x.metricKey === normalizeMetricKey(m.metricKey));
       if (!mv) return false;
       return mv.value >= m.minValue && mv.value <= m.maxValue;
     });
@@ -757,10 +767,13 @@ export async function resolveWaterCareForSpaProfile(
   const profile = winner ? await getProfileById(winner.profile_id) : null;
   const latestTest = (await listWaterTestsForSpaProfile(spaProfileId, tenantId, userId))?.[0] ?? null;
   const latestMeasurementMap = new Map(
-    (latestTest?.measurements ?? []).map((measurement) => [measurement.metricKey, measurement])
+    (latestTest?.measurements ?? []).map((measurement) => [
+      normalizeMetricKey(measurement.metricKey),
+      measurement,
+    ])
   );
   const comparison: WaterCareComparisonRow[] = (profile?.measurements ?? []).map((measurement) => {
-    const latest = latestMeasurementMap.get(measurement.metricKey);
+    const latest = latestMeasurementMap.get(normalizeMetricKey(measurement.metricKey));
     const recentValue = latest?.value ?? null;
     return {
       metricKey: measurement.metricKey,
@@ -856,7 +869,7 @@ export async function createWaterMetric(input: {
   sortHint: number;
   valueType: string;
 }> {
-  const metricKey = input.metricKey.trim().slice(0, 80);
+  const metricKey = normalizeMetricKey(input.metricKey).slice(0, 80);
   if (!metricKey) {
     throw new Error('METRIC_KEY_REQUIRED');
   }

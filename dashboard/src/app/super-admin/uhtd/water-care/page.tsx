@@ -308,7 +308,9 @@ export default function WaterCareAdminPage() {
           raw.map((row) => {
             const base: WaterMetricRow = {
               id: String(row.id ?? ''),
-              metricKey: String(row.metricKey ?? row.metric_key ?? ''),
+              metricKey: String(row.metricKey ?? row.metric_key ?? '')
+                .trim()
+                .toLowerCase(),
               label: String(row.label ?? ''),
               unit: String(row.unit ?? ''),
               defaultMinValue: Number(row.defaultMinValue ?? row.default_min_value ?? 0),
@@ -744,7 +746,7 @@ export default function WaterCareAdminPage() {
       if (!m.metricKey.trim()) continue;
       let colorScaleJson: unknown = null;
       if (m.inputMode === 'color_assist') {
-        const lib = metricsByKey.get(m.metricKey.trim());
+        const lib = metricsByKey.get(m.metricKey.trim().toLowerCase());
         const { rangeMin, rangeMax } = lib ? coerceMetricRanges(lib) : { rangeMin: -Infinity, rangeMax: Infinity };
         for (const spot of m.colorSpots) {
           if (spot.value == null || !Number.isFinite(spot.value) || !spot.color.trim()) continue;
@@ -758,7 +760,7 @@ export default function WaterCareAdminPage() {
         colorScaleJson = spotsToColorScalePayload(m.colorSpots);
       }
       metricsPayload.push({
-        metricKey: m.metricKey.trim(),
+        metricKey: m.metricKey.trim().toLowerCase(),
         sortOrder: metricsPayload.length,
         inputMode: m.inputMode,
         helpCopy: m.helpCopy.trim() || null,
@@ -816,7 +818,7 @@ export default function WaterCareAdminPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          metricKey: metricAddForm.metricKey.trim(),
+          metricKey: metricAddForm.metricKey.trim().toLowerCase(),
           label: metricAddForm.label.trim(),
           unit: metricAddForm.unit.trim(),
           rangeMin: Number(metricAddForm.rangeMin),
@@ -1362,7 +1364,7 @@ export default function WaterCareAdminPage() {
               onChange={(e) =>
                 setMetricAddForm({
                   ...metricAddForm,
-                  metricKey: e.target.value.replace(/\s+/g, '_'),
+                  metricKey: e.target.value.replace(/\s+/g, '_').toLowerCase(),
                 })
               }
               placeholder="e.g. ph, free_chlorine"

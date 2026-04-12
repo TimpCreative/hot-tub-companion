@@ -99,6 +99,22 @@ function formatDueDateForCard(raw: string): string {
   });
 }
 
+/** Include year for tasks far in the future (UTC calendar). */
+function formatDueDateForLaterRow(raw: string): string {
+  const key = dueDateToYyyyMmDd(raw);
+  if (!key) return raw.trim();
+  const [y, mo, day] = key.split('-').map((x) => parseInt(x, 10));
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(day)) return raw.trim();
+  const dt = new Date(Date.UTC(y, mo - 1, day));
+  return dt.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
 type UpcomingWeekGroup = { weekStart: string; label: string; events: MaintenanceEvent[] };
 
 function partitionEvents(events: MaintenanceEvent[]) {
@@ -113,6 +129,9 @@ function partitionEvents(events: MaintenanceEvent[]) {
   const overdue = open.filter((e) => dueKey(e) < today);
   const thisWeek = open.filter((e) => dueKey(e) >= today && dueKey(e) <= weekEnd);
   const upcomingFlat = open.filter((e) => dueKey(e) > weekEnd && dueKey(e) <= monthEnd);
+  const laterTasks = open
+    .filter((e) => dueKey(e) > monthEnd)
+    .sort((a, b) => dueKey(a).localeCompare(dueKey(b)));
 
   const byWeek = new Map<string, MaintenanceEvent[]>();
   for (const ev of upcomingFlat) {
@@ -127,7 +146,7 @@ function partitionEvents(events: MaintenanceEvent[]) {
     events: (byWeek.get(weekStart) ?? []).sort((a, b) => dueKey(a).localeCompare(dueKey(b))),
   }));
 
-  return { overdue, thisWeek, upcomingWeeks };
+  return { overdue, thisWeek, upcomingWeeks, laterTasks };
 }
 
 function iconForEventType(eventType: string | undefined): ComponentProps<typeof Ionicons>['name'] {
@@ -249,7 +268,12 @@ export default function MaintenanceTimelineScreen() {
     }, [load, loadGuides, refreshSpaProfiles])
   );
 
-  const { overdue, thisWeek, upcomingWeeks } = useMemo(() => partitionEvents(events), [events]);
+  const { overdue, thisWeek, upcomingWeeks, laterTasks } = useMemo(() => partitionEvents(events), [events]);
+
+  const rescheduleModalEvent = useMemo(
+    () => (rescheduleModalForId ? events.find((e) => e.id === rescheduleModalForId) : undefined),
+    [rescheduleModalForId, events]
+  );
 
   const handleComplete = (ev: MaintenanceEvent) => {
     setCompletingId(ev.id);
@@ -545,6 +569,38 @@ export default function MaintenanceTimelineScreen() {
     );
   };
 
+  const renderLaterSection = () => {
+    if (laterTasks.length === 0) return null;
+    return (
+      <View style={[styles.section, styles.laterSection, { borderColor: colors.border, backgroundColor: colors.contentBackground }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Later</Text>
+        <Text style={[styles.sectionSub, { color: colors.textMuted }]}>
+          Beyond 30 days — tap a task to reschedule
+        </Text>
+        {laterTasks.map((ev) => (
+          <TouchableOpacity
+            key={ev.id}
+            style={[styles.laterRow, { borderColor: colors.border, backgroundColor: colors.background }]}
+            onPress={() => openRescheduleModal(ev.id)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`Reschedule ${ev.title}`}
+          >
+            <View style={styles.laterRowCopy}>
+              <Text style={[styles.laterRowTitle, { color: colors.text }]} numberOfLines={2}>
+                {ev.title}
+              </Text>
+              <Text style={[styles.laterRowDue, { color: colors.textMuted }]}>
+                Due {formatDueDateForLaterRow(ev.dueDate)}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBarBar primaryColor={primaryHex} scrollY={scrollY} />
@@ -662,7 +718,8 @@ export default function MaintenanceTimelineScreen() {
                 {renderSection('Overdue', 'Past due — complete when you can', overdue, 'danger', 'overdue')}
                 {renderSection('This week', 'Due in the next 7 days', thisWeek, 'default', 'scheduled')}
                 {renderUpcomingByWeek()}
-                {!overdue.length && !thisWeek.length && upcomingWeeks.length === 0 ? (
+                {renderLaterSection()}
+                {!overdue.length && !thisWeek.length && upcomingWeeks.length === 0 && laterTasks.length === 0 ? (
                   <Text style={[styles.allClear, { color: colors.textSecondary }]}>{"You're all caught up on pending tasks."}</Text>
                 ) : null}
               </>
@@ -798,6 +855,16 @@ export default function MaintenanceTimelineScreen() {
         <Pressable style={styles.modalBackdrop} onPress={() => !mutatingTaskId && closeRescheduleModal()}>
           <Pressable style={[styles.modalCard, { backgroundColor: colors.contentBackground }]} onPress={(e) => e.stopPropagation()}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Reschedule</Text>
+            {rescheduleModalEvent ? (
+              <View style={styles.rescheduleModalTask}>
+                <Text style={[styles.rescheduleModalTaskTitle, { color: colors.text }]} numberOfLines={3}>
+                  {rescheduleModalEvent.title}
+                </Text>
+                <Text style={[styles.rescheduleModalTaskDue, { color: colors.textMuted }]}>
+                  Currently due {formatDueDateForLaterRow(rescheduleModalEvent.dueDate)}
+                </Text>
+              </View>
+            ) : null}
             <Text style={[styles.modalHint, { color: colors.textSecondary }]}>
               Move this task to a later day (UTC calendar).
             </Text>
@@ -971,6 +1038,23 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   modalHint: { fontSize: 14, lineHeight: 20, marginTop: 6, marginBottom: 4 },
+  laterSection: { paddingVertical: 12 },
+  laterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  laterRowCopy: { flex: 1, paddingRight: 10 },
+  laterRowTitle: { fontSize: 14, fontWeight: '600' },
+  laterRowDue: { fontSize: 12, marginTop: 4 },
+  rescheduleModalTask: { marginBottom: 8 },
+  rescheduleModalTaskTitle: { fontSize: 16, fontWeight: '600' },
+  rescheduleModalTaskDue: { fontSize: 13, marginTop: 6 },
   empty: {
     borderWidth: 1,
     borderRadius: 18,
