@@ -24,6 +24,15 @@ export function proxy(request: NextRequest) {
 
     // Retailer admin: ?tenant=takeabreak or takeabreak.localhost
     if (tenant && tenant !== 'admin') {
+      // Public subscription checkout must NOT be under /admin (Firebase admin gate).
+      if (url.pathname.startsWith('/subscriptions')) {
+        const response = NextResponse.rewrite(
+          new URL(`${url.pathname}${url.search}`, request.url)
+        );
+        response.headers.set('x-tenant-slug', tenant);
+        response.cookies.set('tenant_slug', tenant);
+        return response;
+      }
       const targetPath = url.pathname.startsWith('/admin')
         ? url.pathname
         : `/admin${url.pathname === '/' ? '/dashboard' : url.pathname}`;
@@ -59,6 +68,14 @@ export function proxy(request: NextRequest) {
     subdomain !== 'hottubcompanion' &&
     hostname.includes('hottubcompanion.com')
   ) {
+    if (url.pathname.startsWith('/subscriptions')) {
+      const response = NextResponse.rewrite(
+        new URL(`${url.pathname}${url.search}`, request.url)
+      );
+      response.headers.set('x-tenant-slug', subdomain);
+      response.cookies.set('tenant_slug', subdomain);
+      return response;
+    }
     // Avoid double-prefixing if already on /admin path
     const targetPath = url.pathname.startsWith('/admin')
       ? url.pathname

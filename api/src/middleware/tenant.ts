@@ -29,7 +29,9 @@ function shouldSkipTenant(path: string): boolean {
     matchesPath(path, '/api/v1/internal/cron') ||
     matchesPath(normalized, '/internal/cron') ||
     matchesPath(path, '/api/v1/webhooks') ||
-    matchesPath(normalized, '/webhooks')
+    matchesPath(normalized, '/webhooks') ||
+    matchesPath(path, '/api/v1/public/subscriptions') ||
+    matchesPath(normalized, '/public/subscriptions')
   );
 }
 

@@ -29,6 +29,9 @@ import spaProfilesRoutes from './spaProfiles.routes';
 import maintenanceRoutes from './maintenance.routes';
 import usersRoutes from './users.routes';
 import consumerUhtdSuggestionsRoutes from './consumerUhtdSuggestions.routes';
+import publicSubscriptionsRoutes from './publicSubscriptions.routes';
+import subscriptionsCustomerRoutes from './subscriptionsCustomer.routes';
+import subscriptionsTenantRoutes from './subscriptionsTenant.routes';
 
 const router = Router();
 
@@ -36,6 +39,9 @@ router.use(healthRoutes);
 
 router.use('/api/v1/auth', authRoutes);
 router.get('/api/v1/tenant/config', tenantController.getTenantConfig);
+
+// Public subscription checkout (handoff JWT only; no x-tenant-key)
+router.use('/api/v1/public/subscriptions', publicSubscriptionsRoutes);
 
 // Internal cron (CRON_SECRET required)
 router.post(
@@ -106,6 +112,12 @@ router.use('/api/v1', contentRoutes);
 router.use('/api/v1', productsRoutes);
 router.use('/api/v1', cartRoutes);
 router.use('/api/v1', ordersRoutes);
+
+// Subscription bundle lookup for shop (tenant API key only)
+router.use('/api/v1', subscriptionsTenantRoutes);
+
+// Customer subscriptions (tenant API key + Firebase auth)
+router.use('/api/v1', subscriptionsCustomerRoutes);
 
 // Customer spa profiles (tenant API key + Firebase auth)
 router.use('/api/v1', spaProfilesRoutes);

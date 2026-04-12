@@ -12,6 +12,7 @@ import * as adminPosController from '../controllers/adminPos.controller';
 import * as adminSettingsPosSyncController from '../controllers/adminSettingsPosSync.controller';
 import * as adminNotificationsController from '../controllers/adminNotifications.controller';
 import * as adminTeamController from '../controllers/adminTeam.controller';
+import * as adminSubscriptionsController from '../controllers/adminSubscriptions.controller';
 import adminContentRoutes from './adminContent.routes';
 
 const router = Router();
@@ -111,6 +112,17 @@ router.post(
   upload.single('file'),
   adminBrandingMediaController.uploadBrandingMedia
 );
+
+// Subscriptions (Stripe Connect)
+router.get('/subscriptions/connect', adminSubscriptionsController.getConnectStatus);
+router.post('/subscriptions/connect/onboarding-link', adminSubscriptionsController.postConnectOnboardingLink);
+router.post('/subscriptions/connect/dashboard-link', adminSubscriptionsController.postConnectDashboardLink);
+router.put('/subscriptions/settings', adminSubscriptionsController.putSubscriptionSettings);
+router.get('/subscriptions/bundles', adminSubscriptionsController.listBundles);
+router.post('/subscriptions/bundles', adminSubscriptionsController.postBundle);
+router.put('/subscriptions/bundles/:id', adminSubscriptionsController.putBundle);
+router.delete('/subscriptions/bundles/:id', adminSubscriptionsController.removeBundle);
+router.get('/subscriptions/customers', adminSubscriptionsController.listTenantCustomerSubscriptions);
 
 export default router;
 

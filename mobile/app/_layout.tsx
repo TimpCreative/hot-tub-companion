@@ -24,6 +24,7 @@ export default function RootLayout() {
                 <Stack.Screen name="onboarding" />
                 <Stack.Screen name="welcome" options={{ headerShown: false }} />
                 <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="subscriptions" options={{ headerShown: false }} />
                 <Stack.Screen name="profile" options={{ headerShown: false }} />
               </Stack>
             </CartProviderRoot>

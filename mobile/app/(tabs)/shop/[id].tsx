@@ -11,6 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import RenderHtml from 'react-native-render-html';
 import { useFocusEffect } from '@react-navigation/native';
@@ -23,6 +24,11 @@ import {
   type ShopProductRow,
 } from '../../../services/shop';
 import { messageFromApiReject } from '../../../services/cart';
+import {
+  fetchSubscriptionBundleForProduct,
+  postSubscriptionCheckoutHandoff,
+  type SubscriptionBundleRef,
+} from '../../../services/subscriptions';
 import { useTheme } from '../../../theme/ThemeProvider';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCart } from '../../../contexts/CartContext';
@@ -62,6 +68,10 @@ function compatCopy(status: ShopCompatibility | undefined): { text: string; tone
   }
 }
 
+function isStaffTenantAppLogin(user: { id: string } | null): boolean {
+  return Boolean(user?.id?.startsWith('admin_'));
+}
+
 function htmlStyles(colors: { text: string; textSecondary: string }) {
   return {
     tagsStyles: {
@@ -90,6 +100,8 @@ export default function ProductDetailScreen() {
   const [addingCart, setAddingCart] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [related, setRelated] = useState<ShopProductRow[]>([]);
+  const [subscribeBundle, setSubscribeBundle] = useState<SubscriptionBundleRef | null>(null);
+  const [subscribeLoading, setSubscribeLoading] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -148,6 +160,30 @@ export default function ProductDetailScreen() {
     };
   }, [params.id, spaProfileId, user]);
 
+  useEffect(() => {
+    if (!product?.id) {
+      setSubscribeBundle(null);
+      return;
+    }
+    if (user && isStaffTenantAppLogin(user)) {
+      setSubscribeBundle(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchSubscriptionBundleForProduct(product.id);
+        const b = res?.data?.bundle ?? null;
+        if (!cancelled) setSubscribeBundle(b);
+      } catch {
+        if (!cancelled) setSubscribeBundle(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [product?.id, user]);
+
   const images = useMemo(() => firstImageUrls(product?.images), [product?.images]);
   const compat = useMemo(() => compatCopy(product?.shopCompatibility), [product?.shopCompatibility]);
   const descHtml = useMemo(() => {
@@ -186,6 +222,36 @@ export default function ProductDetailScreen() {
   const compare =
     displayCompare != null && Number(displayCompare) > Number(displayPrice);
   const stockLine = productDetailStockLine(stock, tenantConfig?.shop ?? null);
+
+  const staffAppLogin = isStaffTenantAppLogin(user);
+
+  const handleSubscribe = async () => {
+    if (!user) {
+      Alert.alert('Sign in required', 'Please sign in to subscribe.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign in', onPress: () => router.push('/auth/login') },
+      ]);
+      return;
+    }
+    if (!subscribeBundle) {
+      Alert.alert('Subscribe', 'This product is not available as a subscription yet.');
+      return;
+    }
+    setSubscribeLoading(true);
+    try {
+      const res = await postSubscriptionCheckoutHandoff(subscribeBundle.id, spaProfileId ?? null);
+      const url = res?.data?.checkoutPageUrl;
+      if (url) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert('Subscribe', 'Could not start checkout.');
+      }
+    } catch (e) {
+      Alert.alert('Subscribe', messageFromApiReject(e, 'Could not start checkout.'));
+    } finally {
+      setSubscribeLoading(false);
+    }
+  };
 
   const handleAddToCart = async () => {
     if (!user) {
@@ -366,9 +432,22 @@ export default function ProductDetailScreen() {
               opacity: pressed ? 0.88 : 1,
             },
           ]}
-          disabled
+          disabled={!subscribeBundle || staffAppLogin || subscribeLoading}
+          onPress={() => void handleSubscribe()}
         >
-          <Text style={[styles.ctaText, { color: colors.primary }]}>Subscribe — coming soon</Text>
+          {subscribeLoading ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <Text style={[styles.ctaText, { color: colors.primary }]}>
+              {!user
+                ? 'Subscribe'
+                : staffAppLogin
+                  ? 'Subscribe (staff)'
+                  : subscribeBundle
+                    ? 'Subscribe'
+                    : 'Subscribe unavailable'}
+            </Text>
+          )}
         </Pressable>
         <Pressable
           style={({ pressed }) => [

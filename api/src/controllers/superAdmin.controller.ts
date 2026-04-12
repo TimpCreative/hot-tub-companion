@@ -181,6 +181,13 @@ export async function registerSuperAdmin(req: Request, res: Response): Promise<v
 
 const RESERVED_TENANT_SLUGS = new Set(['admin', 'www', 'hottubcompanion', 'api']);
 
+function maskStripeConnectAccountId(id: unknown): string | null {
+  if (id == null || typeof id !== 'string' || !id.trim()) return null;
+  const s = id.trim();
+  if (s.length <= 10) return '****';
+  return `…${s.slice(-6)}`;
+}
+
 export async function listTenants(_req: Request, res: Response): Promise<void> {
   const tenants = await db('tenants').select('*').orderBy('name');
   const formatted = tenants.map((t) => ({
@@ -201,6 +208,21 @@ export async function listTenants(_req: Request, res: Response): Promise<void> {
     vercelDomainError: t.vercel_domain_error ?? null,
     vercelDomainUpdatedAt: t.vercel_domain_updated_at ?? null,
     saasPlan: (t as { saas_plan?: string }).saas_plan ?? 'base',
+    stripeConnectAccountMasked: maskStripeConnectAccountId(
+      (t as { stripe_connect_account_id?: string | null }).stripe_connect_account_id
+    ),
+    stripeConnectChargesEnabled: Boolean((t as { stripe_connect_charges_enabled?: boolean }).stripe_connect_charges_enabled),
+    stripeConnectPayoutsEnabled: Boolean((t as { stripe_connect_payouts_enabled?: boolean }).stripe_connect_payouts_enabled),
+    stripeConnectDetailsSubmitted: Boolean(
+      (t as { stripe_connect_details_submitted?: boolean }).stripe_connect_details_submitted
+    ),
+    stripeConnectUpdatedAt: (t as { stripe_connect_updated_at?: Date | string | null }).stripe_connect_updated_at ?? null,
+    stripeOnboardedAt: (t as { stripe_onboarded_at?: Date | string | null }).stripe_onboarded_at ?? null,
+    subscriptionApplicationFeeBps:
+      (t as { subscription_application_fee_bps?: number | null }).subscription_application_fee_bps ?? null,
+    subscriptionShopifyFulfillmentEnabled: Boolean(
+      (t as { subscription_shopify_fulfillment_enabled?: boolean }).subscription_shopify_fulfillment_enabled
+    ),
   }));
   success(res, { tenants: formatted });
 }

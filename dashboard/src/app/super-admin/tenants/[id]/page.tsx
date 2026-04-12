@@ -39,6 +39,14 @@ interface Tenant {
   vercelDomainStatus?: string | null;
   vercelDomainError?: string | null;
   vercelDomainUpdatedAt?: string | null;
+  stripeConnectAccountMasked?: string | null;
+  stripeConnectChargesEnabled?: boolean;
+  stripeConnectPayoutsEnabled?: boolean;
+  stripeConnectDetailsSubmitted?: boolean;
+  stripeConnectUpdatedAt?: string | null;
+  stripeOnboardedAt?: string | null;
+  subscriptionApplicationFeeBps?: number | null;
+  subscriptionShopifyFulfillmentEnabled?: boolean;
 }
 
 export default function TenantDetailPage() {
@@ -590,6 +598,66 @@ export default function TenantDetailPage() {
             <Button type="button" variant="secondary" disabled={brandingLoading} onClick={handleSaveBranding}>
               {brandingLoading ? 'Saving…' : 'Save Branding'}
             </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="card shadow rounded-lg overflow-hidden max-w-2xl">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">Subscription billing (Stripe Connect)</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Read-only Connect status for support. Retailers complete onboarding under their admin → Subscriptions →
+            Billing.
+          </p>
+        </div>
+        <div className="px-6 py-4 space-y-3 text-sm text-gray-900">
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Connected account</dt>
+            <dd className="mt-1 sm:mt-0 sm:col-span-2 font-mono text-xs">
+              {tenant?.stripeConnectAccountMasked || '—'}
+            </dd>
+          </div>
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Charges / payouts</dt>
+            <dd className="mt-1 sm:mt-0 sm:col-span-2">
+              {tenant?.stripeConnectChargesEnabled ? 'Charges enabled' : 'Charges not enabled'}
+              {' · '}
+              {tenant?.stripeConnectPayoutsEnabled ? 'Payouts enabled' : 'Payouts not enabled'}
+            </dd>
+          </div>
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Details submitted</dt>
+            <dd className="mt-1 sm:mt-0 sm:col-span-2">
+              {tenant?.stripeConnectDetailsSubmitted ? 'Yes' : 'No'}
+            </dd>
+          </div>
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Last Connect sync</dt>
+            <dd className="mt-1 sm:mt-0 sm:col-span-2">
+              {tenant?.stripeConnectUpdatedAt
+                ? format(new Date(tenant.stripeConnectUpdatedAt), 'PPpp')
+                : '—'}
+            </dd>
+          </div>
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Onboarded at</dt>
+            <dd className="mt-1 sm:mt-0 sm:col-span-2">
+              {tenant?.stripeOnboardedAt ? format(new Date(tenant.stripeOnboardedAt), 'PPpp') : '—'}
+            </dd>
+          </div>
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">App fee (bps)</dt>
+            <dd className="mt-1 sm:mt-0 sm:col-span-2">
+              {tenant?.subscriptionApplicationFeeBps != null
+                ? `${tenant.subscriptionApplicationFeeBps} (${(tenant.subscriptionApplicationFeeBps / 100).toFixed(2)}%)`
+                : 'Default platform fee'}
+            </dd>
+          </div>
+          <div className="sm:grid sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">Shopify fulfillment</dt>
+            <dd className="mt-1 sm:mt-0 sm:col-span-2">
+              {tenant?.subscriptionShopifyFulfillmentEnabled ? 'Enabled' : 'Disabled'}
+            </dd>
           </div>
         </div>
       </div>

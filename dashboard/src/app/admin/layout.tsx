@@ -17,6 +17,14 @@ const ADMIN_NAV = [
   { label: 'Services', href: '/services', comingPhase: 4 },
   { label: 'Content', href: '/content' },
   { label: 'Notifications', href: '/notifications' },
+  {
+    label: 'Subscriptions',
+    children: [
+      { label: 'Billing & Connect', href: '/subscriptions/billing' },
+      { label: 'Bundles', href: '/subscriptions/bundles' },
+      { label: 'Customer subscriptions', href: '/subscriptions/customers' },
+    ],
+  },
   { label: 'Analytics', href: '/analytics', comingPhase: 5 },
   { label: 'Team', href: '/team', requiresCanManageUsers: true },
   { label: 'Settings', href: '/settings' },

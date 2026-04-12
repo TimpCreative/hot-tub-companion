@@ -57,6 +57,18 @@ export const env = {
   VERCEL_TEAM_ID: process.env.VERCEL_TEAM_ID?.trim() || '',
   /** Optional docs frontend origin used by /docs proxy, e.g. https://docs-service.internal */
   DOCS_SITE_ORIGIN: process.env.DOCS_SITE_ORIGIN?.trim() || '',
+  /** Stripe platform secret (Connect). Optional until subscriptions are enabled. */
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY?.trim() || '',
+  /** Webhook signing secret for POST /api/v1/webhooks/stripe */
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET?.trim() || '',
+  /** Default platform fee on subscription invoices (basis points). Tenant may override. */
+  SUBSCRIPTION_DEFAULT_APPLICATION_FEE_BPS: parseInt(
+    process.env.SUBSCRIPTION_DEFAULT_APPLICATION_FEE_BPS || '100',
+    10
+  ),
+  /** Success/cancel URLs for Checkout may include this as base for mobile deep link (Expo scheme). */
+  MOBILE_SUBSCRIPTION_DEEP_LINK_BASE:
+    process.env.MOBILE_SUBSCRIPTION_DEEP_LINK_BASE?.trim() || 'hottubcompanion://subscriptions',
 };
 
 /** Hostname from DASHBOARD_BASE (e.g. hottubcompanion.com) for retailer subdomain URLs. */

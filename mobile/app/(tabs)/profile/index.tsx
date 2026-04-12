@@ -176,11 +176,19 @@ export default function ProfileScreen() {
                 <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.menuRow, styles.menuRowLast, { borderTopColor: colors.border }]}
+                style={[styles.menuRow, { borderTopColor: colors.border }]}
                 onPress={() => router.push('/(tabs)/profile/orders')}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.menuLabel, { color: colors.text }]}>Orders</Text>
+                <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.menuRow, styles.menuRowLast, { borderTopColor: colors.border }]}
+                onPress={() => router.push('/(tabs)/profile/subscriptions')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Subscriptions</Text>
                 <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
