@@ -605,6 +605,12 @@ export async function bulkApply(req: Request, res: Response): Promise<void> {
     let skippedInBundles = 0;
     if (ids.length) {
       if (on) {
+        const beforeEligible = (await db('pos_products')
+          .where({ tenant_id: tenantId })
+          .whereIn('id', ids)
+          .select('id', 'subscription_eligible')) as Array<{ id: string; subscription_eligible?: boolean }>;
+        const wasEligible = new Map(beforeEligible.map((r) => [r.id, Boolean(r.subscription_eligible)]));
+
         updated = await db('pos_products')
           .where({ tenant_id: tenantId })
           .whereIn('id', ids)
@@ -620,18 +626,36 @@ export async function bulkApply(req: Request, res: Response): Promise<void> {
             'title',
             'price',
             'subscription_stripe_product_id',
-            'subscription_stripe_price_id'
+            'subscription_stripe_price_id',
+            'subscription_unit_amount_cents',
+            'subscription_currency',
+            'subscription_interval'
           )) as Array<{
           id: string;
           title?: string | null;
           price?: number | null;
           subscription_stripe_product_id?: string | null;
           subscription_stripe_price_id?: string | null;
+          subscription_unit_amount_cents?: number | null;
+          subscription_currency?: string | null;
+          subscription_interval?: string | null;
         }>;
         for (const row of rows) {
-          if (row.subscription_stripe_price_id?.trim()) continue;
+          const reenableFromOff = wasEligible.get(row.id) === false;
+          const rowForOffer =
+            reenableFromOff && row.subscription_stripe_price_id?.trim()
+              ? {
+                  ...row,
+                  subscription_stripe_price_id: null,
+                  subscription_stripe_product_id: null,
+                  subscription_unit_amount_cents: null,
+                  subscription_currency: null,
+                  subscription_interval: null,
+                }
+              : row;
+          if (rowForOffer.subscription_stripe_price_id?.trim()) continue;
           try {
-            const stripePatch = await buildStripeSubscriptionOfferPatch(tenantId, row);
+            const stripePatch = await buildStripeSubscriptionOfferPatch(tenantId, rowForOffer);
             if (stripePatch) {
               await db('pos_products').where({ id: row.id, tenant_id: tenantId }).update(stripePatch);
             }
@@ -887,11 +911,26 @@ export async function putSubscriptionEligible(req: Request, res: Response): Prom
     updated_at: db.fn.now(),
   };
 
-  // If we are enabling subscriptions and this variant has no recurring price yet,
-  // auto-create one from retail price minus tenant default subscription discount % when Connect is ready.
-  if (subscriptionEligible === true && !existing.subscription_stripe_price_id?.trim()) {
+  // Re-enabling (false → true) may still have old Stripe price ids (e.g. live prices after switching API to sk_test).
+  // Ignore those for creation so we can mint a new price in the current key mode.
+  const turningEligibleOn = subscriptionEligible === true && existing.subscription_eligible === false;
+  const rowForStripeOffer =
+    turningEligibleOn && existing.subscription_stripe_price_id?.trim()
+      ? {
+          ...existing,
+          subscription_stripe_price_id: null,
+          subscription_stripe_product_id: null,
+          subscription_unit_amount_cents: null,
+          subscription_currency: null,
+          subscription_interval: null,
+        }
+      : existing;
+
+  // If we are enabling subscriptions and this variant has no recurring price (or we cleared stale ids above),
+  // auto-create from retail price minus tenant default subscription discount % when Connect is ready.
+  if (subscriptionEligible === true && !rowForStripeOffer.subscription_stripe_price_id?.trim()) {
     try {
-      const stripePatch = await buildStripeSubscriptionOfferPatch(tenantId, existing);
+      const stripePatch = await buildStripeSubscriptionOfferPatch(tenantId, rowForStripeOffer);
       if (stripePatch) {
         Object.assign(patch, stripePatch);
       }

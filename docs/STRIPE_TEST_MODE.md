@@ -32,9 +32,9 @@ Complete **Stripe Connect** onboarding **in Test mode** for that store so the te
 
 After keys + Connect are **test**:
 
-- In **Retail Admin → Products**, for each product you want to subscribe to: turn **Subscription eligible** **off**, save, then **on** again (or use bulk), so the server **creates new test** `subscription_stripe_price_id` values.
+- In **Retail Admin → Products**, turn **Subscription eligible** **off**, save, then **on** again (or use bulk “Subscription eligible” on those rows). The API **recreates** Stripe prices when you go from **not eligible → eligible** so old **live** `price_…` ids are replaced with **test** ones.
 
-Until those ids are recreated, old **live** `price_…` strings will still break test checkout.
+You do **not** need to wait—if you still see `STRIPE_MODE_MISMATCH`, the old price id was still stored; toggle **off** then **on** once more after deploy, or use **Clear subscription offer** in the product panel then mark eligible again.
 
 ### 5. Point the app at this API
 
