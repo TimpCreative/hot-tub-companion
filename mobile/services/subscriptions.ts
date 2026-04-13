@@ -9,7 +9,13 @@ export type SubscriptionBundleRef = {
 
 export type SubscriptionOffersData = {
   single: { stripePriceId: string; title: string } | null;
-  bundleUpsells: Array<{ bundleId: string; title: string; stripePriceId: string; subtitle?: string }>;
+  bundleUpsells: Array<{
+    bundleId: string;
+    title: string;
+    stripePriceId: string;
+    subtitle?: string;
+    savingsPercent?: number | null;
+  }>;
 };
 
 export type CustomerSubscriptionRow = {

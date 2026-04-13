@@ -511,7 +511,7 @@ export default function ProductDetailScreen() {
       {(subOffers?.bundleUpsells?.length ?? 0) > 0 ? (
         <View style={{ marginTop: 16 }}>
           <Text style={[typography.caption, { color: colors.textSecondary, fontWeight: '700', marginBottom: 8 }]}>
-            {subOffers?.single ? 'Or subscribe as a kit' : 'Subscribe as a kit'}
+            {subOffers?.single ? 'Or subscription bundles with this item' : 'Subscription bundles with this item'}
           </Text>
           {subOffers!.bundleUpsells!.map((b) => (
             <Pressable
@@ -530,9 +530,16 @@ export default function ProductDetailScreen() {
               {subscribeLoading === b.bundleId ? (
                 <ActivityIndicator color={colors.primary} />
               ) : (
-                <Text style={[styles.ctaText, { color: colors.primary, textAlign: 'center' }]}>
-                  {!user ? 'Sign in to subscribe' : staffAppLogin ? 'Kit (staff)' : b.title}
-                </Text>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={[styles.ctaText, { color: colors.primary, textAlign: 'center' }]}>
+                    {!user ? 'Sign in to subscribe' : staffAppLogin ? 'Bundle (staff)' : b.title}
+                  </Text>
+                  {typeof b.savingsPercent === 'number' && Number.isFinite(b.savingsPercent) && b.savingsPercent > 0 ? (
+                    <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
+                      Save {Math.round(b.savingsPercent * 100) / 100}%
+                    </Text>
+                  ) : null}
+                </View>
               )}
             </Pressable>
           ))}

@@ -17,6 +17,7 @@ export type BundleRow = {
   is_kit: boolean;
   bundle_discount_percent?: string | number | null;
   bundle_recurring_unit_amount_cents?: number | null;
+  bundle_savings_percent?: string | number | null;
 };
 
 type ComponentLine = { posProductId: string; quantity: number };
@@ -154,7 +155,13 @@ export async function getSubscriptionOffersForProduct(
   tenantId: string
 ): Promise<{
   single: { stripePriceId: string; title: string } | null;
-  bundleUpsells: Array<{ bundleId: string; title: string; stripePriceId: string; subtitle?: string }>;
+  bundleUpsells: Array<{
+    bundleId: string;
+    title: string;
+    stripePriceId: string;
+    subtitle?: string;
+    savingsPercent?: number | null;
+  }>;
 }> {
   const tenant = (await db('tenants').where({ id: tenantId }).first()) as
     | { stripe_connect_charges_enabled?: boolean }
@@ -186,7 +193,13 @@ export async function getSubscriptionOffersForProduct(
     .orderBy('sort_order')
     .orderBy('title')) as BundleRow[];
 
-  const bundleUpsells: Array<{ bundleId: string; title: string; stripePriceId: string; subtitle?: string }> = [];
+  const bundleUpsells: Array<{
+    bundleId: string;
+    title: string;
+    stripePriceId: string;
+    subtitle?: string;
+    savingsPercent?: number | null;
+  }> = [];
   for (const b of bundles) {
     if (!b.stripe_price_id?.trim()) continue;
     if (!productInBundle(b, posProductId)) continue;
@@ -196,6 +209,10 @@ export async function getSubscriptionOffersForProduct(
       title: b.title,
       stripePriceId: b.stripe_price_id.trim(),
       subtitle: 'Full kit subscription',
+      savingsPercent:
+        b.bundle_savings_percent != null && b.bundle_savings_percent !== ''
+          ? Number(b.bundle_savings_percent)
+          : null,
     });
   }
 
@@ -360,6 +377,7 @@ export async function upsertBundle(
     isKit?: boolean;
     bundleDiscountPercent?: number | null;
     bundleRecurringUnitAmountCents?: number | null;
+    bundleSavingsPercent?: number | null;
   }
 ): Promise<BundleRow> {
   const componentsJson = JSON.stringify(input.components ?? []);
@@ -376,6 +394,10 @@ export async function upsertBundle(
   const recurringCents =
     input.bundleRecurringUnitAmountCents != null && Number.isFinite(input.bundleRecurringUnitAmountCents)
       ? Math.round(input.bundleRecurringUnitAmountCents)
+      : null;
+  const savingsPct =
+    input.bundleSavingsPercent != null && Number.isFinite(input.bundleSavingsPercent)
+      ? Math.max(0, Math.min(100, Math.round(input.bundleSavingsPercent * 100) / 100))
       : null;
   if (input.id) {
     const existing = await db('subscription_bundle_definitions').where({ id: input.id, tenant_id: tenantId }).first();
@@ -399,6 +421,7 @@ export async function upsertBundle(
     if (recurringCents !== null) {
       patch.bundle_recurring_unit_amount_cents = recurringCents;
     }
+    patch.bundle_savings_percent = savingsPct;
     await db('subscription_bundle_definitions').where({ id: input.id, tenant_id: tenantId }).update(patch);
     const row = await db('subscription_bundle_definitions').where({ id: input.id }).first();
     return row as BundleRow;
@@ -418,6 +441,7 @@ export async function upsertBundle(
       is_kit: input.isKit !== false,
       bundle_discount_percent: bundleDiscountSql === undefined ? null : bundleDiscountSql,
       bundle_recurring_unit_amount_cents: recurringCents,
+      bundle_savings_percent: savingsPct,
       created_at: db.fn.now(),
       updated_at: db.fn.now(),
     })

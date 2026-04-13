@@ -31,6 +31,7 @@ type BundleRow = {
   isKit?: boolean;
   bundleDiscountPercent?: number | null;
   bundleRecurringUnitAmountCents?: number | null;
+  bundleSavingsPercent?: number | null;
   previewSubtotalCents?: number;
   previewSuggestedCents?: number;
   previewDiscountPercent?: number;
@@ -81,6 +82,12 @@ function mappingBadge(status: MappingStatus | undefined) {
 function centsToUsd(c: number | null | undefined): string {
   if (c == null || !Number.isFinite(c)) return '—';
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(c / 100);
+}
+
+function formatPercent(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return '—';
+  const rounded = Math.round(n * 100) / 100;
+  return `${rounded}%`;
 }
 
 export default function ProductsBundlesPage() {
@@ -153,6 +160,16 @@ export default function ProductsBundlesPage() {
     const n = parseFloat(t);
     return Number.isFinite(n) ? n : null;
   }, [bundleDiscountOverride]);
+
+  const finalSavingsPercent = useMemo(() => {
+    if (!preview || !Number.isFinite(preview.subtotalCents) || preview.subtotalCents <= 0) return null;
+    const dollars = parseFloat(unitDollars.replace(/,/g, ''));
+    if (!Number.isFinite(dollars) || dollars < 0) return null;
+    const finalCents = Math.round(dollars * 100);
+    const raw = ((preview.subtotalCents - finalCents) / preview.subtotalCents) * 100;
+    const clamped = Math.max(0, Math.min(100, raw));
+    return Math.round(clamped * 100) / 100;
+  }, [preview, unitDollars]);
 
   useEffect(() => {
     if (previewTimer.current) clearTimeout(previewTimer.current);
@@ -263,8 +280,6 @@ export default function ProductsBundlesPage() {
   function addProduct(p: PickerProduct) {
     if (lines.some((l) => l.posProductId === p.id)) return;
     setLines((prev) => [...prev, { posProductId: p.id, quantity: 1, title: p.title }]);
-    setSearchQ('');
-    setSearchHits([]);
   }
 
   function setQty(i: number, q: number) {
@@ -274,16 +289,6 @@ export default function ProductsBundlesPage() {
 
   function removeLine(i: number) {
     setLines((prev) => prev.filter((_, j) => j !== i));
-  }
-
-  function makePrimary(i: number) {
-    if (i <= 0) return;
-    setLines((prev) => {
-      const next = [...prev];
-      const [row] = next.splice(i, 1);
-      next.unshift(row);
-      return next;
-    });
   }
 
   async function saveBundleDefaults() {
@@ -396,6 +401,7 @@ export default function ProductsBundlesPage() {
             <tr>
               <th className="px-4 py-2 font-medium">Title</th>
               <th className="px-4 py-2 font-medium">Saved price</th>
+              <th className="px-4 py-2 font-medium">You save</th>
               <th className="px-4 py-2 font-medium">Suggested</th>
               <th className="px-4 py-2 font-medium">Kit upsell</th>
               <th className="px-4 py-2 font-medium">Active</th>
@@ -407,6 +413,7 @@ export default function ProductsBundlesPage() {
               <tr key={b.id} className="border-t border-gray-100">
                 <td className="px-4 py-2 font-medium text-gray-900">{b.title}</td>
                 <td className="px-4 py-2">{centsToUsd(b.bundleRecurringUnitAmountCents)}</td>
+                <td className="px-4 py-2 text-gray-700">{formatPercent(b.bundleSavingsPercent)}</td>
                 <td className="px-4 py-2 text-gray-700">{centsToUsd(b.previewSuggestedCents)}</td>
                 <td className="px-4 py-2">{b.isKit !== false ? 'Yes' : 'No'}</td>
                 <td className="px-4 py-2">{b.active ? 'Yes' : 'No'}</td>
@@ -422,7 +429,7 @@ export default function ProductsBundlesPage() {
             ))}
             {bundles.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
                   No bundles yet.
                 </td>
               </tr>
@@ -528,24 +535,29 @@ export default function ProductsBundlesPage() {
             {searchLoading ? <p className="text-xs text-gray-500 mt-1">Searching…</p> : null}
             {searchHits.length > 0 ? (
               <ul className="mt-2 max-h-48 overflow-auto rounded-md border border-gray-200 bg-gray-50 divide-y divide-gray-100">
-                {searchHits.map((p) => (
-                  <li key={p.id}>
-                    <button
-                      type="button"
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-white flex flex-wrap items-center justify-between gap-2"
-                      onClick={() => addProduct(p)}
-                    >
-                      <span className="font-medium text-gray-900">{p.title}</span>
-                      <span className="flex items-center gap-2 shrink-0">
-                        {mappingBadge(p.mapping_status)}
-                        <span className="text-gray-600">{centsToUsd(p.price)}</span>
-                      </span>
-                    </button>
-                    {p.uhtd_part_name ? (
-                      <p className="px-3 pb-2 text-xs text-gray-500 -mt-1">{p.uhtd_part_name}</p>
-                    ) : null}
-                  </li>
-                ))}
+                {searchHits.map((p) => {
+                  const alreadyAdded = lines.some((l) => l.posProductId === p.id);
+                  return (
+                    <li key={p.id}>
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-white flex flex-wrap items-center justify-between gap-2 disabled:opacity-60"
+                        onClick={() => addProduct(p)}
+                        disabled={alreadyAdded}
+                      >
+                        <span className="font-medium text-gray-900">{p.title}</span>
+                        <span className="flex items-center gap-2 shrink-0">
+                          {alreadyAdded ? <Badge variant="default">Added</Badge> : null}
+                          {mappingBadge(p.mapping_status)}
+                          <span className="text-gray-600">{centsToUsd(p.price)}</span>
+                        </span>
+                      </button>
+                      {p.uhtd_part_name ? (
+                        <p className="px-3 pb-2 text-xs text-gray-500 -mt-1">{p.uhtd_part_name}</p>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             ) : null}
           </div>
@@ -553,7 +565,9 @@ export default function ProductsBundlesPage() {
           <div>
             <h3 className="text-sm font-medium text-gray-900">Line items</h3>
             {lines.length === 0 ? (
-              <p className="text-sm text-gray-500 mt-1">No products yet. The first line is the primary product for PDP matching.</p>
+              <p className="text-sm text-gray-500 mt-1">
+                No products yet. Any product you add here can show this bundle on its product detail page.
+              </p>
             ) : (
               <table className="mt-2 min-w-full text-sm border border-gray-200 rounded-md overflow-hidden">
                 <thead className="bg-gray-50 text-gray-600">
@@ -568,7 +582,9 @@ export default function ProductsBundlesPage() {
                     <tr key={`${l.posProductId}-${i}`} className="border-t border-gray-100">
                       <td className="px-3 py-2">
                         <div className="font-medium text-gray-900">{l.title || l.posProductId}</div>
-                        {i === 0 ? <span className="text-xs text-green-700">Primary for PDP</span> : null}
+                        <span className="text-xs text-green-700">
+                          This item can show this bundle in PDP subscription bundle upsells
+                        </span>
                       </td>
                       <td className="px-3 py-2">
                         <input
@@ -580,11 +596,6 @@ export default function ProductsBundlesPage() {
                         />
                       </td>
                       <td className="px-3 py-2 text-right space-x-2">
-                        {i > 0 ? (
-                          <button type="button" className="text-blue-600 hover:underline text-xs" onClick={() => makePrimary(i)}>
-                            Set primary
-                          </button>
-                        ) : null}
                         <button type="button" className="text-red-600 hover:underline text-xs" onClick={() => removeLine(i)}>
                           Remove
                         </button>
@@ -621,6 +632,11 @@ export default function ProductsBundlesPage() {
                 placeholder="e.g. 29.99"
               />
               <p className="text-xs text-gray-500 mt-1">This amount is used to create the Stripe recurring price.</p>
+              <p className="text-xs text-gray-600 mt-1">
+                {finalSavingsPercent != null
+                  ? `Compared to full catalog subtotal, customers save ${formatPercent(finalSavingsPercent)} with this bundle.`
+                  : 'Enter a final price to see customer savings percent.'}
+              </p>
             </div>
           </div>
 

@@ -259,6 +259,10 @@ export async function listBundles(req: Request, res: Response): Promise<void> {
           ? Number(b.bundle_discount_percent)
           : null,
       bundleRecurringUnitAmountCents: b.bundle_recurring_unit_amount_cents ?? null,
+      bundleSavingsPercent:
+        b.bundle_savings_percent != null && b.bundle_savings_percent !== ''
+          ? Number(b.bundle_savings_percent)
+          : null,
       previewSubtotalCents: b.previewSubtotalCents,
       previewSuggestedCents: b.previewSuggestedCents,
       previewDiscountPercent: b.previewDiscountPercent,
@@ -302,6 +306,14 @@ type BundleWriteBody = {
   isKit?: boolean;
   bundleDiscountPercent?: number | null;
 };
+
+function computeBundleSavingsPercent(subtotalCents: number, finalUnitAmountCents: number): number | null {
+  if (!Number.isFinite(subtotalCents) || subtotalCents <= 0) return null;
+  if (!Number.isFinite(finalUnitAmountCents) || finalUnitAmountCents < 0) return null;
+  const rawPct = ((subtotalCents - finalUnitAmountCents) / subtotalCents) * 100;
+  const clamped = Math.max(0, Math.min(100, rawPct));
+  return Math.round(clamped * 100) / 100;
+}
 
 async function validateAndResolveBundle(
   tid: string,
@@ -354,6 +366,8 @@ export async function postBundle(req: Request, res: Response): Promise<void> {
   try {
     const { stripePriceId, stripeProductId } = await validateAndResolveBundle(tid, body, null);
     const unitCents = Math.round(Number(body.pricing!.unitAmountCents));
+    const pricingPreview = await previewBundlePricing(tid, components, body.bundleDiscountPercent);
+    const savingsPercent = computeBundleSavingsPercent(pricingPreview.subtotalCents, unitCents);
     const row = await upsertBundle(tid, {
       title: body.title,
       slug: body.slug,
@@ -367,6 +381,7 @@ export async function postBundle(req: Request, res: Response): Promise<void> {
       isKit: body.isKit,
       bundleDiscountPercent: body.bundleDiscountPercent ?? null,
       bundleRecurringUnitAmountCents: unitCents,
+      bundleSavingsPercent: savingsPercent,
     });
     success(res, { bundle: row });
   } catch (e) {
@@ -434,6 +449,8 @@ export async function putBundle(req: Request, res: Response): Promise<void> {
   try {
     const { stripePriceId, stripeProductId } = await validateAndResolveBundle(tid, body, existing);
     const unitCents = Math.round(Number(body.pricing!.unitAmountCents));
+    const pricingPreview = await previewBundlePricing(tid, components, body.bundleDiscountPercent);
+    const savingsPercent = computeBundleSavingsPercent(pricingPreview.subtotalCents, unitCents);
     const row = await upsertBundle(tid, {
       id,
       title: body.title,
@@ -448,6 +465,7 @@ export async function putBundle(req: Request, res: Response): Promise<void> {
       isKit: body.isKit,
       bundleDiscountPercent: body.bundleDiscountPercent,
       bundleRecurringUnitAmountCents: unitCents,
+      bundleSavingsPercent: savingsPercent,
     });
     success(res, { bundle: row });
   } catch (e) {
