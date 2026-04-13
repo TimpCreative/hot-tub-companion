@@ -507,6 +507,16 @@ export default function AdminProductsPage() {
     setSubscriptionActionError(null);
   }, [selected?.id]);
 
+  const blockUiBusy = bulkBusy || importBusy;
+  useEffect(() => {
+    if (!blockUiBusy) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [blockUiBusy]);
+
   async function selectAllMatchingFilter() {
     setBulkBusy(true);
     setError(null);
@@ -1476,6 +1486,31 @@ export default function AdminProductsPage() {
           </div>
         )}
       </Modal>
+
+      {blockUiBusy ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 backdrop-blur-[1px]"
+          role="alertdialog"
+          aria-busy="true"
+          aria-live="polite"
+          aria-label={importBusy ? 'Import in progress' : 'Bulk update in progress'}
+        >
+          <div className="mx-4 max-w-sm rounded-xl border border-gray-200 bg-white px-8 py-6 text-center shadow-xl">
+            <div
+              className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-gray-200 border-t-blue-600"
+              aria-hidden
+            />
+            <p className="mt-4 text-sm font-semibold text-gray-900">
+              {importBusy ? 'Importing…' : 'Applying bulk changes…'}
+            </p>
+            <p className="mt-2 text-xs text-gray-500 leading-relaxed">
+              {importBusy
+                ? 'Your file is being processed. Please keep this tab open.'
+                : 'Talking to the server. Large selections can take a while—please wait.'}
+            </p>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

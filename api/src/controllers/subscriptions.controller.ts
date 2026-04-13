@@ -10,6 +10,7 @@ import {
 } from '../services/subscriptions.service';
 import { isStripeConfigured, createBillingPortalSession, createSubscriptionCheckoutSessionForItems } from '../services/stripeConnect.service';
 import { getCart } from '../services/storefrontCart.service';
+import { responseForStripeCheckoutModeMismatch } from '../utils/stripeModeMismatch';
 function customerUserId(req: Request): string | null {
   const u = req.user as { id?: string; role?: string } | undefined;
   if (!u?.id || u.role === 'admin') return null;
@@ -214,6 +215,12 @@ export async function postCartSubscriptionCheckout(req: Request, res: Response):
     }
     success(res, { checkoutPageUrl: url });
   } catch (e) {
+    const modeMismatch = responseForStripeCheckoutModeMismatch(e);
+    if (modeMismatch) {
+      console.warn('[subscriptions] cart checkout', modeMismatch.code, (e as Error)?.message);
+      error(res, modeMismatch.code, modeMismatch.message, modeMismatch.status);
+      return;
+    }
     console.error('[subscriptions] cart checkout', e);
     error(res, 'CHECKOUT_FAILED', 'Could not create checkout session', 500);
   }

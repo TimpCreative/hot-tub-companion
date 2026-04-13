@@ -7,6 +7,7 @@ import {
   buildSubscriptionsCompleteUrl,
 } from '../services/subscriptions.service';
 import { createSubscriptionCheckoutSession, isStripeConfigured } from '../services/stripeConnect.service';
+import { responseForStripeCheckoutModeMismatch } from '../utils/stripeModeMismatch';
 
 type TenantStripeRow = {
   id: string;
@@ -108,6 +109,12 @@ export async function postStartSubscriptionCheckout(req: Request, res: Response)
     const msg = e instanceof Error ? e.message : String(e);
     if (msg === 'STRIPE_CONNECT_NOT_READY') {
       error(res, 'STRIPE_CONNECT_NOT_READY', 'Stripe Connect is not ready for charges', 403);
+      return;
+    }
+    const modeMismatch = responseForStripeCheckoutModeMismatch(e);
+    if (modeMismatch) {
+      console.warn('[publicSubscriptions] start-checkout', modeMismatch.code, (e as Error)?.message);
+      error(res, modeMismatch.code, modeMismatch.message, modeMismatch.status);
       return;
     }
     console.error('[publicSubscriptions] start-checkout', e);
