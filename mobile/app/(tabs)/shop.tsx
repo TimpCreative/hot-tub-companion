@@ -504,6 +504,24 @@ export default function Shop() {
                   </Text>
                 )}
               </Pressable>
+              {item.subscription_eligible ? (
+                <Pressable
+                  onPress={goDetail}
+                  style={({ pressed }) => [
+                    styles.rowSubscribeBtn,
+                    {
+                      borderColor: colors.primary,
+                      backgroundColor: colors.surface,
+                      opacity: pressed ? 0.9 : 1,
+                    },
+                  ]}
+                  accessibilityLabel={`View ${item.title} subscription options`}
+                >
+                  <Text style={[styles.rowSubscribeBtnText, { color: colors.primary }]} numberOfLines={1}>
+                    Subscribe
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           </View>
         </View>
@@ -1066,6 +1084,20 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   rowAddBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  rowSubscribeBtn: {
+    marginTop: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+  },
+  rowSubscribeBtnText: {
     fontSize: 14,
     fontWeight: '700',
   },

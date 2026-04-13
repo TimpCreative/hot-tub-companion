@@ -16,6 +16,7 @@ export type ShopProductRow = {
   shop_compatibility: ShopCompatibility;
   category_id?: string | null;
   category_name?: string | null;
+  subscription_eligible?: boolean;
 };
 
 export type ShopCategory =
@@ -131,6 +132,7 @@ export type ProductDetail = {
   product_type?: string | null;
   shopCompatibility?: ShopCompatibility;
   variants?: ProductVariantRow[];
+  subscription_eligible?: boolean;
   [key: string]: unknown;
 };
 

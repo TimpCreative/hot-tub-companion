@@ -225,6 +225,9 @@ export default function ProductDetailScreen() {
   const stockLine = productDetailStockLine(stock, tenantConfig?.shop ?? null);
 
   const staffAppLogin = isStaffTenantAppLogin(user);
+  const subscriptionEligible =
+    product?.subscription_eligible === true || (product as { subscriptionEligible?: boolean }).subscriptionEligible === true;
+  const showSingleSubscribeCta = subscriptionEligible || !!subOffers?.single;
 
   const handleSubscribeSingle = async () => {
     if (!user) {
@@ -453,7 +456,7 @@ export default function ProductDetailScreen() {
       ) : null}
 
       <View style={styles.ctaRow}>
-        {subOffers?.single ? (
+        {showSingleSubscribeCta ? (
           <Pressable
             style={({ pressed }) => [
               styles.cta,
@@ -472,11 +475,7 @@ export default function ProductDetailScreen() {
               <ActivityIndicator color={colors.primary} />
             ) : (
               <Text style={[styles.ctaText, { color: colors.primary }]}>
-                {!user
-                  ? 'Subscribe'
-                  : staffAppLogin
-                    ? 'Subscribe (staff)'
-                    : 'Subscribe to this item'}
+                {!user ? 'Subscribe' : staffAppLogin ? 'Subscribe (staff)' : 'Subscribe to this item'}
               </Text>
             )}
           </Pressable>
@@ -484,7 +483,7 @@ export default function ProductDetailScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.cta,
-            subOffers?.single ? styles.ctaHalf : { flex: 1, minWidth: 0 },
+            showSingleSubscribeCta ? styles.ctaHalf : { flex: 1, minWidth: 0 },
             {
               backgroundColor: stock > 0 ? colors.primary : colors.border,
               opacity: pressed ? 0.88 : 1,
