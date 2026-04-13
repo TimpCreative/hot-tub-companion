@@ -442,8 +442,8 @@ Before broad rollout, validate against real TAB data and real operating conditio
 
 ## Should Wait Until Post-Pilot or Later Phase 3
 
-- Subscription engine
-- Bundle purchasing
+- **Full** subscription lifecycle (per-cycle Shopify fulfillment, OOS/substitution, in-app Chewy-style controls without leaving Stripe surfaces) — billing rail + cart checkout + profile list/portal shipped Apr 2026; see [PHASE-3-ENGAGEMENT.md](./PHASE-3-ENGAGEMENT.md) Part 4
+- **Curated** recommended bundle templates (retailer-defined subscription bundles are shipped; “recommended templates” productization may be Phase 5)
 - Referral purchase attribution
 - Commerce-driven advanced analytics
 
@@ -457,7 +457,7 @@ Commerce is not done until all of the following are true:
 - Checkout launches through Shopify Checkout Kit ✓ **(verified in app, Apr 2026)**
 - Successful orders are reconciled through verified webhook handling ✓ (`order_references` + idempotency)
 - `order_references` persist correctly ✓
-- **Recent orders UI works from authoritative backend data** — **not done** (no read API / Home card)
+- **Recent orders UI works from authoritative backend data** ✓ **(read API + Home `RecentOrdersCard`; formal TAB pilot QA still Milestone 6)**
 - Shopify secrets are encrypted at rest ✓
 - Sync handles full retailer catalog size with **pagination** ✓; **retry behavior** still recommended for production
 - Tenant isolation and webhook safety have been explicitly tested — **Milestone 6**

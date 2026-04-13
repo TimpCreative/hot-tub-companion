@@ -112,7 +112,7 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         phase: '3',
         status: 'partial',
         notes:
-          'Care Schedule, cron reminders, spa seasons, custom tasks, profile tracking on complete, home maintenance_summary widget, onboarding seasons. UTC calendar v1.',
+          'Apr 2026+: Care schedule, snooze/reschedule, activity/history, dedupe, cron, home widget. UTC calendar v1; tenant TZ — v1.1.',
       },
       {
         feature: 'Multi-spa support (basic)',
@@ -121,7 +121,8 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         adv: '✓',
         phase: '3',
         status: 'partial',
-        notes: 'Multiple profiles; Home/Shop selector Phase 3.',
+        notes:
+          'Multiple profiles; Shop: persisted active spa selector. Home: primary spa display (active switcher on Home — polish).',
       },
       {
         feature: 'Multi-spa support (refined UX)',

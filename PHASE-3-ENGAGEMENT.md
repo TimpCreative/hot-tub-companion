@@ -12,21 +12,21 @@
 
 | Area | Status | Notes |
 |------|--------|-------|
-| **Commerce (Shop / cart / checkout)** | ✅ Partial | **Shipped:** Shop, Storefront cart, native Checkout Kit; **verified Apr 2026** test checkout. Detail: [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md). **Subscriptions (billing rail):** Stripe Connect onboarding, signed app→web handoff, tenant CNAME checkout path, webhooks + idempotency, retailer **bundle builder** + eligibility — see [Part 4 §4.15](#415-security--rbac-audit-apr-2026). **Still open:** in-app self-service MVP (§4.11), fulfillment automation / OOS (§4.4). |
+| **Commerce (Shop / cart / checkout)** | ✅ Partial | **Shipped:** Shop, Storefront cart, native Checkout Kit; **verified Apr 2026** test checkout; **recent orders** read API + Home card ([commerce plan](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md)). **Subscriptions (billing rail):** Stripe Connect, **cart** subscription checkout (API creates Stripe Checkout on connected account), **in-app** payment sheet for Stripe URLs, signed handoff JWT + tenant CNAME path, webhooks + idempotency, retailer **bundle builder** + default discount + RBAC — [Part 4 §4.15](#415-security--rbac-audit-apr-2026). **Customer app:** Profile **Subscriptions** list, detail, **Stripe Customer Portal** (manage payment / cancel). **Still open:** Chewy-style in-app controls without portal (§4.11), per-cycle fulfillment / OOS (§4.4). |
 | **Retailer Admin — Products ↔ UHTD mapping** | ✅ Partial | **Shipped:** list enrichment with top suggestion score (tiered % pills), `pcdb_parts` join for mapped part labels, extended list sort (visibility, mapping status, confidence), modal **Product mapping** vs **UHTD Suggestions** with confirm/clear keeping the modal open. See [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md § Retailer Admin: Products and UHTD mapping UX](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#retailer-admin-products-and-uhtd-mapping-ux). **Still open:** performance at very large page sizes (batch/denormalize scores later), optional super-admin deep link to PCdb part. |
 | **Referral program** | ❌ | Still planned in this phase |
 | **Water Care Assistant** | ✅ Partial | **Shipped (Apr 2026):** Super Admin **Water Care** — canonical metrics (scale min/max, default ideals), chemistry profiles + scope mappings (priority tie-break documented in UI), published **test kits** (per-metric help, numeric vs color-assist, **color scale points** `{ spots: [{ value, color, label? }] }`). **Mobile:** Water Care tab (resolved profile, comparison vs latest test), **log test** with profile-driven measurements, optional kit picker, dosage **recommendations** on save, list/history via **Maintenance log** / water-tests API. **Still open vs Part 1 spec:** fixed pH/slider UI, trend charts, color-assist entry from kit spots on device, recommendation → **Add to cart** product cards, retailer admin for opted-in shared tests, full `chemical_dosage_rules` breadth. |
 | **Seasonal maintenance timeline** | ✅ Shipped (Apr 2026+) | **Care schedule** (`maintenance-timeline`): auto schedule + custom tasks; **Overdue / This week / Upcoming (30d by week) / Later (beyond 30d)** — compact **Later** rows (title + due, tap → reschedule modal). **Actions:** Mark done, **Snooze** (overdue), **Reschedule** (not overdue); **Task history** screen + activity API. **Backend:** `snoozed_until`, soft **`deleted_at`** for custom, **`maintenance_activity`** audit log; **dedupe** pending auto tasks per `event_type` (keep **nearest upcoming** due, else latest overdue); `POST …/snooze`, `POST …/reschedule`, `GET …/maintenance/activity`. **Cron:** `maintenance-reminders` (lead-up window **and** one-time overdue nudge if `notification_sent` still false); **`POST …/internal/cron/regenerate-maintenance-schedules`** (all spas or `?spaProfileId=`) for ops. **Tracking / guides / widget / UTC v1** unchanged; **tenant/user TZ** still v1.1. **Ops:** daily `maintenance-reminders` + optional periodic or on-demand **regenerate** with `CRON_SECRET`. |
 | **Content system** | ✅ Partial | Core universal + retailer content platform is shipped; contextual recommendation/search refinements remain |
-| **Subscription management** | ✅ Partial (Apr 2026) | **Shipped:** Stripe Connect (Express) in retailer admin; **Settings → Subscriptions** (fee bps, Shopify fulfillment toggle, default bundle discount, new-SKU subscription eligibility); **Products → Bundles** (CRUD, Stripe Price creation on connected account, HMAC bulk-selection tokens); **Active subscriptions** list (admin); signed **handoff JWT** for web checkout; webhook pipeline with signature verification + event dedupe. **RBAC:** `can_manage_subscriptions` enforced on financial/onboarding/customer-sub views; product-only admins get **minimal** Connect GET (no fee/account PII) and may update **only** default bundle discount (via settings PUT) — [§4.15](#415-security--rbac-audit-apr-2026). **Not yet:** Chewy-style **in-app** manage (§4.11), per-cycle Shopify order explosion, OOS/substitution flows. |
+| **Subscription management** | ✅ Partial (Apr 2026) | **Shipped:** Stripe Connect (Express); **Settings → Billing** (Connect + **Subscriptions** fee/fulfillment/eligibility/default bundle discount); **Products → Bundles**; **Billing → Active subscriptions** (admin); **cart → subscription Checkout** + **in-app Stripe browser**; signed **handoff JWT**; webhooks + dedupe; **Profile → Subscriptions** (list, detail, portal). **RBAC:** [§4.15](#415-security--rbac-audit-apr-2026). **Not yet:** Chewy-style **native** pause/skip/item edits (§4.11), per-cycle Shopify order explosion, OOS/substitution flows. |
 | **Cross-platform QA** | ⏳ | Ongoing as features ship |
 
 ### Next steps (Phase 3 — suggested order)
 
-1. **Commerce backend:** product sync pagination/retry, `order_references` from `orders/create`, Storefront variant GID normalization, read APIs for shop/PDP — [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#recommended-delivery-order).
-2. **Customer app:** read-only Shop, PDP, multi-spa selector, then cart + Checkout Kit, then Home orders card.
-3. **Pilot prep:** TAB catalog QA, webhook/order idempotency extensions if needed, manual checklist (#1–4 in *Manual Steps Required* below).
-4. **Engagement streams:** referrals, **water care polish** (charts, shop links, mobile color-assist), subscriptions — care schedule core + history/snooze/reschedule shipped; referrals/bundles ordering per commerce doc.
+1. **Commerce hardening:** TAB pilot QA (Milestone 6), sync retry/edge cases, multi-variant PDP if catalog requires — [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#recommended-delivery-order).
+2. **Customer app polish:** Home multi-spa **active** selector (Shop already uses persisted active spa); cart/orders verification on both platforms.
+3. **Pilot prep:** Scripted catalog + webhook matrix, zero-trust audit sign-off where required.
+4. **Engagement streams:** referrals, water care polish (charts, shop links, color-assist), subscription **fulfillment** + **§4.11** native controls when prioritized.
 
 ### Care schedule — still open (nice-to-have / v1.1)
 
@@ -1007,8 +1007,8 @@ Before moving to Phase 4, verify:
 
 ### Commerce, home, and platform
 
-- [ ] Multi-spa: user with multiple spas can switch active spa on Home and Shop
-- [ ] My Tub dashboard shows warranty, filter reminder, seasonal alert, and recent orders as specified
+- [ ] Multi-spa: **Shop** — persisted active spa selector ✓; **Home** — primary spa display today (full “switch active spa on Home” still open if product wants parity)
+- [ ] My Tub dashboard shows warranty, filter reminder, seasonal alert, and recent orders as specified *(recent orders: Home card + API shipped — verify widgets vs spec)*
 - [ ] Shop tab shows products filtered to the user's spa model (compatible mode)
 - [ ] Shop tab filters further by sanitization system for chemicals (as specified)
 - [ ] "Browse All" mode shows all non-hidden products
@@ -1016,7 +1016,7 @@ Before moving to Phase 4, verify:
 - [ ] Product search works
 - [ ] Product detail screen shows full info with images, variants, pricing
 - [x] Add to Cart creates/updates a Shopify cart
-- [ ] Cart screen shows items, allows quantity changes and removal
+- [x] Cart screen shows items, allows quantity changes and removal *(verify edge cases; Milestone 6 for broad pilot)*
 - [x] Checkout via Shopify Checkout Kit works end-to-end (test purchase) — verified Apr 2026
 - [ ] Order webhook fires and creates a notification (and order reference if applicable)
 - [ ] App works on both iOS and Android (full pass on new surfaces)
@@ -1046,8 +1046,8 @@ Before moving to Phase 4, verify:
 - [ ] Video content embeds YouTube correctly
 - [ ] Admin can create, edit, delete, and publish content
 - [ ] **Stripe Connect:** retailer can complete onboarding; tenant gated until `charges_enabled` or white-label TAB path
-- [ ] **Subscribe** flow: app handoff → tenant CNAME web → Stripe Checkout (connected account) → deep link return
-- [ ] Subscriptions listable in app; **pause, resume, skip, cancel**, item edits, frequency change (per Part 4 MVP)
+- [x] **Subscribe** (MVP): subscription line items from **cart** → API Stripe Checkout (connected account) → **in-app** payment sheet where applicable → return URL; **plus** signed handoff JWT → web checkout when used — verified Apr 2026 *(full CNAME-only path: configure DNS)*
+- [ ] Subscriptions in app: **native** pause, resume, skip, cancel, item edits, frequency change (Part 4 §4.11) — **today:** list + detail + **Stripe Customer Portal** for billing/payment/cancel
 - [ ] **Seasonal** pause suggestion notifications fire at correct time
 - [ ] **Invoice paid** (webhook) → **one Shopify order** per cycle with **external payment** + **component line items** (Shopify tenants); or fulfillment routed to **POS / TAB** (non-Shopify)
 - [ ] **OOS path:** pre-ship check; customer choice — substitute, partial ship, or skip month (per Part 4)
