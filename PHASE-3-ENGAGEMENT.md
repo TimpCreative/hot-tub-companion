@@ -12,13 +12,13 @@
 
 | Area | Status | Notes |
 |------|--------|-------|
-| **Commerce (Shop / cart / checkout)** | ✅ Partial | **Shipped:** Shop, Storefront cart, native Checkout Kit; **verified Apr 2026** test checkout. Detail: [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md). **Subscriptions:** architecture locked in [Part 4](#part-4-subscriptions--recurring-commerce); implementation pending. |
+| **Commerce (Shop / cart / checkout)** | ✅ Partial | **Shipped:** Shop, Storefront cart, native Checkout Kit; **verified Apr 2026** test checkout. Detail: [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md). **Subscriptions (billing rail):** Stripe Connect onboarding, signed app→web handoff, tenant CNAME checkout path, webhooks + idempotency, retailer **bundle builder** + eligibility — see [Part 4 §4.15](#415-security--rbac-audit-apr-2026). **Still open:** in-app self-service MVP (§4.11), fulfillment automation / OOS (§4.4). |
 | **Retailer Admin — Products ↔ UHTD mapping** | ✅ Partial | **Shipped:** list enrichment with top suggestion score (tiered % pills), `pcdb_parts` join for mapped part labels, extended list sort (visibility, mapping status, confidence), modal **Product mapping** vs **UHTD Suggestions** with confirm/clear keeping the modal open. See [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md § Retailer Admin: Products and UHTD mapping UX](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#retailer-admin-products-and-uhtd-mapping-ux). **Still open:** performance at very large page sizes (batch/denormalize scores later), optional super-admin deep link to PCdb part. |
 | **Referral program** | ❌ | Still planned in this phase |
 | **Water Care Assistant** | ✅ Partial | **Shipped (Apr 2026):** Super Admin **Water Care** — canonical metrics (scale min/max, default ideals), chemistry profiles + scope mappings (priority tie-break documented in UI), published **test kits** (per-metric help, numeric vs color-assist, **color scale points** `{ spots: [{ value, color, label? }] }`). **Mobile:** Water Care tab (resolved profile, comparison vs latest test), **log test** with profile-driven measurements, optional kit picker, dosage **recommendations** on save, list/history via **Maintenance log** / water-tests API. **Still open vs Part 1 spec:** fixed pH/slider UI, trend charts, color-assist entry from kit spots on device, recommendation → **Add to cart** product cards, retailer admin for opted-in shared tests, full `chemical_dosage_rules` breadth. |
 | **Seasonal maintenance timeline** | ✅ Shipped (Apr 2026+) | **Care schedule** (`maintenance-timeline`): auto schedule + custom tasks; **Overdue / This week / Upcoming (30d by week) / Later (beyond 30d)** — compact **Later** rows (title + due, tap → reschedule modal). **Actions:** Mark done, **Snooze** (overdue), **Reschedule** (not overdue); **Task history** screen + activity API. **Backend:** `snoozed_until`, soft **`deleted_at`** for custom, **`maintenance_activity`** audit log; **dedupe** pending auto tasks per `event_type` (keep **nearest upcoming** due, else latest overdue); `POST …/snooze`, `POST …/reschedule`, `GET …/maintenance/activity`. **Cron:** `maintenance-reminders` (lead-up window **and** one-time overdue nudge if `notification_sent` still false); **`POST …/internal/cron/regenerate-maintenance-schedules`** (all spas or `?spaProfileId=`) for ops. **Tracking / guides / widget / UTC v1** unchanged; **tenant/user TZ** still v1.1. **Ops:** daily `maintenance-reminders` + optional periodic or on-demand **regenerate** with `CRON_SECRET`. |
 | **Content system** | ✅ Partial | Core universal + retailer content platform is shipped; contextual recommendation/search refinements remain |
-| **Subscription management** | ❌ | Spec in [Part 4](#part-4-subscriptions--recurring-commerce): Stripe Connect + tenant CNAME web checkout + Shopify (or TAB/POS) fulfillment; Chewy-style self-service MVP. |
+| **Subscription management** | ✅ Partial (Apr 2026) | **Shipped:** Stripe Connect (Express) in retailer admin; **Settings → Subscriptions** (fee bps, Shopify fulfillment toggle, default bundle discount, new-SKU subscription eligibility); **Products → Bundles** (CRUD, Stripe Price creation on connected account, HMAC bulk-selection tokens); **Active subscriptions** list (admin); signed **handoff JWT** for web checkout; webhook pipeline with signature verification + event dedupe. **RBAC:** `can_manage_subscriptions` enforced on financial/onboarding/customer-sub views; product-only admins get **minimal** Connect GET (no fee/account PII) and may PATCH **only** default bundle discount — [§4.15](#415-security--rbac-audit-apr-2026). **Not yet:** Chewy-style **in-app** manage (§4.11), per-cycle Shopify order explosion, OOS/substitution flows. |
 | **Cross-platform QA** | ⏳ | Ongoing as features ship |
 
 ### Next steps (Phase 3 — suggested order)
@@ -718,6 +718,28 @@ GET    /api/v1/admin/subscriptions?customerId=&status=
 - **Seal Subscriptions** (or any **third-party Shopify subscription app**) as the **required** billing engine — optional later compatibility only if a retailer demands it; not the default plan.
 - **Shopify Selling Plans / Shopify Subscriptions API** as the **system of record** for subscription **billing** (still use Shopify **only** for **one-off checkout** and, when applicable, **order / inventory** for fulfillment).
 - **Internal cron that emails “complete this cart to pay”** per delivery as the **primary** charge mechanism — replaced by **Stripe subscription billing** + fulfillment order creation.
+
+### 4.15 Security & RBAC audit (Apr 2026)
+
+Zero-trust style pass on the **subscription stack** after admin + Connect + bundle changes. This section records what was verified, what was fixed, and what remains acceptable risk or backlog.
+
+**Verified (in code)**
+
+- **Stripe webhooks:** HMAC signature verification, raw body handling, **idempotent** processing via stored event ids (`stripe_webhook_events` or equivalent).
+- **Public / handoff checkout:** Short-lived **JWT** (or equivalent) for app→web handoff; server-side validation of tenant, Connect readiness, and bundle vs single-product rules before Checkout Session creation.
+- **Bulk product selection (subscriptions):** Tokens are **HMAC-signed**, scoped (e.g. tenant), and verified before apply.
+- **Admin bundle APIs:** Stripe Product/Price ids are **not** pasted by admins; server creates/rotates recurring prices on the **connected account** when pricing is supplied.
+
+**Fixed in this audit**
+
+- **RBAC gap:** `admin_roles.can_manage_subscriptions` was not consistently enforced on **Connect onboarding**, **Express dashboard links**, **subscription settings** (fee / fulfillment / new-product default), **tenant customer subscription list**, and **Settings → Subscriptions** UI. Any admin role could previously reach financial and PII-heavy surfaces. **Mitigation:** handlers require `can_manage_subscriptions` for those mutations and lists; **GET Connect status** allows `can_manage_products` **only** for bundle UX but returns a **reduced payload** (no application fee, fulfillment flag, account id, or new-product default) so product managers do not see subscription financial config.
+- **Settings PUT split:** Product-only admins may update **only** `subscriptionBundleDefaultDiscountPercent` (bundles page); all other subscription settings require `can_manage_subscriptions`.
+
+**Residual risks / backlog (documented, not blockers for pilot discipline)**
+
+- **Handoff JWT theft within TTL:** If a token is leaked before expiry, an attacker could start checkout as that user; mitigate operationally with **short TTL**, HTTPS-only, and monitoring — same class as any short-lived session exchange.
+- **Multiple active subscriptions per user (customer billing portal):** Some paths assume a **single** `customer_subscriptions` row; document and harden if multi-sub becomes common.
+- **MVP scope:** Fulfillment automation, OOS, and in-app self-service remain per §4.4 and §4.11 — security of **billing** is not a substitute for **operational** reconciliation playbooks.
 
 ---
 

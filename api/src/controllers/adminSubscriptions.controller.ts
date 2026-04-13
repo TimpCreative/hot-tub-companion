@@ -31,6 +31,28 @@ function requireManageProducts(req: Request, res: Response): boolean {
   return true;
 }
 
+function requireManageSubscriptions(req: Request, res: Response): boolean {
+  const role = (req as Request & { adminRole?: Record<string, unknown> }).adminRole;
+  const allowed = !!role && role.can_manage_subscriptions === true;
+  if (!allowed) {
+    error(res, 'FORBIDDEN', 'Missing permission: can_manage_subscriptions', 403);
+    return false;
+  }
+  return true;
+}
+
+/** Connect status includes Stripe identifiers; allow product admins to read for bundle-default UX. */
+function requireSubscriptionsOrProductsRead(req: Request, res: Response): boolean {
+  const role = (req as Request & { adminRole?: Record<string, unknown> }).adminRole;
+  const ok =
+    !!role && (role.can_manage_subscriptions === true || role.can_manage_products === true);
+  if (!ok) {
+    error(res, 'FORBIDDEN', 'Missing permission: can_manage_subscriptions or can_manage_products', 403);
+    return false;
+  }
+  return true;
+}
+
 type PricingBody = {
   unitAmountCents: number;
   currency?: string;
@@ -102,14 +124,28 @@ function buildAdminReturnUrl(tenantSlug: string, path: string): string {
 }
 
 export async function getConnectStatus(req: Request, res: Response): Promise<void> {
+  if (!requireSubscriptionsOrProductsRead(req, res)) return;
   const tid = tenantId(req);
   if (!tid) {
     error(res, 'UNAUTHORIZED', 'Tenant required', 401);
     return;
   }
+  const role = (req as Request & { adminRole?: Record<string, unknown> }).adminRole;
+  const canSub = role?.can_manage_subscriptions === true;
   const t = (await db('tenants').where({ id: tid }).first()) as Record<string, unknown> | undefined;
   if (!t) {
     error(res, 'NOT_FOUND', 'Tenant not found', 404);
+    return;
+  }
+  const bundleDiscount = Number(
+    (t as { subscription_bundle_default_discount_percent?: unknown }).subscription_bundle_default_discount_percent ?? 0
+  );
+  if (!canSub) {
+    success(res, {
+      stripeConfigured: isStripeConfigured(),
+      chargesEnabled: Boolean(t.stripe_connect_charges_enabled),
+      subscriptionBundleDefaultDiscountPercent: bundleDiscount,
+    });
     return;
   }
   success(res, {
@@ -121,13 +157,16 @@ export async function getConnectStatus(req: Request, res: Response): Promise<voi
     onboardedAt: t.stripe_onboarded_at ?? null,
     subscriptionApplicationFeeBps: t.subscription_application_fee_bps ?? null,
     subscriptionShopifyFulfillmentEnabled: Boolean(t.subscription_shopify_fulfillment_enabled),
-    subscriptionBundleDefaultDiscountPercent: Number(
-      (t as { subscription_bundle_default_discount_percent?: unknown }).subscription_bundle_default_discount_percent ?? 0
+    subscriptionBundleDefaultDiscountPercent: bundleDiscount,
+    newProductsSubscriptionEligibleByDefault: Boolean(
+      (t as { new_products_subscription_eligible_by_default?: unknown }).new_products_subscription_eligible_by_default !==
+        false
     ),
   });
 }
 
 export async function postConnectOnboardingLink(req: Request, res: Response): Promise<void> {
+  if (!requireManageSubscriptions(req, res)) return;
   const tid = tenantId(req);
   if (!tid) {
     error(res, 'UNAUTHORIZED', 'Tenant required', 401);
@@ -143,8 +182,8 @@ export async function postConnectOnboardingLink(req: Request, res: Response): Pr
     return;
   }
   const body = req.body as { refreshPath?: string; returnPath?: string };
-  const refreshPath = typeof body.refreshPath === 'string' ? body.refreshPath : '/admin/settings/billing';
-  const returnPath = typeof body.returnPath === 'string' ? body.returnPath : '/admin/settings/billing';
+  const refreshPath = typeof body.refreshPath === 'string' ? body.refreshPath : '/admin/settings/subscriptions';
+  const returnPath = typeof body.returnPath === 'string' ? body.returnPath : '/admin/settings/subscriptions';
   try {
     const url = await createAccountOnboardingLink(
       tid,
@@ -159,6 +198,7 @@ export async function postConnectOnboardingLink(req: Request, res: Response): Pr
 }
 
 export async function postConnectDashboardLink(req: Request, res: Response): Promise<void> {
+  if (!requireManageSubscriptions(req, res)) return;
   const tid = tenantId(req);
   if (!tid) {
     error(res, 'UNAUTHORIZED', 'Tenant required', 401);
@@ -450,6 +490,7 @@ export async function removeBundle(req: Request, res: Response): Promise<void> {
 }
 
 export async function listTenantCustomerSubscriptions(req: Request, res: Response): Promise<void> {
+  if (!requireManageSubscriptions(req, res)) return;
   const tid = tenantId(req);
   if (!tid) {
     error(res, 'UNAUTHORIZED', 'Tenant required', 401);
@@ -469,7 +510,28 @@ export async function putSubscriptionSettings(req: Request, res: Response): Prom
     subscriptionApplicationFeeBps?: number | null;
     subscriptionShopifyFulfillmentEnabled?: boolean;
     subscriptionBundleDefaultDiscountPercent?: number;
+    newProductsSubscriptionEligibleByDefault?: boolean;
   };
+  const role = (req as Request & { adminRole?: Record<string, unknown> }).adminRole;
+  const canSub = role?.can_manage_subscriptions === true;
+  const canProd = role?.can_manage_products === true;
+  const wantsFee = body.subscriptionApplicationFeeBps !== undefined;
+  const wantsFulfill = body.subscriptionShopifyFulfillmentEnabled !== undefined;
+  const wantsNewProd = body.newProductsSubscriptionEligibleByDefault !== undefined;
+  const wantsBundleDisc = body.subscriptionBundleDefaultDiscountPercent !== undefined;
+  const sensitive = wantsFee || wantsFulfill || wantsNewProd;
+  if (sensitive && !canSub) {
+    error(res, 'FORBIDDEN', 'Missing permission: can_manage_subscriptions', 403);
+    return;
+  }
+  if (wantsBundleDisc && !canSub && !canProd) {
+    error(res, 'FORBIDDEN', 'Missing permission: can_manage_products or can_manage_subscriptions', 403);
+    return;
+  }
+  if (!canSub && !canProd) {
+    error(res, 'FORBIDDEN', 'Missing permission', 403);
+    return;
+  }
   const update: Record<string, unknown> = {};
   if (body.subscriptionApplicationFeeBps !== undefined) {
     if (body.subscriptionApplicationFeeBps !== null) {
@@ -494,6 +556,9 @@ export async function putSubscriptionSettings(req: Request, res: Response): Prom
     }
     update.subscription_bundle_default_discount_percent = n;
   }
+  if (body.newProductsSubscriptionEligibleByDefault !== undefined) {
+    update.new_products_subscription_eligible_by_default = Boolean(body.newProductsSubscriptionEligibleByDefault);
+  }
   if (Object.keys(update).length === 0) {
     error(res, 'VALIDATION_ERROR', 'No valid fields to update', 400);
     return;
@@ -515,6 +580,10 @@ export async function putSubscriptionSettings(req: Request, res: Response): Prom
     subscriptionShopifyFulfillmentEnabled: Boolean(t.subscription_shopify_fulfillment_enabled),
     subscriptionBundleDefaultDiscountPercent: Number(
       (t as { subscription_bundle_default_discount_percent?: unknown }).subscription_bundle_default_discount_percent ?? 0
+    ),
+    newProductsSubscriptionEligibleByDefault: Boolean(
+      (t as { new_products_subscription_eligible_by_default?: unknown }).new_products_subscription_eligible_by_default !==
+        false
     ),
   });
 }

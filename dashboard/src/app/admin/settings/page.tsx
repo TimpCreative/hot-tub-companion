@@ -594,8 +594,10 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="max-w-2xl">
-      <h2 className="text-2xl font-semibold text-gray-900 mb-4">Settings</h2>
-      <p className="text-gray-600 mb-6">Branding and public business information used across the mobile app.</p>
+      <h2 className="text-xl font-semibold text-gray-900 mb-1">General</h2>
+      <p className="text-gray-600 mb-6 text-sm">
+        Branding, dealer contact, shop display, and POS / Shopify sync for this store.
+      </p>
 
       {error && <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700">{error}</div>}
       {success && <div className="mb-4 rounded-lg bg-green-50 p-4 text-green-800">{success}</div>}

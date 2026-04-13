@@ -10,6 +10,7 @@ import { Header } from '@/components/ui/Header';
 
 interface AdminNavItem extends NavItem {
   requiresCanManageUsers?: boolean;
+  requiresCanManageSubscriptions?: boolean;
 }
 
 interface AdminLayoutClientProps {
@@ -69,9 +70,10 @@ export default function AdminLayoutClient({
   const filteredNavItems = useMemo(() => {
     return navItems.filter((item) => {
       if (item.requiresCanManageUsers && !permissions?.can_manage_users) return false;
+      if (item.requiresCanManageSubscriptions && !permissions?.can_manage_subscriptions) return false;
       return true;
     }) as NavItem[];
-  }, [navItems, permissions?.can_manage_users]);
+  }, [navItems, permissions?.can_manage_users, permissions?.can_manage_subscriptions]);
 
   useEffect(() => {
     if (authLoading) return;

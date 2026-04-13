@@ -291,7 +291,8 @@ function listingDiffersFromSnapshot(
 async function upsertVariantRow(
   tenantId: string,
   product: ShopifyProduct,
-  variant: ShopifyProduct['variants'][number]
+  variant: ShopifyProduct['variants'][number],
+  subscriptionEligibleForNewRows: boolean
 ): Promise<void> {
   const now = new Date();
 
@@ -380,6 +381,7 @@ async function upsertVariantRow(
       mapped_by: null,
       mapped_at: null,
       sync_hash: null,
+      subscription_eligible: subscriptionEligibleForNewRows,
       created_at: now,
       updated_at: now,
     });
@@ -658,6 +660,12 @@ export async function applyShopifyProductsToPosProducts(
   let updated = 0;
   const deletedOrArchived = 0;
 
+  const tenantRow = (await db('tenants').where({ id: tenantId }).first()) as
+    | { new_products_subscription_eligible_by_default?: boolean | null }
+    | undefined;
+  const subscriptionEligibleForNewRows =
+    tenantRow?.new_products_subscription_eligible_by_default !== false;
+
   for (const product of products) {
     for (const variant of product.variants || []) {
       try {
@@ -669,7 +677,7 @@ export async function applyShopifyProductsToPosProducts(
           })
           .first();
 
-        await upsertVariantRow(tenantId, product, variant);
+        await upsertVariantRow(tenantId, product, variant, subscriptionEligibleForNewRows);
 
         if (before) {
           updated += 1;

@@ -178,8 +178,9 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '3',
-        status: 'not_yet',
-        notes: 'Phase 3 Part 4.',
+        status: 'partial',
+        notes:
+          'Apr 2026: Connect + webhooks + handoff checkout + retailer bundle builder + admin RBAC. In-app manage, per-cycle fulfillment, OOS — still open (PHASE-3-ENGAGEMENT.md Part 4).',
       },
       {
         feature: 'Subscription discount engine',
@@ -194,9 +195,10 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         base: '—',
         core: '—',
         adv: '✓',
-        phase: '5',
-        status: 'not_yet',
-        notes: 'Templates may start Phase 3.',
+        phase: '3 / 5',
+        status: 'partial',
+        notes:
+          'Apr 2026: Retailer-defined subscription bundles (admin) + default discount; curated “recommended templates” still Phase 5.',
       },
       {
         feature: 'White-label fulfillment (optional add-on)',
@@ -612,5 +614,11 @@ export const ENTITLEMENTS_EXTRA: BuildOutRow[] = [
     phase: '1 / 2',
     status: 'partial',
     notes: 'Shopify path primary for TAB.',
+  },
+  {
+    item: 'Retailer admin: Stripe Connect + subscription bundles + subscription RBAC',
+    phase: '3',
+    status: 'partial',
+    notes: 'Apr 2026: PHASE-3-ENGAGEMENT.md Part 4 §4.15; customer self-service + fulfillment automation still open.',
   },
 ];

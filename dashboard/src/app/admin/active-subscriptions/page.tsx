@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAdminPermissions } from '@/contexts/AdminPermissionsContext';
 import { createTenantApiClient } from '@/services/api';
 
 type SubRow = {
@@ -26,6 +28,8 @@ function errMessage(e: unknown): string {
 }
 
 export default function ActiveSubscriptionsPage() {
+  const router = useRouter();
+  const { permissions, loading: permLoading } = useAdminPermissions();
   const { getIdToken } = useAuth();
   const api = useMemo(() => createTenantApiClient(async () => await getIdToken()), [getIdToken]);
   const [rows, setRows] = useState<SubRow[]>([]);
@@ -48,8 +52,16 @@ export default function ActiveSubscriptionsPage() {
   }, [api]);
 
   useEffect(() => {
+    if (permLoading) return;
+    if (!permissions?.can_manage_subscriptions) {
+      router.replace('/admin/dashboard');
+      return;
+    }
     void load();
-  }, [load]);
+  }, [load, permLoading, permissions?.can_manage_subscriptions, router]);
+
+  if (permLoading) return <p className="text-gray-600">Loading…</p>;
+  if (!permissions?.can_manage_subscriptions) return null;
 
   if (loading) return <p className="text-gray-600">Loading…</p>;
 

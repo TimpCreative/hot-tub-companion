@@ -18,16 +18,10 @@ const ADMIN_NAV = [
   { label: 'Services', href: '/services', comingPhase: 4 },
   { label: 'Content', href: '/content' },
   { label: 'Notifications', href: '/notifications' },
-  { label: 'Active subscriptions', href: '/active-subscriptions' },
+  { label: 'Active subscriptions', href: '/active-subscriptions', requiresCanManageSubscriptions: true },
   { label: 'Analytics', href: '/analytics', comingPhase: 5 },
   { label: 'Team', href: '/team', requiresCanManageUsers: true },
-  {
-    label: 'Settings',
-    children: [
-      { label: 'General', href: '/settings' },
-      { label: 'Billing & Connect', href: '/settings/billing' },
-    ],
-  },
+  { label: 'Settings', href: '/settings' },
   { label: 'App setup', href: '/app-setup' },
 ];
 
