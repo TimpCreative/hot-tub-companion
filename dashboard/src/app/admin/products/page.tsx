@@ -537,22 +537,40 @@ export default function AdminProductsPage() {
     }
   }
 
+  function confirmBulkAction(
+    action: 'set_hidden' | 'clear_mapping' | 'set_subscription_eligible',
+    opts?: { isHidden?: boolean; subscriptionEligible?: boolean }
+  ): boolean {
+    const scope =
+      selectionCount > 0
+        ? `This applies to ${selectionCount} product(s) in your bulk scope (current filters).`
+        : 'This applies to all products in your bulk scope (current filters).';
+    let detail = '';
+    if (action === 'set_hidden') {
+      detail = opts?.isHidden
+        ? `${scope}\n\nEvery product in that set will be hidden in the app (not deleted from Shopify).`
+        : `${scope}\n\nEvery product in that set will be shown again in the app.`;
+    } else if (action === 'clear_mapping') {
+      detail = `${scope}\n\nUHTD part links will be removed and each product’s mapping status will return to unmapped.`;
+    } else if (action === 'set_subscription_eligible') {
+      detail =
+        opts?.subscriptionEligible === true
+          ? `${scope}\n\nProducts will be marked subscription-eligible so they can be used for individual subscriptions and subscription bundles.`
+          : `${scope}\n\nSubscription eligibility will be turned off where possible. Products still used in a subscription bundle will be skipped until you remove them from those bundles.`;
+    }
+    return window.confirm(`Are you sure?\n\n${detail}`);
+  }
+
   async function bulkApply(
     action: 'set_hidden' | 'clear_mapping' | 'set_subscription_eligible',
     opts?: { isHidden?: boolean; subscriptionEligible?: boolean }
   ) {
     if (!selectionToken) {
-      setError('Select “All matching filter” first, or use row actions.');
+      setError('Click “Select all matching filters” (under the filters) first to choose which products bulk actions apply to.');
       return;
     }
-    if (action === 'set_subscription_eligible' && opts?.subscriptionEligible === false) {
-      if (
-        !confirm(
-          'Products that appear in a subscription bundle cannot be marked not eligible until removed from bundles. Those rows will be skipped. Continue?'
-        )
-      ) {
-        return;
-      }
+    if (!confirmBulkAction(action, opts)) {
+      return;
     }
     setBulkBusy(true);
     setError(null);
@@ -911,20 +929,28 @@ export default function AdminProductsPage() {
 
       {/* Always render this strip so selecting checkboxes does not shift the page; empty state matches height/padding */}
       <div
-        className={`sticky top-0 z-10 mb-4 min-h-[3.25rem] rounded-lg border px-4 py-3 text-sm transition-colors ${
+        className={`sticky top-0 z-10 mb-4 rounded-lg border px-4 py-3 text-sm transition-colors ${
           selectedIds.size > 0 || selectionToken
             ? 'border-blue-200 bg-blue-50'
             : 'border-gray-100 bg-gray-50/80'
         }`}
       >
+        <div className="mb-3 pb-3 border-b border-gray-200/70">
+          <h3 className="text-sm font-semibold text-gray-900">Bulk edit</h3>
+          <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+            These actions update many products at once. Set your filters below, then click{' '}
+            <strong className="font-medium text-gray-800">Select all matching filters</strong> so the bulk buttons apply
+            to that full result set (not just the rows checked on this page).
+          </p>
+        </div>
         {selectedIds.size > 0 || selectionToken ? (
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-gray-800">
-              Selected: <strong>{selectedIds.size}</strong> on list
+              <strong>{selectedIds.size}</strong> checked on this page
               {selectionToken ? (
                 <>
                   {' · '}
-                  <strong>{selectionCount}</strong> matching filter (token)
+                  <strong>{selectionCount}</strong> in bulk scope (current filters)
                 </>
               ) : null}
             </span>
@@ -934,7 +960,7 @@ export default function AdminProductsPage() {
               disabled={bulkBusy}
               onClick={() => void bulkApply('set_hidden', { isHidden: true })}
             >
-              Hide (token)
+              Hide
             </Button>
             <Button
               size="sm"
@@ -942,10 +968,10 @@ export default function AdminProductsPage() {
               disabled={bulkBusy}
               onClick={() => void bulkApply('set_hidden', { isHidden: false })}
             >
-              Show (token)
+              Show
             </Button>
             <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => void bulkApply('clear_mapping')}>
-              Clear mapping (token)
+              Clear mapping
             </Button>
             <Button
               size="sm"
@@ -953,7 +979,7 @@ export default function AdminProductsPage() {
               disabled={bulkBusy}
               onClick={() => void bulkApply('set_subscription_eligible', { subscriptionEligible: true })}
             >
-              Subscription eligible (token)
+              Subscription eligible
             </Button>
             <Button
               size="sm"
@@ -961,16 +987,16 @@ export default function AdminProductsPage() {
               disabled={bulkBusy}
               onClick={() => void bulkApply('set_subscription_eligible', { subscriptionEligible: false })}
             >
-              Subscription not eligible (token)
+              Subscription not eligible
             </Button>
             <Button size="sm" variant="secondary" onClick={clearSelection}>
               Clear selection
             </Button>
           </div>
         ) : (
-          <p className="text-gray-400 leading-snug">
-            Select products with checkboxes, then use “All matching filter” for bulk hide, show, clear mapping, or
-            subscription eligibility.
+          <p className="text-gray-500 text-sm leading-snug">
+            When you’re ready, use <strong className="font-medium text-gray-700">Select all matching filters</strong>{' '}
+            (under the filters) and return here to run bulk actions.
           </p>
         )}
       </div>
@@ -1121,7 +1147,7 @@ export default function AdminProductsPage() {
             Select page ({rows.length})
           </Button>
           <Button size="sm" variant="secondary" loading={bulkBusy} onClick={() => void selectAllMatchingFilter()}>
-            All matching filter (token)
+            Select all matching filters
           </Button>
           <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
             <input
