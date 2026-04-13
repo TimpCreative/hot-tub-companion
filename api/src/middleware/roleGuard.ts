@@ -30,12 +30,17 @@ export async function adminRoleGuard(
     (req as any).adminRole = {
       user_id: user.id,
       tenant_id: tenant.id,
+      role: 'owner',
+      can_view_customers: true,
+      can_view_orders: true,
       can_manage_products: true,
-      can_manage_uhtd: true,
+      can_manage_content: true,
+      can_manage_service_requests: true,
       can_manage_settings: true,
+      can_manage_subscriptions: true,
       can_manage_users: true,
-      can_view_audit_log: true,
       can_send_notifications: true,
+      can_view_analytics: true,
     };
     next();
     return;
