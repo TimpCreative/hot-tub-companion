@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Linking from 'expo-linking';
+import { openStripeHostedUrl } from '../../../lib/stripeHostedBrowser';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -278,7 +278,7 @@ export default function ShopCartScreen() {
                     );
                     return;
                   }
-                  await Linking.openURL(url);
+                  await openStripeHostedUrl(url);
                 } catch (e) {
                   Alert.alert('Subscribe', messageFromApiReject(e, 'Could not start subscription checkout.'));
                 } finally {

@@ -11,6 +11,7 @@ import {
 import { isStripeConfigured, createBillingPortalSession, createSubscriptionCheckoutSessionForItems } from '../services/stripeConnect.service';
 import { getCart } from '../services/storefrontCart.service';
 import { cartCheckoutResponseFromStripeError } from '../utils/stripeSubscriptionCheckoutErrors';
+
 function customerUserId(req: Request): string | null {
   const u = req.user as { id?: string; role?: string } | undefined;
   if (!u?.id || u.role === 'admin') return null;
@@ -315,21 +316,36 @@ export async function postBillingPortal(req: Request, res: Response): Promise<vo
   }
   const sub = (await db('customer_subscriptions')
     .where({ user_id: userId, tenant_id: tenantId })
+    .whereNotNull('stripe_customer_id')
+    .andWhere('stripe_customer_id', '<>', '')
+    .orderBy('updated_at', 'desc')
     .orderBy('created_at', 'desc')
     .first()) as { stripe_customer_id: string } | undefined;
   if (!sub) {
-    error(res, 'NOT_FOUND', 'No subscription found', 404);
+    error(
+      res,
+      'NOT_FOUND',
+      'No subscription with billing on file yet. If you just subscribed, wait a minute for sync then try again.',
+      404
+    );
     return;
   }
   const returnUrl = buildSubscriptionsCompleteUrl(tenant.slug, { status: 'portal_return' });
   try {
     const url = await createBillingPortalSession({
       tenant,
-      stripeCustomerId: sub.stripe_customer_id,
+      stripeCustomerId: sub.stripe_customer_id.trim(),
       returnUrl,
     });
     success(res, { url });
   } catch (e) {
+    const mapped = cartCheckoutResponseFromStripeError(e);
+    if (mapped) {
+      const level = mapped.status >= 500 ? 'error' : 'warn';
+      console[level]('[subscriptions] billing portal', mapped.code, (e as Error)?.message);
+      error(res, mapped.code, mapped.message, mapped.status);
+      return;
+    }
     console.error('[subscriptions] billing portal', e);
     error(res, 'PORTAL_FAILED', 'Could not create billing portal session', 500);
   }

@@ -50,6 +50,10 @@ Stripe may reject Checkout that only passes `customer_email` on a connected acco
 
 If Stripe points you to **Sandboxes** instead of test mode, that is an alternative testing environment; the customer-based Checkout path above is what this app uses.
 
+## Customer billing portal (Payment & billing)
+
+The app opens Stripe’s **Customer portal** on the **connected account**. In Stripe (Test mode), open the retailer’s **Express dashboard** (or switch context to that connected account), then enable and save **Customer portal** settings under **Settings → Billing → Customer portal**. If the portal is not configured, the API returns a `STRIPE_CHECKOUT_INVALID`-style error with Stripe’s message (often “No configuration provided…”).
+
 ## Production
 
 Use **`sk_live_…`**, live webhook secret, live Connect, and live prices. Do **not** point production customers at `sk_test_…`.

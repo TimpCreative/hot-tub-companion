@@ -115,6 +115,7 @@ module.exports = ({ config: expoConfig }) => {
     scheme: config.slug,
     plugins: [
       'expo-router',
+      'expo-web-browser',
       'expo-secure-store',
       [
         'expo-notifications',

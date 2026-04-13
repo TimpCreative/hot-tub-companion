@@ -62,6 +62,7 @@ async function upsertCustomerSubscriptionFromStripe(sub: Stripe.Subscription): P
     })
     .onConflict('stripe_subscription_id')
     .merge({
+      stripe_customer_id: customerId,
       status: sub.status,
       current_period_end: periodEnd,
       cancel_at_period_end: sub.cancel_at_period_end === true,

@@ -35,9 +35,15 @@ export default function SubscriptionCompleteScreen() {
       ) : null}
       <Pressable
         style={[styles.btn, { backgroundColor: colors.primary, marginTop: 28 }]}
-        onPress={() => router.replace('/(tabs)/profile/subscriptions')}
+        onPress={() => router.replace('/(tabs)/profile')}
       >
-        <Text style={styles.btnText}>View subscriptions</Text>
+        <Text style={styles.btnText}>Back to profile</Text>
+      </Pressable>
+      <Pressable
+        style={[styles.btnSecondary, { borderColor: colors.primary, marginTop: 12 }]}
+        onPress={() => router.push('/(tabs)/profile/subscriptions')}
+      >
+        <Text style={[styles.btnSecondaryText, { color: colors.primary }]}>View subscriptions</Text>
       </Pressable>
       <Pressable style={{ marginTop: 16 }} onPress={() => router.replace('/(tabs)/home')}>
         <Text style={{ color: colors.primary, fontWeight: '600' }}>Home</Text>
@@ -51,4 +57,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '800' },
   btn: { borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  btnSecondary: { borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 2 },
+  btnSecondaryText: { fontWeight: '700', fontSize: 16 },
 });

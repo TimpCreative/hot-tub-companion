@@ -8,7 +8,9 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import * as Linking from 'expo-linking';
+import { useRouter } from 'expo-router';
+import { openStripeHostedUrl } from '../../../lib/stripeHostedBrowser';
+import { subscriptionStatusExplanation } from '../../../lib/subscriptionStatusHints';
 import { useTheme } from '../../../theme/ThemeProvider';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
@@ -23,6 +25,7 @@ function isStaffTenantAppLogin(user: { id: string } | null): boolean {
 }
 
 export default function ProfileSubscriptionsScreen() {
+  const router = useRouter();
   const { colors, typography } = useTheme();
   const { user } = useAuth();
   const [rows, setRows] = useState<CustomerSubscriptionRow[]>([]);
@@ -57,7 +60,7 @@ export default function ProfileSubscriptionsScreen() {
     try {
       const res = await postSubscriptionBillingPortal();
       const url = res?.data?.url;
-      if (url) await Linking.openURL(url);
+      if (url) await openStripeHostedUrl(url);
       else Alert.alert('Billing', 'Portal link not available.');
     } catch (e) {
       Alert.alert('Billing', messageFromApiReject(e, 'Could not open billing portal.'));
@@ -99,25 +102,37 @@ export default function ProfileSubscriptionsScreen() {
       {rows.length === 0 ? (
         <Text style={[typography.body, { color: colors.textMuted, marginTop: 24 }]}>No active subscriptions yet.</Text>
       ) : (
-        rows.map((r) => (
-          <View
-            key={r.id}
-            style={[styles.card, { borderColor: colors.border, backgroundColor: colors.contentBackground }]}
-          >
-            <Text style={[typography.body, { color: colors.text, fontWeight: '700' }]}>
-              {r.bundle_title || 'Subscription'}
-            </Text>
-            <Text style={[typography.caption, { color: colors.textMuted, marginTop: 6 }]}>Status: {r.status}</Text>
-            {r.current_period_end ? (
-              <Text style={[typography.caption, { color: colors.textMuted }]}>
-                Current period ends: {new Date(r.current_period_end).toLocaleDateString()}
+        rows.map((r) => {
+          const hint = subscriptionStatusExplanation(r.status);
+          return (
+            <Pressable
+              key={r.id}
+              onPress={() => router.push(`/(tabs)/profile/subscriptions/${r.id}`)}
+              style={[styles.card, { borderColor: colors.border, backgroundColor: colors.contentBackground }]}
+            >
+              <Text style={[typography.body, { color: colors.text, fontWeight: '700' }]}>
+                {r.bundle_title || 'Subscription'}
               </Text>
-            ) : null}
-            {r.cancel_at_period_end ? (
-              <Text style={[typography.caption, { color: '#b45309', marginTop: 4 }]}>Ends after this period</Text>
-            ) : null}
-          </View>
-        ))
+              <Text style={[typography.caption, { color: colors.textMuted, marginTop: 6 }]}>Status: {r.status}</Text>
+              {hint ? (
+                <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 8, lineHeight: 18 }]}>
+                  {hint}
+                </Text>
+              ) : null}
+              {r.current_period_end ? (
+                <Text style={[typography.caption, { color: colors.textMuted, marginTop: hint ? 6 : 0 }]}>
+                  Current period ends: {new Date(r.current_period_end).toLocaleDateString()}
+                </Text>
+              ) : null}
+              {r.cancel_at_period_end ? (
+                <Text style={[typography.caption, { color: '#b45309', marginTop: 4 }]}>Ends after this period</Text>
+              ) : null}
+              <Text style={[typography.caption, { color: colors.primary, marginTop: 10, fontWeight: '600' }]}>
+                Details →
+              </Text>
+            </Pressable>
+          );
+        })
       )}
     </ScrollView>
   );

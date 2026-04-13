@@ -85,6 +85,12 @@ export default function TabLayout() {
           headerShown: false,
           tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" size={size} color={color} />,
         }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            // Reset nested profile stack so users are not stuck on Subscriptions after deep links.
+            navigation.navigate('profile' as never, { screen: 'index' } as never);
+          },
+        })}
       />
       <Tabs.Screen
         name="water-test"
