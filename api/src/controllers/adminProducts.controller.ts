@@ -18,7 +18,10 @@ import {
 } from '../services/uhtdProductSuggestions.service';
 import { createRecurringProductAndPrice } from '../services/stripeSubscriptionCatalog.service';
 import { isStripeConfigured } from '../services/stripeConnect.service';
-import { posProductReferencedInAnyBundle } from '../services/subscriptions.service';
+import {
+  posProductReferencedInAnyBundle,
+  getPosProductIdsReferencedInBundles,
+} from '../services/subscriptions.service';
 
 function requireManageProducts(req: Request, res: Response): boolean {
   const role = (req as any).adminRole as Record<string, unknown> | undefined;
@@ -527,24 +530,63 @@ export async function bulkApply(req: Request, res: Response): Promise<void> {
     }
     const isHidden = payload.isHidden;
     if (ids.length) {
-      updated = await db('pos_products').whereIn('id', ids).update({
-        is_hidden: isHidden,
-        hidden_at: isHidden ? db.fn.now() : null,
-        hidden_by: isHidden ? auditUserId : null,
-        updated_at: db.fn.now(),
-      });
+      updated = await db('pos_products')
+        .where({ tenant_id: tenantId })
+        .whereIn('id', ids)
+        .update({
+          is_hidden: isHidden,
+          hidden_at: isHidden ? db.fn.now() : null,
+          hidden_by: isHidden ? auditUserId : null,
+          updated_at: db.fn.now(),
+        });
     }
   } else if (action === 'clear_mapping') {
     if (ids.length) {
-      updated = await db('pos_products').whereIn('id', ids).update({
-        uhtd_part_id: null,
-        mapping_status: 'unmapped',
-        mapping_confidence: null,
-        mapped_by: null,
-        mapped_at: null,
-        updated_at: db.fn.now(),
-      });
+      updated = await db('pos_products')
+        .where({ tenant_id: tenantId })
+        .whereIn('id', ids)
+        .update({
+          uhtd_part_id: null,
+          mapping_status: 'unmapped',
+          mapping_confidence: null,
+          mapped_by: null,
+          mapped_at: null,
+          updated_at: db.fn.now(),
+        });
     }
+  } else if (action === 'set_subscription_eligible') {
+    if (typeof payload?.subscriptionEligible !== 'boolean') {
+      error(res, 'VALIDATION_ERROR', 'payload.subscriptionEligible (boolean) is required for set_subscription_eligible', 400);
+      return;
+    }
+    const on = payload.subscriptionEligible;
+    let skippedInBundles = 0;
+    if (ids.length) {
+      if (on) {
+        updated = await db('pos_products')
+          .where({ tenant_id: tenantId })
+          .whereIn('id', ids)
+          .update({
+            subscription_eligible: true,
+            updated_at: db.fn.now(),
+          });
+      } else {
+        const blocked = await getPosProductIdsReferencedInBundles(tenantId);
+        const toClear = ids.filter((id) => !blocked.has(id));
+        skippedInBundles = ids.length - toClear.length;
+        if (toClear.length) {
+          updated = await db('pos_products')
+            .where({ tenant_id: tenantId })
+            .whereIn('id', toClear)
+            .update({
+              subscription_eligible: false,
+              updated_at: db.fn.now(),
+            });
+        }
+      }
+    }
+    success(res, { updated, matched: count, skipped_in_bundles: skippedInBundles });
+    return;
   } else {
     error(res, 'VALIDATION_ERROR', 'Unknown action', 400);
     return;

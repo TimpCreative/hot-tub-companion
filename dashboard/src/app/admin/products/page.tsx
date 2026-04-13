@@ -171,6 +171,7 @@ export default function AdminProductsPage() {
   const [selectionToken, setSelectionToken] = useState<string | null>(null);
   const [selectionCount, setSelectionCount] = useState<number>(0);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkInfo, setBulkInfo] = useState<string | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
   const importPreviewInputRef = useRef<HTMLInputElement>(null);
@@ -182,6 +183,7 @@ export default function AdminProductsPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [offerDollars, setOfferDollars] = useState('');
   const [offerInterval, setOfferInterval] = useState<'month' | 'year'>('month');
+  const [subscriptionActionError, setSubscriptionActionError] = useState<string | null>(null);
 
   const buildListParams = useCallback(
     (forIds?: string) => {
@@ -380,11 +382,12 @@ export default function AdminProductsPage() {
     }
   }
 
-  async function toggleSubscriptionEligible(row: PosProductRow) {
+  async function setSubscriptionEligibleForRow(row: PosProductRow, eligible: boolean) {
+    setSubscriptionActionError(null);
     setActionLoading(true);
     try {
       const res = (await api.put(`/admin/products/${row.id}/subscription-eligible`, {
-        subscriptionEligible: !row.subscription_eligible,
+        subscriptionEligible: eligible,
       })) as { success?: boolean; data?: PosProductRow };
       if (res?.success && res.data) {
         const updated = res.data;
@@ -393,6 +396,12 @@ export default function AdminProductsPage() {
         }
       }
       await fetchProducts({ skipLoading: true });
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'error' in err
+          ? String((err as { error?: { message?: string } }).error?.message || '')
+          : '';
+      setSubscriptionActionError(msg || 'Could not update subscription eligibility');
     } finally {
       setActionLoading(false);
     }
@@ -491,7 +500,12 @@ export default function AdminProductsPage() {
     setSelectedIds(new Set());
     setSelectionToken(null);
     setSelectionCount(0);
+    setBulkInfo(null);
   }
+
+  useEffect(() => {
+    setSubscriptionActionError(null);
+  }, [selected?.id]);
 
   async function selectAllMatchingFilter() {
     setBulkBusy(true);
@@ -523,28 +537,63 @@ export default function AdminProductsPage() {
     }
   }
 
-  async function bulkApply(action: 'set_hidden' | 'clear_mapping', isHidden?: boolean) {
+  async function bulkApply(
+    action: 'set_hidden' | 'clear_mapping' | 'set_subscription_eligible',
+    opts?: { isHidden?: boolean; subscriptionEligible?: boolean }
+  ) {
     if (!selectionToken) {
       setError('Select “All matching filter” first, or use row actions.');
       return;
     }
+    if (action === 'set_subscription_eligible' && opts?.subscriptionEligible === false) {
+      if (
+        !confirm(
+          'Products that appear in a subscription bundle cannot be marked not eligible until removed from bundles. Those rows will be skipped. Continue?'
+        )
+      ) {
+        return;
+      }
+    }
     setBulkBusy(true);
     setError(null);
+    setBulkInfo(null);
     try {
+      const payload =
+        action === 'set_hidden'
+          ? { isHidden: opts?.isHidden === true }
+          : action === 'set_subscription_eligible'
+            ? { subscriptionEligible: opts?.subscriptionEligible === true }
+            : {};
       const res = (await api.post('/admin/products/bulk-apply', {
         selection_token: selectionToken,
         action,
-        payload:
-          action === 'set_hidden' ? { isHidden: isHidden === true } : {},
-      })) as any;
+        payload,
+      })) as {
+        success?: boolean;
+        data?: { updated?: number; skipped_in_bundles?: number };
+        error?: { message?: string };
+      };
       if (!res?.success) {
         setError(res?.error?.message || 'Bulk apply failed');
         return;
       }
+      const skipped = res.data?.skipped_in_bundles ?? 0;
+      const n = res.data?.updated ?? 0;
+      if (action === 'set_subscription_eligible' && opts?.subscriptionEligible === false && skipped > 0) {
+        setBulkInfo(
+          `Updated ${n} product(s). ${skipped} skipped (still in a subscription bundle—remove from bundles first).`
+        );
+      } else {
+        setBulkInfo(`Updated ${n} product(s).`);
+      }
       clearSelection();
       await fetchProducts();
-    } catch (err: any) {
-      setError(err?.error?.message || err?.message || 'Bulk apply failed');
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'error' in err
+          ? (err as { error?: { message?: string } }).error?.message
+          : undefined;
+      setError(msg || (err instanceof Error ? err.message : null) || 'Bulk apply failed');
     } finally {
       setBulkBusy(false);
     }
@@ -856,6 +905,9 @@ export default function AdminProductsPage() {
       )}
 
       {error && <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700">{error}</div>}
+      {bulkInfo && (
+        <div className="mb-4 rounded-lg bg-emerald-50 border border-emerald-100 p-4 text-emerald-900 text-sm">{bulkInfo}</div>
+      )}
 
       {/* Always render this strip so selecting checkboxes does not shift the page; empty state matches height/padding */}
       <div
@@ -876,14 +928,40 @@ export default function AdminProductsPage() {
                 </>
               ) : null}
             </span>
-            <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => void bulkApply('set_hidden', true)}>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={bulkBusy}
+              onClick={() => void bulkApply('set_hidden', { isHidden: true })}
+            >
               Hide (token)
             </Button>
-            <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => void bulkApply('set_hidden', false)}>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={bulkBusy}
+              onClick={() => void bulkApply('set_hidden', { isHidden: false })}
+            >
               Show (token)
             </Button>
             <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => void bulkApply('clear_mapping')}>
               Clear mapping (token)
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={bulkBusy}
+              onClick={() => void bulkApply('set_subscription_eligible', { subscriptionEligible: true })}
+            >
+              Subscription eligible (token)
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={bulkBusy}
+              onClick={() => void bulkApply('set_subscription_eligible', { subscriptionEligible: false })}
+            >
+              Subscription not eligible (token)
             </Button>
             <Button size="sm" variant="secondary" onClick={clearSelection}>
               Clear selection
@@ -891,7 +969,8 @@ export default function AdminProductsPage() {
           </div>
         ) : (
           <p className="text-gray-400 leading-snug">
-            Select products with checkboxes to use bulk hide, show, or clear mapping (token actions).
+            Select products with checkboxes, then use “All matching filter” for bulk hide, show, clear mapping, or
+            subscription eligibility.
           </p>
         )}
       </div>
@@ -1159,15 +1238,43 @@ export default function AdminProductsPage() {
                 </Link>
                 ).
               </p>
-              <label className="flex items-center gap-2 text-sm text-gray-800">
-                <input
-                  type="checkbox"
-                  checked={Boolean(selected.subscription_eligible)}
-                  disabled={actionLoading}
-                  onChange={() => void toggleSubscriptionEligible(selected)}
-                />
-                Subscription-eligible
-              </label>
+              {subscriptionActionError ? (
+                <p className="text-sm text-red-600" role="alert">
+                  {subscriptionActionError}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-gray-700">Status:</span>
+                {selected.subscription_eligible ? (
+                  <Badge variant="success">Subscription eligible</Badge>
+                ) : (
+                  <Badge variant="default">Not subscription eligible</Badge>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  loading={actionLoading}
+                  disabled={Boolean(selected.subscription_eligible)}
+                  onClick={() => void setSubscriptionEligibleForRow(selected, true)}
+                >
+                  Make subscription eligible
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  loading={actionLoading}
+                  disabled={!selected.subscription_eligible}
+                  onClick={() => void setSubscriptionEligibleForRow(selected, false)}
+                >
+                  Make subscription not eligible
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500">
+                To mark a product not eligible, remove it from all subscription bundles first (otherwise the API will
+                reject the change).
+              </p>
               {selected.subscription_eligible ? (
                 <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-3 space-y-2">
                   <div className="text-xs text-gray-600">

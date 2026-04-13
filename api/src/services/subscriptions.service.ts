@@ -67,6 +67,21 @@ export async function posProductReferencedInAnyBundle(posProductId: string, tena
   return rows.some((b) => parseComponents(b.components).some((c) => c.posProductId === posProductId));
 }
 
+/** All POS product ids referenced by any bundle (hero or line item) for this tenant. */
+export async function getPosProductIdsReferencedInBundles(tenantId: string): Promise<Set<string>> {
+  const rows = (await db('subscription_bundle_definitions')
+    .where({ tenant_id: tenantId })
+    .select('pos_product_id', 'components')) as Array<{ pos_product_id?: string | null; components: unknown }>;
+  const out = new Set<string>();
+  for (const r of rows) {
+    if (r.pos_product_id) out.add(String(r.pos_product_id));
+    for (const c of parseComponents(r.components)) {
+      out.add(c.posProductId);
+    }
+  }
+  return out;
+}
+
 /** Base origin for tenant dashboard (production: https://slug.host; local: DASHBOARD_BASE with tenant query on paths). */
 export function buildTenantDashboardOrigin(tenantSlug: string): string {
   const raw = env.DASHBOARD_BASE.trim();
