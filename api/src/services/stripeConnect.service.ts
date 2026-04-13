@@ -15,7 +15,9 @@ type TenantRow = {
 export function applicationFeePercentForTenant(tenant: TenantRow): number {
   const bps = tenant.subscription_application_fee_bps ?? env.SUBSCRIPTION_DEFAULT_APPLICATION_FEE_BPS;
   const pct = bps / 100;
-  return Math.min(100, Math.max(0, Math.round(pct * 100) / 100));
+  const clamped = Math.min(100, Math.max(0, pct));
+  // Stripe allows at most two decimal places for subscription application_fee_percent.
+  return Number(clamped.toFixed(2));
 }
 
 export async function createExpressAccountIfNeeded(tenantId: string): Promise<string> {
