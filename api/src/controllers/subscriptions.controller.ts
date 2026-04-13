@@ -179,7 +179,7 @@ export async function postCartSubscriptionCheckout(req: Request, res: Response):
         error(
           res,
           'SUBSCRIPTION_NOT_READY',
-          'Some cart items are subscription-eligible but not checkout-ready yet. Save Stripe subscription pricing for those items in Retail Admin and try again.',
+          'Subscriptions are not available for these items right now. Please try again later or use standard checkout.',
           400
         );
         return;

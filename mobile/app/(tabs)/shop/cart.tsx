@@ -274,7 +274,7 @@ export default function ShopCartScreen() {
                   if (!url) {
                     Alert.alert(
                       'Subscribe',
-                      'No checkout-ready subscription items are currently available in your cart.'
+                      'Subscriptions are not available for these items right now. You can still check out as usual.'
                     );
                     return;
                   }
@@ -303,7 +303,7 @@ export default function ShopCartScreen() {
                 {checkoutReadyCount > 0
                   ? `Subscribe to ${checkoutReadyCount} eligible item${checkoutReadyCount === 1 ? '' : 's'}`
                   : eligibleCount > 0
-                    ? 'Eligible items need subscription setup'
+                    ? 'Subscriptions unavailable for checkout right now'
                     : 'No eligible items to subscribe'}
               </Text>
             )}

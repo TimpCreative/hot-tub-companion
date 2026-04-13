@@ -18,6 +18,7 @@ import {
 } from '../services/uhtdProductSuggestions.service';
 import { createRecurringProductAndPrice } from '../services/stripeSubscriptionCatalog.service';
 import { isStripeConfigured } from '../services/stripeConnect.service';
+import { buildStripeSubscriptionOfferPatch } from '../services/subscriptionProductStripeOffer.service';
 import {
   posProductReferencedInAnyBundle,
   getPosProductIdsReferencedInBundles,
@@ -611,6 +612,33 @@ export async function bulkApply(req: Request, res: Response): Promise<void> {
             subscription_eligible: true,
             updated_at: db.fn.now(),
           });
+        const rows = (await db('pos_products')
+          .where({ tenant_id: tenantId })
+          .whereIn('id', ids)
+          .select(
+            'id',
+            'title',
+            'price',
+            'subscription_stripe_product_id',
+            'subscription_stripe_price_id'
+          )) as Array<{
+          id: string;
+          title?: string | null;
+          price?: number | null;
+          subscription_stripe_product_id?: string | null;
+          subscription_stripe_price_id?: string | null;
+        }>;
+        for (const row of rows) {
+          if (row.subscription_stripe_price_id?.trim()) continue;
+          try {
+            const stripePatch = await buildStripeSubscriptionOfferPatch(tenantId, row);
+            if (stripePatch) {
+              await db('pos_products').where({ id: row.id, tenant_id: tenantId }).update(stripePatch);
+            }
+          } catch (e) {
+            console.error('[adminProducts] bulk subscription stripe backfill', row.id, e);
+          }
+        }
       } else {
         const blocked = await getPosProductIdsReferencedInBundles(tenantId);
         const toClear = ids.filter((id) => !blocked.has(id));
@@ -860,42 +888,22 @@ export async function putSubscriptionEligible(req: Request, res: Response): Prom
   };
 
   // If we are enabling subscriptions and this variant has no recurring price yet,
-  // auto-create one from the current product price when Connect is ready.
+  // auto-create one from retail price minus tenant default subscription discount % when Connect is ready.
   if (subscriptionEligible === true && !existing.subscription_stripe_price_id?.trim()) {
-    if (isStripeConfigured()) {
-      const tenant = (await db('tenants').where({ id: tenantId }).first()) as
-        | { stripe_connect_account_id: string | null; stripe_connect_charges_enabled: boolean }
-        | undefined;
-      if (tenant?.stripe_connect_account_id && tenant.stripe_connect_charges_enabled) {
-        const unitAmountCents = Math.round(Number(existing.price ?? 0));
-        if (Number.isFinite(unitAmountCents) && unitAmountCents > 0) {
-          try {
-            const out = await createRecurringProductAndPrice({
-              connectedAccountId: tenant.stripe_connect_account_id,
-              productName: (existing.title || 'Subscription item').trim().slice(0, 200),
-              existingStripeProductId: existing.subscription_stripe_product_id?.trim() || null,
-              unitAmountCents,
-              currency: 'usd',
-              interval: 'month',
-              archivePriceId: existing.subscription_stripe_price_id?.trim() || null,
-            });
-            patch.subscription_stripe_product_id = out.stripeProductId;
-            patch.subscription_stripe_price_id = out.stripePriceId;
-            patch.subscription_unit_amount_cents = unitAmountCents;
-            patch.subscription_currency = 'usd';
-            patch.subscription_interval = 'month';
-          } catch (e) {
-            console.error('[adminProducts] auto-create subscription offer on eligibility', e);
-            error(
-              res,
-              'INTERNAL_ERROR',
-              'Could not auto-create Stripe subscription price. Try Save subscription price in product details.',
-              500
-            );
-            return;
-          }
-        }
+    try {
+      const stripePatch = await buildStripeSubscriptionOfferPatch(tenantId, existing);
+      if (stripePatch) {
+        Object.assign(patch, stripePatch);
       }
+    } catch (e) {
+      console.error('[adminProducts] auto-create subscription offer on eligibility', e);
+      error(
+        res,
+        'INTERNAL_ERROR',
+        'Could not create subscription pricing. Try again in a moment or adjust the product price.',
+        500
+      );
+      return;
     }
   }
 
