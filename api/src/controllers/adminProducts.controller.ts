@@ -16,6 +16,9 @@ import {
   getUhtdSuggestionsForProduct,
   getTopSuggestionScore,
 } from '../services/uhtdProductSuggestions.service';
+import { createRecurringProductAndPrice } from '../services/stripeSubscriptionCatalog.service';
+import { isStripeConfigured } from '../services/stripeConnect.service';
+import { posProductReferencedInAnyBundle } from '../services/subscriptions.service';
 
 function requireManageProducts(req: Request, res: Response): boolean {
   const role = (req as any).adminRole as Record<string, unknown> | undefined;
@@ -164,6 +167,11 @@ export async function listProducts(req: Request, res: Response): Promise<void> {
       'pos_products.pos_variant_id',
       'pos_products.last_synced_at',
       'pos_products.updated_at',
+      'pos_products.subscription_eligible',
+      'pos_products.subscription_stripe_price_id',
+      'pos_products.subscription_unit_amount_cents',
+      'pos_products.subscription_currency',
+      'pos_products.subscription_interval',
       db.raw(`(
         SELECT COALESCE(
           json_agg(
@@ -679,6 +687,154 @@ export async function setVisibility(req: Request, res: Response): Promise<void> 
     .returning('*');
 
   success(res, updated);
+}
+
+export async function putSubscriptionEligible(req: Request, res: Response): Promise<void> {
+  if (!requireManageProducts(req, res)) return;
+  const tenantId = tenantIdFromReq(req);
+  const { id } = req.params;
+  const { subscriptionEligible } = req.body as { subscriptionEligible?: boolean };
+
+  if (!tenantId) {
+    error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
+    return;
+  }
+  if (typeof subscriptionEligible !== 'boolean') {
+    error(res, 'VALIDATION_ERROR', 'subscriptionEligible boolean is required', 400);
+    return;
+  }
+
+  const existing = await db('pos_products').where({ id, tenant_id: tenantId }).first();
+  if (!existing) {
+    error(res, 'NOT_FOUND', 'Product not found', 404);
+    return;
+  }
+
+  if (subscriptionEligible === false) {
+    const used = await posProductReferencedInAnyBundle(id, tenantId);
+    if (used) {
+      error(
+        res,
+        'VALIDATION_ERROR',
+        'Remove this product from all subscription bundles before disabling subscription eligibility',
+        400
+      );
+      return;
+    }
+  }
+
+  const [updated] = await db('pos_products')
+    .where({ id, tenant_id: tenantId })
+    .update({
+      subscription_eligible: subscriptionEligible,
+      updated_at: db.fn.now(),
+    })
+    .returning('*');
+
+  success(res, updated);
+}
+
+export async function putSubscriptionOffer(req: Request, res: Response): Promise<void> {
+  if (!requireManageProducts(req, res)) return;
+  const tenantId = tenantIdFromReq(req);
+  const { id } = req.params;
+  const body = req.body as {
+    clear?: boolean;
+    unitAmountCents?: number;
+    currency?: string;
+    interval?: 'month' | 'year';
+  };
+
+  if (!tenantId) {
+    error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
+    return;
+  }
+
+  const existing = (await db('pos_products').where({ id, tenant_id: tenantId }).first()) as
+    | {
+        title?: string;
+        subscription_eligible?: boolean;
+        subscription_stripe_product_id?: string | null;
+        subscription_stripe_price_id?: string | null;
+      }
+    | undefined;
+  if (!existing) {
+    error(res, 'NOT_FOUND', 'Product not found', 404);
+    return;
+  }
+  if (!existing.subscription_eligible) {
+    error(res, 'VALIDATION_ERROR', 'Mark the product subscription-eligible first', 400);
+    return;
+  }
+
+  if (body.clear === true) {
+    const [updated] = await db('pos_products')
+      .where({ id, tenant_id: tenantId })
+      .update({
+        subscription_stripe_product_id: null,
+        subscription_stripe_price_id: null,
+        subscription_unit_amount_cents: null,
+        subscription_currency: null,
+        subscription_interval: null,
+        updated_at: db.fn.now(),
+      })
+      .returning('*');
+    success(res, updated);
+    return;
+  }
+
+  const cents = Number(body.unitAmountCents);
+  if (!Number.isFinite(cents) || Math.round(cents) < 1) {
+    error(res, 'VALIDATION_ERROR', 'unitAmountCents must be a positive number', 400);
+    return;
+  }
+  if (!isStripeConfigured()) {
+    error(res, 'STRIPE_NOT_CONFIGURED', 'Stripe is not configured', 503);
+    return;
+  }
+  const tenant = (await db('tenants').where({ id: tenantId }).first()) as
+    | { stripe_connect_account_id: string | null; stripe_connect_charges_enabled: boolean }
+    | undefined;
+  if (!tenant?.stripe_connect_account_id || !tenant.stripe_connect_charges_enabled) {
+    error(res, 'STRIPE_CONNECT_NOT_READY', 'Complete Stripe Connect onboarding before creating prices', 403);
+    return;
+  }
+
+  const interval = body.interval === 'year' ? 'year' : 'month';
+  const currency = (body.currency || 'usd').toLowerCase();
+  const productName = (existing.title || 'Subscription item').trim().slice(0, 200);
+
+  try {
+    const out = await createRecurringProductAndPrice({
+      connectedAccountId: tenant.stripe_connect_account_id,
+      productName,
+      existingStripeProductId: existing.subscription_stripe_product_id?.trim() || null,
+      unitAmountCents: Math.round(cents),
+      currency,
+      interval,
+      archivePriceId: existing.subscription_stripe_price_id?.trim() || null,
+    });
+    const [updated] = await db('pos_products')
+      .where({ id, tenant_id: tenantId })
+      .update({
+        subscription_stripe_product_id: out.stripeProductId,
+        subscription_stripe_price_id: out.stripePriceId,
+        subscription_unit_amount_cents: Math.round(cents),
+        subscription_currency: currency,
+        subscription_interval: interval,
+        updated_at: db.fn.now(),
+      })
+      .returning('*');
+    success(res, updated);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg === 'INVALID_UNIT_AMOUNT') {
+      error(res, 'VALIDATION_ERROR', 'unitAmountCents must be a positive number', 400);
+      return;
+    }
+    console.error('[adminProducts] putSubscriptionOffer', e);
+    error(res, 'INTERNAL_ERROR', 'Failed to save subscription offer', 500);
+  }
 }
 
 export async function getUhtdSuggestions(req: Request, res: Response): Promise<void> {

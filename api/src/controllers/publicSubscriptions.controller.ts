@@ -51,19 +51,38 @@ export async function postStartSubscriptionCheckout(req: Request, res: Response)
       return;
     }
 
-    const bundle = await getActiveBundleForTenant(claims.bundleId, claims.tenantId);
-    if (!bundle) {
-      error(res, 'BUNDLE_NOT_FOUND', 'Subscription bundle is not available', 404);
-      return;
-    }
-
+    let stripePriceId: string;
     const metadata: Record<string, string> = {
       htc_tenant_id: claims.tenantId,
       htc_user_id: claims.userId,
-      htc_bundle_id: claims.bundleId,
+      htc_bundle_id: claims.bundleId || '',
+      htc_single_pos_product_id: claims.singlePosProductId || '',
       htc_spa_profile_id: claims.spaProfileId || '',
       htc_user_email: claims.email,
     };
+
+    if (claims.bundleId) {
+      const bundle = await getActiveBundleForTenant(claims.bundleId, claims.tenantId);
+      if (!bundle?.stripe_price_id?.trim()) {
+        error(res, 'BUNDLE_NOT_FOUND', 'Subscription bundle is not available', 404);
+        return;
+      }
+      stripePriceId = bundle.stripe_price_id.trim();
+    } else if (claims.singlePosProductId) {
+      const pp = (await db('pos_products')
+        .where({ id: claims.singlePosProductId, tenant_id: claims.tenantId })
+        .first()) as
+        | { subscription_stripe_price_id?: string | null; subscription_eligible?: boolean }
+        | undefined;
+      if (!pp?.subscription_eligible || !pp.subscription_stripe_price_id?.trim()) {
+        error(res, 'SINGLE_OFFER_NOT_FOUND', 'Subscription is not available for this product', 404);
+        return;
+      }
+      stripePriceId = pp.subscription_stripe_price_id.trim();
+    } else {
+      error(res, 'INVALID_TOKEN', 'Invalid handoff payload', 401);
+      return;
+    }
 
     const successUrl = buildSubscriptionsCompleteUrl(tenant.slug, {
       status: 'success',
@@ -73,7 +92,7 @@ export async function postStartSubscriptionCheckout(req: Request, res: Response)
 
     const { url, sessionId } = await createSubscriptionCheckoutSession({
       tenant,
-      stripePriceId: bundle.stripe_price_id,
+      stripePriceId,
       customerEmail: claims.email,
       successUrl,
       cancelUrl,

@@ -25,9 +25,9 @@ import {
 } from '../../../services/shop';
 import { messageFromApiReject } from '../../../services/cart';
 import {
-  fetchSubscriptionBundleForProduct,
+  fetchSubscriptionOffers,
   postSubscriptionCheckoutHandoff,
-  type SubscriptionBundleRef,
+  type SubscriptionOffersData,
 } from '../../../services/subscriptions';
 import { useTheme } from '../../../theme/ThemeProvider';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -100,8 +100,8 @@ export default function ProductDetailScreen() {
   const [addingCart, setAddingCart] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [related, setRelated] = useState<ShopProductRow[]>([]);
-  const [subscribeBundle, setSubscribeBundle] = useState<SubscriptionBundleRef | null>(null);
-  const [subscribeLoading, setSubscribeLoading] = useState(false);
+  const [subOffers, setSubOffers] = useState<SubscriptionOffersData | null>(null);
+  const [subscribeLoading, setSubscribeLoading] = useState<'single' | string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -162,27 +162,28 @@ export default function ProductDetailScreen() {
 
   useEffect(() => {
     if (!product?.id) {
-      setSubscribeBundle(null);
+      setSubOffers(null);
       return;
     }
     if (user && isStaffTenantAppLogin(user)) {
-      setSubscribeBundle(null);
+      setSubOffers(null);
       return;
     }
+    const pid = selectedVariantId ?? product.id;
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetchSubscriptionBundleForProduct(product.id);
-        const b = res?.data?.bundle ?? null;
-        if (!cancelled) setSubscribeBundle(b);
+        const res = await fetchSubscriptionOffers(pid);
+        const d = res?.data;
+        if (!cancelled) setSubOffers(d && typeof d === 'object' ? d : null);
       } catch {
-        if (!cancelled) setSubscribeBundle(null);
+        if (!cancelled) setSubOffers(null);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [product?.id, user]);
+  }, [product?.id, selectedVariantId, user]);
 
   const images = useMemo(() => firstImageUrls(product?.images), [product?.images]);
   const compat = useMemo(() => compatCopy(product?.shopCompatibility), [product?.shopCompatibility]);
@@ -225,7 +226,7 @@ export default function ProductDetailScreen() {
 
   const staffAppLogin = isStaffTenantAppLogin(user);
 
-  const handleSubscribe = async () => {
+  const handleSubscribeSingle = async () => {
     if (!user) {
       Alert.alert('Sign in required', 'Please sign in to subscribe.', [
         { text: 'Cancel', style: 'cancel' },
@@ -233,13 +234,17 @@ export default function ProductDetailScreen() {
       ]);
       return;
     }
-    if (!subscribeBundle) {
-      Alert.alert('Subscribe', 'This product is not available as a subscription yet.');
+    const pid = activeVariantId;
+    if (!subOffers?.single || !pid) {
+      Alert.alert('Subscribe', 'This variant is not available as an individual subscription yet.');
       return;
     }
-    setSubscribeLoading(true);
+    setSubscribeLoading('single');
     try {
-      const res = await postSubscriptionCheckoutHandoff(subscribeBundle.id, spaProfileId ?? null);
+      const res = await postSubscriptionCheckoutHandoff({
+        posProductId: pid,
+        spaProfileId: spaProfileId ?? null,
+      });
       const url = res?.data?.checkoutPageUrl;
       if (url) {
         await Linking.openURL(url);
@@ -249,7 +254,34 @@ export default function ProductDetailScreen() {
     } catch (e) {
       Alert.alert('Subscribe', messageFromApiReject(e, 'Could not start checkout.'));
     } finally {
-      setSubscribeLoading(false);
+      setSubscribeLoading(null);
+    }
+  };
+
+  const handleSubscribeBundle = async (bundleId: string) => {
+    if (!user) {
+      Alert.alert('Sign in required', 'Please sign in to subscribe.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign in', onPress: () => router.push('/auth/login') },
+      ]);
+      return;
+    }
+    setSubscribeLoading(bundleId);
+    try {
+      const res = await postSubscriptionCheckoutHandoff({
+        bundleId,
+        spaProfileId: spaProfileId ?? null,
+      });
+      const url = res?.data?.checkoutPageUrl;
+      if (url) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert('Subscribe', 'Could not start checkout.');
+      }
+    } catch (e) {
+      Alert.alert('Subscribe', messageFromApiReject(e, 'Could not start checkout.'));
+    } finally {
+      setSubscribeLoading(null);
     }
   };
 
@@ -421,38 +453,38 @@ export default function ProductDetailScreen() {
       ) : null}
 
       <View style={styles.ctaRow}>
+        {subOffers?.single ? (
+          <Pressable
+            style={({ pressed }) => [
+              styles.cta,
+              styles.ctaHalf,
+              {
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                borderColor: colors.primary,
+                opacity: pressed ? 0.88 : 1,
+              },
+            ]}
+            disabled={staffAppLogin || subscribeLoading !== null}
+            onPress={() => void handleSubscribeSingle()}
+          >
+            {subscribeLoading === 'single' ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : (
+              <Text style={[styles.ctaText, { color: colors.primary }]}>
+                {!user
+                  ? 'Subscribe'
+                  : staffAppLogin
+                    ? 'Subscribe (staff)'
+                    : 'Subscribe to this item'}
+              </Text>
+            )}
+          </Pressable>
+        ) : null}
         <Pressable
           style={({ pressed }) => [
             styles.cta,
-            styles.ctaHalf,
-            {
-              backgroundColor: 'transparent',
-              borderWidth: 2,
-              borderColor: colors.primary,
-              opacity: pressed ? 0.88 : 1,
-            },
-          ]}
-          disabled={!subscribeBundle || staffAppLogin || subscribeLoading}
-          onPress={() => void handleSubscribe()}
-        >
-          {subscribeLoading ? (
-            <ActivityIndicator color={colors.primary} />
-          ) : (
-            <Text style={[styles.ctaText, { color: colors.primary }]}>
-              {!user
-                ? 'Subscribe'
-                : staffAppLogin
-                  ? 'Subscribe (staff)'
-                  : subscribeBundle
-                    ? 'Subscribe'
-                    : 'Subscribe unavailable'}
-            </Text>
-          )}
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [
-            styles.cta,
-            styles.ctaHalf,
+            subOffers?.single ? styles.ctaHalf : { flex: 1, minWidth: 0 },
             {
               backgroundColor: stock > 0 ? colors.primary : colors.border,
               opacity: pressed ? 0.88 : 1,
@@ -475,6 +507,37 @@ export default function ProductDetailScreen() {
           )}
         </Pressable>
       </View>
+
+      {(subOffers?.bundleUpsells?.length ?? 0) > 0 ? (
+        <View style={{ marginTop: 16 }}>
+          <Text style={[typography.caption, { color: colors.textSecondary, fontWeight: '700', marginBottom: 8 }]}>
+            {subOffers?.single ? 'Or subscribe as a kit' : 'Subscribe as a kit'}
+          </Text>
+          {subOffers!.bundleUpsells!.map((b) => (
+            <Pressable
+              key={b.bundleId}
+              style={({ pressed }) => [
+                styles.kitUpsellBtn,
+                {
+                  borderColor: colors.primary,
+                  backgroundColor: colors.surface,
+                  opacity: pressed ? 0.88 : 1,
+                },
+              ]}
+              disabled={staffAppLogin || subscribeLoading !== null}
+              onPress={() => void handleSubscribeBundle(b.bundleId)}
+            >
+              {subscribeLoading === b.bundleId ? (
+                <ActivityIndicator color={colors.primary} />
+              ) : (
+                <Text style={[styles.ctaText, { color: colors.primary, textAlign: 'center' }]}>
+                  {!user ? 'Sign in to subscribe' : staffAppLogin ? 'Kit (staff)' : b.title}
+                </Text>
+              )}
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -507,6 +570,15 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   ctaText: { fontSize: 14, fontWeight: '700', color: '#6b7280', textAlign: 'center' },
+  kitUpsellBtn: {
+    borderRadius: 14,
+    borderWidth: 2,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   variantChip: {
     borderWidth: 1,
     borderRadius: 12,

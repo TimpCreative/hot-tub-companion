@@ -7,5 +7,6 @@ import * as subscriptionsController from '../controllers/subscriptions.controlle
 const router = Router();
 
 router.get('/subscriptions/products/:productId/bundle', subscriptionsController.getSubscriptionBundleForProduct);
+router.get('/subscriptions/products/:productId/offers', subscriptionsController.getSubscriptionOffersForProductHandler);
 
 export default router;

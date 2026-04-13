@@ -12,6 +12,7 @@ const ADMIN_NAV = [
     children: [
       { label: 'All products', href: '/products' },
       { label: 'Categories', href: '/products/categories' },
+      { label: 'Bundles', href: '/products/bundles' },
     ],
   },
   { label: 'Services', href: '/services', comingPhase: 4 },
@@ -21,7 +22,6 @@ const ADMIN_NAV = [
     label: 'Subscriptions',
     children: [
       { label: 'Billing & Connect', href: '/subscriptions/billing' },
-      { label: 'Bundles', href: '/subscriptions/bundles' },
       { label: 'Customer subscriptions', href: '/subscriptions/customers' },
     ],
   },

@@ -46,6 +46,11 @@ type PosProductRow = Record<string, unknown> & {
   updated_at: string;
   collections?: CollectionSummary[];
   first_image_url?: string | null;
+  subscription_eligible?: boolean;
+  subscription_stripe_price_id?: string | null;
+  subscription_unit_amount_cents?: number | null;
+  subscription_currency?: string | null;
+  subscription_interval?: string | null;
 };
 
 interface Suggestion {
@@ -175,6 +180,8 @@ export default function AdminProductsPage() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [offerDollars, setOfferDollars] = useState('');
+  const [offerInterval, setOfferInterval] = useState<'month' | 'year'>('month');
 
   const buildListParams = useCallback(
     (forIds?: string) => {
@@ -295,6 +302,19 @@ export default function AdminProductsPage() {
   }, [filtersDep]);
 
   useEffect(() => {
+    if (!selected) {
+      setOfferDollars('');
+      setOfferInterval('month');
+      return;
+    }
+    const c = selected.subscription_unit_amount_cents;
+    setOfferDollars(
+      c != null && Number.isFinite(Number(c)) ? (Number(c) / 100).toFixed(2) : ''
+    );
+    setOfferInterval(selected.subscription_interval === 'year' ? 'year' : 'month');
+  }, [selected?.id, selected?.subscription_unit_amount_cents, selected?.subscription_interval]);
+
+  useEffect(() => {
     const t = window.setTimeout(() => {
       void fetchProducts();
     }, 280);
@@ -353,6 +373,68 @@ export default function AdminProductsPage() {
               } as PosProductRow)
             : prev
         );
+      }
+      await fetchProducts({ skipLoading: true });
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function toggleSubscriptionEligible(row: PosProductRow) {
+    setActionLoading(true);
+    try {
+      const res = (await api.put(`/admin/products/${row.id}/subscription-eligible`, {
+        subscriptionEligible: !row.subscription_eligible,
+      })) as { success?: boolean; data?: PosProductRow };
+      if (res?.success && res.data) {
+        const updated = res.data;
+        if (selected?.id === row.id) {
+          setSelected((prev) => (prev ? { ...prev, ...updated } : prev));
+        }
+      }
+      await fetchProducts({ skipLoading: true });
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function saveSubscriptionOffer() {
+    if (!selected) return;
+    const selId = selected.id;
+    const dollars = parseFloat(offerDollars.replace(/,/g, ''));
+    if (!Number.isFinite(dollars) || dollars <= 0) {
+      window.alert('Enter a valid subscription price in USD.');
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = (await api.put(`/admin/products/${selId}/subscription-offer`, {
+        unitAmountCents: Math.round(dollars * 100),
+        currency: 'usd',
+        interval: offerInterval,
+      })) as { success?: boolean; data?: PosProductRow };
+      if (res?.success && res.data) {
+        const updated = res.data;
+        setSelected((prev) => (prev && prev.id === selId ? { ...prev, ...updated } : prev));
+      }
+      await fetchProducts({ skipLoading: true });
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function clearSubscriptionOffer() {
+    if (!selected) return;
+    const selId = selected.id;
+    if (!confirm('Remove Stripe subscription pricing for this variant?')) return;
+    setActionLoading(true);
+    try {
+      const res = (await api.put(`/admin/products/${selId}/subscription-offer`, {
+        clear: true,
+      })) as { success?: boolean; data?: PosProductRow };
+      if (res?.success && res.data) {
+        const updated = res.data;
+        setSelected((prev) => (prev && prev.id === selId ? { ...prev, ...updated } : prev));
       }
       await fetchProducts({ skipLoading: true });
     } finally {
@@ -643,6 +725,17 @@ export default function AdminProductsPage() {
         item.is_hidden ? <Badge variant="warning">Hidden</Badge> : <Badge variant="success">Shown</Badge>,
       className: 'w-24',
     },
+    {
+      key: 'subscription_eligible',
+      header: 'Sub',
+      render: (item: PosProductRow) =>
+        item.subscription_eligible ? (
+          <Badge variant="success">Eligible</Badge>
+        ) : (
+          <span className="text-xs text-gray-400">—</span>
+        ),
+      className: 'w-24',
+    },
   ];
 
   return (
@@ -658,6 +751,10 @@ export default function AdminProductsPage() {
             {' · '}
             <Link href="/admin/products/categories" className="text-blue-600 hover:text-blue-800 underline-offset-2 hover:underline">
               Collection → category maps
+            </Link>
+            {' · '}
+            <Link href="/admin/products/bundles" className="text-blue-600 hover:text-blue-800 underline-offset-2 hover:underline">
+              Subscription bundles
             </Link>
           </p>
         </div>
@@ -1053,6 +1150,80 @@ export default function AdminProductsPage() {
                 <div>{selected.inventory_quantity}</div>
               </div>
             </div>
+            <div className="border-t border-gray-100 pt-4 space-y-3">
+              <h3 className="text-sm font-semibold text-gray-900">Subscriptions</h3>
+              <p className="text-xs text-gray-600">
+                Eligible variants can be sold as individual subscriptions and included in kit bundles (
+                <Link href="/admin/products/bundles" className="text-blue-600 hover:underline">
+                  Products → Bundles
+                </Link>
+                ).
+              </p>
+              <label className="flex items-center gap-2 text-sm text-gray-800">
+                <input
+                  type="checkbox"
+                  checked={Boolean(selected.subscription_eligible)}
+                  disabled={actionLoading}
+                  onChange={() => void toggleSubscriptionEligible(selected)}
+                />
+                Subscription-eligible
+              </label>
+              {selected.subscription_eligible ? (
+                <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-3 space-y-2">
+                  <div className="text-xs text-gray-600">
+                    {selected.subscription_stripe_price_id ? (
+                      <span>
+                        Active Stripe price:{' '}
+                        <code className="text-xs bg-white px-1 rounded border">{selected.subscription_stripe_price_id}</code>
+                      </span>
+                    ) : (
+                      <span>No recurring price yet — set amount below (requires Stripe Connect).</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 items-end">
+                    <div>
+                      <div className="text-xs font-medium text-gray-600 mb-1">Price (USD)</div>
+                      <input
+                        className="w-32 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                        value={offerDollars}
+                        onChange={(e) => setOfferDollars(e.target.value)}
+                        placeholder="29.99"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium text-gray-600 mb-1">Interval</div>
+                      <select
+                        className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                        value={offerInterval}
+                        onChange={(e) => setOfferInterval(e.target.value as 'month' | 'year')}
+                      >
+                        <option value="month">Monthly</option>
+                        <option value="year">Yearly</option>
+                      </select>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      loading={actionLoading}
+                      onClick={() => void saveSubscriptionOffer()}
+                    >
+                      Save subscription price
+                    </Button>
+                    {selected.subscription_stripe_price_id ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        loading={actionLoading}
+                        onClick={() => void clearSubscriptionOffer()}
+                      >
+                        Clear offer
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
             {selected.description ? (
               <div className="text-sm">
                 <div className="text-xs text-gray-500 mb-1">Description</div>

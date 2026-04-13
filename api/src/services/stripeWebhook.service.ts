@@ -27,7 +27,8 @@ function meta(sub: Stripe.Subscription): Record<string, string> {
   return {
     tenantId: m.htc_tenant_id || '',
     userId: m.htc_user_id || '',
-    bundleId: m.htc_bundle_id || '',
+    bundleId: (m.htc_bundle_id || '').trim(),
+    singlePosProductId: (m.htc_single_pos_product_id || '').trim(),
     spaProfileId: m.htc_spa_profile_id || '',
   };
 }
@@ -130,6 +131,14 @@ export async function processStripeWebhookEvent(event: Stripe.Event): Promise<vo
           components = (bundle.components as ComponentLine[]).filter(
             (c) => c && typeof c.posProductId === 'string' && Number.isFinite(Number(c.quantity))
           );
+        }
+      } else {
+        const pid =
+          typeof sub.metadata?.htc_single_pos_product_id === 'string'
+            ? sub.metadata.htc_single_pos_product_id.trim()
+            : '';
+        if (pid) {
+          components = [{ posProductId: pid, quantity: 1 }];
         }
       }
 

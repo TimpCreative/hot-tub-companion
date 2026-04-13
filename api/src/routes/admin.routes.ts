@@ -45,6 +45,10 @@ router.post(
   upload.single('file'),
   adminProductsController.importProductsCsv
 );
+router.get('/products/bundles', adminSubscriptionsController.listBundles);
+router.post('/products/bundles', adminSubscriptionsController.postBundle);
+router.put('/products/bundles/:id', adminSubscriptionsController.putBundle);
+router.delete('/products/bundles/:id', adminSubscriptionsController.removeBundle);
 router.get('/products', adminProductsController.listProducts);
 router.get('/shopify-collections', adminProductsController.listShopifyCollections);
 router.get('/collection-category-maps', adminProductsController.listCollectionCategoryMaps);
@@ -61,6 +65,8 @@ router.get('/products/:id/uhtd-suggestions', adminProductsController.getUhtdSugg
 router.post('/products/:id/map', adminProductsController.confirmMapping);
 router.delete('/products/:id/map', adminProductsController.clearMapping);
 router.put('/products/:id/visibility', adminProductsController.setVisibility);
+router.put('/products/:id/subscription-eligible', adminProductsController.putSubscriptionEligible);
+router.put('/products/:id/subscription-offer', adminProductsController.putSubscriptionOffer);
 
 // Branding / settings
 router.get('/settings/branding', adminBrandingController.getBranding);

@@ -7,6 +7,11 @@ export type SubscriptionBundleRef = {
   posProductId?: string | null;
 };
 
+export type SubscriptionOffersData = {
+  single: { stripePriceId: string; title: string } | null;
+  bundleUpsells: Array<{ bundleId: string; title: string; stripePriceId: string; subtitle?: string }>;
+};
+
 export type CustomerSubscriptionRow = {
   id: string;
   status: string;
@@ -27,8 +32,23 @@ export async function fetchSubscriptionBundleForProduct(productId: string) {
   }>;
 }
 
-export async function postSubscriptionCheckoutHandoff(bundleId: string, spaProfileId?: string | null) {
-  return api.post('/subscriptions/checkout-handoff', { bundleId, spaProfileId }) as Promise<{
+export async function fetchSubscriptionOffers(productId: string) {
+  return api.get(`/subscriptions/products/${productId}/offers`) as Promise<{
+    success?: boolean;
+    data?: SubscriptionOffersData;
+  }>;
+}
+
+export async function postSubscriptionCheckoutHandoff(opts: {
+  bundleId?: string;
+  posProductId?: string;
+  spaProfileId?: string | null;
+}) {
+  return api.post('/subscriptions/checkout-handoff', {
+    bundleId: opts.bundleId,
+    posProductId: opts.posProductId,
+    spaProfileId: opts.spaProfileId ?? null,
+  }) as Promise<{
     success?: boolean;
     data?: { checkoutPageUrl: string; expiresInSeconds: number };
   }>;

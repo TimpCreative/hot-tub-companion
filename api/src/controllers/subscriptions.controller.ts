@@ -5,6 +5,7 @@ import {
   buildSubscriptionsCompleteUrl,
   createCheckoutHandoffForUser,
   getBundleByPosProductId,
+  getSubscriptionOffersForProduct,
   listCustomerSubscriptionsForUser,
 } from '../services/subscriptions.service';
 import { isStripeConfigured, createBillingPortalSession } from '../services/stripeConnect.service';
@@ -34,10 +35,15 @@ export async function postCheckoutHandoff(req: Request, res: Response): Promise<
     error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
     return;
   }
-  const body = req.body as { bundleId?: string; spaProfileId?: string | null };
+  const body = req.body as { bundleId?: string; posProductId?: string; spaProfileId?: string | null };
   const bundleId = typeof body.bundleId === 'string' ? body.bundleId.trim() : '';
-  if (!bundleId) {
-    error(res, 'VALIDATION_ERROR', 'bundleId is required', 400);
+  const posProductId = typeof body.posProductId === 'string' ? body.posProductId.trim() : '';
+  if (!bundleId && !posProductId) {
+    error(res, 'VALIDATION_ERROR', 'bundleId or posProductId is required', 400);
+    return;
+  }
+  if (bundleId && posProductId) {
+    error(res, 'VALIDATION_ERROR', 'Provide only one of bundleId or posProductId', 400);
     return;
   }
   const tenant = await db('tenants').where({ id: tenantId }).first();
@@ -56,7 +62,8 @@ export async function postCheckoutHandoff(req: Request, res: Response): Promise<
       tenantSlug: (tenant as { slug: string }).slug,
       userId,
       userEmail: email,
-      bundleId,
+      bundleId: bundleId || null,
+      posProductId: posProductId || null,
       spaProfileId: body.spaProfileId ?? null,
     });
     success(res, out);
@@ -66,11 +73,19 @@ export async function postCheckoutHandoff(req: Request, res: Response): Promise<
       error(res, 'BUNDLE_NOT_FOUND', 'Bundle not found or inactive', 404);
       return;
     }
+    if (msg === 'SINGLE_OFFER_NOT_FOUND') {
+      error(res, 'SINGLE_OFFER_NOT_FOUND', 'Single-item subscription is not available for this product', 404);
+      return;
+    }
+    if (msg === 'HANDOFF_XOR') {
+      error(res, 'VALIDATION_ERROR', 'Invalid checkout target', 400);
+      return;
+    }
     throw e;
   }
 }
 
-/** Resolve bundle for a product (PDP Subscribe). */
+/** Resolve bundle for a product (PDP Subscribe) — legacy; prefer getSubscriptionOffersForProduct. */
 export async function getSubscriptionBundleForProduct(req: Request, res: Response): Promise<void> {
   const tenantId = req.tenant?.id;
   if (!tenantId) {
@@ -91,10 +106,26 @@ export async function getSubscriptionBundleForProduct(req: Request, res: Respons
     bundle: {
       id: bundle.id,
       title: bundle.title,
-      stripePriceId: bundle.stripe_price_id,
+      stripePriceId: bundle.stripe_price_id ?? undefined,
       posProductId: bundle.pos_product_id,
     },
   });
+}
+
+/** Single + kit upsells for PDP. */
+export async function getSubscriptionOffersForProductHandler(req: Request, res: Response): Promise<void> {
+  const tenantId = req.tenant?.id;
+  if (!tenantId) {
+    error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
+    return;
+  }
+  const productId = req.params.productId;
+  if (!productId) {
+    error(res, 'VALIDATION_ERROR', 'productId required', 400);
+    return;
+  }
+  const offers = await getSubscriptionOffersForProduct(productId, tenantId);
+  success(res, offers);
 }
 
 export async function listMySubscriptions(req: Request, res: Response): Promise<void> {
