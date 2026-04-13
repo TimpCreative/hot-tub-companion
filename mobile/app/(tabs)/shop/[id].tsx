@@ -11,7 +11,6 @@ import {
   Text,
   View,
 } from 'react-native';
-import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import RenderHtml from 'react-native-render-html';
 import { useFocusEffect } from '@react-navigation/native';
@@ -24,11 +23,6 @@ import {
   type ShopProductRow,
 } from '../../../services/shop';
 import { messageFromApiReject } from '../../../services/cart';
-import {
-  fetchSubscriptionOffers,
-  postSubscriptionCheckoutHandoff,
-  type SubscriptionOffersData,
-} from '../../../services/subscriptions';
 import { useTheme } from '../../../theme/ThemeProvider';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCart } from '../../../contexts/CartContext';
@@ -68,10 +62,6 @@ function compatCopy(status: ShopCompatibility | undefined): { text: string; tone
   }
 }
 
-function isStaffTenantAppLogin(user: { id: string } | null): boolean {
-  return Boolean(user?.id?.startsWith('admin_'));
-}
-
 function htmlStyles(colors: { text: string; textSecondary: string }) {
   return {
     tagsStyles: {
@@ -100,8 +90,6 @@ export default function ProductDetailScreen() {
   const [addingCart, setAddingCart] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [related, setRelated] = useState<ShopProductRow[]>([]);
-  const [subOffers, setSubOffers] = useState<SubscriptionOffersData | null>(null);
-  const [subscribeLoading, setSubscribeLoading] = useState<'single' | string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -160,31 +148,6 @@ export default function ProductDetailScreen() {
     };
   }, [params.id, spaProfileId, user]);
 
-  useEffect(() => {
-    if (!product?.id) {
-      setSubOffers(null);
-      return;
-    }
-    if (user && isStaffTenantAppLogin(user)) {
-      setSubOffers(null);
-      return;
-    }
-    const pid = selectedVariantId ?? product.id;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetchSubscriptionOffers(pid);
-        const d = res?.data;
-        if (!cancelled) setSubOffers(d && typeof d === 'object' ? d : null);
-      } catch {
-        if (!cancelled) setSubOffers(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [product?.id, selectedVariantId, user]);
-
   const images = useMemo(() => firstImageUrls(product?.images), [product?.images]);
   const compat = useMemo(() => compatCopy(product?.shopCompatibility), [product?.shopCompatibility]);
   const descHtml = useMemo(() => {
@@ -223,70 +186,6 @@ export default function ProductDetailScreen() {
   const compare =
     displayCompare != null && Number(displayCompare) > Number(displayPrice);
   const stockLine = productDetailStockLine(stock, tenantConfig?.shop ?? null);
-
-  const staffAppLogin = isStaffTenantAppLogin(user);
-  const subscriptionEligible =
-    product?.subscription_eligible === true || (product as { subscriptionEligible?: boolean }).subscriptionEligible === true;
-  const showSingleSubscribeCta = subscriptionEligible || !!subOffers?.single;
-
-  const handleSubscribeSingle = async () => {
-    if (!user) {
-      Alert.alert('Sign in required', 'Please sign in to subscribe.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign in', onPress: () => router.push('/auth/login') },
-      ]);
-      return;
-    }
-    const pid = activeVariantId;
-    if (!subOffers?.single || !pid) {
-      Alert.alert('Subscribe', 'This variant is not available as an individual subscription yet.');
-      return;
-    }
-    setSubscribeLoading('single');
-    try {
-      const res = await postSubscriptionCheckoutHandoff({
-        posProductId: pid,
-        spaProfileId: spaProfileId ?? null,
-      });
-      const url = res?.data?.checkoutPageUrl;
-      if (url) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert('Subscribe', 'Could not start checkout.');
-      }
-    } catch (e) {
-      Alert.alert('Subscribe', messageFromApiReject(e, 'Could not start checkout.'));
-    } finally {
-      setSubscribeLoading(null);
-    }
-  };
-
-  const handleSubscribeBundle = async (bundleId: string) => {
-    if (!user) {
-      Alert.alert('Sign in required', 'Please sign in to subscribe.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign in', onPress: () => router.push('/auth/login') },
-      ]);
-      return;
-    }
-    setSubscribeLoading(bundleId);
-    try {
-      const res = await postSubscriptionCheckoutHandoff({
-        bundleId,
-        spaProfileId: spaProfileId ?? null,
-      });
-      const url = res?.data?.checkoutPageUrl;
-      if (url) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert('Subscribe', 'Could not start checkout.');
-      }
-    } catch (e) {
-      Alert.alert('Subscribe', messageFromApiReject(e, 'Could not start checkout.'));
-    } finally {
-      setSubscribeLoading(null);
-    }
-  };
 
   const handleAddToCart = async () => {
     if (!user) {
@@ -456,34 +355,10 @@ export default function ProductDetailScreen() {
       ) : null}
 
       <View style={styles.ctaRow}>
-        {showSingleSubscribeCta ? (
-          <Pressable
-            style={({ pressed }) => [
-              styles.cta,
-              styles.ctaHalf,
-              {
-                backgroundColor: 'transparent',
-                borderWidth: 2,
-                borderColor: colors.primary,
-                opacity: pressed ? 0.88 : 1,
-              },
-            ]}
-            disabled={staffAppLogin || subscribeLoading !== null}
-            onPress={() => void handleSubscribeSingle()}
-          >
-            {subscribeLoading === 'single' ? (
-              <ActivityIndicator color={colors.primary} />
-            ) : (
-              <Text style={[styles.ctaText, { color: colors.primary }]}>
-                {!user ? 'Subscribe' : staffAppLogin ? 'Subscribe (staff)' : 'Subscribe to this item'}
-              </Text>
-            )}
-          </Pressable>
-        ) : null}
         <Pressable
           style={({ pressed }) => [
             styles.cta,
-            showSingleSubscribeCta ? styles.ctaHalf : { flex: 1, minWidth: 0 },
+            { flex: 1, minWidth: 0 },
             {
               backgroundColor: stock > 0 ? colors.primary : colors.border,
               opacity: pressed ? 0.88 : 1,
@@ -506,44 +381,6 @@ export default function ProductDetailScreen() {
           )}
         </Pressable>
       </View>
-
-      {(subOffers?.bundleUpsells?.length ?? 0) > 0 ? (
-        <View style={{ marginTop: 16 }}>
-          <Text style={[typography.caption, { color: colors.textSecondary, fontWeight: '700', marginBottom: 8 }]}>
-            {subOffers?.single ? 'Or subscription bundles with this item' : 'Subscription bundles with this item'}
-          </Text>
-          {subOffers!.bundleUpsells!.map((b) => (
-            <Pressable
-              key={b.bundleId}
-              style={({ pressed }) => [
-                styles.kitUpsellBtn,
-                {
-                  borderColor: colors.primary,
-                  backgroundColor: colors.surface,
-                  opacity: pressed ? 0.88 : 1,
-                },
-              ]}
-              disabled={staffAppLogin || subscribeLoading !== null}
-              onPress={() => void handleSubscribeBundle(b.bundleId)}
-            >
-              {subscribeLoading === b.bundleId ? (
-                <ActivityIndicator color={colors.primary} />
-              ) : (
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={[styles.ctaText, { color: colors.primary, textAlign: 'center' }]}>
-                    {!user ? 'Sign in to subscribe' : staffAppLogin ? 'Bundle (staff)' : b.title}
-                  </Text>
-                  {typeof b.savingsPercent === 'number' && Number.isFinite(b.savingsPercent) && b.savingsPercent > 0 ? (
-                    <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
-                      Save {Math.round(b.savingsPercent * 100) / 100}%
-                    </Text>
-                  ) : null}
-                </View>
-              )}
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
     </ScrollView>
   );
 }
@@ -571,20 +408,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaHalf: {
-    flex: 1,
-    minWidth: 0,
-  },
   ctaText: { fontSize: 14, fontWeight: '700', color: '#6b7280', textAlign: 'center' },
-  kitUpsellBtn: {
-    borderRadius: 14,
-    borderWidth: 2,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    marginBottom: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   variantChip: {
     borderWidth: 1,
     borderRadius: 12,

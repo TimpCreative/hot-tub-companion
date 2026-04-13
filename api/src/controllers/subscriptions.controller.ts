@@ -8,7 +8,8 @@ import {
   getSubscriptionOffersForProduct,
   listCustomerSubscriptionsForUser,
 } from '../services/subscriptions.service';
-import { isStripeConfigured, createBillingPortalSession } from '../services/stripeConnect.service';
+import { isStripeConfigured, createBillingPortalSession, createSubscriptionCheckoutSessionForItems } from '../services/stripeConnect.service';
+import { getCart } from '../services/storefrontCart.service';
 function customerUserId(req: Request): string | null {
   const u = req.user as { id?: string; role?: string } | undefined;
   if (!u?.id || u.role === 'admin') return null;
@@ -18,6 +19,12 @@ function customerUserId(req: Request): string | null {
 function userEmail(req: Request): string {
   const u = req.user as { email?: string } | undefined;
   return (u?.email || '').trim().toLowerCase();
+}
+
+function parseVariantIdFromMerchandiseGid(gid: string | null | undefined): string | null {
+  if (!gid) return null;
+  const m = gid.match(/ProductVariant\/(\d+)/);
+  return m?.[1] ?? null;
 }
 
 export async function postCheckoutHandoff(req: Request, res: Response): Promise<void> {
@@ -82,6 +89,120 @@ export async function postCheckoutHandoff(req: Request, res: Response): Promise<
       return;
     }
     throw e;
+  }
+}
+
+export async function postCartSubscriptionCheckout(req: Request, res: Response): Promise<void> {
+  const userId = customerUserId(req);
+  if (!userId) {
+    error(res, 'FORBIDDEN', 'Customer session required', 403);
+    return;
+  }
+  if (!isStripeConfigured()) {
+    error(res, 'STRIPE_NOT_CONFIGURED', 'Subscriptions are not available', 503);
+    return;
+  }
+  const tenantId = req.tenant?.id;
+  if (!tenantId) {
+    error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
+    return;
+  }
+  const email = userEmail(req);
+  if (!email) {
+    error(res, 'VALIDATION_ERROR', 'User email required for checkout', 400);
+    return;
+  }
+  const tenant = (await db('tenants').where({ id: tenantId }).first()) as
+    | {
+        id: string;
+        slug: string;
+        stripe_connect_account_id: string | null;
+        stripe_connect_charges_enabled: boolean;
+        subscription_application_fee_bps: number | null;
+      }
+    | undefined;
+  if (!tenant) {
+    error(res, 'NOT_FOUND', 'Tenant not found', 404);
+    return;
+  }
+  if (!tenant.stripe_connect_account_id || !tenant.stripe_connect_charges_enabled) {
+    error(res, 'STRIPE_CONNECT_NOT_READY', 'Subscriptions are not available', 403);
+    return;
+  }
+  try {
+    const cart = await getCart(tenantId, userId);
+    if (!cart?.lines?.length) {
+      error(res, 'CART_EMPTY', 'Your cart is empty', 400);
+      return;
+    }
+    const variantIds = [
+      ...new Set(
+        cart.lines
+          .map((l) => parseVariantIdFromMerchandiseGid((l as { merchandiseId?: string | null }).merchandiseId ?? null))
+          .filter((v): v is string => !!v)
+      ),
+    ];
+    if (variantIds.length === 0) {
+      error(res, 'SUBSCRIPTION_CART_EMPTY', 'No subscription-eligible items in cart', 400);
+      return;
+    }
+    const products = (await db('pos_products')
+      .where({ tenant_id: tenantId })
+      .whereIn('pos_variant_id', variantIds)
+      .select('id', 'title', 'pos_variant_id', 'subscription_eligible', 'subscription_stripe_price_id')) as Array<{
+      id: string;
+      title: string | null;
+      pos_variant_id: string | null;
+      subscription_eligible?: boolean;
+      subscription_stripe_price_id?: string | null;
+    }>;
+    const byVariant = new Map(products.map((p) => [String(p.pos_variant_id || ''), p]));
+    const qtyByPrice = new Map<string, number>();
+    const eligibleProductIds = new Set<string>();
+    for (const line of cart.lines) {
+      const variantId = parseVariantIdFromMerchandiseGid((line as { merchandiseId?: string | null }).merchandiseId ?? null);
+      if (!variantId) continue;
+      const p = byVariant.get(variantId);
+      if (!p) continue;
+      const priceId = p?.subscription_eligible ? p.subscription_stripe_price_id?.trim() : '';
+      if (!priceId) continue;
+      qtyByPrice.set(priceId, (qtyByPrice.get(priceId) ?? 0) + Math.max(1, line.quantity || 1));
+      eligibleProductIds.add(p.id);
+    }
+    const lineItems = [...qtyByPrice.entries()].map(([stripePriceId, quantity]) => ({ stripePriceId, quantity }));
+    if (lineItems.length === 0) {
+      error(res, 'SUBSCRIPTION_CART_EMPTY', 'No subscription-eligible items in cart', 400);
+      return;
+    }
+    const successUrl = buildSubscriptionsCompleteUrl(tenant.slug, {
+      status: 'success',
+      session_id: '{CHECKOUT_SESSION_ID}',
+    });
+    const cancelUrl = buildSubscriptionsCompleteUrl(tenant.slug, { status: 'cancel' });
+    const metadata: Record<string, string> = {
+      htc_tenant_id: tenantId,
+      htc_user_id: userId,
+      htc_user_email: email,
+      htc_cart_subscription: 'true',
+      htc_cart_line_item_count: String(lineItems.length),
+      htc_cart_product_ids: [...eligibleProductIds].join(',').slice(0, 450),
+    };
+    const { url } = await createSubscriptionCheckoutSessionForItems({
+      tenant,
+      lineItems,
+      customerEmail: email,
+      successUrl,
+      cancelUrl,
+      metadata,
+    });
+    if (!url) {
+      error(res, 'CHECKOUT_FAILED', 'Could not create checkout session', 500);
+      return;
+    }
+    success(res, { checkoutPageUrl: url });
+  } catch (e) {
+    console.error('[subscriptions] cart checkout', e);
+    error(res, 'CHECKOUT_FAILED', 'Could not create checkout session', 500);
   }
 }
 

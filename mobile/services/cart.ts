@@ -32,6 +32,9 @@ export type CartLine = {
   quantity: number;
   productTitle: string;
   variantTitle: string;
+  merchandiseId?: string | null;
+  posProductId?: string | null;
+  subscriptionEligible?: boolean;
   /** Present when API returns Storefront variant / product images. */
   imageUrl?: string | null;
 };

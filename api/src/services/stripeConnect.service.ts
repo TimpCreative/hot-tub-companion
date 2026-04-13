@@ -119,6 +119,46 @@ export async function createSubscriptionCheckoutSession(input: {
   return { url: session.url, sessionId: session.id };
 }
 
+export async function createSubscriptionCheckoutSessionForItems(input: {
+  tenant: TenantRow;
+  lineItems: Array<{ stripePriceId: string; quantity: number }>;
+  customerEmail: string;
+  successUrl: string;
+  cancelUrl: string;
+  metadata: Record<string, string>;
+}): Promise<{ url: string | null; sessionId: string }> {
+  const stripe = getStripe();
+  if (!input.tenant.stripe_connect_account_id) {
+    throw new Error('STRIPE_CONNECT_NOT_LINKED');
+  }
+  if (!input.tenant.stripe_connect_charges_enabled) {
+    throw new Error('STRIPE_CONNECT_NOT_READY');
+  }
+  const normalized = input.lineItems
+    .map((li) => ({ stripePriceId: li.stripePriceId.trim(), quantity: Math.max(1, Math.floor(li.quantity || 1)) }))
+    .filter((li) => !!li.stripePriceId);
+  if (normalized.length === 0) {
+    throw new Error('SUBSCRIPTION_LINE_ITEMS_REQUIRED');
+  }
+  const applicationFeePercent = applicationFeePercentForTenant(input.tenant);
+  const session = await stripe.checkout.sessions.create(
+    {
+      mode: 'subscription',
+      customer_email: input.customerEmail,
+      line_items: normalized.map((li) => ({ price: li.stripePriceId, quantity: li.quantity })),
+      success_url: input.successUrl,
+      cancel_url: input.cancelUrl,
+      metadata: input.metadata,
+      subscription_data: {
+        metadata: input.metadata,
+        ...(applicationFeePercent > 0 ? { application_fee_percent: applicationFeePercent } : {}),
+      },
+    },
+    { stripeAccount: input.tenant.stripe_connect_account_id }
+  );
+  return { url: session.url, sessionId: session.id };
+}
+
 export async function createBillingPortalSession(input: {
   tenant: TenantRow;
   stripeCustomerId: string;

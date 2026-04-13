@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -16,6 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCart } from '../../../contexts/CartContext';
 import { formatCartMoney, messageFromApiReject } from '../../../services/cart';
+import { postCartSubscriptionCheckout } from '../../../services/subscriptions';
 import { useTheme } from '../../../theme/ThemeProvider';
 
 export default function ShopCartScreen() {
@@ -36,6 +38,7 @@ export default function ShopCartScreen() {
   } = useCart();
   const [busyLine, setBusyLine] = useState<string | null>(null);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [subscribeBusy, setSubscribeBusy] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -98,6 +101,7 @@ export default function ShopCartScreen() {
   const tot = cart?.totalAmount;
   const sameSubAndTotal =
     Boolean(sub && tot && sub.amount === tot.amount && sub.currencyCode === tot.currencyCode);
+  const eligibleCount = cart?.lines.filter((line) => line.subscriptionEligible === true).length ?? 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -162,6 +166,24 @@ export default function ShopCartScreen() {
                     {line.variantTitle}
                   </Text>
                 ) : null}
+                <View
+                  style={[
+                    styles.subscriptionPill,
+                    {
+                      backgroundColor: line.subscriptionEligible ? '#dbeafe' : '#fee2e2',
+                      borderColor: line.subscriptionEligible ? '#93c5fd' : '#fecaca',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      typography.caption,
+                      { color: line.subscriptionEligible ? '#1d4ed8' : '#b91c1c', fontWeight: '700' },
+                    ]}
+                  >
+                    {line.subscriptionEligible ? 'Subscription Eligible' : 'Not Subscription Eligible'}
+                  </Text>
+                </View>
               </View>
             </View>
             <View style={styles.lineActions}>
@@ -238,6 +260,49 @@ export default function ShopCartScreen() {
             </View>
           ) : null}
           <Pressable
+            onPress={() => {
+              void (async () => {
+                if (!user) {
+                  Alert.alert('Sign in required', 'Please sign in to subscribe.');
+                  return;
+                }
+                setSubscribeBusy(true);
+                try {
+                  const res = await postCartSubscriptionCheckout();
+                  const url = res?.data?.checkoutPageUrl;
+                  if (!url) {
+                    Alert.alert('Subscribe', 'No subscription-eligible items in cart.');
+                    return;
+                  }
+                  await Linking.openURL(url);
+                } catch (e) {
+                  Alert.alert('Subscribe', messageFromApiReject(e, 'Could not start subscription checkout.'));
+                } finally {
+                  setSubscribeBusy(false);
+                }
+              })();
+            }}
+            disabled={subscribeBusy || eligibleCount <= 0}
+            style={({ pressed }) => [
+              styles.primaryBtn,
+              {
+                backgroundColor: colors.primary,
+                opacity: pressed || subscribeBusy || eligibleCount <= 0 ? 0.88 : 1,
+                marginTop: 10,
+              },
+            ]}
+          >
+            {subscribeBusy ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.primaryBtnText}>
+                {eligibleCount > 0
+                  ? `Subscribe to ${eligibleCount} eligible item${eligibleCount === 1 ? '' : 's'}`
+                  : 'No eligible items to subscribe'}
+              </Text>
+            )}
+          </Pressable>
+          <Pressable
             onPress={() => void onCheckout()}
             disabled={checkoutBusy}
             style={({ pressed }) => [
@@ -291,6 +356,14 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 10,
+  },
+  subscriptionPill: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   cartFooter: {
     borderTopWidth: StyleSheet.hairlineWidth,

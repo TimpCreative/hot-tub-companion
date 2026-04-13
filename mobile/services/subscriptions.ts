@@ -60,6 +60,13 @@ export async function postSubscriptionCheckoutHandoff(opts: {
   }>;
 }
 
+export async function postCartSubscriptionCheckout() {
+  return api.post('/subscriptions/cart/checkout', {}) as Promise<{
+    success?: boolean;
+    data?: { checkoutPageUrl: string };
+  }>;
+}
+
 export async function listMySubscriptions() {
   return api.get('/subscriptions') as Promise<{
     success?: boolean;

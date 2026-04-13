@@ -31,6 +31,7 @@ export type CartLineDto = {
   quantity: number;
   productTitle: string;
   variantTitle: string;
+  merchandiseId: string | null;
   imageUrl: string | null;
 };
 
@@ -172,6 +173,7 @@ function parseCart(cart: unknown): CartDto | null {
       const lineId = typeof n.id === 'string' ? n.id : null;
       const qty = typeof n.quantity === 'number' ? n.quantity : 0;
       const merch = n.merchandise as Record<string, unknown> | undefined;
+      const merchandiseId = typeof merch?.id === 'string' ? merch.id : null;
       const variantTitle = typeof merch?.title === 'string' ? merch.title : '';
       const product = merch?.product as Record<string, unknown> | undefined;
       const productTitle = typeof product?.title === 'string' ? product.title : '';
@@ -191,6 +193,7 @@ function parseCart(cart: unknown): CartDto | null {
           quantity: qty,
           productTitle,
           variantTitle,
+          merchandiseId,
           imageUrl,
         });
       }

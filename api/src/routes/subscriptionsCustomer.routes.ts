@@ -7,6 +7,7 @@ const router = Router();
 router.use(authMiddleware);
 
 router.post('/subscriptions/checkout-handoff', subscriptionsController.postCheckoutHandoff);
+router.post('/subscriptions/cart/checkout', subscriptionsController.postCartSubscriptionCheckout);
 router.get('/subscriptions', subscriptionsController.listMySubscriptions);
 router.post('/subscriptions/billing-portal', subscriptionsController.postBillingPortal);
 
