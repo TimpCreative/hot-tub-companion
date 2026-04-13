@@ -35,6 +35,7 @@ export type CartLine = {
   merchandiseId?: string | null;
   posProductId?: string | null;
   subscriptionEligible?: boolean;
+  subscriptionCheckoutReady?: boolean;
   /** Present when API returns Storefront variant / product images. */
   imageUrl?: string | null;
 };

@@ -84,11 +84,13 @@ async function enrichCartSubscriptionFlags(tenantId: string, cart: CartDto | nul
     lines: cart.lines.map((l) => {
       const variantId = parseVariantIdFromMerchandiseGid((l as { merchandiseId?: string | null }).merchandiseId ?? null);
       const r = variantId ? byVariant.get(variantId) : undefined;
-      const eligible = Boolean(r?.subscription_eligible && r.subscription_stripe_price_id?.trim());
+      const eligible = Boolean(r?.subscription_eligible);
+      const checkoutReady = Boolean(r?.subscription_eligible && r.subscription_stripe_price_id?.trim());
       return {
         ...l,
         posProductId: r?.id ?? null,
         subscriptionEligible: eligible,
+        subscriptionCheckoutReady: checkoutReady,
       };
     }),
   } as CartDto;
