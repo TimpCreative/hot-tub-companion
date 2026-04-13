@@ -826,7 +826,16 @@ export async function putSubscriptionEligible(req: Request, res: Response): Prom
     return;
   }
 
-  const existing = await db('pos_products').where({ id, tenant_id: tenantId }).first();
+  const existing = (await db('pos_products').where({ id, tenant_id: tenantId }).first()) as
+    | {
+        id: string;
+        title?: string | null;
+        price?: number | null;
+        subscription_eligible?: boolean;
+        subscription_stripe_product_id?: string | null;
+        subscription_stripe_price_id?: string | null;
+      }
+    | undefined;
   if (!existing) {
     error(res, 'NOT_FOUND', 'Product not found', 404);
     return;
@@ -845,13 +854,52 @@ export async function putSubscriptionEligible(req: Request, res: Response): Prom
     }
   }
 
-  const [updated] = await db('pos_products')
-    .where({ id, tenant_id: tenantId })
-    .update({
-      subscription_eligible: subscriptionEligible,
-      updated_at: db.fn.now(),
-    })
-    .returning('*');
+  const patch: Record<string, unknown> = {
+    subscription_eligible: subscriptionEligible,
+    updated_at: db.fn.now(),
+  };
+
+  // If we are enabling subscriptions and this variant has no recurring price yet,
+  // auto-create one from the current product price when Connect is ready.
+  if (subscriptionEligible === true && !existing.subscription_stripe_price_id?.trim()) {
+    if (isStripeConfigured()) {
+      const tenant = (await db('tenants').where({ id: tenantId }).first()) as
+        | { stripe_connect_account_id: string | null; stripe_connect_charges_enabled: boolean }
+        | undefined;
+      if (tenant?.stripe_connect_account_id && tenant.stripe_connect_charges_enabled) {
+        const unitAmountCents = Math.round(Number(existing.price ?? 0));
+        if (Number.isFinite(unitAmountCents) && unitAmountCents > 0) {
+          try {
+            const out = await createRecurringProductAndPrice({
+              connectedAccountId: tenant.stripe_connect_account_id,
+              productName: (existing.title || 'Subscription item').trim().slice(0, 200),
+              existingStripeProductId: existing.subscription_stripe_product_id?.trim() || null,
+              unitAmountCents,
+              currency: 'usd',
+              interval: 'month',
+              archivePriceId: existing.subscription_stripe_price_id?.trim() || null,
+            });
+            patch.subscription_stripe_product_id = out.stripeProductId;
+            patch.subscription_stripe_price_id = out.stripePriceId;
+            patch.subscription_unit_amount_cents = unitAmountCents;
+            patch.subscription_currency = 'usd';
+            patch.subscription_interval = 'month';
+          } catch (e) {
+            console.error('[adminProducts] auto-create subscription offer on eligibility', e);
+            error(
+              res,
+              'INTERNAL_ERROR',
+              'Could not auto-create Stripe subscription price. Try Save subscription price in product details.',
+              500
+            );
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  const [updated] = await db('pos_products').where({ id, tenant_id: tenantId }).update(patch).returning('*');
 
   success(res, updated);
 }
