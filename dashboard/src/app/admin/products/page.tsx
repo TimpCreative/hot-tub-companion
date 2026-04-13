@@ -541,10 +541,13 @@ export default function AdminProductsPage() {
     action: 'set_hidden' | 'clear_mapping' | 'set_subscription_eligible',
     opts?: { isHidden?: boolean; subscriptionEligible?: boolean }
   ): boolean {
+    const checked = selectedIds.size;
     const scope =
-      selectionCount > 0
-        ? `This applies to ${selectionCount} product(s) in your bulk scope (current filters).`
-        : 'This applies to all products in your bulk scope (current filters).';
+      checked > 0
+        ? `This applies to ${checked} selected product(s) (checked rows).`
+        : selectionCount > 0
+          ? `This applies to ${selectionCount} product(s) matching your current filters (full result set, all pages).`
+          : 'This applies to products matching your current filters.';
     let detail = '';
     if (action === 'set_hidden') {
       detail = opts?.isHidden
@@ -565,8 +568,11 @@ export default function AdminProductsPage() {
     action: 'set_hidden' | 'clear_mapping' | 'set_subscription_eligible',
     opts?: { isHidden?: boolean; subscriptionEligible?: boolean }
   ) {
-    if (!selectionToken) {
-      setError('Click “Select all matching filters” (under the filters) first to choose which products bulk actions apply to.');
+    const idList = Array.from(selectedIds);
+    if (idList.length === 0 && !selectionToken) {
+      setError(
+        'Select products with the checkboxes, or use “Select all matching filters” to run the action on every product that matches your filters (all pages).'
+      );
       return;
     }
     if (!confirmBulkAction(action, opts)) {
@@ -582,11 +588,13 @@ export default function AdminProductsPage() {
           : action === 'set_subscription_eligible'
             ? { subscriptionEligible: opts?.subscriptionEligible === true }
             : {};
-      const res = (await api.post('/admin/products/bulk-apply', {
-        selection_token: selectionToken,
-        action,
-        payload,
-      })) as {
+      const body: Record<string, unknown> = { action, payload };
+      if (idList.length > 0) {
+        body.product_ids = idList;
+      } else {
+        body.selection_token = selectionToken;
+      }
+      const res = (await api.post('/admin/products/bulk-apply', body)) as {
         success?: boolean;
         data?: { updated?: number; skipped_in_bundles?: number };
         error?: { message?: string };
@@ -938,9 +946,10 @@ export default function AdminProductsPage() {
         <div className="mb-3 pb-3 border-b border-gray-200/70">
           <h3 className="text-sm font-semibold text-gray-900">Bulk edit</h3>
           <p className="text-xs text-gray-600 mt-1 leading-relaxed">
-            These actions update many products at once. Set your filters below, then click{' '}
-            <strong className="font-medium text-gray-800">Select all matching filters</strong> so the bulk buttons apply
-            to that full result set (not just the rows checked on this page).
+            Check products in the table to run bulk actions on <strong className="font-medium text-gray-800">those rows</strong>.
+            Optional: <strong className="font-medium text-gray-800">Select all matching filters</strong> (under the filters)
+            includes <strong className="font-medium text-gray-800">every product matching your filters</strong> on all pages.
+            If you have both checkboxes and that filter scope, <strong className="font-medium text-gray-800">checked rows win</strong>.
           </p>
         </div>
         {selectedIds.size > 0 || selectionToken ? (
@@ -950,7 +959,7 @@ export default function AdminProductsPage() {
               {selectionToken ? (
                 <>
                   {' · '}
-                  <strong>{selectionCount}</strong> in bulk scope (current filters)
+                  <strong>{selectionCount}</strong> in filtered set (all pages)
                 </>
               ) : null}
             </span>
@@ -995,8 +1004,8 @@ export default function AdminProductsPage() {
           </div>
         ) : (
           <p className="text-gray-500 text-sm leading-snug">
-            When you’re ready, use <strong className="font-medium text-gray-700">Select all matching filters</strong>{' '}
-            (under the filters) and return here to run bulk actions.
+            Check products in the table, or use <strong className="font-medium text-gray-700">Select all matching filters</strong>{' '}
+            under the filters to target the full filtered list.
           </p>
         )}
       </div>

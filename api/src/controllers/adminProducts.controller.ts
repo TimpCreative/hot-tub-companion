@@ -487,38 +487,79 @@ export async function bulkApply(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const { selection_token: selectionToken, action, payload } = req.body as {
+  const { selection_token: selectionToken, product_ids: productIdsRaw, action, payload } = req.body as {
     selection_token?: string;
+    product_ids?: unknown;
     action?: string;
     payload?: Record<string, unknown>;
   };
 
-  if (!selectionToken) {
-    error(res, 'VALIDATION_ERROR', 'selection_token is required', 400);
+  let ids: string[];
+  let matchedCount: number;
+
+  if (Array.isArray(productIdsRaw) && productIdsRaw.length > 0) {
+    const unique = [
+      ...new Set(
+        productIdsRaw
+          .map((x) => (typeof x === 'string' ? x : String(x)).trim())
+          .filter((id) => id.length > 0)
+      ),
+    ];
+    if (unique.length > BULK_APPLY_MAX_ROWS) {
+      error(
+        res,
+        'VALIDATION_ERROR',
+        `At most ${BULK_APPLY_MAX_ROWS} products per bulk action. Narrow your selection.`,
+        400
+      );
+      return;
+    }
+    const rows = await db('pos_products').select('id').where({ tenant_id: tenantId }).whereIn('id', unique);
+    const found = new Set(rows.map((r: { id: string }) => r.id));
+    const missing = unique.filter((id) => !found.has(id));
+    if (missing.length > 0) {
+      error(
+        res,
+        'VALIDATION_ERROR',
+        'One or more product ids are invalid or do not belong to this store.',
+        400
+      );
+      return;
+    }
+    ids = unique;
+    matchedCount = ids.length;
+  } else if (selectionToken) {
+    const verified = verifyBulkProductSelectionToken(selectionToken);
+    if (!verified || verified.tenantId !== tenantId) {
+      error(res, 'VALIDATION_ERROR', 'Invalid or expired selection_token', 400);
+      return;
+    }
+
+    const filters = verified.filters;
+    let countQ = db('pos_products').whereRaw('1=1');
+    applyAdminProductFilters(countQ, tenantId, filters);
+    const countRow = await countQ.clone().clearSelect().clearOrder().count('* as count').first();
+    const count = parseInt(String((countRow as { count?: string })?.count ?? '0'), 10);
+
+    if (count > BULK_APPLY_MAX_ROWS) {
+      error(res, 'VALIDATION_ERROR', 'Selection too large', 400);
+      return;
+    }
+
+    const idQuery = db('pos_products').select('id').whereRaw('1=1');
+    applyAdminProductFilters(idQuery, tenantId, filters);
+    const idRows = await idQuery;
+    ids = idRows.map((r: { id: string }) => r.id);
+    matchedCount = count;
+  } else {
+    error(
+      res,
+      'VALIDATION_ERROR',
+      'Provide a non-empty product_ids array or a valid selection_token.',
+      400
+    );
     return;
   }
-
-  const verified = verifyBulkProductSelectionToken(selectionToken);
-  if (!verified || verified.tenantId !== tenantId) {
-    error(res, 'VALIDATION_ERROR', 'Invalid or expired selection_token', 400);
-    return;
-  }
-
-  const filters = verified.filters;
-  let countQ = db('pos_products').whereRaw('1=1');
-  applyAdminProductFilters(countQ, tenantId, filters);
-  const countRow = await countQ.clone().clearSelect().clearOrder().count('* as count').first();
-  const count = parseInt(String((countRow as { count?: string })?.count ?? '0'), 10);
-
-  if (count > BULK_APPLY_MAX_ROWS) {
-    error(res, 'VALIDATION_ERROR', 'Selection too large', 400);
-    return;
-  }
-
-  const idQuery = db('pos_products').select('id').whereRaw('1=1');
-  applyAdminProductFilters(idQuery, tenantId, filters);
-  const idRows = await idQuery;
-  const ids = idRows.map((r: { id: string }) => r.id);
 
   const auditUserId = posProductsAuditUserId(req);
   let updated = 0;
@@ -585,14 +626,14 @@ export async function bulkApply(req: Request, res: Response): Promise<void> {
         }
       }
     }
-    success(res, { updated, matched: count, skipped_in_bundles: skippedInBundles });
+    success(res, { updated, matched: matchedCount, skipped_in_bundles: skippedInBundles });
     return;
   } else {
     error(res, 'VALIDATION_ERROR', 'Unknown action', 400);
     return;
   }
 
-  success(res, { updated, matched: count });
+  success(res, { updated, matched: matchedCount });
 }
 
 export async function listShopifyCollections(req: Request, res: Response): Promise<void> {
