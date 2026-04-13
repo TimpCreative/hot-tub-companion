@@ -11,6 +11,8 @@ import {
   upsertBundle,
   deleteBundle,
   listCustomerSubscriptionsForTenant,
+  enrichBundlesWithPricingPreview,
+  previewBundlePricing,
 } from '../services/subscriptions.service';
 import { createRecurringProductAndPrice } from '../services/stripeSubscriptionCatalog.service';
 import { env, getDashboardHostname } from '../config/environment';
@@ -35,49 +37,36 @@ type PricingBody = {
   interval?: 'month' | 'year';
 };
 
-async function resolveBundleStripeCatalog(
+/** Create or rotate Stripe Product + recurring Price on the connected account (admin never pastes price ids). */
+async function createBundleStripePrice(
   tenantId: string,
   productName: string,
-  body: {
-    stripePriceId?: string;
-    stripeProductId?: string | null;
-    pricing?: PricingBody;
-  },
+  pricing: PricingBody,
   existing: { stripe_price_id?: string | null; stripe_product_id?: string | null } | null
 ): Promise<{ stripePriceId: string; stripeProductId: string | null }> {
-  const pricing = body.pricing;
-  if (pricing && Number.isFinite(Number(pricing.unitAmountCents))) {
-    const tenant = (await db('tenants').where({ id: tenantId }).first()) as
-      | {
-          stripe_connect_account_id: string | null;
-          stripe_connect_charges_enabled: boolean;
-        }
-      | undefined;
-    if (!tenant?.stripe_connect_account_id || !tenant.stripe_connect_charges_enabled) {
-      throw new Error('STRIPE_CONNECT_NOT_READY');
-    }
-    const acct = tenant.stripe_connect_account_id;
-    const u = Math.round(Number(pricing.unitAmountCents));
-    if (u < 1) throw new Error('INVALID_UNIT_AMOUNT');
-    const interval = pricing.interval === 'year' ? 'year' : 'month';
-    const out = await createRecurringProductAndPrice({
-      connectedAccountId: acct,
-      productName,
-      existingStripeProductId:
-        existing?.stripe_product_id?.trim() || body.stripeProductId?.trim() || null,
-      unitAmountCents: u,
-      currency: pricing.currency || 'usd',
-      interval,
-      archivePriceId: existing?.stripe_price_id?.trim() || null,
-    });
-    return { stripePriceId: out.stripePriceId, stripeProductId: out.stripeProductId };
+  const tenant = (await db('tenants').where({ id: tenantId }).first()) as
+    | {
+        stripe_connect_account_id: string | null;
+        stripe_connect_charges_enabled: boolean;
+      }
+    | undefined;
+  if (!tenant?.stripe_connect_account_id || !tenant.stripe_connect_charges_enabled) {
+    throw new Error('STRIPE_CONNECT_NOT_READY');
   }
-  const sid = body.stripePriceId?.trim();
-  if (!sid) throw new Error('PRICE_REQUIRED');
-  return {
-    stripePriceId: sid,
-    stripeProductId: body.stripeProductId?.trim() || existing?.stripe_product_id?.trim() || null,
-  };
+  const acct = tenant.stripe_connect_account_id;
+  const u = Math.round(Number(pricing.unitAmountCents));
+  if (u < 1) throw new Error('INVALID_UNIT_AMOUNT');
+  const interval = pricing.interval === 'year' ? 'year' : 'month';
+  const out = await createRecurringProductAndPrice({
+    connectedAccountId: acct,
+    productName,
+    existingStripeProductId: existing?.stripe_product_id?.trim() || null,
+    unitAmountCents: u,
+    currency: pricing.currency || 'usd',
+    interval,
+    archivePriceId: existing?.stripe_price_id?.trim() || null,
+  });
+  return { stripePriceId: out.stripePriceId, stripeProductId: out.stripeProductId };
 }
 
 async function assertPosProductsSubscriptionEligible(
@@ -132,6 +121,9 @@ export async function getConnectStatus(req: Request, res: Response): Promise<voi
     onboardedAt: t.stripe_onboarded_at ?? null,
     subscriptionApplicationFeeBps: t.subscription_application_fee_bps ?? null,
     subscriptionShopifyFulfillmentEnabled: Boolean(t.subscription_shopify_fulfillment_enabled),
+    subscriptionBundleDefaultDiscountPercent: Number(
+      (t as { subscription_bundle_default_discount_percent?: unknown }).subscription_bundle_default_discount_percent ?? 0
+    ),
   });
 }
 
@@ -151,8 +143,8 @@ export async function postConnectOnboardingLink(req: Request, res: Response): Pr
     return;
   }
   const body = req.body as { refreshPath?: string; returnPath?: string };
-  const refreshPath = typeof body.refreshPath === 'string' ? body.refreshPath : '/admin/subscriptions/billing';
-  const returnPath = typeof body.returnPath === 'string' ? body.returnPath : '/admin/subscriptions/billing';
+  const refreshPath = typeof body.refreshPath === 'string' ? body.refreshPath : '/admin/settings/billing';
+  const returnPath = typeof body.returnPath === 'string' ? body.returnPath : '/admin/settings/billing';
   try {
     const url = await createAccountOnboardingLink(
       tid,
@@ -197,8 +189,9 @@ export async function listBundles(req: Request, res: Response): Promise<void> {
     return;
   }
   const rows = await listBundlesForAdmin(tid);
+  const enriched = await enrichBundlesWithPricingPreview(tid, rows);
   success(res, {
-    bundles: rows.map((b) => ({
+    bundles: enriched.map((b) => ({
       id: b.id,
       title: b.title,
       slug: b.slug,
@@ -210,22 +203,53 @@ export async function listBundles(req: Request, res: Response): Promise<void> {
       sortOrder: b.sort_order,
       heroSubscribeCategory: b.hero_subscribe_category,
       isKit: b.is_kit !== false,
+      bundleDiscountPercent:
+        b.bundle_discount_percent != null && b.bundle_discount_percent !== ''
+          ? Number(b.bundle_discount_percent)
+          : null,
+      bundleRecurringUnitAmountCents: b.bundle_recurring_unit_amount_cents ?? null,
+      previewSubtotalCents: b.previewSubtotalCents,
+      previewSuggestedCents: b.previewSuggestedCents,
+      previewDiscountPercent: b.previewDiscountPercent,
     })),
   });
 }
 
+export async function postBundlePreview(req: Request, res: Response): Promise<void> {
+  if (!requireManageProducts(req, res)) return;
+  const tid = tenantId(req);
+  if (!tid) {
+    error(res, 'UNAUTHORIZED', 'Tenant required', 401);
+    return;
+  }
+  const body = req.body as {
+    components?: Array<{ posProductId: string; quantity: number }>;
+    bundleDiscountPercent?: number | null;
+  };
+  const components = Array.isArray(body.components) ? body.components : [];
+  try {
+    const { subtotalCents, discountPercent, suggestedCents } = await previewBundlePricing(
+      tid,
+      components,
+      body.bundleDiscountPercent
+    );
+    success(res, { subtotalCents, discountPercent, suggestedCents });
+  } catch (e) {
+    console.error('[adminSubscriptions] bundle preview', e);
+    error(res, 'INTERNAL_ERROR', 'Could not preview bundle pricing', 500);
+  }
+}
+
 type BundleWriteBody = {
   title?: string;
-  stripePriceId?: string;
-  stripeProductId?: string | null;
   pricing?: PricingBody;
   components?: Array<{ posProductId: string; quantity: number }>;
   slug?: string;
-  posProductId?: string | null;
   active?: boolean;
   sortOrder?: number;
   heroSubscribeCategory?: string | null;
   isKit?: boolean;
+  bundleDiscountPercent?: number | null;
 };
 
 async function validateAndResolveBundle(
@@ -239,17 +263,18 @@ async function validateAndResolveBundle(
       throw new Error('BAD_COMPONENTS');
     }
   }
-  const heroId = body.posProductId?.trim() || '';
-  const idsForEligible = [...components.map((c) => c.posProductId), ...(heroId ? [heroId] : [])];
+  const idsForEligible = components.map((c) => c.posProductId);
   const eligErr = await assertPosProductsSubscriptionEligible(tid, idsForEligible);
   if (eligErr) {
     throw new Error(`ELIG:${eligErr}`);
   }
-  const needsStripeApi = body.pricing != null && Number.isFinite(Number(body.pricing.unitAmountCents));
-  if (needsStripeApi && !isStripeConfigured()) {
+  if (!body.pricing || !Number.isFinite(Number(body.pricing.unitAmountCents))) {
+    throw new Error('PRICING_REQUIRED');
+  }
+  if (!isStripeConfigured()) {
     throw new Error('STRIPE_NOT_CONFIGURED');
   }
-  return resolveBundleStripeCatalog(tid, body.title!.trim(), body, existing);
+  return createBundleStripePrice(tid, body.title!.trim(), body.pricing, existing);
 }
 
 export async function postBundle(req: Request, res: Response): Promise<void> {
@@ -265,9 +290,8 @@ export async function postBundle(req: Request, res: Response): Promise<void> {
     return;
   }
   const hasPricing = body.pricing != null && Number.isFinite(Number(body.pricing.unitAmountCents));
-  const hasPriceId = !!body.stripePriceId?.trim();
-  if (!hasPricing && !hasPriceId) {
-    error(res, 'VALIDATION_ERROR', 'Provide subscription pricing or a Stripe price id', 400);
+  if (!hasPricing) {
+    error(res, 'VALIDATION_ERROR', 'pricing with unitAmountCents is required', 400);
     return;
   }
   const components = Array.isArray(body.components) ? body.components : [];
@@ -275,19 +299,23 @@ export async function postBundle(req: Request, res: Response): Promise<void> {
     error(res, 'VALIDATION_ERROR', 'Add at least one bundle line item', 400);
     return;
   }
+  const firstPos = components[0]?.posProductId ?? null;
   try {
     const { stripePriceId, stripeProductId } = await validateAndResolveBundle(tid, body, null);
+    const unitCents = Math.round(Number(body.pricing!.unitAmountCents));
     const row = await upsertBundle(tid, {
       title: body.title,
       slug: body.slug,
       stripePriceId,
       stripeProductId,
-      posProductId: body.posProductId ?? null,
+      posProductId: firstPos,
       components,
       active: body.active,
       sortOrder: body.sortOrder,
       heroSubscribeCategory: body.heroSubscribeCategory,
       isKit: body.isKit,
+      bundleDiscountPercent: body.bundleDiscountPercent ?? null,
+      bundleRecurringUnitAmountCents: unitCents,
     });
     success(res, { bundle: row });
   } catch (e) {
@@ -312,8 +340,8 @@ export async function postBundle(req: Request, res: Response): Promise<void> {
       error(res, 'VALIDATION_ERROR', 'unitAmountCents must be a positive integer', 400);
       return;
     }
-    if (msg === 'PRICE_REQUIRED') {
-      error(res, 'VALIDATION_ERROR', 'Stripe price id is required when pricing is omitted', 400);
+    if (msg === 'PRICING_REQUIRED') {
+      error(res, 'VALIDATION_ERROR', 'pricing.unitAmountCents is required', 400);
       return;
     }
     console.error('[adminSubscriptions] post bundle', e);
@@ -335,9 +363,8 @@ export async function putBundle(req: Request, res: Response): Promise<void> {
     return;
   }
   const hasPricing = body.pricing != null && Number.isFinite(Number(body.pricing.unitAmountCents));
-  const hasPriceId = !!body.stripePriceId?.trim();
-  if (!hasPricing && !hasPriceId) {
-    error(res, 'VALIDATION_ERROR', 'Provide subscription pricing or a Stripe price id', 400);
+  if (!hasPricing) {
+    error(res, 'VALIDATION_ERROR', 'pricing with unitAmountCents is required', 400);
     return;
   }
   const components = Array.isArray(body.components) ? body.components : [];
@@ -345,6 +372,7 @@ export async function putBundle(req: Request, res: Response): Promise<void> {
     error(res, 'VALIDATION_ERROR', 'Add at least one bundle line item', 400);
     return;
   }
+  const firstPos = components[0]?.posProductId ?? null;
   const existing = (await db('subscription_bundle_definitions').where({ id, tenant_id: tid }).first()) as
     | { stripe_price_id?: string | null; stripe_product_id?: string | null }
     | undefined;
@@ -354,18 +382,21 @@ export async function putBundle(req: Request, res: Response): Promise<void> {
   }
   try {
     const { stripePriceId, stripeProductId } = await validateAndResolveBundle(tid, body, existing);
+    const unitCents = Math.round(Number(body.pricing!.unitAmountCents));
     const row = await upsertBundle(tid, {
       id,
       title: body.title,
       slug: body.slug,
       stripePriceId,
       stripeProductId,
-      posProductId: body.posProductId ?? null,
+      posProductId: firstPos,
       components,
       active: body.active,
       sortOrder: body.sortOrder,
       heroSubscribeCategory: body.heroSubscribeCategory,
       isKit: body.isKit,
+      bundleDiscountPercent: body.bundleDiscountPercent,
+      bundleRecurringUnitAmountCents: unitCents,
     });
     success(res, { bundle: row });
   } catch (e) {
@@ -390,8 +421,8 @@ export async function putBundle(req: Request, res: Response): Promise<void> {
       error(res, 'VALIDATION_ERROR', 'unitAmountCents must be a positive integer', 400);
       return;
     }
-    if (msg === 'PRICE_REQUIRED') {
-      error(res, 'VALIDATION_ERROR', 'Stripe price id is required when pricing is omitted', 400);
+    if (msg === 'PRICING_REQUIRED') {
+      error(res, 'VALIDATION_ERROR', 'pricing.unitAmountCents is required', 400);
       return;
     }
     if (msg === 'BUNDLE_NOT_FOUND') {
@@ -437,6 +468,7 @@ export async function putSubscriptionSettings(req: Request, res: Response): Prom
   const body = req.body as {
     subscriptionApplicationFeeBps?: number | null;
     subscriptionShopifyFulfillmentEnabled?: boolean;
+    subscriptionBundleDefaultDiscountPercent?: number;
   };
   const update: Record<string, unknown> = {};
   if (body.subscriptionApplicationFeeBps !== undefined) {
@@ -453,6 +485,14 @@ export async function putSubscriptionSettings(req: Request, res: Response): Prom
   }
   if (body.subscriptionShopifyFulfillmentEnabled !== undefined) {
     update.subscription_shopify_fulfillment_enabled = Boolean(body.subscriptionShopifyFulfillmentEnabled);
+  }
+  if (body.subscriptionBundleDefaultDiscountPercent !== undefined) {
+    const n = Number(body.subscriptionBundleDefaultDiscountPercent);
+    if (!Number.isFinite(n) || n < 0 || n > 100) {
+      error(res, 'VALIDATION_ERROR', 'subscriptionBundleDefaultDiscountPercent must be 0–100', 400);
+      return;
+    }
+    update.subscription_bundle_default_discount_percent = n;
   }
   if (Object.keys(update).length === 0) {
     error(res, 'VALIDATION_ERROR', 'No valid fields to update', 400);
@@ -473,5 +513,8 @@ export async function putSubscriptionSettings(req: Request, res: Response): Prom
     onboardedAt: t.stripe_onboarded_at ?? null,
     subscriptionApplicationFeeBps: t.subscription_application_fee_bps ?? null,
     subscriptionShopifyFulfillmentEnabled: Boolean(t.subscription_shopify_fulfillment_enabled),
+    subscriptionBundleDefaultDiscountPercent: Number(
+      (t as { subscription_bundle_default_discount_percent?: unknown }).subscription_bundle_default_discount_percent ?? 0
+    ),
   });
 }

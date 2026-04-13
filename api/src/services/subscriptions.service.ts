@@ -15,6 +15,8 @@ export type BundleRow = {
   sort_order: number;
   hero_subscribe_category: string | null;
   is_kit: boolean;
+  bundle_discount_percent?: string | number | null;
+  bundle_recurring_unit_amount_cents?: number | null;
 };
 
 type ComponentLine = { posProductId: string; quantity: number };
@@ -248,6 +250,85 @@ export async function listBundlesForAdmin(tenantId: string): Promise<BundleRow[]
   return db('subscription_bundle_definitions').where({ tenant_id: tenantId }).orderBy('sort_order').orderBy('title');
 }
 
+/** Sum of catalog line prices (pos_products.price in cents) × qty; apply discount % for suggested recurring. */
+export async function previewBundlePricing(
+  tenantId: string,
+  components: Array<{ posProductId: string; quantity: number }>,
+  bundleDiscountPercent: number | null | undefined
+): Promise<{
+  subtotalCents: number;
+  discountPercent: number;
+  suggestedCents: number;
+}> {
+  const tenant = (await db('tenants').where({ id: tenantId }).first()) as
+    | { subscription_bundle_default_discount_percent?: string | number | null }
+    | undefined;
+  const defaultPct = Number(tenant?.subscription_bundle_default_discount_percent ?? 0);
+  const useOverride = bundleDiscountPercent !== undefined && bundleDiscountPercent !== null;
+  const raw = useOverride ? Number(bundleDiscountPercent) : defaultPct;
+  const clamped = Math.min(100, Math.max(0, Number.isFinite(raw) ? raw : 0));
+  const ids = [...new Set(components.map((c) => c.posProductId).filter(Boolean))];
+  const rows =
+    ids.length > 0
+      ? await db('pos_products')
+          .where({ tenant_id: tenantId })
+          .whereIn('id', ids)
+          .select('id', 'price')
+      : [];
+  const priceMap = new Map(rows.map((r) => [String((r as { id: string }).id), Number((r as { price: number }).price)]));
+  let subtotal = 0;
+  for (const line of components) {
+    const p = priceMap.get(line.posProductId);
+    if (p == null || !Number.isFinite(p)) continue;
+    subtotal += Math.round(p) * Math.floor(line.quantity);
+  }
+  const suggested = Math.round(subtotal * (1 - clamped / 100));
+  return { subtotalCents: subtotal, discountPercent: clamped, suggestedCents: suggested };
+}
+
+export async function enrichBundlesWithPricingPreview(
+  tenantId: string,
+  bundles: BundleRow[]
+): Promise<Array<BundleRow & { previewSubtotalCents: number; previewSuggestedCents: number; previewDiscountPercent: number }>> {
+  const tenant = (await db('tenants').where({ id: tenantId }).first()) as
+    | { subscription_bundle_default_discount_percent?: string | number | null }
+    | undefined;
+  const defaultPct = Number(tenant?.subscription_bundle_default_discount_percent ?? 0);
+  const out: Array<BundleRow & { previewSubtotalCents: number; previewSuggestedCents: number; previewDiscountPercent: number }> = [];
+  for (const b of bundles) {
+    const comps = parseComponents(b.components);
+    const overridePct =
+      b.bundle_discount_percent != null && b.bundle_discount_percent !== ''
+        ? Number(b.bundle_discount_percent)
+        : null;
+    const discountPct = overridePct != null && Number.isFinite(overridePct) ? overridePct : defaultPct;
+    const clamped = Math.min(100, Math.max(0, discountPct));
+    const ids = [...new Set(comps.map((c) => c.posProductId))];
+    const rows =
+      ids.length > 0
+        ? await db('pos_products')
+            .where({ tenant_id: tenantId })
+            .whereIn('id', ids)
+            .select('id', 'price')
+        : [];
+    const priceMap = new Map(rows.map((r) => [String((r as { id: string }).id), Number((r as { price: number }).price)]));
+    let subtotal = 0;
+    for (const line of comps) {
+      const p = priceMap.get(line.posProductId);
+      if (p == null || !Number.isFinite(p)) continue;
+      subtotal += Math.round(p) * Math.floor(line.quantity);
+    }
+    const suggested = Math.round(subtotal * (1 - clamped / 100));
+    out.push({
+      ...b,
+      previewSubtotalCents: subtotal,
+      previewSuggestedCents: suggested,
+      previewDiscountPercent: clamped,
+    });
+  }
+  return out;
+}
+
 export async function upsertBundle(
   tenantId: string,
   input: {
@@ -262,6 +343,8 @@ export async function upsertBundle(
     sortOrder?: number;
     heroSubscribeCategory?: string | null;
     isKit?: boolean;
+    bundleDiscountPercent?: number | null;
+    bundleRecurringUnitAmountCents?: number | null;
   }
 ): Promise<BundleRow> {
   const componentsJson = JSON.stringify(input.components ?? []);
@@ -269,24 +352,39 @@ export async function upsertBundle(
   if (!stripePriceId) {
     throw new Error('STRIPE_PRICE_REQUIRED');
   }
+  const bundleDiscountSql =
+    input.bundleDiscountPercent === undefined
+      ? undefined
+      : input.bundleDiscountPercent === null
+        ? null
+        : input.bundleDiscountPercent;
+  const recurringCents =
+    input.bundleRecurringUnitAmountCents != null && Number.isFinite(input.bundleRecurringUnitAmountCents)
+      ? Math.round(input.bundleRecurringUnitAmountCents)
+      : null;
   if (input.id) {
     const existing = await db('subscription_bundle_definitions').where({ id: input.id, tenant_id: tenantId }).first();
     if (!existing) throw new Error('BUNDLE_NOT_FOUND');
-    await db('subscription_bundle_definitions')
-      .where({ id: input.id, tenant_id: tenantId })
-      .update({
-        title: input.title.trim().slice(0, 200),
-        slug: input.slug?.trim().slice(0, 120) || null,
-        stripe_price_id: stripePriceId,
-        stripe_product_id: input.stripeProductId?.trim() || null,
-        pos_product_id: input.posProductId || null,
-        components: componentsJson,
-        active: input.active !== false,
-        sort_order: input.sortOrder ?? 0,
-        hero_subscribe_category: input.heroSubscribeCategory?.trim().slice(0, 80) || null,
-        is_kit: input.isKit !== false,
-        updated_at: db.fn.now(),
-      });
+    const patch: Record<string, unknown> = {
+      title: input.title.trim().slice(0, 200),
+      slug: input.slug?.trim().slice(0, 120) || null,
+      stripe_price_id: stripePriceId,
+      stripe_product_id: input.stripeProductId?.trim() || null,
+      pos_product_id: input.posProductId || null,
+      components: componentsJson,
+      active: input.active !== false,
+      sort_order: input.sortOrder ?? 0,
+      hero_subscribe_category: input.heroSubscribeCategory?.trim().slice(0, 80) || null,
+      is_kit: input.isKit !== false,
+      updated_at: db.fn.now(),
+    };
+    if (bundleDiscountSql !== undefined) {
+      patch.bundle_discount_percent = bundleDiscountSql;
+    }
+    if (recurringCents !== null) {
+      patch.bundle_recurring_unit_amount_cents = recurringCents;
+    }
+    await db('subscription_bundle_definitions').where({ id: input.id, tenant_id: tenantId }).update(patch);
     const row = await db('subscription_bundle_definitions').where({ id: input.id }).first();
     return row as BundleRow;
   }
@@ -303,6 +401,8 @@ export async function upsertBundle(
       sort_order: input.sortOrder ?? 0,
       hero_subscribe_category: input.heroSubscribeCategory?.trim().slice(0, 80) || null,
       is_kit: input.isKit !== false,
+      bundle_discount_percent: bundleDiscountSql === undefined ? null : bundleDiscountSql,
+      bundle_recurring_unit_amount_cents: recurringCents,
       created_at: db.fn.now(),
       updated_at: db.fn.now(),
     })

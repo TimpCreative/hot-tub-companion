@@ -46,9 +46,11 @@ router.post(
   adminProductsController.importProductsCsv
 );
 router.get('/products/bundles', adminSubscriptionsController.listBundles);
+router.post('/products/bundles/preview', adminSubscriptionsController.postBundlePreview);
 router.post('/products/bundles', adminSubscriptionsController.postBundle);
 router.put('/products/bundles/:id', adminSubscriptionsController.putBundle);
 router.delete('/products/bundles/:id', adminSubscriptionsController.removeBundle);
+router.get('/products/search-for-bundles', adminProductsController.searchProductsForBundlePicker);
 router.get('/products', adminProductsController.listProducts);
 router.get('/shopify-collections', adminProductsController.listShopifyCollections);
 router.get('/collection-category-maps', adminProductsController.listCollectionCategoryMaps);
@@ -125,6 +127,7 @@ router.post('/subscriptions/connect/onboarding-link', adminSubscriptionsControll
 router.post('/subscriptions/connect/dashboard-link', adminSubscriptionsController.postConnectDashboardLink);
 router.put('/subscriptions/settings', adminSubscriptionsController.putSubscriptionSettings);
 router.get('/subscriptions/bundles', adminSubscriptionsController.listBundles);
+router.post('/subscriptions/bundles/preview', adminSubscriptionsController.postBundlePreview);
 router.post('/subscriptions/bundles', adminSubscriptionsController.postBundle);
 router.put('/subscriptions/bundles/:id', adminSubscriptionsController.putBundle);
 router.delete('/subscriptions/bundles/:id', adminSubscriptionsController.removeBundle);

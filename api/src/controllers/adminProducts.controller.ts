@@ -218,6 +218,45 @@ export async function listProducts(req: Request, res: Response): Promise<void> {
   });
 }
 
+/** Compact product rows for bundle line picker (subscription-eligible only; same search semantics as catalog). */
+export async function searchProductsForBundlePicker(req: Request, res: Response): Promise<void> {
+  if (!requireManageProducts(req, res)) return;
+  const tenantId = tenantIdFromReq(req);
+  if (!tenantId) {
+    error(res, 'UNAUTHORIZED', 'Tenant context required', 401);
+    return;
+  }
+
+  const q = req.query as Record<string, string | undefined>;
+  const raw = (q.q ?? q.search ?? '').trim();
+  const limit = Math.min(30, Math.max(1, parseInt(q.limit ?? '15', 10) || 15));
+  if (raw.length < 2) {
+    success(res, { products: [] });
+    return;
+  }
+
+  const filters = parseAdminProductFilters({ ...q, search: raw });
+  let query = db('pos_products')
+    .leftJoin('pcdb_parts', (join) => {
+      join
+        .on('pos_products.uhtd_part_id', 'pcdb_parts.id')
+        .andOnNull('pcdb_parts.deleted_at');
+    })
+    .where('pos_products.subscription_eligible', true)
+    .select(
+      'pos_products.id',
+      'pos_products.title',
+      'pos_products.sku',
+      'pos_products.price',
+      'pos_products.mapping_status',
+      'pcdb_parts.name as uhtd_part_name'
+    );
+  applyAdminProductFilters(query, tenantId, filters);
+  query = query.orderBy('pos_products.title', 'asc').limit(limit);
+  const rows = await query;
+  success(res, { products: rows });
+}
+
 export async function exportProductsCsv(req: Request, res: Response): Promise<void> {
   if (!requireManageProducts(req, res)) return;
   const tenantId = tenantIdFromReq(req);
