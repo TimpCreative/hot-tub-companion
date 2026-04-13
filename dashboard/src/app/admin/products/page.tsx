@@ -1177,7 +1177,7 @@ export default function AdminProductsPage() {
         data={rows}
         keyField="id"
         loading={loading}
-        emptyMessage="No products found. Run catalog sync from Settings → POS Integration."
+        emptyMessage="No products found. Run catalog sync from Settings → POS integration."
         sortBy={tableSortBy}
         sortOrder={tableSortOrder}
         onSort={(key) => {

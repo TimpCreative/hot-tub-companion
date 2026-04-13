@@ -191,7 +191,7 @@ export default function AdminProductCategoriesPage() {
             ) : collections.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
-                  No collections synced yet. Run catalog sync from Settings → POS Integration.
+                  No collections synced yet. Run catalog sync from Settings → POS integration.
                 </td>
               </tr>
             ) : (

@@ -32,6 +32,9 @@ function errMessage(e: unknown): string {
 export default function SettingsSubscriptionsPage() {
   const router = useRouter();
   const { permissions, loading: permLoading } = useAdminPermissions();
+  const canAccess =
+    permissions?.can_manage_subscriptions === true || permissions?.can_manage_settings === true;
+  const canEditSubscriptions = permissions?.can_manage_subscriptions === true;
   const { getIdToken } = useAuth();
   const api = useMemo(() => createTenantApiClient(async () => await getIdToken()), [getIdToken]);
   const [data, setData] = useState<ConnectPayload | null>(null);
@@ -73,12 +76,12 @@ export default function SettingsSubscriptionsPage() {
 
   useEffect(() => {
     if (permLoading) return;
-    if (!permissions?.can_manage_subscriptions) {
+    if (!canAccess) {
       router.replace('/admin/settings');
       return;
     }
     void load();
-  }, [load, permLoading, permissions?.can_manage_subscriptions, router]);
+  }, [load, permLoading, canAccess, router]);
 
   async function openOnboarding() {
     setErr(null);
@@ -154,7 +157,7 @@ export default function SettingsSubscriptionsPage() {
   if (permLoading) {
     return <p className="text-gray-600">Loading…</p>;
   }
-  if (!permissions?.can_manage_subscriptions) {
+  if (!canAccess) {
     return null;
   }
 
@@ -165,17 +168,29 @@ export default function SettingsSubscriptionsPage() {
   return (
     <div className="max-w-3xl space-y-8">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">Subscriptions</h2>
+        <h2 className="text-xl font-semibold text-gray-900">Subscriptions &amp; billing</h2>
         <p className="mt-1 text-sm text-gray-600">
-          Stripe Connect, subscription fees, and catalog defaults for new products from Shopify sync.
+          Stripe Connect (retailer payouts), platform fee, subscription fulfillment options, and catalog defaults for new
+          Shopify variants.
         </p>
       </div>
+
+      {!canEditSubscriptions ? (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <p className="font-medium">View only</p>
+          <p className="mt-1 text-blue-800">
+            Changing Stripe onboarding, fees, or subscription settings requires the <strong>Manage subscriptions</strong>{' '}
+            permission. A store owner can grant it under <Link href="/admin/team" className="underline font-medium">Team</Link>
+            .
+          </p>
+        </div>
+      ) : null}
 
       {err ? <p className="text-sm text-red-600">{err}</p> : null}
       {msg ? <p className="text-sm text-green-700">{msg}</p> : null}
 
       <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm space-y-4">
-        <h3 className="text-lg font-medium text-gray-900">Stripe</h3>
+        <h3 className="text-lg font-medium text-gray-900">Stripe Connect</h3>
         {!data?.stripeConfigured ? (
           <p className="text-sm text-amber-800">
             Stripe is not configured on the API for this environment. Subscriptions are unavailable until platform keys
@@ -201,14 +216,19 @@ export default function SettingsSubscriptionsPage() {
           </div>
         </dl>
         <div className="flex flex-wrap gap-3 pt-2">
-          <Button type="button" variant="primary" onClick={() => void openOnboarding()} disabled={!data?.stripeConfigured}>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => void openOnboarding()}
+            disabled={!canEditSubscriptions || !data?.stripeConfigured}
+          >
             {data?.stripeConnectAccountId ? 'Continue Stripe onboarding' : 'Start Stripe Connect'}
           </Button>
           <Button
             type="button"
             variant="secondary"
             onClick={() => void openDashboard()}
-            disabled={!data?.stripeConfigured || !data?.stripeConnectAccountId}
+            disabled={!canEditSubscriptions || !data?.stripeConfigured || !data?.stripeConnectAccountId}
           >
             Open Stripe Express dashboard
           </Button>
@@ -227,12 +247,15 @@ export default function SettingsSubscriptionsPage() {
             </Link>
             .
           </p>
-          <label className="flex items-start gap-3 text-sm text-gray-800 cursor-pointer">
+          <label
+            className={`flex items-start gap-3 text-sm text-gray-800 ${canEditSubscriptions ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
+          >
             <input
               type="checkbox"
               className="mt-0.5 rounded border-gray-300"
               checked={newProductsSubEligibleDraft}
               onChange={(e) => setNewProductsSubEligibleDraft(e.target.checked)}
+              disabled={!canEditSubscriptions}
             />
             <span>
               <span className="font-medium">New products are subscription-eligible by default</span>
@@ -246,36 +269,41 @@ export default function SettingsSubscriptionsPage() {
         <div>
           <label className="block text-sm font-medium text-gray-700">Application fee override (basis points)</label>
           <input
-            className="mt-1 w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="mt-1 w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
             placeholder="e.g. 100 = 1.00% — leave blank for default"
             value={feeDraft}
             onChange={(e) => setFeeDraft(e.target.value)}
+            disabled={!canEditSubscriptions}
           />
           <p className="text-xs text-gray-500 mt-1">100 basis points = 1%. Max 10000 (100%).</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Default bundle discount (%)</label>
           <input
-            className="mt-1 w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="mt-1 w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
             placeholder="0"
             value={bundleDiscountDraft}
             onChange={(e) => setBundleDiscountDraft(e.target.value)}
+            disabled={!canEditSubscriptions}
           />
           <p className="text-xs text-gray-500 mt-1">
             Suggested subscription price for new bundles uses catalog line totals minus this percent (per-bundle overrides
             on the Bundles page).
           </p>
         </div>
-        <label className="flex items-center gap-2 text-sm text-gray-800">
+        <label
+          className={`flex items-center gap-2 text-sm text-gray-800 ${canEditSubscriptions ? '' : 'cursor-not-allowed opacity-80'}`}
+        >
           <input
             type="checkbox"
             checked={fulfillDraft}
             onChange={(e) => setFulfillDraft(e.target.checked)}
             className="rounded border-gray-300"
+            disabled={!canEditSubscriptions}
           />
           Create Shopify orders when subscription invoices are paid (HTC pilot / external payment)
         </label>
-        <Button type="button" variant="secondary" onClick={() => void saveSettings()}>
+        <Button type="button" variant="secondary" onClick={() => void saveSettings()} disabled={!canEditSubscriptions}>
           Save settings
         </Button>
       </div>

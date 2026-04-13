@@ -41,13 +41,21 @@ function requireManageSubscriptions(req: Request, res: Response): boolean {
   return true;
 }
 
-/** Connect status includes Stripe identifiers; allow product admins to read for bundle-default UX. */
+/** Connect status read: subscription admins, product admins (minimal payload), or store settings admins (full read). */
 function requireSubscriptionsOrProductsRead(req: Request, res: Response): boolean {
   const role = (req as Request & { adminRole?: Record<string, unknown> }).adminRole;
   const ok =
-    !!role && (role.can_manage_subscriptions === true || role.can_manage_products === true);
+    !!role &&
+    (role.can_manage_subscriptions === true ||
+      role.can_manage_products === true ||
+      role.can_manage_settings === true);
   if (!ok) {
-    error(res, 'FORBIDDEN', 'Missing permission: can_manage_subscriptions or can_manage_products', 403);
+    error(
+      res,
+      'FORBIDDEN',
+      'Missing permission: can_manage_subscriptions, can_manage_products, or can_manage_settings',
+      403
+    );
     return false;
   }
   return true;
@@ -132,6 +140,9 @@ export async function getConnectStatus(req: Request, res: Response): Promise<voi
   }
   const role = (req as Request & { adminRole?: Record<string, unknown> }).adminRole;
   const canSub = role?.can_manage_subscriptions === true;
+  const canProd = role?.can_manage_products === true;
+  /** Product-only admins: bundle default only; everyone else with read access gets full Connect payload. */
+  const minimalPayload = canProd && !canSub;
   const t = (await db('tenants').where({ id: tid }).first()) as Record<string, unknown> | undefined;
   if (!t) {
     error(res, 'NOT_FOUND', 'Tenant not found', 404);
@@ -140,7 +151,7 @@ export async function getConnectStatus(req: Request, res: Response): Promise<voi
   const bundleDiscount = Number(
     (t as { subscription_bundle_default_discount_percent?: unknown }).subscription_bundle_default_discount_percent ?? 0
   );
-  if (!canSub) {
+  if (minimalPayload) {
     success(res, {
       stripeConfigured: isStripeConfigured(),
       chargesEnabled: Boolean(t.stripe_connect_charges_enabled),

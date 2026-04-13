@@ -4,10 +4,26 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAdminPermissions } from '@/contexts/AdminPermissionsContext';
 
-const TABS_ALL = [
-  { href: '/admin/settings', label: 'General', exact: true, needsSubscriptions: false },
-  { href: '/admin/settings/subscriptions', label: 'Subscriptions', exact: false, needsSubscriptions: true },
-] as const;
+type TabDef = {
+  href: string;
+  label: string;
+  exact: boolean;
+  /** Hide unless user can manage store settings (POS, branding APIs). */
+  requiresManageSettings?: boolean;
+  /** Hide unless user can manage subscriptions or store settings (Connect / billing UI). */
+  requiresSubsOrSettings?: boolean;
+};
+
+const TABS: TabDef[] = [
+  { href: '/admin/settings', label: 'General', exact: true },
+  { href: '/admin/settings/pos', label: 'POS integration', exact: false, requiresManageSettings: true },
+  {
+    href: '/admin/settings/subscriptions',
+    label: 'Subscriptions',
+    exact: false,
+    requiresSubsOrSettings: true,
+  },
+];
 
 function tabActive(pathname: string, href: string, exact: boolean): boolean {
   if (exact) {
@@ -18,10 +34,20 @@ function tabActive(pathname: string, href: string, exact: boolean): boolean {
 
 export function SettingsTabsNav() {
   const pathname = usePathname() || '';
-  const { permissions } = useAdminPermissions();
-  const tabs = TABS_ALL.filter(
-    (t) => !t.needsSubscriptions || permissions?.can_manage_subscriptions === true
-  );
+  const { permissions, loading: permLoading } = useAdminPermissions();
+
+  const tabs = TABS.filter((t) => {
+    if (permLoading) return true;
+    if (t.requiresManageSettings && !permissions?.can_manage_settings) return false;
+    if (
+      t.requiresSubsOrSettings &&
+      !permissions?.can_manage_subscriptions &&
+      !permissions?.can_manage_settings
+    ) {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <div className="mb-6 border-b border-gray-200">
