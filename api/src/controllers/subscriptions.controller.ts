@@ -159,18 +159,31 @@ export async function postCartSubscriptionCheckout(req: Request, res: Response):
     const byVariant = new Map(products.map((p) => [String(p.pos_variant_id || ''), p]));
     const qtyByPrice = new Map<string, number>();
     const eligibleProductIds = new Set<string>();
+    let eligibleMissingPriceCount = 0;
     for (const line of cart.lines) {
       const variantId = parseVariantIdFromMerchandiseGid((line as { merchandiseId?: string | null }).merchandiseId ?? null);
       if (!variantId) continue;
       const p = byVariant.get(variantId);
       if (!p) continue;
-      const priceId = p?.subscription_eligible ? p.subscription_stripe_price_id?.trim() : '';
+      if (p.subscription_eligible && !p.subscription_stripe_price_id?.trim()) {
+        eligibleMissingPriceCount += 1;
+      }
+      const priceId = p.subscription_eligible ? p.subscription_stripe_price_id?.trim() : '';
       if (!priceId) continue;
       qtyByPrice.set(priceId, (qtyByPrice.get(priceId) ?? 0) + Math.max(1, line.quantity || 1));
       eligibleProductIds.add(p.id);
     }
     const lineItems = [...qtyByPrice.entries()].map(([stripePriceId, quantity]) => ({ stripePriceId, quantity }));
     if (lineItems.length === 0) {
+      if (eligibleMissingPriceCount > 0) {
+        error(
+          res,
+          'SUBSCRIPTION_NOT_READY',
+          'Some cart items are subscription-eligible but not checkout-ready yet. Save Stripe subscription pricing for those items in Retail Admin and try again.',
+          400
+        );
+        return;
+      }
       error(res, 'SUBSCRIPTION_CART_EMPTY', 'No subscription-eligible items in cart', 400);
       return;
     }

@@ -102,6 +102,7 @@ export default function ShopCartScreen() {
   const sameSubAndTotal =
     Boolean(sub && tot && sub.amount === tot.amount && sub.currencyCode === tot.currencyCode);
   const eligibleCount = cart?.lines.filter((line) => line.subscriptionEligible === true).length ?? 0;
+  const checkoutReadyCount = cart?.lines.filter((line) => line.subscriptionCheckoutReady === true).length ?? 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -271,7 +272,10 @@ export default function ShopCartScreen() {
                   const res = await postCartSubscriptionCheckout();
                   const url = res?.data?.checkoutPageUrl;
                   if (!url) {
-                    Alert.alert('Subscribe', 'No subscription-eligible items in cart.');
+                    Alert.alert(
+                      'Subscribe',
+                      'No checkout-ready subscription items are currently available in your cart.'
+                    );
                     return;
                   }
                   await Linking.openURL(url);
@@ -282,12 +286,12 @@ export default function ShopCartScreen() {
                 }
               })();
             }}
-            disabled={subscribeBusy || eligibleCount <= 0}
+            disabled={subscribeBusy || checkoutReadyCount <= 0}
             style={({ pressed }) => [
               styles.primaryBtn,
               {
                 backgroundColor: colors.primary,
-                opacity: pressed || subscribeBusy || eligibleCount <= 0 ? 0.88 : 1,
+                opacity: pressed || subscribeBusy || checkoutReadyCount <= 0 ? 0.88 : 1,
                 marginTop: 10,
               },
             ]}
@@ -296,9 +300,11 @@ export default function ShopCartScreen() {
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.primaryBtnText}>
-                {eligibleCount > 0
-                  ? `Subscribe to ${eligibleCount} eligible item${eligibleCount === 1 ? '' : 's'}`
-                  : 'No eligible items to subscribe'}
+                {checkoutReadyCount > 0
+                  ? `Subscribe to ${checkoutReadyCount} eligible item${checkoutReadyCount === 1 ? '' : 's'}`
+                  : eligibleCount > 0
+                    ? 'Eligible items need subscription setup'
+                    : 'No eligible items to subscribe'}
               </Text>
             )}
           </Pressable>
