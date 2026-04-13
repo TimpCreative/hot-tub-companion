@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   PLANS_ROADMAP_SECTIONS,
   BUILD_OUT_ITEMS,
@@ -37,7 +37,22 @@ export default function SuperAdminRoadmapPage() {
     ...ENTITLEMENTS_EXTRA,
   ];
 
-  const progressCounts = roadmapItems.reduce(
+  const [phaseCutoff, setPhaseCutoff] = useState<'all' | '1' | '2' | '3' | '4' | '5' | '6'>('all');
+
+  const progressItems = useMemo(() => {
+    if (phaseCutoff === 'all') return roadmapItems;
+    const maxPhase = Number(phaseCutoff);
+    return roadmapItems.filter((item) => {
+      const nums = String(item.phase)
+        .match(/\d+/g)
+        ?.map((n) => Number(n))
+        .filter((n) => Number.isFinite(n));
+      if (!nums || nums.length === 0) return true;
+      return Math.min(...nums) <= maxPhase;
+    });
+  }, [roadmapItems, phaseCutoff]);
+
+  const progressCounts = progressItems.reduce(
     (acc, item) => {
       acc[item.status] += 1;
       return acc;
@@ -70,6 +85,27 @@ export default function SuperAdminRoadmapPage() {
       </div>
 
       <section className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mb-4">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-2">
+            Progress phase scope
+          </label>
+          <select
+            value={phaseCutoff}
+            onChange={(e) => setPhaseCutoff(e.target.value as typeof phaseCutoff)}
+            className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
+          >
+            <option value="all">All phases</option>
+            <option value="1">Up to Phase 1</option>
+            <option value="2">Up to Phase 2</option>
+            <option value="3">Up to Phase 3</option>
+            <option value="4">Up to Phase 4</option>
+            <option value="5">Up to Phase 5</option>
+            <option value="6">Up to Phase 6</option>
+          </select>
+          <p className="mt-1 text-xs text-gray-500">
+            This filter only changes the progress tracker totals; roadmap tables below always show the full plan.
+          </p>
+        </div>
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <h3 className="text-base font-semibold text-gray-900">Overall build progress</h3>
