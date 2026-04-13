@@ -44,6 +44,12 @@ The mobile app must call the **same** base URL that uses **`sk_test_…`** (e.g.
 
 Use Stripe [test card](https://stripe.com/docs/testing) `4242 4242 4242 4242`, any future expiry, any CVC.
 
+### Accounts V2 + test mode
+
+Stripe may reject Checkout that only passes `customer_email` on a connected account. The API **creates or reuses a Customer** on that connected account (same email) and opens Checkout with `customer`, which satisfies Accounts V2. You do not need to pre-create the customer yourself.
+
+If Stripe points you to **Sandboxes** instead of test mode, that is an alternative testing environment; the customer-based Checkout path above is what this app uses.
+
 ## Production
 
 Use **`sk_live_…`**, live webhook secret, live Connect, and live prices. Do **not** point production customers at `sk_test_…`.

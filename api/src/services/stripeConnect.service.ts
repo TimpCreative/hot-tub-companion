@@ -66,6 +66,33 @@ export async function createExpressDashboardLink(tenantId: string): Promise<stri
   return link.url;
 }
 
+/**
+ * Accounts V2 + Connect: Checkout in test mode does not support `customer_email` alone; the session
+ * must reference an existing Customer on the connected account. Live mode works with either pattern.
+ */
+export async function getOrCreateCustomerOnConnectedAccount(
+  connectedAccountId: string,
+  email: string
+): Promise<string> {
+  const stripe = getStripe();
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) {
+    throw new Error('CUSTOMER_EMAIL_REQUIRED');
+  }
+  const existing = await stripe.customers.list(
+    { email: normalized, limit: 1 },
+    { stripeAccount: connectedAccountId }
+  );
+  if (existing.data.length > 0) {
+    return existing.data[0].id;
+  }
+  const created = await stripe.customers.create(
+    { email: normalized, metadata: { htc_source: 'subscription_checkout' } },
+    { stripeAccount: connectedAccountId }
+  );
+  return created.id;
+}
+
 export async function syncAccountFromStripe(accountId: string): Promise<void> {
   const stripe = getStripe();
   const acct = await stripe.accounts.retrieve(accountId);
@@ -103,10 +130,14 @@ export async function createSubscriptionCheckoutSession(input: {
     throw new Error('STRIPE_CONNECT_NOT_READY');
   }
   const applicationFeePercent = applicationFeePercentForTenant(input.tenant);
+  const customerId = await getOrCreateCustomerOnConnectedAccount(
+    input.tenant.stripe_connect_account_id,
+    input.customerEmail
+  );
   const session = await stripe.checkout.sessions.create(
     {
       mode: 'subscription',
-      customer_email: input.customerEmail,
+      customer: customerId,
       line_items: [{ price: input.stripePriceId, quantity: 1 }],
       success_url: input.successUrl,
       cancel_url: input.cancelUrl,
@@ -143,10 +174,14 @@ export async function createSubscriptionCheckoutSessionForItems(input: {
     throw new Error('SUBSCRIPTION_LINE_ITEMS_REQUIRED');
   }
   const applicationFeePercent = applicationFeePercentForTenant(input.tenant);
+  const customerId = await getOrCreateCustomerOnConnectedAccount(
+    input.tenant.stripe_connect_account_id,
+    input.customerEmail
+  );
   const session = await stripe.checkout.sessions.create(
     {
       mode: 'subscription',
-      customer_email: input.customerEmail,
+      customer: customerId,
       line_items: normalized.map((li) => ({ price: li.stripePriceId, quantity: li.quantity })),
       success_url: input.successUrl,
       cancel_url: input.cancelUrl,
