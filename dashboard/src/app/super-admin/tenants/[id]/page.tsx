@@ -57,6 +57,9 @@ export default function TenantDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [connectSyncLoading, setConnectSyncLoading] = useState(false);
+  const [connectSyncError, setConnectSyncError] = useState<string | null>(null);
+  const [connectSyncMessage, setConnectSyncMessage] = useState<string | null>(null);
   const [posLoading, setPosLoading] = useState(false);
   const [posError, setPosError] = useState<string | null>(null);
   const [posSavedMessage, setPosSavedMessage] = useState<string | null>(null);
@@ -392,6 +395,52 @@ export default function TenantDetailPage() {
     }
   }
 
+  async function handleSyncConnectStatus() {
+    if (!tenant) return;
+    setConnectSyncLoading(true);
+    setConnectSyncError(null);
+    setConnectSyncMessage(null);
+    try {
+      const res = await fetchWithAuth(`/api/dashboard/super-admin/tenants/${tenant.id}/subscriptions/sync-connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setConnectSyncError(data.error?.message || 'Failed to sync Stripe Connect status');
+        return;
+      }
+      setTenant((prev) =>
+        prev
+          ? {
+              ...prev,
+              stripeConnectAccountMasked: data.data?.stripeConnectAccountMasked ?? prev.stripeConnectAccountMasked,
+              stripeConnectChargesEnabled:
+                typeof data.data?.stripeConnectChargesEnabled === 'boolean'
+                  ? data.data.stripeConnectChargesEnabled
+                  : prev.stripeConnectChargesEnabled,
+              stripeConnectPayoutsEnabled:
+                typeof data.data?.stripeConnectPayoutsEnabled === 'boolean'
+                  ? data.data.stripeConnectPayoutsEnabled
+                  : prev.stripeConnectPayoutsEnabled,
+              stripeConnectDetailsSubmitted:
+                typeof data.data?.stripeConnectDetailsSubmitted === 'boolean'
+                  ? data.data.stripeConnectDetailsSubmitted
+                  : prev.stripeConnectDetailsSubmitted,
+              stripeConnectUpdatedAt: data.data?.stripeConnectUpdatedAt ?? prev.stripeConnectUpdatedAt,
+              stripeOnboardedAt: data.data?.stripeOnboardedAt ?? prev.stripeOnboardedAt,
+            }
+          : prev
+      );
+      setConnectSyncMessage('Stripe Connect status refreshed');
+    } catch (err: unknown) {
+      setConnectSyncError(err instanceof Error ? err.message : 'Failed to sync Stripe Connect status');
+    } finally {
+      setConnectSyncLoading(false);
+    }
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -609,6 +658,13 @@ export default function TenantDetailPage() {
             Read-only Connect status for support. Retailers complete onboarding under their admin → Subscriptions →
             Billing.
           </p>
+          <div className="mt-3">
+            <Button type="button" variant="secondary" disabled={connectSyncLoading} onClick={handleSyncConnectStatus}>
+              {connectSyncLoading ? 'Syncing…' : 'Sync Connect status now'}
+            </Button>
+          </div>
+          {connectSyncError ? <p className="mt-2 text-sm text-red-600">{connectSyncError}</p> : null}
+          {connectSyncMessage ? <p className="mt-2 text-sm text-green-700">{connectSyncMessage}</p> : null}
         </div>
         <div className="px-6 py-4 space-y-3 text-sm text-gray-900">
           <div className="sm:grid sm:grid-cols-3 sm:gap-4">

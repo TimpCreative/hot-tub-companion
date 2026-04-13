@@ -29,6 +29,7 @@ router.put('/tenants/:id/entitlements', superAdminController.updateTenantEntitle
 router.put('/tenants/:id/pos', superAdminController.updateTenantPosConfig);
 router.post('/tenants/:id/pos/test', superAdminController.testTenantPosConnection);
 router.post('/tenants/:id/pos/sync', superAdminController.syncTenantCatalog);
+router.post('/tenants/:id/subscriptions/sync-connect', superAdminController.syncTenantStripeConnectStatus);
 router.get('/settings', superAdminController.getSettings);
 
 router.get('/consumer-uhtd-suggestions', superAdminConsumerUhtdController.listConsumerSuggestions);

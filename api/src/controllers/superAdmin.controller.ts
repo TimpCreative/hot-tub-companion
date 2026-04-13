@@ -27,6 +27,7 @@ import {
   listPosIntegrationActivity,
   logPosIntegrationActivity,
 } from '../services/posIntegrationActivity.service';
+import { syncAccountFromStripe } from '../services/stripeConnect.service';
 
 // Initialize SendGrid if API key is available
 if (env.SENDGRID_API_KEY) {
@@ -497,6 +498,57 @@ export async function testTenantPosConnection(req: Request, res: Response): Prom
       return;
     }
     error(res, 'INTERNAL_ERROR', message, 500);
+  }
+}
+
+/**
+ * Force-sync Stripe Connect account status into tenant fields.
+ */
+export async function syncTenantStripeConnectStatus(req: Request, res: Response): Promise<void> {
+  const { id } = req.params;
+  const tenant = (await db('tenants').where({ id }).first()) as
+    | {
+        id: string;
+        stripe_connect_account_id?: string | null;
+        stripe_connect_charges_enabled?: boolean;
+        stripe_connect_payouts_enabled?: boolean;
+        stripe_connect_details_submitted?: boolean;
+        stripe_connect_updated_at?: Date | string | null;
+        stripe_onboarded_at?: Date | string | null;
+      }
+    | undefined;
+  if (!tenant) {
+    error(res, 'NOT_FOUND', 'Tenant not found', 404);
+    return;
+  }
+  const accountId = tenant.stripe_connect_account_id?.trim();
+  if (!accountId) {
+    error(res, 'VALIDATION_ERROR', 'Tenant has no connected Stripe account id', 400);
+    return;
+  }
+  try {
+    await syncAccountFromStripe(accountId);
+    const refreshed = (await db('tenants').where({ id }).first()) as
+      | {
+          stripe_connect_account_id?: string | null;
+          stripe_connect_charges_enabled?: boolean;
+          stripe_connect_payouts_enabled?: boolean;
+          stripe_connect_details_submitted?: boolean;
+          stripe_connect_updated_at?: Date | string | null;
+          stripe_onboarded_at?: Date | string | null;
+        }
+      | undefined;
+    success(res, {
+      stripeConnectAccountMasked: maskStripeConnectAccountId(refreshed?.stripe_connect_account_id ?? null),
+      stripeConnectChargesEnabled: Boolean(refreshed?.stripe_connect_charges_enabled),
+      stripeConnectPayoutsEnabled: Boolean(refreshed?.stripe_connect_payouts_enabled),
+      stripeConnectDetailsSubmitted: Boolean(refreshed?.stripe_connect_details_submitted),
+      stripeConnectUpdatedAt: refreshed?.stripe_connect_updated_at ?? null,
+      stripeOnboardedAt: refreshed?.stripe_onboarded_at ?? null,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Failed to sync Stripe Connect status';
+    error(res, 'INTERNAL_ERROR', msg, 500);
   }
 }
 
