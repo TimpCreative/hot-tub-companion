@@ -27,7 +27,7 @@ function rowVisible(
   hideShipped: boolean
 ): boolean {
   if (!matchesPhaseScope(item, phaseCutoff)) return false;
-  if (hideShipped && item.status === 'shipped') return false;
+  if (hideShipped && (item.status === 'shipped' || item.status === 'ops')) return false;
   return true;
 }
 
@@ -160,7 +160,7 @@ export default function SuperAdminRoadmapPage() {
             Phase scope limits rows to items whose <strong>earliest</strong> documented phase is within the selected
             cutoff (e.g. &quot;Up to Phase 3&quot; hides Phase 4+–only lines). It applies to the totals above and the
             tables below. <strong>Hide shipped</strong> removes completed rows from both so you can focus on partial and
-            not-yet work (ops rows stay visible).
+            not-yet work (and also hides ops rows for focus).
           </p>
         </div>
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
