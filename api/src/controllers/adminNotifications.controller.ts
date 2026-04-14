@@ -326,30 +326,42 @@ export function listAutomatedNotificationTemplates(req: Request, res: Response):
         description:
           'Reminder when a care schedule task is due soon or overdue (one push per pending task while eligible).',
         firesWhen: 'Daily maintenance-reminders cron; user must have maintenance notifications enabled.',
+        messageTitle: 'Maintenance reminder',
+        messageBodyTemplate:
+          'Lead-up: "{taskTitle} is due soon for {spaLabel}." | Overdue: "{taskTitle} is overdue for {spaLabel}."',
       },
       {
         id: 'order_confirmed',
         name: 'Order confirmed',
         description: 'Confirmation when Shopify records a new order for the customer account email.',
         firesWhen: 'Shopify orders/create webhook after a matched user is found.',
+        messageTitle: 'Order confirmed',
+        messageBodyTemplate: 'Your order #{orderNumber} has been placed.',
       },
       {
         id: 'welcome',
         name: 'Welcome',
         description: 'Sent after the first spa profile is registered for the account.',
         firesWhen: 'Spa profile creation / UHTD onboarding completion flows.',
+        messageTitle: 'Welcome!',
+        messageBodyTemplate: 'Welcome to {tenantName}! Your {modelNameOrSpa} is all set up. 🎉',
       },
       {
         id: 'retailer_promotional',
         name: 'Retailer promotional & scheduled',
         description: 'Manual or scheduled campaigns to customers who opted into promotional notifications.',
         firesWhen: 'Retailer composes a push or a scheduled notification is dispatched by cron.',
+        messageTitle: 'Retailer-defined',
+        messageBodyTemplate:
+          'Exactly the title/body entered by retailer at compose time (manual send or scheduled campaign).',
       },
       {
         id: 'global_announcement',
         name: 'Platform announcement',
         description: 'Broadcast from Super Admin to customers (all or your tenant), when used.',
         firesWhen: 'Super Admin sends an announcement targeting customers.',
+        messageTitle: 'Super Admin-defined',
+        messageBodyTemplate: 'Exactly the title/body entered by Super Admin at send time.',
       },
     ],
   });

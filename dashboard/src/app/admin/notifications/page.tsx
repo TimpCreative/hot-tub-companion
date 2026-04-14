@@ -44,6 +44,8 @@ interface AutomatedTemplate {
   name: string;
   description: string;
   firesWhen: string;
+  messageTitle?: string;
+  messageBodyTemplate?: string;
 }
 
 interface HistoryRow {
@@ -689,6 +691,23 @@ export default function AdminNotificationsPage() {
                   <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
                     <strong>When:</strong> {t.firesWhen}
                   </p>
+                  {t.messageTitle || t.messageBodyTemplate ? (
+                    <div className="mt-3 rounded-md border p-3" style={{ borderColor: 'var(--card-border)' }}>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        <strong>Exact wording (current):</strong>
+                      </p>
+                      {t.messageTitle ? (
+                        <p className="text-sm mt-1" style={{ color: 'var(--text-primary)' }}>
+                          <strong>Title:</strong> {t.messageTitle}
+                        </p>
+                      ) : null}
+                      {t.messageBodyTemplate ? (
+                        <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+                          <strong>Body:</strong> {t.messageBodyTemplate}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>

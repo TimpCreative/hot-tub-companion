@@ -65,6 +65,7 @@ export default function TabLayout() {
         name="inbox"
         options={{
           title: 'Inbox',
+          headerShown: false,
           href: hideInbox ? null : undefined,
           tabBarIcon: ({ color, size }) => <Ionicons name="mail-outline" size={size} color={color} />,
         }}

@@ -381,7 +381,8 @@ CREATE TABLE scheduled_notifications (
 
 Align with **Phase 3** [Inbox — Retailer Admin — Notifications](./PHASE-3-ENGAGEMENT.md#72-retailer-admin--notifications-mvp):
 
-- **Automated** tab (MVP): Lists **system / automated** notification **templates** (e.g. Care Schedule maintenance reminders, overdue nudges, order-related system notifications). Each row shows what the app *can* send automatically — **no silent push categories**. Templates are descriptive in MVP; editable copy per tenant can come later.
+- **Automated** tab (MVP): Lists **system / automated** notification **templates** (e.g. Care Schedule maintenance reminders, overdue nudges, order-related system notifications). Each row shows what the app *can* send automatically — **no silent push categories**. Templates are descriptive in MVP and should show the **exact current wording** (title/body, with placeholders where dynamic) so retailers can review what customers receive.
+- **Phase 4 enhancement:** make Automated template copy **editable per tenant** (versioned/template-managed), with guardrails and preview before publish.
 - **History** tab (MVP): **All successfully sent** notifications for this tenant (manual, scheduled, automated). **Failed** sends are **not** listed (see Phase 3 success-only rule). This is the retailer’s mirror of what customers see in **Notifications** (plus operational detail as needed).
 
 **Composer (scheduled / manual sends)** — existing design below; keep **Upcoming** / compose flows as needed:

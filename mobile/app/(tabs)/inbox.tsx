@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppPageHeader } from '../../components/AppPageHeader';
+import { AppHeroHeader } from '../../components/AppHeroHeader';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 import { getApiErrorMessage } from '../../lib/apiError';
@@ -170,15 +170,23 @@ export default function InboxScreen() {
         onEndReachedThreshold={0.4}
         ListHeaderComponent={
           <>
-            <AppPageHeader title="Inbox" subtitle="Messages and updates from your retailer." />
+            <AppHeroHeader
+              title="Inbox"
+              subtitle="Messages and updates from your retailer."
+              icon="mail-outline"
+            />
             <View style={styles.segment}>
               <Pressable
                 onPress={() => setSegment('notifications')}
                 style={[
                   styles.segmentBtn,
                   {
-                    backgroundColor: segment === 'notifications' ? colors.surface : 'transparent',
+                    backgroundColor:
+                      segment === 'notifications'
+                        ? colors.surface
+                        : (colors.border ?? '#e5e7eb') + '55',
                     borderColor: colors.border ?? '#e5e7eb',
+                    opacity: segment === 'notifications' ? 1 : 0.75,
                   },
                 ]}
               >
@@ -196,8 +204,12 @@ export default function InboxScreen() {
                 style={[
                   styles.segmentBtn,
                   {
-                    backgroundColor: segment === 'messages' ? colors.surface : 'transparent',
+                    backgroundColor:
+                      segment === 'messages'
+                        ? colors.surface
+                        : (colors.border ?? '#e5e7eb') + '55',
                     borderColor: colors.border ?? '#e5e7eb',
+                    opacity: segment === 'messages' ? 1 : 0.75,
                   },
                 ]}
               >
