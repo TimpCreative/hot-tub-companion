@@ -28,13 +28,15 @@ Used by Super Admin **Plans vs phases** (`/super-admin/roadmap`) and `dashboard/
 | **Content system** | ✅ Shipped | Universal + retailer content platform, targeting, and publish flows are shipped. Contextual search/ranking refinements are **polish**, not missing core content. |
 | **Subscription management** | ⚠️ Partial (Apr 2026) | **Billing rail shipped:** Stripe Connect (Express); **Settings → Billing**; **Products → Bundles**; **Billing → Active subscriptions** (admin); **cart → subscription Checkout** + **in-app Stripe browser**; signed **handoff JWT**; webhooks + dedupe; **Profile → Subscriptions** (list, detail, portal). **RBAC:** [§4.15](#415-security--rbac-audit-apr-2026). **Roadmap partial** = Chewy-style **native** pause/skip/item edits (§4.11), per-cycle Shopify order explosion, OOS/substitution flows — not “missing bundle rows in admin.” |
 | **Cross-platform QA** | ⏳ | Ongoing as features ship |
+| **Inbox — Notifications (MVP)** | 🚧 | **Spec:** [Part 7](#part-7-inbox--notifications--messages). Mobile **Notifications** feed + Retailer Admin **Notifications** (Automated templates + History). **Messages** (two-way chat) is Phase 4 — [PHASE-4-SERVICES-COMMS.md](./PHASE-4-SERVICES-COMMS.md). |
 
 ### Next steps (Phase 3 — suggested order)
 
 1. **Commerce hardening:** TAB pilot QA (Milestone 6), sync retry/edge cases, multi-variant PDP if catalog requires — [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#recommended-delivery-order).
 2. **Customer app polish:** Home multi-spa **active** selector (Shop already uses persisted active spa); cart/orders verification on both platforms.
 3. **Pilot prep:** Scripted catalog + webhook matrix, zero-trust audit sign-off where required.
-4. **Engagement streams:** referrals, water care polish (charts, shop links, color-assist), subscription **fulfillment** + **§4.11** native controls when prioritized.
+4. **Inbox Notifications MVP:** durable **Notifications** log (customer app) + Retailer Admin **Notifications** tabs (**Automated** templates + **History**) — [Part 7](#part-7-inbox--notifications--messages).
+5. **Engagement streams:** referrals, water care polish (charts, shop links, color-assist), subscription **fulfillment** + **§4.11** native controls when prioritized.
 
 ### Care schedule — still open (nice-to-have / v1.1)
 
@@ -114,6 +116,9 @@ Work is grouped **below** for clarity; later parts of this document retain detai
 
 7. **Cross-platform QA**  
    Android verification alongside iOS for new surfaces.
+
+8. **Inbox — Notifications (MVP)**  
+   One-way notification log for customers; retailer-visible mirror (Automated + History). **Messages** (two-way) is Phase 4 — [Part 7](#part-7-inbox--notifications--messages).
 
 ---
 
@@ -1011,9 +1016,61 @@ PUT    /api/v1/admin/referral-config
 
 ---
 
+## Part 7: Inbox — Notifications & Messages
+
+The **Inbox** tab (`mobile/app/(tabs)/inbox.tsx`) is the home for customer-visible communication. It has two conceptual areas:
+
+| Area | Phase | Purpose |
+|------|-------|---------|
+| **Notifications** | **Phase 3 (MVP)** | One-way record of **successful** pushes and system notifications the customer should see. |
+| **Messages** | **Phase 4+** | Two-way **retailer ↔ customer** chat in the app, **plan-gated** and opt-in per retailer. Spec: [PHASE-4-SERVICES-COMMS.md — Customer Messages](./PHASE-4-SERVICES-COMMS.md#part-5-customer--retailer-messages-inbox-tab). |
+
+**Naming (mobile):** Use **Notifications** and **Messages** as the two section titles (segmented control or top tabs inside Inbox).
+
+### 7.1 Notifications — MVP rules
+
+1. **Log everything (MVP):** Every **successful** send appears in the customer’s **Notifications** feed. No aggregation or rollup in MVP (care schedule, order pushes, retailer manual sends, etc. each produce rows as implemented).
+2. **Success only:** **Do not** persist rows for **failed** notification delivery attempts. Only **successful** sends are logged (customer feed + retailer History).
+3. **Invariant:** A push must not go out **without** a path that gives **Retailer Admin** visibility (see §7.2). Implementation: write the durable record on **success** in the same pipeline that delivers the push (or immediately after confirmed delivery), not “fire and forget.”
+
+**Customer app (Notifications UI):**
+
+- Reverse-chronological list; optional day grouping.
+- Minimum row fields: title, body/summary, timestamp, category/source (`maintenance`, `order`, `retailer`, `system`, …), optional deep link.
+- Read/unread (or “opened”) state as implemented.
+
+### 7.2 Retailer Admin — Notifications (MVP)
+
+**Route:** e.g. **Retailer Admin → Notifications** (alongside existing push compose / scheduling work documented in [Phase 4 Part 4](./PHASE-4-SERVICES-COMMS.md#part-4-retailer-push-notification-scheduling) where overlapping).
+
+Two tabs (minimum):
+
+1. **Automated**  
+   - Lists **automated** / **system** notification **templates** the app can send (e.g. **Care Schedule** maintenance reminders, overdue nudges, and any other cron or system-driven types).  
+   - Purpose: the retailer can see **what categories of automated pushes exist** — no “silent” system behavior. Each entry is a **template** description (name, short explanation, when it fires), not necessarily editable copy in MVP.
+
+2. **History**  
+   - **All successfully sent** notifications for this tenant (manual, scheduled, automated). Mirrors the **success-only** rule in §7.1.  
+   - Supports support questions: “Did the customer get that reminder?”
+
+Together, **Automated + History** ensure the retailer never lacks a record that matches what can fire and what did fire.
+
+### 7.3 Phase 4+ (not MVP)
+
+- **Messages** tab in Inbox: two-way chat; entitlement and product rules — [PHASE-4-SERVICES-COMMS.md](./PHASE-4-SERVICES-COMMS.md).
+- **Optional “revisit”:** smarter grouping/rollup of **Notifications** (e.g. care schedule density) may be considered in Phase 4 or later — **not** committed; MVP remains **log everything**.
+
+---
+
 ## Verification Checklist
 
 Before moving to Phase 4, verify:
+
+### Inbox — Notifications (MVP)
+
+- [ ] Mobile **Inbox** shows **Notifications** (and placeholder or hidden **Messages** until Phase 4)
+- [ ] Every **successful** push / system notification creates a customer-visible row; **failed** sends are **not** logged
+- [ ] Retailer Admin **Notifications** has **Automated** (templates) and **History** (successful sends); no silent automated categories
 
 ### Commerce, home, and platform
 

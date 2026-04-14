@@ -282,6 +282,16 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         notes: 'Admin compose + Expo/FCM.',
       },
       {
+        feature: 'Inbox: Notifications (one-way log + retailer Automated/History)',
+        base: '✓',
+        core: '✓',
+        adv: '✓',
+        phase: '3',
+        status: 'partial',
+        notes:
+          'Customer Notifications feed; Retailer Admin tabs Automated + History; success-only. PHASE-3-ENGAGEMENT.md Part 7.',
+      },
+      {
         feature: 'Scheduled push campaigns',
         base: '—',
         core: '✓',
@@ -323,13 +333,13 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         status: 'not_yet',
       },
       {
-        feature: 'In-app live chat / messaging',
+        feature: 'Inbox: Messages (customer ↔ retailer chat)',
         base: '—',
-        core: '—',
+        core: '✓',
         adv: '✓',
-        phase: '6',
+        phase: '4',
         status: 'not_yet',
-        notes: 'Customer ↔ retailer; not Timp inbox.',
+        notes: 'Plan-gated; not TimpCreative inbox. PHASE-4-SERVICES-COMMS.md Part 5.',
       },
       {
         feature: 'White-label email notifications',

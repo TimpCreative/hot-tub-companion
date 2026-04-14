@@ -114,7 +114,9 @@ export default function SuperAdminRoadmapPage() {
           size, UHTD mapping coverage, metric keys, test kits in Super Admin) does not block shipped.{' '}
           <strong>Partial</strong> means real product/engineering scope remains, or the line is inherently ongoing (e.g.
           per-retailer app store submission, pilot QA). See <code className="text-xs bg-gray-100 px-1 rounded">PHASE-3-ENGAGEMENT.md</code>{' '}
-          (Roadmap build status).
+          (Roadmap build status). <strong>Inbox</strong> is split: <strong>Notifications</strong> (Phase 3, one-way log + retailer Automated/History) vs{' '}
+          <strong>Messages</strong> (Phase 4, customer chat) — see Part 7 in that doc and{' '}
+          <code className="text-xs bg-gray-100 px-1 rounded">PHASE-4-SERVICES-COMMS.md</code> Part 5.
         </p>
       </div>
 

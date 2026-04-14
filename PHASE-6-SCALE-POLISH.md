@@ -53,7 +53,7 @@ _Stubs for marketing/engineering alignment; full specs TBD. These map to **Advan
 |------------|--------|
 | Automated / trigger-based push campaigns | Reorder, filter replacement, win-back; segmentation rules. Beyond Phase 4 scheduled campaigns. |
 | Customer segmentation & targeted push | Behavioral segments for push/email surfaces. |
-| In-app live chat / messaging with customer | Distinct from TimpCreative ↔ Retailer inbox (Phase 4). |
+| Inbox: Messages (customer ↔ retailer chat) — polish | Core chat is [Phase 4 Part 5](./PHASE-4-SERVICES-COMMS.md#part-5-customer--retailer-messages-inbox-tab); Phase 6 is advanced (scale, assignment, etc.). Distinct from TimpCreative ↔ Retailer inbox. |
 | White-label **customer** email | Branded transactional/marketing email; not the same as internal retailer notification email. |
 | Multi-location support | Tenant org structure / locations in admin. |
 | Retailer API access | Documented external API for partners. |

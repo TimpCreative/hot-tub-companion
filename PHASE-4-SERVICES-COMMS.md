@@ -23,9 +23,11 @@
 - Service request system (Water Valet vs Technician **categories**, **retailer-defined** service types — matches public copy *Retailer-defined service categories*)
 - **Customer service history** — in-app list and detail for active and past requests (status timeline, ratings); aligns with Core plan *Customer service history view* on [hottubcompanion.com/plans](https://hottubcompanion.com/plans/)
 - Retailer scheduling tool integration or built-in request flow
-- Two-way retailer ↔ TimpCreative inbox
+- Two-way retailer ↔ TimpCreative inbox (**support / operations** — distinct from customer chat below)
+- **Inbox — Messages (customer ↔ retailer):** two-way in-app messaging between retailer staff and customers; **plan-gated** and retailer opt-in. Depends on Phase 3 **Notifications** foundation — [PHASE-3-ENGAGEMENT.md](./PHASE-3-ENGAGEMENT.md#part-7-inbox--notifications--messages).
+- **Notifications (optional revisit):** possible UX improvements to the customer **Notifications** feed (e.g. rollup of dense automated sends). **Not** guaranteed in Phase 4; MVP remains “log everything” per Phase 3.
 - Urgent banner system (admin dashboards + customer app)
-- Retailer-initiated push notification scheduling
+- Retailer-initiated push notification scheduling (extends **Retailer Admin → Notifications** — see Part 4 and Phase 3 Part 7 for Automated / History tabs)
 
 ---
 
@@ -206,6 +208,8 @@ DELETE /api/v1/admin/service-types/:id
 
 ## Part 2: Retailer ↔ TimpCreative Inbox
 
+This is **TimpCreative ↔ retailer** messaging (support, billing, platform operations). It is **not** the same as **customer ↔ retailer Messages** in the mobile app (see [Part 5](#part-5-customer--retailer-messages-inbox-tab)).
+
 ### 2.1 Database Tables
 
 ```sql
@@ -371,12 +375,19 @@ CREATE TABLE scheduled_notifications (
 );
 ```
 
-### 4.2 Retailer Dashboard Notification Composer
+### 4.2 Retailer Dashboard — Notifications
 
-`/admin/notifications` page:
+**Route:** `/admin/notifications` (exact path may match existing dashboard layout).
+
+Align with **Phase 3** [Inbox — Retailer Admin — Notifications](./PHASE-3-ENGAGEMENT.md#72-retailer-admin--notifications-mvp):
+
+- **Automated** tab (MVP): Lists **system / automated** notification **templates** (e.g. Care Schedule maintenance reminders, overdue nudges, order-related system notifications). Each row shows what the app *can* send automatically — **no silent push categories**. Templates are descriptive in MVP; editable copy per tenant can come later.
+- **History** tab (MVP): **All successfully sent** notifications for this tenant (manual, scheduled, automated). **Failed** sends are **not** listed (see Phase 3 success-only rule). This is the retailer’s mirror of what customers see in **Notifications** (plus operational detail as needed).
+
+**Composer (scheduled / manual sends)** — existing design below; keep **Upcoming** / compose flows as needed:
 
 - **Upcoming:** List of scheduled notifications with send date, status
-- **Sent:** History of sent notifications with delivery stats
+- **Sent:** May overlap **History** or be merged — product should avoid duplicate concepts; prefer **History** as the single “sent” record for MVP.
 - **Compose:**
   - Title (max 50 chars)
   - Body (max 200 chars)
@@ -408,6 +419,29 @@ GET    /api/v1/admin/notifications/:id/stats
 
 ---
 
+## Part 5: Customer ↔ Retailer Messages (Inbox tab)
+
+**Depends on:** Phase 3 **Notifications** MVP ([PHASE-3-ENGAGEMENT.md § Part 7](./PHASE-3-ENGAGEMENT.md#part-7-inbox--notifications--messages)) — customer **Notifications** feed and retailer **Automated / History** must exist so outbound pushes are never “invisible” to the retailer.
+
+**Scope:** Two-way **Messages** inside the mobile **Inbox** tab (alongside **Notifications**). **Retailer ↔ customer** conversation, not TimpCreative support (that remains [Part 2](#part-2-retailer--timpcreative-inbox)).
+
+**Gating:**
+
+- **Plan / entitlement:** Only tenants on the appropriate plan (and/or feature flag) **and** retailer opt-in enable the **Messages** UI.
+- When disabled: hide **Messages** or show a short “not available” state; **Notifications** remains available.
+
+**Product (high level):**
+
+- Thread per customer (or per spa profile if product requires separation).
+- Retailer admin surface to read and reply (may live under **Notifications** or a dedicated **Messages** area — implementation choice).
+- Push to customer on new message (which also creates a **Notifications** row per Phase 3 rules when delivered successfully).
+
+**Optional later:** Thread assignment, attachments, moderation — expand when needed.
+
+**Optional revisit (not guaranteed):** Reduce notification noise in the customer **Notifications** feed (rollup / grouping) — see [What Phase 4 Builds](#what-phase-4-builds). MVP does **not** require rollup.
+
+---
+
 ## Public plans page — alignment
 
 Cross-check with [hottubcompanion.com/plans](https://hottubcompanion.com/plans/) so Core service bullets have a clear home in this phase.
@@ -435,6 +469,7 @@ Before moving to Phase 5, verify:
 - [ ] **Retailer-defined** types/categories behave as documented (Water Valet / Technician + tenant-defined types)
 - [ ] Retailer ↔ TimpCreative inbox works both directions
 - [ ] Email notifications fire when new messages arrive
+- [ ] **Messages** (customer ↔ retailer) works in app when plan-gated and enabled; threads visible in retailer admin
 - [ ] Urgent banners display in admin dashboards (all severity levels)
 - [ ] Urgent banners display in customer app
 - [ ] Super admin can create, edit, and deactivate banners
