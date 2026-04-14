@@ -1,6 +1,15 @@
 /**
  * Maps public plans (hottubcompanion.com/plans) to internal phases + build status.
  * Keep in sync with plans-phase-matrix.html when marketing table changes.
+ *
+ * Build status rubric (see PHASE-3-ENGAGEMENT.md):
+ * - **shipped** — The feature or tooling is functional and complete for what we sell; incomplete
+ *   retailer data (catalog rows, UHTD mapping coverage, metric keys, test kits in Super Admin) does
+ *   not block shipped.
+ * - **partial** — Meaningful product/engineering scope remains (e.g. subscription fulfillment, campaign
+ *   UX, shop links from water-care recs), or an inherently ongoing program (app store per retailer,
+ *   pilot QA checklists).
+ * - **not_yet** / **ops** — Unchanged.
  */
 
 export type BuildStatus = 'shipped' | 'partial' | 'not_yet' | 'ops';
@@ -31,8 +40,8 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '2 / 3',
-        status: 'partial',
-        notes: 'Shell + EAS; Android QA in Phase 3.',
+        status: 'shipped',
+        notes: 'Shell + EAS multi-tenant; per-retailer store release QA is ongoing ops, not feature gap.',
       },
       {
         feature: 'White-label branding (colors, logo, icon, splash)',
@@ -81,8 +90,9 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '1 / 2 / 3',
-        status: 'partial',
-        notes: 'API ready; Shop UI Phase 3.',
+        status: 'shipped',
+        notes:
+          'API + Shop compatibility surfaces shipped; expanding part/catalog coverage is retailer data, not engine completeness.',
       },
       {
         feature: 'Water test logging & history',
@@ -90,9 +100,9 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '3',
-        status: 'partial',
+        status: 'shipped',
         notes:
-          'Log tests from profile-driven metrics; list/history in Maintenance log. Super Admin metrics/profiles/kits. Trends/charts and full spec polish still Phase 3.',
+          'Profile-driven log, Maintenance log history, Super Admin metrics/profiles/kits. Trend charts = polish (see PHASE-3-ENGAGEMENT.md), not blocked by metric key breadth.',
       },
       {
         feature: 'Water care assistant (dosage guidance)',
@@ -102,7 +112,7 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         phase: '3',
         status: 'partial',
         notes:
-          'Post-save recommendations (oz / capful hints). Shop product links from recs still open. See PHASE-3-ENGAGEMENT.md Part 1.',
+          'Dosage recommendations on save shipped. Partial until: recommendation → purchasable product / Add to cart from recs (Part 1); not blocked by dosage rule row count in DB.',
       },
       {
         feature: 'Seasonal maintenance timeline',
@@ -110,9 +120,9 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '3',
-        status: 'partial',
+        status: 'shipped',
         notes:
-          'Apr 2026+: Care schedule, snooze/reschedule, activity/history, dedupe, cron, home widget. UTC calendar v1; tenant TZ — v1.1.',
+          'Care schedule, snooze/reschedule, activity/history, dedupe, cron, home widget. UTC calendar v1 shipped; tenant-aware TZ = v1.1 enhancement.',
       },
       {
         feature: 'Multi-spa support (basic)',
@@ -120,9 +130,9 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '3',
-        status: 'partial',
+        status: 'shipped',
         notes:
-          'Multiple profiles; Shop: persisted active spa selector. Home: primary spa display (active switcher on Home — polish).',
+          'Multiple profiles; Shop persisted active spa selector; Home shows primary spa. Optional Home active switcher = UX polish.',
       },
       {
         feature: 'Multi-spa support (refined UX)',
@@ -152,8 +162,9 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '1 / 2',
-        status: 'partial',
-        notes: 'Sync + admin; prod hardening Phase 6 ops.',
+        status: 'shipped',
+        notes:
+          'Sync + admin + webhooks functional; retailer catalog size is data. Ongoing ops hardening (Milestone 6 / scale) is not “partial feature.”',
       },
       {
         feature: 'In-app Shopify checkout (native sheet)',
@@ -170,8 +181,8 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '3',
-        status: 'partial',
-        notes: 'Backend ready; Shop UI Phase 3.',
+        status: 'shipped',
+        notes: 'Shop compatible + browse-all + filters shipped.',
       },
       {
         feature: 'Subscription management & auto-delivery',
@@ -349,8 +360,9 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '3',
-        status: 'partial',
-        notes: 'Targeted delivery is live; contextual search/ranking still needs refinement.',
+        status: 'shipped',
+        notes:
+          'Targeted delivery shipped. Search/ranking refinement is product polish, not missing content rows.',
       },
       {
         feature: 'Retailer-authored custom content',
@@ -411,7 +423,8 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '0 / 2',
-        status: 'partial',
+        status: 'shipped',
+        notes: 'Retailer admin live per tenant; provisioning automation is build-out line item.',
       },
       {
         feature: 'Customer list & spa profiles',
@@ -419,7 +432,7 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '2+',
-        status: 'partial',
+        status: 'shipped',
       },
       {
         feature: 'Product visibility controls',
@@ -427,7 +440,7 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '1 / 2',
-        status: 'partial',
+        status: 'shipped',
       },
       {
         feature: 'UHTD product mapping tool',
@@ -435,7 +448,8 @@ export const PLANS_ROADMAP_SECTIONS: RoadmapSection[] = [
         core: '✓',
         adv: '✓',
         phase: '1 / 2',
-        status: 'partial',
+        status: 'shipped',
+        notes: 'Mapping UX shipped; how many SKUs are mapped is retailer operations, not tool completeness.',
       },
       {
         feature: 'Service request management',
@@ -559,40 +573,45 @@ export const BUILD_OUT_ITEMS: BuildOutRow[] = [
   {
     item: 'Branded app build (iOS + Android)',
     phase: '2 / 3',
-    status: 'partial',
-    notes: 'EAS multi-tenant; Android QA Phase 3.',
+    status: 'shipped',
+    notes: 'EAS multi-tenant pipeline shipped; per-build store submission cycles are ops.',
   },
   {
     item: 'App store submission & approval',
     phase: '0 / 2',
     status: 'partial',
-    notes: 'Ongoing per retailer.',
+    notes: 'Inherently per retailer / per release; never a one-time checkbox.',
   },
   {
     item: 'POS / Shopify connection',
     phase: '1 / 2',
-    status: 'partial',
-    notes: 'Super Admin POS + sync.',
+    status: 'shipped',
+    notes: 'Super Admin POS + credential exchange + sync path functional.',
   },
-  { item: 'Product catalog sync', phase: '1 / 2', status: 'partial' },
+  {
+    item: 'Product catalog sync',
+    phase: '1 / 2',
+    status: 'shipped',
+    notes: 'Sync mechanism shipped; catalog row count is tenant data.',
+  },
   {
     item: 'UHTD product mapping',
     phase: '1 / 2',
-    status: 'partial',
-    notes: 'Data coverage is continuous.',
+    status: 'shipped',
+    notes: 'Mapping workflows shipped; coverage is continuous retailer work, not incomplete tooling.',
   },
   { item: 'Branding & white-label config', phase: '2', status: 'shipped' },
   {
     item: 'Admin dashboard provisioning',
     phase: '0 / 2',
-    status: 'partial',
-    notes: 'Tenant subdomain + Vercel attach.',
+    status: 'shipped',
+    notes: 'Tenant subdomain + attach path automated; edge DNS/deploy steps may continue per tenant.',
   },
   {
     item: 'QA & soft launch',
     phase: '2 / 3',
     status: 'partial',
-    notes: 'See phase verification checklists.',
+    notes: 'Checklist-driven; formal pilot sign-off is ongoing until Milestone 6 evidence.',
   },
 ];
 
@@ -600,9 +619,9 @@ export const ENTITLEMENTS_EXTRA: BuildOutRow[] = [
   {
     item: 'Water care Super Admin (metrics, profiles, mappings, test kits)',
     phase: '3',
-    status: 'partial',
+    status: 'shipped',
     notes:
-      'Apr 2026: scale bounds, default ideals, mapping priority UX, kit color scale points; mobile log + recs shipped — PHASE-3-ENGAGEMENT.md.',
+      'Platform for metrics, profiles, kits, and mappings shipped (Apr 2026). Breadth of configured metrics/kits is operational data entry, not partial platform.',
   },
   {
     item: 'saas_plan + preset feature flags (Super Admin entitlements API)',

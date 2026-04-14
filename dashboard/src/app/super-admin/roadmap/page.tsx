@@ -8,6 +8,29 @@ import {
   type BuildStatus,
 } from '@/data/plansRoadmap';
 
+type PhaseCutoff = 'all' | '1' | '2' | '3' | '4' | '5' | '6';
+
+function matchesPhaseScope(item: { phase: string }, phaseCutoff: PhaseCutoff): boolean {
+  if (phaseCutoff === 'all') return true;
+  const maxPhase = Number(phaseCutoff);
+  const nums = String(item.phase)
+    .match(/\d+/g)
+    ?.map((n) => Number(n))
+    .filter((n) => Number.isFinite(n));
+  if (!nums || nums.length === 0) return true;
+  return Math.min(...nums) <= maxPhase;
+}
+
+function rowVisible(
+  item: { phase: string; status: BuildStatus },
+  phaseCutoff: PhaseCutoff,
+  hideShipped: boolean
+): boolean {
+  if (!matchesPhaseScope(item, phaseCutoff)) return false;
+  if (hideShipped && item.status === 'shipped') return false;
+  return true;
+}
+
 function StatusBadge({ status }: { status: BuildStatus }) {
   const styles: Record<BuildStatus, string> = {
     shipped: 'bg-emerald-100 text-emerald-900 border-emerald-200',
@@ -37,22 +60,19 @@ export default function SuperAdminRoadmapPage() {
     ...ENTITLEMENTS_EXTRA,
   ];
 
-  const [phaseCutoff, setPhaseCutoff] = useState<'all' | '1' | '2' | '3' | '4' | '5' | '6'>('all');
+  const [phaseCutoff, setPhaseCutoff] = useState<PhaseCutoff>('all');
+  const [hideShipped, setHideShipped] = useState(false);
 
   const progressItems = useMemo(() => {
-    if (phaseCutoff === 'all') return roadmapItems;
-    const maxPhase = Number(phaseCutoff);
-    return roadmapItems.filter((item) => {
-      const nums = String(item.phase)
-        .match(/\d+/g)
-        ?.map((n) => Number(n))
-        .filter((n) => Number.isFinite(n));
-      if (!nums || nums.length === 0) return true;
-      return Math.min(...nums) <= maxPhase;
-    });
+    return roadmapItems.filter((item) => matchesPhaseScope(item, phaseCutoff));
   }, [roadmapItems, phaseCutoff]);
 
-  const progressCounts = progressItems.reduce(
+  const progressItemsForStats = useMemo(() => {
+    if (!hideShipped) return progressItems;
+    return progressItems.filter((item) => item.status !== 'shipped');
+  }, [progressItems, hideShipped]);
+
+  const progressCounts = progressItemsForStats.reduce(
     (acc, item) => {
       acc[item.status] += 1;
       return acc;
@@ -64,6 +84,15 @@ export default function SuperAdminRoadmapPage() {
   const shippedPct = productTotal ? Math.round((progressCounts.shipped / productTotal) * 100) : 0;
   const partialPct = productTotal ? Math.round((progressCounts.partial / productTotal) * 100) : 0;
   const notYetPct = productTotal ? Math.round((progressCounts.not_yet / productTotal) * 100) : 0;
+
+  const hasVisibleTableRows = useMemo(() => {
+    const sectionMatch = PLANS_ROADMAP_SECTIONS.some((s) =>
+      s.rows.some((r) => rowVisible(r, phaseCutoff, hideShipped))
+    );
+    const buildMatch = BUILD_OUT_ITEMS.some((r) => rowVisible(r, phaseCutoff, hideShipped));
+    const entMatch = ENTITLEMENTS_EXTRA.some((r) => rowVisible(r, phaseCutoff, hideShipped));
+    return sectionMatch || buildMatch || entMatch;
+  }, [phaseCutoff, hideShipped]);
 
   return (
     <div className="max-w-[1100px]">
@@ -80,30 +109,58 @@ export default function SuperAdminRoadmapPage() {
             pricing &amp; features
           </a>{' '}
           page. <strong>Phase</strong> = where we document or plan work (<code className="text-xs bg-gray-100 px-1 rounded">PHASE-*.md</code>
-          ). <strong>Build</strong> is a rough engineering snapshot, not formal QA sign-off.
+          ). <strong>Build</strong> is a working snapshot (not formal QA sign-off):{' '}
+          <strong>Shipped</strong> means the line item is functional for what we sell—incomplete retailer data (catalog
+          size, UHTD mapping coverage, metric keys, test kits in Super Admin) does not block shipped.{' '}
+          <strong>Partial</strong> means real product/engineering scope remains, or the line is inherently ongoing (e.g.
+          per-retailer app store submission, pilot QA). See <code className="text-xs bg-gray-100 px-1 rounded">PHASE-3-ENGAGEMENT.md</code>{' '}
+          (Roadmap build status).
         </p>
       </div>
 
       <section className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="mb-4">
-          <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-2">
-            Progress phase scope
-          </label>
-          <select
-            value={phaseCutoff}
-            onChange={(e) => setPhaseCutoff(e.target.value as typeof phaseCutoff)}
-            className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
-          >
-            <option value="all">All phases</option>
-            <option value="1">Up to Phase 1</option>
-            <option value="2">Up to Phase 2</option>
-            <option value="3">Up to Phase 3</option>
-            <option value="4">Up to Phase 4</option>
-            <option value="5">Up to Phase 5</option>
-            <option value="6">Up to Phase 6</option>
-          </select>
-          <p className="mt-1 text-xs text-gray-500">
-            This filter only changes the progress tracker totals; roadmap tables below always show the full plan.
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-2">
+              Progress phase scope
+            </label>
+            <select
+              value={phaseCutoff}
+              onChange={(e) => setPhaseCutoff(e.target.value as PhaseCutoff)}
+              className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
+            >
+              <option value="all">All phases</option>
+              <option value="1">Up to Phase 1</option>
+              <option value="2">Up to Phase 2</option>
+              <option value="3">Up to Phase 3</option>
+              <option value="4">Up to Phase 4</option>
+              <option value="5">Up to Phase 5</option>
+              <option value="6">Up to Phase 6</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="roadmap-hide-shipped" className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-2">
+              Row visibility
+            </label>
+            <button
+              id="roadmap-hide-shipped"
+              type="button"
+              onClick={() => setHideShipped((v) => !v)}
+              className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                hideShipped
+                  ? 'border-amber-400 bg-amber-100 text-amber-950 shadow-sm'
+                  : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-50'
+              }`}
+              aria-pressed={hideShipped}
+            >
+              {hideShipped ? 'Show shipped' : 'Hide shipped'}
+            </button>
+          </div>
+          <p className="w-full text-xs text-gray-500 sm:basis-full">
+            Phase scope limits rows to items whose <strong>earliest</strong> documented phase is within the selected
+            cutoff (e.g. &quot;Up to Phase 3&quot; hides Phase 4+–only lines). It applies to the totals above and the
+            tables below. <strong>Hide shipped</strong> removes completed rows from both so you can focus on partial and
+            not-yet work (ops rows stay visible).
           </p>
         </div>
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -111,7 +168,8 @@ export default function SuperAdminRoadmapPage() {
             <h3 className="text-base font-semibold text-gray-900">Overall build progress</h3>
             <p className="mt-1 text-sm text-gray-600">
               {progressCounts.shipped} shipped, {progressCounts.partial} partial, {progressCounts.not_yet} not yet
-              {' '}across {productTotal} product roadmap items.
+              {' '}across {productTotal} product roadmap items
+              {hideShipped ? ' (shipped rows hidden from this view)' : ''}.
             </p>
             {progressCounts.ops > 0 && (
               <p className="mt-1 text-xs text-gray-500">
@@ -179,103 +237,126 @@ export default function SuperAdminRoadmapPage() {
       </div>
 
       <div className="space-y-10">
-        {PLANS_ROADMAP_SECTIONS.map((section) => (
-          <section key={section.title}>
-            <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-3">
-              {section.title}
-            </h3>
-            <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-              <table className="min-w-[800px] w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                    <th className="px-3 py-2 w-[32%]">Feature</th>
-                    <th className="px-2 py-2 text-center w-12">Base</th>
-                    <th className="px-2 py-2 text-center w-12">Core</th>
-                    <th className="px-2 py-2 text-center w-12">Adv.</th>
-                    <th className="px-3 py-2 w-20">Phase</th>
-                    <th className="px-3 py-2 w-24">Build</th>
-                    <th className="px-3 py-2">Notes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {section.rows.map((row) => (
-                    <tr key={row.feature} className="hover:bg-gray-50/80">
-                      <td className="px-3 py-2 font-medium text-gray-900">{row.feature}</td>
-                      <td className="px-2 py-2 text-center text-gray-600">{row.base}</td>
-                      <td className="px-2 py-2 text-center text-gray-600">{row.core}</td>
-                      <td className="px-2 py-2 text-center text-gray-600">{row.adv}</td>
-                      <td className="px-3 py-2 text-blue-700 whitespace-nowrap">{row.phase}</td>
-                      <td className="px-3 py-2">
-                        <StatusBadge status={row.status} />
-                      </td>
-                      <td className="px-3 py-2 text-gray-500 text-xs max-w-xs">{row.notes ?? '—'}</td>
+        {PLANS_ROADMAP_SECTIONS.map((section) => {
+          const visibleRows = section.rows.filter((row) => rowVisible(row, phaseCutoff, hideShipped));
+          if (visibleRows.length === 0) return null;
+          return (
+            <section key={section.title}>
+              <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-3">
+                {section.title}
+              </h3>
+              <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+                <table className="min-w-[800px] w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      <th className="px-3 py-2 w-[32%]">Feature</th>
+                      <th className="px-2 py-2 text-center w-12">Base</th>
+                      <th className="px-2 py-2 text-center w-12">Core</th>
+                      <th className="px-2 py-2 text-center w-12">Adv.</th>
+                      <th className="px-3 py-2 w-20">Phase</th>
+                      <th className="px-3 py-2 w-24">Build</th>
+                      <th className="px-3 py-2">Notes</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        ))}
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {visibleRows.map((row) => (
+                      <tr key={row.feature} className="hover:bg-gray-50/80">
+                        <td className="px-3 py-2 font-medium text-gray-900">{row.feature}</td>
+                        <td className="px-2 py-2 text-center text-gray-600">{row.base}</td>
+                        <td className="px-2 py-2 text-center text-gray-600">{row.core}</td>
+                        <td className="px-2 py-2 text-center text-gray-600">{row.adv}</td>
+                        <td className="px-3 py-2 text-blue-700 whitespace-nowrap">{row.phase}</td>
+                        <td className="px-3 py-2">
+                          <StatusBadge status={row.status} />
+                        </td>
+                        <td className="px-3 py-2 text-gray-500 text-xs max-w-xs">{row.notes ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          );
+        })}
 
-        <section>
-          <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-3">
-            Standard build-out (marketing package)
-          </h3>
-          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-            <table className="min-w-[600px] w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                  <th className="px-3 py-2">Line item</th>
-                  <th className="px-3 py-2 w-24">Phase</th>
-                  <th className="px-3 py-2 w-24">Build</th>
-                  <th className="px-3 py-2">Notes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {BUILD_OUT_ITEMS.map((row) => (
-                  <tr key={row.item} className="hover:bg-gray-50/80">
-                    <td className="px-3 py-2 font-medium text-gray-900">{row.item}</td>
-                    <td className="px-3 py-2 text-blue-700 whitespace-nowrap">{row.phase}</td>
-                    <td className="px-3 py-2">
-                      <StatusBadge status={row.status} />
-                    </td>
-                    <td className="px-3 py-2 text-gray-500 text-xs">{row.notes ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        {(() => {
+          const visibleBuild = BUILD_OUT_ITEMS.filter((row) => rowVisible(row, phaseCutoff, hideShipped));
+          if (visibleBuild.length === 0) return null;
+          return (
+            <section>
+              <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-3">
+                Standard build-out (marketing package)
+              </h3>
+              <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+                <table className="min-w-[600px] w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      <th className="px-3 py-2">Line item</th>
+                      <th className="px-3 py-2 w-24">Phase</th>
+                      <th className="px-3 py-2 w-24">Build</th>
+                      <th className="px-3 py-2">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {visibleBuild.map((row) => (
+                      <tr key={row.item} className="hover:bg-gray-50/80">
+                        <td className="px-3 py-2 font-medium text-gray-900">{row.item}</td>
+                        <td className="px-3 py-2 text-blue-700 whitespace-nowrap">{row.phase}</td>
+                        <td className="px-3 py-2">
+                          <StatusBadge status={row.status} />
+                        </td>
+                        <td className="px-3 py-2 text-gray-500 text-xs">{row.notes ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          );
+        })()}
 
-        <section>
-          <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-3">
-            Platform / entitlements (not on comparison grid)
-          </h3>
-          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-            <table className="min-w-[600px] w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                  <th className="px-3 py-2">Item</th>
-                  <th className="px-3 py-2 w-24">Phase</th>
-                  <th className="px-3 py-2 w-24">Build</th>
-                  <th className="px-3 py-2">Notes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {ENTITLEMENTS_EXTRA.map((row) => (
-                  <tr key={row.item} className="hover:bg-gray-50/80">
-                    <td className="px-3 py-2 font-medium text-gray-900">{row.item}</td>
-                    <td className="px-3 py-2 text-blue-700 whitespace-nowrap">{row.phase}</td>
-                    <td className="px-3 py-2">
-                      <StatusBadge status={row.status} />
-                    </td>
-                    <td className="px-3 py-2 text-gray-500 text-xs">{row.notes ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        {(() => {
+          const visibleEnt = ENTITLEMENTS_EXTRA.filter((row) => rowVisible(row, phaseCutoff, hideShipped));
+          if (visibleEnt.length === 0) return null;
+          return (
+            <section>
+              <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-3">
+                Platform / entitlements (not on comparison grid)
+              </h3>
+              <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+                <table className="min-w-[600px] w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      <th className="px-3 py-2">Item</th>
+                      <th className="px-3 py-2 w-24">Phase</th>
+                      <th className="px-3 py-2 w-24">Build</th>
+                      <th className="px-3 py-2">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {visibleEnt.map((row) => (
+                      <tr key={row.item} className="hover:bg-gray-50/80">
+                        <td className="px-3 py-2 font-medium text-gray-900">{row.item}</td>
+                        <td className="px-3 py-2 text-blue-700 whitespace-nowrap">{row.phase}</td>
+                        <td className="px-3 py-2">
+                          <StatusBadge status={row.status} />
+                        </td>
+                        <td className="px-3 py-2 text-gray-500 text-xs">{row.notes ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          );
+        })()}
+
+        {!hasVisibleTableRows && (
+          <p className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-600">
+            No roadmap rows match the current phase scope and filters. Try <strong>All phases</strong> or turn off{' '}
+            <strong>Hide shipped</strong>.
+          </p>
+        )}
       </div>
 
       <div className="mt-10 p-4 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-950">

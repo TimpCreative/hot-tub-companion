@@ -6,19 +6,27 @@
 
 **Plans / entitlements:** [SAAS-PLANS-AND-FEATURES.md](./SAAS-PLANS-AND-FEATURES.md) (TAB on **Advanced** preset for guinea-pig coverage; referrals on **all** tiers.)
 
+### Roadmap build status (internal)
+
+Used by Super Admin **Plans vs phases** (`/super-admin/roadmap`) and `dashboard/src/data/plansRoadmap.ts` (see also `plans-phase-matrix.html`).
+
+- **Shipped** — The feature or tooling is **functional and complete** for what we sell. Incomplete **retailer data** (catalog rows, UHTD mapping coverage, configured metric keys, test kits in Super Admin) does **not** block shipped.
+- **Partial** — **Real product or engineering work** is still open (e.g. subscription per-cycle fulfillment, scheduled campaign UX, water-care → shop links), **or** the line is **inherently ongoing** (per-retailer app store submission, formal pilot QA until Milestone 6 sign-off).
+- **Not yet / Ops** — Unchanged.
+
 ---
 
 ## Phase 3 Status Review (current)
 
 | Area | Status | Notes |
 |------|--------|-------|
-| **Commerce (Shop / cart / checkout)** | ✅ Partial | **Shipped:** Shop, Storefront cart, native Checkout Kit; **verified Apr 2026** test checkout; **recent orders** read API + Home card ([commerce plan](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md)). **Subscriptions (billing rail):** Stripe Connect, **cart** subscription checkout (API creates Stripe Checkout on connected account), **in-app** payment sheet for Stripe URLs, signed handoff JWT + tenant CNAME path, webhooks + idempotency, retailer **bundle builder** + default discount + RBAC — [Part 4 §4.15](#415-security--rbac-audit-apr-2026). **Customer app:** Profile **Subscriptions** list, detail, **Stripe Customer Portal** (manage payment / cancel). **Still open:** Chewy-style in-app controls without portal (§4.11), per-cycle fulfillment / OOS (§4.4). |
-| **Retailer Admin — Products ↔ UHTD mapping** | ✅ Partial | **Shipped:** list enrichment with top suggestion score (tiered % pills), `pcdb_parts` join for mapped part labels, extended list sort (visibility, mapping status, confidence), modal **Product mapping** vs **UHTD Suggestions** with confirm/clear keeping the modal open. See [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md § Retailer Admin: Products and UHTD mapping UX](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#retailer-admin-products-and-uhtd-mapping-ux). **Still open:** performance at very large page sizes (batch/denormalize scores later), optional super-admin deep link to PCdb part. |
+| **Commerce (Shop / cart / checkout)** | ✅ Shipped (customer path); ⚠️ subscriptions | **Customer shop path shipped:** Shop, Storefront cart, native Checkout Kit; **verified Apr 2026** test checkout; **recent orders** read API + Home card ([commerce plan](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md)). **Subscriptions (billing rail) also shipped** for Connect, **cart** subscription checkout, **in-app** Stripe sheet, handoff JWT + CNAME path, webhooks, bundle builder, RBAC — [Part 4 §4.15](#415-security--rbac-audit-apr-2026). **Roadmap** still marks subscription **partial** only for **fulfillment / Chewy-style native controls / OOS** (§4.4, §4.11), not missing catalog data. |
+| **Retailer Admin — Products ↔ UHTD mapping** | ✅ Shipped | **Shipped:** list enrichment with top suggestion score (tiered % pills), `pcdb_parts` join for mapped part labels, extended list sort (visibility, mapping status, confidence), modal **Product mapping** vs **UHTD Suggestions** with confirm/clear keeping the modal open. See [PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md § Retailer Admin: Products and UHTD mapping UX](./PHASE-3-COMMERCE-IMPLEMENTATION-PLAN.md#retailer-admin-products-and-uhtd-mapping-ux). **Polish (not “partial tool”):** performance at very large page sizes (batch/denormalize scores later), optional super-admin deep link to PCdb part. How many SKUs are mapped is **retailer operations**, not incomplete product. |
 | **Referral program** | ❌ | Still planned in this phase |
-| **Water Care Assistant** | ✅ Partial | **Shipped (Apr 2026):** Super Admin **Water Care** — canonical metrics (scale min/max, default ideals), chemistry profiles + scope mappings (priority tie-break documented in UI), published **test kits** (per-metric help, numeric vs color-assist, **color scale points** `{ spots: [{ value, color, label? }] }`). **Mobile:** Water Care tab (resolved profile, comparison vs latest test), **log test** with profile-driven measurements, optional kit picker, dosage **recommendations** on save, list/history via **Maintenance log** / water-tests API. **Still open vs Part 1 spec:** fixed pH/slider UI, trend charts, color-assist entry from kit spots on device, recommendation → **Add to cart** product cards, retailer admin for opted-in shared tests, full `chemical_dosage_rules` breadth. |
+| **Water Care Assistant** | ✅ Shipped (platform); ⚠️ Part 1 polish | **Platform shipped (Apr 2026):** Super Admin **Water Care** — canonical metrics (scale min/max, default ideals), chemistry profiles + scope mappings (priority tie-break documented in UI), published **test kits** (per-metric help, numeric vs color-assist, **color scale points** `{ spots: [{ value, color, label? }] }`). **Mobile:** Water Care tab (resolved profile, comparison vs latest test), **log test** with profile-driven measurements, optional kit picker, dosage **recommendations** on save, list/history via **Maintenance log** / water-tests API. Missing **configured** metrics/kits is **data entry**, not “partial platform.” **Still open (real product gaps vs Part 1):** fixed pH/slider UI, trend charts, color-assist entry from kit spots on device, recommendation → **Add to cart** product cards, retailer admin for opted-in shared tests, broader `chemical_dosage_rules` where product wants it. |
 | **Seasonal maintenance timeline** | ✅ Shipped (Apr 2026+) | **Care schedule** (`maintenance-timeline`): auto schedule + custom tasks; **Overdue / This week / Upcoming (30d by week) / Later (beyond 30d)** — compact **Later** rows (title + due, tap → reschedule modal). **Actions:** Mark done, **Snooze** (overdue), **Reschedule** (not overdue); **Task history** screen + activity API. **Backend:** `snoozed_until`, soft **`deleted_at`** for custom, **`maintenance_activity`** audit log; **dedupe** pending auto tasks per `event_type` (keep **nearest upcoming** due, else latest overdue); `POST …/snooze`, `POST …/reschedule`, `GET …/maintenance/activity`. **Cron:** `maintenance-reminders` (lead-up window **and** one-time overdue nudge if `notification_sent` still false); **`POST …/internal/cron/regenerate-maintenance-schedules`** (all spas or `?spaProfileId=`) for ops. **Tracking / guides / widget / UTC v1** unchanged; **tenant/user TZ** still v1.1. **Ops:** daily `maintenance-reminders` + optional periodic or on-demand **regenerate** with `CRON_SECRET`. |
-| **Content system** | ✅ Partial | Core universal + retailer content platform is shipped; contextual recommendation/search refinements remain |
-| **Subscription management** | ✅ Partial (Apr 2026) | **Shipped:** Stripe Connect (Express); **Settings → Billing** (Connect + **Subscriptions** fee/fulfillment/eligibility/default bundle discount); **Products → Bundles**; **Billing → Active subscriptions** (admin); **cart → subscription Checkout** + **in-app Stripe browser**; signed **handoff JWT**; webhooks + dedupe; **Profile → Subscriptions** (list, detail, portal). **RBAC:** [§4.15](#415-security--rbac-audit-apr-2026). **Not yet:** Chewy-style **native** pause/skip/item edits (§4.11), per-cycle Shopify order explosion, OOS/substitution flows. |
+| **Content system** | ✅ Shipped | Universal + retailer content platform, targeting, and publish flows are shipped. Contextual search/ranking refinements are **polish**, not missing core content. |
+| **Subscription management** | ⚠️ Partial (Apr 2026) | **Billing rail shipped:** Stripe Connect (Express); **Settings → Billing**; **Products → Bundles**; **Billing → Active subscriptions** (admin); **cart → subscription Checkout** + **in-app Stripe browser**; signed **handoff JWT**; webhooks + dedupe; **Profile → Subscriptions** (list, detail, portal). **RBAC:** [§4.15](#415-security--rbac-audit-apr-2026). **Roadmap partial** = Chewy-style **native** pause/skip/item edits (§4.11), per-cycle Shopify order explosion, OOS/substitution flows — not “missing bundle rows in admin.” |
 | **Cross-platform QA** | ⏳ | Ongoing as features ship |
 
 ### Next steps (Phase 3 — suggested order)
@@ -42,7 +50,9 @@
 - Universal + retailer-authored content supports targeting, categories, suppression, and publish workflows
 - Mobile app renders content detail and list surfaces from tenant-aware content APIs
 
-### Water Care shipped from this phase (partial — Apr 2026)
+### Water Care — platform shipped (Apr 2026)
+
+Roadmap **shipped** here means the **Water Care platform** (Super Admin + mobile flows) is functional. How many metrics or test kits are **configured** for a tenant is operational data entry, not a product “partial.”
 
 - Super Admin **Water Care** (`/super-admin/uhtd/water-care`): metric library with **scale bounds** and default ideals, profiles, mappings (priority tie-break: higher wins among ties), test kits with **color scale points** for color-assist metrics
 - Customer **Water Care** + **Test Water** flows: resolved chemistry profile, comparison row, logging tests, post-save dosage recommendations; kits and legal/disclaimer config from tenant/API
@@ -59,7 +69,7 @@
 
 3. **Create test customer accounts.** 3–5 accounts with different spa models and sanitization systems.
 
-4. **Confirm sufficient UHTD / POS mapping** (e.g. at least ~10 mapped products per test model) so compatible and browse flows have real data.
+4. **Confirm sufficient UHTD / POS mapping** (e.g. at least ~10 mapped products per test model) so compatible and browse flows have real **pilot data**. The mapping **tool** is shipped; row count is retailer operations, not product completeness.
 
 **Engagement**
 

@@ -19,6 +19,10 @@ Shopify CLI remains useful for broader app-lifecycle workflows, but the tenant o
 
 _Updated to match the repository during Phase 3 commerce work._
 
+### Roadmap build status (internal)
+
+Aligned with `dashboard/src/data/plansRoadmap.ts` and [PHASE-3-ENGAGEMENT.md](./PHASE-3-ENGAGEMENT.md) (Roadmap build status). **Shipped** means the commerce path or tooling works end-to-end for what we sell. **Incomplete retailer catalog or UHTD mapping coverage** is operational data, not a “partial” product unless the sync/mapping **mechanisms** are missing. **Partial** here is reserved for real gaps (e.g. Milestone 6 pilot evidence, subscription fulfillment automation, multi-variant edge cases if catalog requires them).
+
 ### Implemented
 
 - Shopify tenant secrets encrypted at rest; decrypt only at point of use; legacy plaintext read paths still supported
