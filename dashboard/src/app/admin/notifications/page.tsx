@@ -39,6 +39,12 @@ interface ProductOption {
   title: string;
 }
 
+interface AutomatedTemplateVariant {
+  key: string;
+  label: string;
+  messageBodyTemplate: string;
+}
+
 interface AutomatedTemplate {
   id: string;
   name: string;
@@ -46,6 +52,7 @@ interface AutomatedTemplate {
   firesWhen: string;
   messageTitle?: string;
   messageBodyTemplate?: string;
+  variants?: AutomatedTemplateVariant[];
 }
 
 interface HistoryRow {
@@ -60,6 +67,17 @@ interface HistoryRow {
   scheduledNotificationId: string | null;
   payload: Record<string, unknown> | null;
   recipient: { userId: string; email: string | null; displayName: string } | null;
+}
+
+function formatAutomatedBody(
+  template: AutomatedTemplate,
+  tenantDisplayName: string | undefined
+): string | undefined {
+  if (!template.messageBodyTemplate) return undefined;
+  if (template.id === 'welcome' && tenantDisplayName?.trim()) {
+    return template.messageBodyTemplate.replace(/\{tenantName\}/g, tenantDisplayName.trim());
+  }
+  return template.messageBodyTemplate;
 }
 
 function formatDateTime(iso: string | null | undefined, timeZone: string): string {
@@ -675,7 +693,7 @@ export default function AdminNotificationsPage() {
       {mainTab === 'automated' && (
         <div>
           <p className="mb-4" style={{ color: 'var(--text-secondary)' }}>
-            System and automated push types your app can send. These are informational (not editable in MVP).
+            Automated push types your app sends without manual compose. These are informational (not editable in MVP).
           </p>
           {automatedErr && (
             <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700">{automatedErr}</div>
@@ -691,19 +709,39 @@ export default function AdminNotificationsPage() {
                   <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
                     <strong>When:</strong> {t.firesWhen}
                   </p>
-                  {t.messageTitle || t.messageBodyTemplate ? (
-                    <div className="mt-3 rounded-md border p-3" style={{ borderColor: 'var(--card-border)' }}>
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        <strong>Exact wording (current):</strong>
-                      </p>
+                  {t.variants?.length ? (
+                    <div className="mt-3 rounded-md border p-3 space-y-3" style={{ borderColor: 'var(--card-border)' }}>
                       {t.messageTitle ? (
-                        <p className="text-sm mt-1" style={{ color: 'var(--text-primary)' }}>
+                        <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                          <strong>Title:</strong> {t.messageTitle}
+                        </p>
+                      ) : null}
+                      {t.variants.map((v) => (
+                        <div
+                          key={v.key}
+                          className="rounded-md border p-3"
+                          style={{ borderColor: 'var(--card-border)' }}
+                        >
+                          <p className="text-xs font-medium mb-2" style={{ color: 'var(--text-muted)' }}>
+                            {v.label}
+                          </p>
+                          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                            <strong>Body:</strong> {v.messageBodyTemplate}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : t.messageTitle || t.messageBodyTemplate ? (
+                    <div className="mt-3 rounded-md border p-3" style={{ borderColor: 'var(--card-border)' }}>
+                      {t.messageTitle ? (
+                        <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
                           <strong>Title:</strong> {t.messageTitle}
                         </p>
                       ) : null}
                       {t.messageBodyTemplate ? (
-                        <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-                          <strong>Body:</strong> {t.messageBodyTemplate}
+                        <p className={`text-sm ${t.messageTitle ? 'mt-1' : ''}`} style={{ color: 'var(--text-secondary)' }}>
+                          <strong>Body:</strong>{' '}
+                          {formatAutomatedBody(t, config?.name)}
                         </p>
                       ) : null}
                     </div>
