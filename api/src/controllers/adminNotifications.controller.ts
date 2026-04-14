@@ -3,6 +3,11 @@ import { db } from '../config/database';
 import { error, success } from '../utils/response';
 import * as notificationService from '../services/notification.service';
 import * as notificationSecurityAudit from '../services/notificationSecurityAudit.service';
+import { notificationTypeToCategory } from '../utils/notificationCategory';
+import {
+  decodeNotificationFeedCursor,
+  encodeNotificationFeedCursor,
+} from '../utils/notificationFeedCursor';
 
 function buildNotificationPayload(
   linkType: string | null,
@@ -174,6 +179,7 @@ export async function createNotification(req: Request, res: Response): Promise<v
         type: 'promotional',
         createdByType: 'retailer_admin',
         createdById: createdBy ?? createdByEmail ?? 'unknown',
+        scheduledNotificationId: inserted.id,
       },
       {
         actorUserId: createdBy ?? undefined,
@@ -305,4 +311,137 @@ export async function getNotificationStats(req: Request, res: Response): Promise
     return;
   }
   success(res, row);
+}
+
+/** Static catalog for Retailer Admin → Notifications → Automated (Part 7). */
+export function listAutomatedNotificationTemplates(req: Request, res: Response): void {
+  if (!requireNotificationPermission(req, res)) return;
+  if (!requireTenantPolicyScope(req, res)) return;
+
+  success(res, {
+    templates: [
+      {
+        id: 'care_schedule_maintenance',
+        name: 'Care schedule maintenance',
+        description:
+          'Reminder when a care schedule task is due soon or overdue (one push per pending task while eligible).',
+        firesWhen: 'Daily maintenance-reminders cron; user must have maintenance notifications enabled.',
+      },
+      {
+        id: 'order_confirmed',
+        name: 'Order confirmed',
+        description: 'Confirmation when Shopify records a new order for the customer account email.',
+        firesWhen: 'Shopify orders/create webhook after a matched user is found.',
+      },
+      {
+        id: 'welcome',
+        name: 'Welcome',
+        description: 'Sent after the first spa profile is registered for the account.',
+        firesWhen: 'Spa profile creation / UHTD onboarding completion flows.',
+      },
+      {
+        id: 'retailer_promotional',
+        name: 'Retailer promotional & scheduled',
+        description: 'Manual or scheduled campaigns to customers who opted into promotional notifications.',
+        firesWhen: 'Retailer composes a push or a scheduled notification is dispatched by cron.',
+      },
+      {
+        id: 'global_announcement',
+        name: 'Platform announcement',
+        description: 'Broadcast from Super Admin to customers (all or your tenant), when used.',
+        firesWhen: 'Super Admin sends an announcement targeting customers.',
+      },
+    ],
+  });
+}
+
+export async function listNotificationHistory(req: Request, res: Response): Promise<void> {
+  if (!requireNotificationPermission(req, res)) return;
+  if (!requireTenantPolicyScope(req, res)) return;
+
+  const tenantId = (req as any).tenant?.id as string;
+  const limitRaw = parseInt(String(req.query.limit ?? '30'), 10);
+  const limit = Math.min(100, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 30));
+  const cursor = decodeNotificationFeedCursor(req.query.cursor as string | undefined);
+  const typeFilter =
+    typeof req.query.type === 'string' && req.query.type.trim() ? req.query.type.trim() : null;
+
+  const base = db('notification_log')
+    .leftJoin('users', 'users.id', 'notification_log.recipient_user_id')
+    .where('notification_log.tenant_id', tenantId)
+    .modify((qb) => {
+      if (typeFilter) qb.where('notification_log.type', typeFilter);
+    });
+
+  const q = cursor
+    ? base.whereRaw('(notification_log.sent_at, notification_log.id) < (?::timestamptz, ?::uuid)', [
+        cursor.sentAt,
+        cursor.id,
+      ])
+    : base;
+
+  const rows = (await q
+    .select(
+      'notification_log.id',
+      'notification_log.title',
+      'notification_log.body',
+      'notification_log.type',
+      'notification_log.sent_at',
+      'notification_log.created_by_type',
+      'notification_log.created_by_id',
+      'notification_log.scheduled_notification_id',
+      'notification_log.payload',
+      'notification_log.recipient_user_id',
+      'users.email as recipient_email',
+      'users.first_name as recipient_first_name',
+      'users.last_name as recipient_last_name'
+    )
+    .orderBy('notification_log.sent_at', 'desc')
+    .orderBy('notification_log.id', 'desc')
+    .limit(limit + 1)) as Array<{
+    id: string;
+    title: string;
+    body: string | null;
+    type: string;
+    sent_at: Date | string;
+    created_by_type: string | null;
+    created_by_id: string | null;
+    scheduled_notification_id: string | null;
+    payload: Record<string, unknown> | null;
+    recipient_user_id: string | null;
+    recipient_email: string | null;
+    recipient_first_name: string | null;
+    recipient_last_name: string | null;
+  }>;
+
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  const last = page[page.length - 1];
+  const nextCursor =
+    hasMore && last ? encodeNotificationFeedCursor(last.sent_at as Date, last.id) : null;
+
+  const items = page.map((r) => {
+    const name = [r.recipient_first_name, r.recipient_last_name].filter(Boolean).join(' ').trim();
+    return {
+      id: r.id,
+      title: r.title,
+      body: r.body,
+      type: r.type,
+      category: notificationTypeToCategory(r.type),
+      sentAt: r.sent_at instanceof Date ? r.sent_at.toISOString() : String(r.sent_at),
+      createdByType: r.created_by_type,
+      createdById: r.created_by_id,
+      scheduledNotificationId: r.scheduled_notification_id,
+      payload: r.payload && typeof r.payload === 'object' ? r.payload : null,
+      recipient: r.recipient_user_id
+        ? {
+            userId: r.recipient_user_id,
+            email: r.recipient_email,
+            displayName: name || r.recipient_email || 'Customer',
+          }
+        : null,
+    };
+  });
+
+  success(res, { items, nextCursor });
 }

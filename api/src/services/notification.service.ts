@@ -72,6 +72,16 @@ export async function getAlreadySentUserIds(scheduledNotificationId: string): Pr
   return new Set(rows.map((r: { recipient_user_id: string }) => r.recipient_user_id));
 }
 
+/** Params persisted to notification_log on successful delivery only. */
+export type NotificationLogParams = {
+  type: string;
+  createdByType?: string;
+  createdById?: string;
+  scheduledNotificationId?: string;
+  /** Deep-link data (string values), mirrored from push payload. */
+  payload?: Record<string, string> | null;
+};
+
 export async function logNotification(params: {
   tenantId?: string | null;
   recipientUserId?: string | null;
@@ -81,6 +91,7 @@ export async function logNotification(params: {
   createdByType?: string | null;
   createdById?: string | null;
   scheduledNotificationId?: string | null;
+  payload?: Record<string, string> | null;
 }): Promise<void> {
   await db('notification_log').insert({
     tenant_id: params.tenantId ?? null,
@@ -91,6 +102,7 @@ export async function logNotification(params: {
     created_by_type: params.createdByType ?? null,
     created_by_id: params.createdById ?? null,
     scheduled_notification_id: params.scheduledNotificationId ?? null,
+    payload: params.payload ?? null,
   });
 }
 
@@ -101,12 +113,13 @@ export async function sendToUser(
   body: string,
   data?: Record<string, string>,
   prefKey?: PrefKey,
-  logParams?: { type: string; createdByType?: string; createdById?: string }
+  logParams?: NotificationLogParams
 ): Promise<boolean> {
   const user = await getUserWithToken(userId, tenantId, prefKey);
   if (!user?.fcm_token) return false;
 
   const strData = data ? stringifyData(data) : undefined;
+  const logPayload = logParams?.payload ?? strData;
 
   if (expoPushSend.isExpoPushToken(user.fcm_token)) {
     try {
@@ -127,6 +140,8 @@ export async function sendToUser(
           type: logParams.type,
           createdByType: logParams.createdByType,
           createdById: logParams.createdById,
+          scheduledNotificationId: logParams.scheduledNotificationId ?? null,
+          payload: logPayload ?? null,
         });
       }
       return r.sent > 0;
@@ -156,6 +171,8 @@ export async function sendToUser(
         type: logParams.type,
         createdByType: logParams.createdByType,
         createdById: logParams.createdById,
+        scheduledNotificationId: logParams.scheduledNotificationId ?? null,
+        payload: logPayload ?? null,
       });
     }
     return true;
@@ -237,7 +254,7 @@ export async function sendToTenantCustomers(
   body: string,
   opts?: SendNotificationOptions | Record<string, string>,
   prefKey: PrefKey = 'promotional',
-  logParams?: { type: string; createdByType?: string; createdById?: string },
+  logParams?: NotificationLogParams,
   auditContext?: DeliveryAuditContext
 ): Promise<{ sent: number; failed: number }> {
   const users = await getTenantCustomerTokens(tenantId, prefKey);
@@ -245,6 +262,7 @@ export async function sendToTenantCustomers(
 
   const { data: finalData, imageUrl } = normalizeNotificationOptions(opts);
   const strData = finalData ? stringifyData(finalData) : undefined;
+  const logPayload = finalData ? stringifyData(finalData) : null;
 
   const expoUsers = users.filter((u) => expoPushSend.isExpoPushToken(u.fcm_token));
   const fcmUsers = users.filter((u) => !expoPushSend.isExpoPushToken(u.fcm_token));
@@ -294,6 +312,8 @@ export async function sendToTenantCustomers(
               type: logParams.type,
               createdByType: logParams.createdByType,
               createdById: logParams.createdById,
+              scheduledNotificationId: logParams.scheduledNotificationId ?? null,
+              payload: logPayload,
             });
           }
         }
@@ -326,6 +346,8 @@ export async function sendToTenantCustomers(
             type: logParams.type,
             createdByType: logParams.createdByType,
             createdById: logParams.createdById,
+            scheduledNotificationId: logParams.scheduledNotificationId ?? null,
+            payload: logPayload,
           });
         }
       }
@@ -362,7 +384,7 @@ export async function sendToSpecificUsers(
   title: string,
   body: string,
   opts?: SendNotificationOptions | Record<string, string>,
-  logParams?: { type: string; createdByType?: string; createdById?: string; scheduledNotificationId?: string }
+  logParams?: NotificationLogParams
 ): Promise<{ sent: number; failed: number }> {
   if (userIds.length === 0) return { sent: 0, failed: 0 };
   const existingUsers = await db('users')
@@ -387,6 +409,8 @@ export async function sendToSpecificUsers(
 
   const { data: finalData, imageUrl } = normalizeNotificationOptions(opts);
   const strData = finalData ? stringifyData(finalData) : undefined;
+  const logPayload =
+    logParams?.payload ?? (finalData ? stringifyData(finalData) : null);
 
   let sent = 0;
   let failed = 0;
@@ -432,7 +456,8 @@ export async function sendToSpecificUsers(
               type: logParams.type,
               createdByType: logParams.createdByType,
               createdById: logParams.createdById,
-              scheduledNotificationId: logParams.scheduledNotificationId,
+              scheduledNotificationId: logParams.scheduledNotificationId ?? null,
+              payload: logPayload,
             });
           }
         }
@@ -465,7 +490,8 @@ export async function sendToSpecificUsers(
             type: logParams.type,
             createdByType: logParams.createdByType,
             createdById: logParams.createdById,
-            scheduledNotificationId: logParams.scheduledNotificationId,
+            scheduledNotificationId: logParams.scheduledNotificationId ?? null,
+            payload: logPayload,
           });
         }
       }
@@ -484,7 +510,7 @@ export async function sendToAllCustomers(
   body: string,
   opts?: SendNotificationOptions | Record<string, string>,
   prefKey: PrefKey = 'promotional',
-  logParams?: { type: string; createdByType?: string; createdById?: string }
+  logParams?: NotificationLogParams
 ): Promise<{ sent: number; failed: number }> {
   let query = db('users')
     .select('id', 'tenant_id', 'fcm_token')
@@ -505,6 +531,7 @@ export async function sendToAllCustomers(
 
   const { data: finalData, imageUrl } = normalizeNotificationOptions(opts);
   const strData = finalData ? stringifyData(finalData) : undefined;
+  const logPayload = finalData ? stringifyData(finalData) : null;
 
   let sent = 0;
   let failed = 0;
@@ -551,6 +578,8 @@ export async function sendToAllCustomers(
               type: logParams.type,
               createdByType: logParams.createdByType,
               createdById: logParams.createdById,
+              scheduledNotificationId: logParams.scheduledNotificationId ?? null,
+              payload: logPayload,
             });
           }
         }
@@ -596,6 +625,8 @@ export async function sendToAllCustomers(
             type: logParams.type,
             createdByType: logParams.createdByType,
             createdById: logParams.createdById,
+            scheduledNotificationId: logParams.scheduledNotificationId ?? null,
+            payload: logPayload,
           });
         }
       }

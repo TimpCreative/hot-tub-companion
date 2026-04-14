@@ -92,6 +92,14 @@ router.use('/', adminContentRoutes);
 
 // Notifications (requires can_send_notifications)
 router.get(
+  '/notifications/automated',
+  adminNotificationsController.listAutomatedNotificationTemplates
+);
+router.get(
+  '/notifications/history',
+  adminNotificationsController.listNotificationHistory
+);
+router.get(
   '/notifications',
   adminNotificationsController.listNotifications
 );

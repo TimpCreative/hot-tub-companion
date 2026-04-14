@@ -73,11 +73,19 @@ export async function handleOrdersCreate(req: Request, res: Response): Promise<v
     const title = 'Order confirmed';
     const body = `Your order #${orderNum} has been placed.`;
     void notificationService
-      .sendToUser(matchedUserId, v.tenantId, title, body, undefined, 'orders', {
-        type: 'order',
-        createdByType: 'system',
-        createdById: 'shopify_webhook',
-      })
+      .sendToUser(
+        matchedUserId,
+        v.tenantId,
+        title,
+        body,
+        { linkType: 'order', linkId: shopifyOrderId },
+        'orders',
+        {
+          type: 'order',
+          createdByType: 'system',
+          createdById: 'shopify_webhook',
+        }
+      )
       .catch((err) => console.warn('[shopifyWebhook] order notification failed:', err));
   }
 

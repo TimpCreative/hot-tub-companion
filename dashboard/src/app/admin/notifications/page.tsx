@@ -39,6 +39,27 @@ interface ProductOption {
   title: string;
 }
 
+interface AutomatedTemplate {
+  id: string;
+  name: string;
+  description: string;
+  firesWhen: string;
+}
+
+interface HistoryRow {
+  id: string;
+  title: string;
+  body: string | null;
+  type: string;
+  category: string;
+  sentAt: string;
+  createdByType: string | null;
+  createdById: string | null;
+  scheduledNotificationId: string | null;
+  payload: Record<string, unknown> | null;
+  recipient: { userId: string; email: string | null; displayName: string } | null;
+}
+
 function formatDateTime(iso: string | null | undefined, timeZone: string): string {
   if (!iso) return '—';
   try {
@@ -99,6 +120,15 @@ export default function AdminNotificationsPage() {
   const [productSearching, setProductSearching] = useState(false);
   const [composeSending, setComposeSending] = useState(false);
 
+  const [mainTab, setMainTab] = useState<'push' | 'automated' | 'history'>('push');
+  const [automatedTemplates, setAutomatedTemplates] = useState<AutomatedTemplate[]>([]);
+  const [automatedLoading, setAutomatedLoading] = useState(false);
+  const [automatedErr, setAutomatedErr] = useState<string | null>(null);
+  const [historyItems, setHistoryItems] = useState<HistoryRow[]>([]);
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyErr, setHistoryErr] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -151,6 +181,77 @@ export default function AdminNotificationsPage() {
       cancelled = true;
     };
   }, [api, composeLinkType, productSearch]);
+
+  const loadAutomated = useCallback(async () => {
+    setAutomatedLoading(true);
+    setAutomatedErr(null);
+    try {
+      const res = (await api.get('/admin/notifications/automated')) as {
+        data?: { templates?: AutomatedTemplate[] };
+        error?: { message?: string };
+      };
+      if (res?.data?.templates) {
+        setAutomatedTemplates(res.data.templates);
+      } else if ((res as { error?: { message?: string } }).error) {
+        setAutomatedErr((res as { error?: { message?: string } }).error?.message ?? 'Failed to load');
+        setAutomatedTemplates([]);
+      }
+    } catch (e: unknown) {
+      const err = e as { error?: { message?: string }; message?: string };
+      setAutomatedErr(err?.error?.message ?? err?.message ?? 'Failed to load');
+      setAutomatedTemplates([]);
+    } finally {
+      setAutomatedLoading(false);
+    }
+  }, [api]);
+
+  const loadHistory = useCallback(
+    async (append: boolean, cursor?: string | null) => {
+      setHistoryLoading(true);
+      if (!append) setHistoryErr(null);
+      try {
+        const qs = new URLSearchParams();
+        qs.set('limit', '40');
+        if (cursor) qs.set('cursor', cursor);
+        const res = (await api.get(`/admin/notifications/history?${qs.toString()}`)) as {
+          data?: { items?: HistoryRow[]; nextCursor?: string | null };
+          error?: { message?: string };
+        };
+        if (res?.data?.items) {
+          setHistoryItems((prev) => (append ? [...prev, ...res.data!.items!] : res.data!.items!));
+          setHistoryCursor(res.data.nextCursor ?? null);
+        } else if ((res as { error?: { message?: string } }).error && !append) {
+          setHistoryErr((res as { error?: { message?: string } }).error?.message ?? 'Failed to load');
+          setHistoryItems([]);
+          setHistoryCursor(null);
+        }
+      } catch (e: unknown) {
+        const err = e as { error?: { message?: string }; message?: string };
+        if (!append) {
+          setHistoryErr(err?.error?.message ?? err?.message ?? 'Failed to load');
+          setHistoryItems([]);
+          setHistoryCursor(null);
+        }
+      } finally {
+        setHistoryLoading(false);
+      }
+    },
+    [api]
+  );
+
+  useEffect(() => {
+    if (mainTab !== 'automated') return;
+    void loadAutomated();
+  }, [mainTab, loadAutomated]);
+
+  useEffect(() => {
+    if (mainTab !== 'history') return;
+    setHistoryItems([]);
+    setHistoryCursor(null);
+    void loadHistory(false);
+    // Intentionally when switching to History tab only (avoid reload loops from loadHistory identity).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mainTab]);
 
   async function handleSchedule() {
     const title = composeTitle.trim();
@@ -243,7 +344,60 @@ export default function AdminNotificationsPage() {
 
   return (
     <div className="max-w-3xl">
-      <h2 className="text-2xl font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Push Notifications</h2>
+      <h2 className="text-2xl font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Notifications</h2>
+      <div className="flex flex-wrap gap-2 mb-6">
+        <button
+          type="button"
+          onClick={() => setMainTab('push')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium ${mainTab === 'push' ? 'text-white' : ''}`}
+          style={
+            mainTab === 'push'
+              ? { backgroundColor: primaryColor }
+              : {
+                  backgroundColor: 'var(--input-bg)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--input-border)',
+                }
+          }
+        >
+          Push &amp; schedule
+        </button>
+        <button
+          type="button"
+          onClick={() => setMainTab('automated')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium ${mainTab === 'automated' ? 'text-white' : ''}`}
+          style={
+            mainTab === 'automated'
+              ? { backgroundColor: primaryColor }
+              : {
+                  backgroundColor: 'var(--input-bg)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--input-border)',
+                }
+          }
+        >
+          Automated
+        </button>
+        <button
+          type="button"
+          onClick={() => setMainTab('history')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium ${mainTab === 'history' ? 'text-white' : ''}`}
+          style={
+            mainTab === 'history'
+              ? { backgroundColor: primaryColor }
+              : {
+                  backgroundColor: 'var(--input-bg)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--input-border)',
+                }
+          }
+        >
+          History
+        </button>
+      </div>
+
+      {mainTab === 'push' && (
+        <>
       <p className="mb-6" style={{ color: 'var(--text-secondary)' }}>
         Compose and schedule push notifications to customers with promotional preferences enabled.
       </p>
@@ -512,6 +666,83 @@ export default function AdminNotificationsPage() {
             </li>
           ))}
         </ul>
+      )}
+        </>
+      )}
+
+      {mainTab === 'automated' && (
+        <div>
+          <p className="mb-4" style={{ color: 'var(--text-secondary)' }}>
+            System and automated push types your app can send. These are informational (not editable in MVP).
+          </p>
+          {automatedErr && (
+            <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700">{automatedErr}</div>
+          )}
+          {automatedLoading ? (
+            <div className="py-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading...</div>
+          ) : (
+            <ul className="space-y-4">
+              {automatedTemplates.map((t) => (
+                <li key={t.id} className="card rounded-lg p-4">
+                  <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{t.name}</p>
+                  <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>{t.description}</p>
+                  <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+                    <strong>When:</strong> {t.firesWhen}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {mainTab === 'history' && (
+        <div>
+          <p className="mb-4" style={{ color: 'var(--text-secondary)' }}>
+            Successful deliveries to customers (same success-only rule as the app feed). Use for support questions.
+          </p>
+          {historyErr && (
+            <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700">{historyErr}</div>
+          )}
+          {historyLoading && historyItems.length === 0 ? (
+            <div className="py-8 text-center" style={{ color: 'var(--text-muted)' }}>Loading...</div>
+          ) : historyItems.length === 0 ? (
+            <div className="py-8 text-center" style={{ color: 'var(--text-muted)' }}>No delivery history yet.</div>
+          ) : (
+            <>
+              <ul className="space-y-3">
+                {historyItems.map((h) => (
+                  <li key={h.id} className="card rounded-lg p-4">
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{h.title}</p>
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {formatDateTime(h.sentAt, retailerTimezone)}
+                      </span>
+                    </div>
+                    {h.body ? (
+                      <p className="text-sm mt-1 line-clamp-3" style={{ color: 'var(--text-secondary)' }}>{h.body}</p>
+                    ) : null}
+                    <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+                      Type: {h.type} ({h.category})
+                      {h.recipient ? ` • ${h.recipient.displayName}` : ''}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              {historyCursor ? (
+                <div className="mt-6 flex justify-center">
+                  <Button
+                    type="button"
+                    onClick={() => void loadHistory(true, historyCursor)}
+                    disabled={historyLoading}
+                  >
+                    {historyLoading ? 'Loading...' : 'Load more'}
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
       )}
     </div>
   );

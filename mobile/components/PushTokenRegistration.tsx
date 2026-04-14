@@ -7,8 +7,9 @@
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
-import { AppState, AppStateStatus, Linking } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { navigateFromNotificationPayload } from '../lib/notificationDeepLink';
 import { registerPushToken } from '../lib/registerPushToken';
 
 function isStaffTenantAppLogin(user: { id: string } | null): boolean {
@@ -26,46 +27,8 @@ Notifications.setNotificationHandler({
 });
 
 function handleNotificationTap(data: Record<string, string> | null, router: ReturnType<typeof useRouter>) {
-  if (!data?.linkType || !router) return;
-  const linkType = String(data.linkType);
-  const linkId = data.linkId ? String(data.linkId) : '';
-
-  switch (linkType) {
-    case 'shop':
-      router.push('/(tabs)/shop');
-      break;
-    case 'product':
-      router.push(
-        linkId ? (`/(tabs)/shop/${encodeURIComponent(linkId)}` as const) : '/(tabs)/shop'
-      );
-      break;
-    case 'inbox':
-      router.push('/(tabs)/inbox');
-      break;
-    case 'dealer':
-      router.push('/(tabs)/dealer');
-      break;
-    case 'services':
-      router.push('/services');
-      break;
-    case 'home':
-      router.push('/(tabs)/home');
-      break;
-    case 'custom_url':
-      if (linkId && /^https?:\/\//i.test(linkId)) {
-        Linking.openURL(linkId);
-      }
-      break;
-    case 'maintenance_event':
-      router.push(
-        linkId
-          ? (`/(tabs)/maintenance-timeline?eventId=${encodeURIComponent(linkId)}` as const)
-          : '/(tabs)/maintenance-timeline'
-      );
-      break;
-    default:
-      break;
-  }
+  if (!data) return;
+  navigateFromNotificationPayload(router, data as Record<string, unknown>);
 }
 
 export function PushTokenRegistration() {

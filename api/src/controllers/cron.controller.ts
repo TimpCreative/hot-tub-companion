@@ -52,6 +52,7 @@ export async function dispatchNotifications(req: Request, res: Response): Promis
         type: 'promotional',
         createdByType: 'retailer_admin',
         createdById: String(createdById),
+        scheduledNotificationId: id,
       }
     );
 
